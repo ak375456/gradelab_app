@@ -67,6 +67,39 @@ enum CompositorResources {
         return built != nil
     }
 
+    /// Loads the creative looks a composited timeline will reference into the
+    /// SAME Metal context its compositor uses.
+    ///
+    /// The ordinary preview renderer owns a different `MetalContext`. Preparing
+    /// a look there is not enough once a second clip, transform or layer moves
+    /// playback onto `LayerCompositor`: its cache would keep returning the
+    /// identity texture and the selected LUT would appear to do nothing.
+    /// Parsing stays off both the main actor and AVFoundation's render queue.
+    @discardableResult
+    static func prepareLooks(
+        _ identifiers: Set<String>,
+        context supplied: MetalContext? = nil
+    ) async -> Bool {
+        guard !identifiers.isEmpty else { return true }
+        return await Task.detached(priority: .userInitiated) {
+            let context: MetalContext
+            if let supplied {
+                context = supplied
+            } else {
+                guard let bundle = try? shared(
+                    supplied: nil,
+                    colorSpace: CompositorWarmup.workingColorSpace
+                ) else { return false }
+                context = bundle.context
+            }
+            var preparedEveryLook = true
+            for identifier in identifiers {
+                if !context.luts.prepare(identifier) { preparedEveryLook = false }
+            }
+            return preparedEveryLook
+        }.value
+    }
+
     /// - Parameter supplied: a context the caller already owns — export and the
     ///   validator pass theirs. A supplied context is built fresh and never
     ///   cached, so a test with its own shader library cannot poison the

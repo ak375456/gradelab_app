@@ -160,4 +160,23 @@ enum TimecodeFormatter {
         }
         return String(format: "%02d:%02d", minutes, remainingSeconds)
     }
+
+    /// Editor timecode whose last field is a frame number, not milliseconds.
+    /// Fractional rates still use their conventional nominal counter (29.97
+    /// counts frames 00...29), which is the notation editors expect to see.
+    static func frameString(from seconds: Double, frameRate: Double?) -> String {
+        guard seconds.isFinite, seconds >= 0,
+              let frameRate, frameRate.isFinite, frameRate > 0 else {
+            return string(from: seconds, alwaysShowHours: true) + ":--"
+        }
+        let totalSeconds = Int(seconds.rounded(.down))
+        let hours = totalSeconds / 3_600
+        let minutes = (totalSeconds % 3_600) / 60
+        let wholeSeconds = totalSeconds % 60
+        let nominalRate = max(1, Int(frameRate.rounded()))
+        let fraction = seconds-Double(totalSeconds)
+        let frame = min(nominalRate-1, max(0, Int((fraction*frameRate + 0.000_001).rounded(.down))))
+        let frameWidth = max(2, String(nominalRate-1).count)
+        return String(format: "%02d:%02d:%02d:%0*d", hours, minutes, wholeSeconds, frameWidth, frame)
+    }
 }

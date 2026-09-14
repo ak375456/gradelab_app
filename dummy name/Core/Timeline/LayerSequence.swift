@@ -32,6 +32,13 @@ extension SequenceComposition {
         }
         let clips = try TimelineEditing.clips(in: project)
         guard project.timeline.duration > .zero, let cadence = project.canvas.frameDuration else { throw TimelineError.invalid("Add media before playback.") }
+        // The layer compositor has its own Metal context during preview, while
+        // export supplies the exporter's context. Load every referenced look
+        // into the context that will actually execute the grade before the
+        // first composition frame is requested.
+        let lookIdentifiers = Set(clips.compactMap { $0.gradeSettings.advanced?.lut })
+        _ = await CompositorResources.prepareLooks(lookIdentifiers, context: context)
+        try Task.checkCancellation()
         let composition = AVMutableComposition()
         var sources: [UUID: ExportSourceInfo] = [:]
         for asset in project.assets where clips.contains(where: { $0.assetID == asset.id }) {

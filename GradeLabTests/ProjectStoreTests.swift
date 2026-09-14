@@ -57,4 +57,44 @@ final class ProjectStoreTests: XCTestCase {
         XCTAssertTrue(thumbnailURL.path.hasPrefix(root.path))
         XCTAssertEqual(thumbnailURL.pathExtension, "jpg")
     }
+
+    func testLoadRepairsManagedURLsAfterTheAppContainerMoves() async throws {
+        let currentRoot = FileManager.default.temporaryDirectory
+            .appendingPathComponent("GradeLabCurrent-\(UUID().uuidString)", isDirectory: true)
+        defer { try? FileManager.default.removeItem(at: currentRoot) }
+        let imports = currentRoot.appendingPathComponent("Imports", isDirectory: true)
+        let thumbnails = currentRoot.appendingPathComponent("Thumbnails", isDirectory: true)
+        try FileManager.default.createDirectory(at: imports, withIntermediateDirectories: true)
+        try FileManager.default.createDirectory(at: thumbnails, withIntermediateDirectories: true)
+
+        let filename = "\(UUID().uuidString).mov"
+        let currentMedia = imports.appendingPathComponent(filename)
+        try Data("movie".utf8).write(to: currentMedia)
+        let currentThumbnail = thumbnails.appendingPathComponent("thumbnail.jpg")
+        try Data("jpeg".utf8).write(to: currentThumbnail)
+
+        let previousRoot = FileManager.default.temporaryDirectory
+            .appendingPathComponent("OldContainer", isDirectory: true)
+        var project = GradeProject(
+            sourceURL: previousRoot.appendingPathComponent("Imports/\(filename)"),
+            displayName: "Moved container",
+            metadata: makeMetadata()
+        )
+        project.thumbnailFileName = previousRoot
+            .appendingPathComponent("Thumbnails/thumbnail.jpg").path
+
+        let store = ProjectStore(rootURL: currentRoot)
+        try await store.save(project)
+        let loaded = try await store.loadProjects()
+        let repaired = try XCTUnwrap(loaded.first)
+
+        XCTAssertEqual(repaired.sourceURL.standardizedFileURL, currentMedia.standardizedFileURL)
+        XCTAssertEqual(repaired.thumbnailFileName, currentThumbnail.path)
+        XCTAssertTrue(FileManager.default.fileExists(atPath: repaired.sourceURL.path))
+
+        // The repair is written back, not held only in memory for this launch.
+        let stored = try String(contentsOf: currentRoot.appendingPathComponent("projects.json"), encoding: .utf8)
+        XCTAssertTrue(stored.contains(currentMedia.path))
+        XCTAssertFalse(stored.contains(previousRoot.path))
+    }
 }

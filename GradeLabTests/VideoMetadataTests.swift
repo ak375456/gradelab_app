@@ -34,6 +34,12 @@ final class VideoMetadataTests: XCTestCase {
         XCTAssertEqual(metadata.frameRateLabel, "60 FPS")
     }
 
+    func testEditorTimecodeUsesFramesRatherThanMilliseconds() {
+        XCTAssertEqual(TimecodeFormatter.frameString(from: 16.85, frameRate: 30), "00:00:16:25")
+        XCTAssertEqual(TimecodeFormatter.frameString(from: 5.04, frameRate: 25), "00:00:05:01")
+        XCTAssertEqual(TimecodeFormatter.frameString(from: 1.5, frameRate: nil), "00:00:01:--")
+    }
+
     func testRec709SupportIsExplicitAndConservative() {
         XCTAssertEqual(ColorPipelineSupport(metadata: makeMetadata()), .supported)
 

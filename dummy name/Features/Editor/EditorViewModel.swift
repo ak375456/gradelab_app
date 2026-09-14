@@ -15,6 +15,9 @@ final class EditorViewModel: ObservableObject, GradingModel {
 
     @Published private(set) var project: VideoProject
     @Published private(set) var selectedClipID: UUID?
+    /// The timeline can marquee-select several clips. `selectedClipID` remains
+    /// the primary selection for inspectors that edit one clip at a time.
+    @Published private(set) var selectedClipIDs: Set<UUID> = []
     @Published private(set) var selectedTransitionID: UUID?
     let playback: VideoPlaybackController
     let renderer: MetalVideoRenderer
@@ -170,8 +173,10 @@ final class EditorViewModel: ObservableObject, GradingModel {
         try TimelineTransitionEditing.reconcile(in: &project)
         try project.validate()
         let clips = try TimelineEditing.clips(in: project)
+        let initialSelection = clips.first?.id ?? project.timeline.items.first?.id
         self.project = project
-        selectedClipID = clips.first?.id ?? project.timeline.items.first?.id
+        selectedClipID = initialSelection
+        selectedClipIDs = Set(initialSelection.map { [$0] } ?? [])
         selectedTrackID = clips.first?.placement.trackID ?? project.timeline.items.first?.placement.trackID
         colorSupport = ColorPipelineSupport(metadata: project.metadata)
         playback = VideoPlaybackController(
@@ -466,6 +471,7 @@ final class EditorViewModel: ObservableObject, GradingModel {
         selectedTransitionID = id
         guard let transition = selectedTransition else { return }
         selectedClipID = nil
+        selectedClipIDs = []
         if let outgoing = project.timeline.videoClip(id: transition.outgoingClipID) {
             selectedTrackID = outgoing.placement.trackID
         }
@@ -533,10 +539,23 @@ final class EditorViewModel: ObservableObject, GradingModel {
     var selectedClip: VideoClip? { selectedClipID.flatMap { project.timeline.videoClip(id: $0) } }
     var selectedItem: TimelineItem? { selectedClipID.flatMap { project.timeline.item(id: $0) } }
     var selectedAudio: AudioClip? { selectedClipID.flatMap { project.timeline.audioClip(id: $0) } }
+    var selectedItems: [TimelineItem] {
+        project.timeline.items.filter { selectedClipIDs.contains($0.id) }
+    }
+    var selectedTextCount: Int {
+        selectedItems.reduce(into: 0) { count, item in if case .text = item { count += 1 } }
+    }
+    var selectionContainsOnlyText: Bool {
+        !selectedItems.isEmpty && selectedItems.allSatisfy { if case .text = $0 { true } else { false } }
+    }
     var hasMedia: Bool { project.timeline.duration > .zero }
     var canEditSelection: Bool {
-        guard let item = selectedItem else { return false }
-        return !isPreparingTimeline && !item.placement.isLocked && project.timeline.tracks.first(where: { $0.id == item.placement.trackID })?.isLocked == false
+        let items = selectedItems
+        guard !items.isEmpty else { return false }
+        return !isPreparingTimeline && items.allSatisfy { item in
+            !item.placement.isLocked &&
+                project.timeline.tracks.first(where: { $0.id == item.placement.trackID })?.isLocked == false
+        }
     }
     var audioSettings: EmbeddedAudio? {
         if let audio = selectedAudio {
@@ -654,15 +673,31 @@ final class EditorViewModel: ObservableObject, GradingModel {
         } catch { editError = error.localizedDescription }
     }
     var selectedText: TextClip? { if case .text(let clip) = selectedItem { return clip }; return nil }
+    /// Every visible text layer at the playhead, evaluated at that frame. The
+    /// canvas uses these bounds as alignment targets for the selected title.
+    var visibleEvaluatedTexts: [TextClip] {
+        let time = playheadTime
+        return project.timeline.items.compactMap { item in
+            guard case .text(let clip) = item,
+                  clip.placement.timelineStart <= time,
+                  let end = try? clip.placement.range.end,
+                  end > time else { return nil }
+            guard let local = clip.localTime(for: time) else { return clip }
+            return clip.evaluated(atLocal: local)
+        }
+    }
     /// `immediate` closes the undo entry at once, for discrete actions such as adding a
     /// keyframe. Continuous edits leave it open so a whole drag coalesces into one entry.
     func editText(_ label: String = "Text", immediate: Bool = false, _ edit: (inout TextClip) -> Void) {
-        guard canEditSelection, var clip = selectedText else { return }
+        guard canEditSelection, selectionContainsOnlyText else { return }
         do {
-            edit(&clip)
-            FontRegistry.shared.normalize(&clip.style)
             var candidate = project
-            try TextEditing.replace(clip.id, with: clip, in: &candidate)
+            for item in selectedItems {
+                guard case .text(var clip) = item else { continue }
+                edit(&clip)
+                FontRegistry.shared.normalize(&clip.style)
+                try TextEditing.replace(clip.id, with: clip, in: &candidate)
+            }
             try candidate.validate()
             guard candidate != project else { return }
             if gradeBaseline == nil { gradeBaseline = project; historyLabel = label }
@@ -962,11 +997,13 @@ final class EditorViewModel: ObservableObject, GradingModel {
             _ = try TimelineEditing.clips(in: after)
             guard before.timeline != after.timeline || before.canvas != after.canvas else {
                 selectedClipID = selection
+                selectedClipIDs = Set(selection.map { [$0] } ?? [])
                 return
             }
             after.updatedAt = .now
             history.record(name, before: before, after: after)
             project = after; selectedClipID = selection
+            selectedClipIDs = Set(selection.map { [$0] } ?? [])
             if let selection, let item = after.timeline.item(id: selection) { selectedTrackID = item.placement.trackID }
             if rebuildsSequence,
                before.timeline.tracks != after.timeline.tracks ||
@@ -1023,7 +1060,8 @@ final class EditorViewModel: ObservableObject, GradingModel {
     }
 
     var canSplit: Bool {
-        guard !isPreparingTimeline, let time = try? TimelineTime.seconds(timelineTime) else { return false }
+        guard selectedClipIDs.count == 1, !isPreparingTimeline,
+              let time = try? TimelineTime.seconds(timelineTime) else { return false }
         if selectedTrack?.kind == .audio { return AudioEditing.splitTarget(in: project, at: time, trackID: selectedTrackID) != nil }
         if selectedTrack?.kind == .text { return TextEditing.splitTarget(in: project, at: time, trackID: selectedTrackID) != nil }
         return TimelineEditing.splitTarget(in: project, at: time, trackID: selectedTrack?.id) != nil
@@ -1042,14 +1080,17 @@ final class EditorViewModel: ObservableObject, GradingModel {
               let id = TimelineEditing.splitTarget(in: project, at: time, trackID: selectedTrack?.id) else { return }
         commit("Split") { try TimelineEditing.split(id, at: TimelineTime.seconds(self.timelineTime), in: &$0) }
     }
-    func copyClip() { if let selectedItem { clipboard = selectedItem } }
+    func copyClip() { if selectedClipIDs.count == 1, let selectedItem { clipboard = selectedItem } }
     func deleteClip(cutting: Bool = false) {
         guard let id = selectedClipID else { return }
         let copy = selectedItem
+        let targets = cutting ? Set([id]) : selectedClipIDs
         commit(cutting ? "Cut" : "Delete") {
-            if $0.timeline.audioClip(id: id) != nil { try AudioEditing.replace(id, with: [], in: &$0) }
-            else if case .text = $0.timeline.item(id: id) { try TextEditing.delete(id, in: &$0) }
-            else { try TimelineEditing.deleteClosingGaps(id, in: &$0) }
+            for target in targets where $0.timeline.item(id: target) != nil {
+                if $0.timeline.audioClip(id: target) != nil { try AudioEditing.replace(target, with: [], in: &$0) }
+                else if case .text = $0.timeline.item(id: target) { try TextEditing.delete(target, in: &$0) }
+                else { try TimelineEditing.deleteClosingGaps(target, in: &$0) }
+            }
             return nil
         }
         if cutting, project.timeline.item(id: id) == nil { clipboard = copy }
@@ -1186,6 +1227,7 @@ final class EditorViewModel: ObservableObject, GradingModel {
             selectedTransitionID = nil
         }
         if selectedItem == nil { selectedClipID = project.timeline.items.first?.id }
+        selectedClipIDs = Set(selectedClipID.map { [$0] } ?? [])
         selectedTrackID = selectedItem?.placement.trackID
         rebuildSequence()
     }
@@ -1197,6 +1239,7 @@ final class EditorViewModel: ObservableObject, GradingModel {
             selectedTransitionID = nil
         }
         if selectedItem == nil { selectedClipID = project.timeline.items.first?.id }
+        selectedClipIDs = Set(selectedClipID.map { [$0] } ?? [])
         selectedTrackID = selectedItem?.placement.trackID
         rebuildSequence()
     }
@@ -1270,7 +1313,7 @@ final class EditorViewModel: ObservableObject, GradingModel {
     }
 
     var timelineTime: Double {
-        max(0, min(project.timeline.duration.seconds, playback.currentTime))
+        max(0, min(project.timeline.duration.seconds, playback.maximumSeekTime, playback.currentTime))
     }
 
     func selectClip(_ selected: Bool) {
@@ -1286,11 +1329,30 @@ final class EditorViewModel: ObservableObject, GradingModel {
         isDrawingMask = false
         if !availablePanels.contains(selectedPanel) { selectedPanel = .light }
         selectedClipID = id
+        selectedClipIDs = Set(id.map { [$0] } ?? [])
         if let clip = selectedItem { selectedTrackID = clip.placement.trackID }
         if let clip = selectedItem, seek, !isPreparingTimeline,
            timelineTime < clip.placement.timelineStart.seconds || timelineTime >= ((try? clip.placement.range.end.seconds) ?? 0) {
             playback.seekPrecisely(to: clip.placement.timelineStart.cmTime)
         }
+    }
+
+    /// Makes a marquee selection without seeking away from the frame being
+    /// inspected. A stable timeline order chooses the primary inspector item.
+    func selectClips(_ ids: Set<UUID>) {
+        selectedTransitionID = nil
+        flushGradeHistory()
+        selectedMaskID = nil
+        maskMatteID = nil
+        isDrawingMask = false
+        let valid = Set(project.timeline.items.lazy.map(\.id).filter(ids.contains))
+        selectedClipIDs = valid
+        if let selectedClipID, valid.contains(selectedClipID) {
+            self.selectedClipID = selectedClipID
+        } else {
+            selectedClipID = project.timeline.items.first(where: { valid.contains($0.id) })?.id
+        }
+        selectedTrackID = selectedItem?.placement.trackID
     }
 
     func seekTimeline(to seconds: Double, finishing: Bool) {
@@ -1672,7 +1734,7 @@ final class EditorViewModel: ObservableObject, GradingModel {
         var advanced = settings.advanced ?? .neutral
         advanced.normalizeCollections()
         if let asset {
-            renderer.prepareLook(asset.id)
+            prepareLookForRendering(asset.id)
             advanced.lut = asset.id
             if advanced.lutIntensity == nil { advanced.lutIntensity = 100 }
         } else {
@@ -1680,6 +1742,19 @@ final class EditorViewModel: ObservableObject, GradingModel {
             advanced.lutIntensity = nil
         }
         settings.advanced = advanced == .neutral ? nil : advanced
+    }
+
+    /// Direct playback and composited playback use separate Metal contexts.
+    /// Prepare both, then repaint the paused composition once its LUT is ready.
+    private func prepareLookForRendering(_ identifier: String) {
+        renderer.prepareLook(identifier)
+        guard layerState != nil else { return }
+        Task { [weak self] in
+            guard await CompositorResources.prepareLooks([identifier]),
+                  let self,
+                  self.settings.advanced?.lut == identifier else { return }
+            self.synchronizeRenderer()
+        }
     }
 
     /// Returns one tool's BASE values to neutral.
@@ -1976,7 +2051,7 @@ final class EditorViewModel: ObservableObject, GradingModel {
             if availableLooks.contains(where: { $0.id == identifier }) {
                 // Load the texture first so the first repainted frame already
                 // carries the look rather than flashing without it.
-                renderer.prepareLook(identifier)
+                prepareLookForRendering(identifier)
             } else {
                 // Applying the rest is more useful than refusing outright, but
                 // it has to be said plainly, and no other look is put in its

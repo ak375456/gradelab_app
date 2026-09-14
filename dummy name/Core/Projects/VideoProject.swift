@@ -47,6 +47,38 @@ struct VideoProject: Codable, Identifiable, Equatable, Sendable {
     var metadata: VideoMetadata { primaryAsset.videoMetadata! }
     mutating func addAsset(_ asset: ProjectMediaAsset) { assets.append(asset) }
 
+    /// Repairs app-owned absolute paths after iOS moves the app's data
+    /// container (which commonly happens when installing a new build from
+    /// Xcode). The files move with the container, but an absolute URL stored in
+    /// the project document still contains the previous container UUID.
+    ///
+    /// Only a missing path with a same-named file in GradeLab's current managed
+    /// folder is changed, so this never substitutes unrelated external media.
+    @discardableResult
+    mutating func relocateManagedFiles(to rootURL: URL, fileManager: FileManager = .default) -> Bool {
+        var changed = false
+        let imports = rootURL.appendingPathComponent("Imports", isDirectory: true)
+        for index in assets.indices where !fileManager.fileExists(atPath: assets[index].url.path) {
+            let candidate = imports.appendingPathComponent(assets[index].url.lastPathComponent)
+            if fileManager.fileExists(atPath: candidate.path) {
+                assets[index].url = candidate
+                changed = true
+            }
+        }
+
+        if let thumbnailFileName,
+           !fileManager.fileExists(atPath: thumbnailFileName) {
+            let candidate = rootURL
+                .appendingPathComponent("Thumbnails", isDirectory: true)
+                .appendingPathComponent(URL(fileURLWithPath: thumbnailFileName).lastPathComponent)
+            if fileManager.fileExists(atPath: candidate.path) {
+                self.thumbnailFileName = candidate.path
+                changed = true
+            }
+        }
+        return changed
+    }
+
     /// Whether the timeline draws on anything but the primary source.
     ///
     /// Asked of the CLIPS, not of `assets`, because deleting a clip never

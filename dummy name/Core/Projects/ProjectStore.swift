@@ -27,7 +27,18 @@ actor ProjectStore {
         guard let database = try ProjectLibraryStorage.load(
             Database.self, at: databaseURL, decoder: decoder, fileManager: fileManager
         ) else { return [] }
-        return database.projects.sorted { $0.updatedAt > $1.updatedAt }
+        var projects = database.projects
+        var repairedContainerPaths = false
+        for index in projects.indices {
+            repairedContainerPaths = projects[index].relocateManagedFiles(
+                to: rootURL,
+                fileManager: fileManager
+            ) || repairedContainerPaths
+        }
+        // Persist the repair immediately. Otherwise a project opens for this
+        // session but fails again if the app is stopped before its next edit.
+        if repairedContainerPaths { try persist(projects) }
+        return projects.sorted { $0.updatedAt > $1.updatedAt }
     }
 
     /// Every media file the stored projects still point at.

@@ -340,7 +340,14 @@ class LayerCompositor: NSObject, AVVideoCompositing, @unchecked Sendable {
                 // Single conversion from composition time to clip-local animation time.
                 // Preview and export reach this same line, so they cannot disagree.
                 let clip = (try? TimelineTime(request.compositionTime)).map { authored.evaluated(at: $0) } ?? authored
-                if let text = TextRenderer.image(clip, canvas: bounds.size) {
+                if let text = TextRenderer.image(
+                    clip,
+                    canvas: bounds.size,
+                    authoredCanvas: SequenceComposition.previewRenderSize(
+                        width: project.canvas.width,
+                        height: project.canvas.height
+                    )
+                ) {
                     let filters: [VisualBlendMode: String] = [.normal: "CISourceOverCompositing", .multiply: "CIMultiplyBlendMode", .screen: "CIScreenBlendMode", .overlay: "CIOverlayBlendMode", .softLight: "CISoftLightBlendMode", .hardLight: "CIHardLightBlendMode", .darken: "CIDarkenBlendMode", .lighten: "CILightenBlendMode"]
                     result = text.applyingFilter(filters[clip.blendMode]!, parameters: [kCIInputBackgroundImageKey: result]).cropped(to: bounds)
                 }
@@ -605,7 +612,14 @@ class LayerCompositor: NSObject, AVVideoCompositing, @unchecked Sendable {
                 guard relative >= .zero, relative < authored.placement.duration.cmTime else { continue }
                 let clip = (try? TimelineTime(request.compositionTime)).map { authored.evaluated(at: $0) } ?? authored
                 try Self.requireNormalBlend(clip.blendMode)
-                guard let image = TextRenderer.image(clip, canvas: canvasSize) else { continue }
+                guard let image = TextRenderer.image(
+                    clip,
+                    canvas: canvasSize,
+                    authoredCanvas: SequenceComposition.previewRenderSize(
+                        width: project.canvas.width,
+                        height: project.canvas.height
+                    )
+                ) else { continue }
                 let buffer = try renderedSDRLayer(image, size: canvasSize, ci: ci)
                 guard let texture = metal.packedTexture(from: buffer, pixelFormat: .bgra8Unorm) else {
                     throw GradeLabError.rendererInitializationFailed
@@ -1094,7 +1108,14 @@ extension LayerCompositor {
                 let relative = CMTimeSubtract(request.compositionTime, authored.placement.timelineStart.cmTime)
                 guard relative >= .zero, relative < authored.placement.duration.cmTime else { continue }
                 let clip = authored.evaluated(at: time)
-                guard let text = TextRenderer.image(clip, canvas: size) else { continue }
+                guard let text = TextRenderer.image(
+                    clip,
+                    canvas: size,
+                    authoredCanvas: SequenceComposition.previewRenderSize(
+                        width: project.canvas.width,
+                        height: project.canvas.height
+                    )
+                ) else { continue }
                 let buffer = try renderedSDRLayer(text, size: size, ci: ci)
                 try image(buffer, transform: .identity, opacity: 1, mask: nil,
                     program: GradeProgram(settings: .neutral, bypass: true, aspect: size.maskAspect), to: surfaces[2])

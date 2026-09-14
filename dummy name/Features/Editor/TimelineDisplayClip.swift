@@ -37,6 +37,62 @@ struct TimelineDisplayClip: Identifiable {
 }
 
 extension TimelineEditing {
+    /// Magnetic anchors shared by clip moves and edge trims. Passing a track
+    /// limits cuts to that row; text passes no track so its edges can meet the
+    /// picture edits underneath it.
+    private static func magnetBoundaries(
+        clips: [TimelineDisplayClip],
+        markers: [TimelineMarker],
+        excluding clipID: UUID?,
+        trackID: UUID?,
+        playhead: Double?
+    ) -> [Double] {
+        var boundaries = [0.0]
+        if let playhead { boundaries.append(playhead) }
+        boundaries += markers.map { $0.time.seconds }
+        for clip in clips where clip.id != clipID && (trackID == nil || clip.placement.trackID == trackID) {
+            boundaries.append(clip.placement.timelineStart.seconds)
+            if let end = try? clip.placement.range.end.seconds { boundaries.append(end) }
+        }
+        return boundaries.filter { $0 >= 0 && $0.isFinite }
+    }
+
+    /// Snaps one trim edge to a playhead, marker, or clip cut.
+    static func snapClipEdge(
+        _ seconds: Double,
+        clips: [TimelineDisplayClip],
+        markers: [TimelineMarker],
+        excluding clipID: UUID? = nil,
+        trackID: UUID? = nil,
+        playhead: Double? = nil,
+        tolerance: Double
+    ) -> Double {
+        let boundaries = magnetBoundaries(clips: clips, markers: markers, excluding: clipID,
+                                           trackID: trackID, playhead: playhead)
+        guard let nearest = boundaries.min(by: { abs($0-seconds) < abs($1-seconds) }),
+              abs(nearest-seconds) <= tolerance else { return seconds }
+        return nearest
+    }
+
+    /// Snaps either end of a moving layer. Returning the corresponding start
+    /// lets a title's head or tail attach cleanly to a cut or marker.
+    static func snapMovingClipStart(
+        _ seconds: Double,
+        duration: Double,
+        clips: [TimelineDisplayClip],
+        markers: [TimelineMarker],
+        excluding clipID: UUID,
+        playhead: Double? = nil,
+        tolerance: Double
+    ) -> Double {
+        let boundaries = magnetBoundaries(clips: clips, markers: markers, excluding: clipID,
+                                           trackID: nil, playhead: playhead)
+        let candidates = boundaries + boundaries.map { $0-duration }
+        guard let nearest = candidates.filter({ $0 >= 0 }).min(by: { abs($0-seconds) < abs($1-seconds) }),
+              abs(nearest-seconds) <= tolerance else { return seconds }
+        return nearest
+    }
+
     /// The playhead magnet. `keyframes` are the selected clip's keyframe times, so scrubbing
     /// lands exactly on a keyframe the same way it lands on a cut or a marker.
     static func snapPlayhead(_ seconds: Double, clips: [TimelineDisplayClip], markers: [TimelineMarker],

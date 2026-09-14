@@ -545,5 +545,9 @@ final class VideoPlaybackController: ObservableObject {
         SeekBounds(minimumTime: minimumTime, duration: duration, frameDuration: frameDuration)
     }
 
+    /// The last position that can display a real frame. UI playheads use this
+    /// instead of the duration boundary, which lies just after the footage.
+    var maximumSeekTime: Double { seekBounds.lastFrameTime }
+
     private func clampedTime(_ seconds: Double) -> Double { seekBounds.clamped(seconds) }
 }

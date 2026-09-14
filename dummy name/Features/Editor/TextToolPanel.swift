@@ -17,11 +17,19 @@ struct TextToolPanel: View {
     private let sections = ["Style", "Font", "Format", "Transform", "Appearance"]
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
-            Button(action: editContent) {
-                HStack { Text(model.selectedText.flatMap { $0.text.isEmpty ? nil : $0.text } ?? "Enter text").lineLimit(2); Spacer(); Image(systemName: "pencil") }
-                    .font(.subheadline).padding(12).frame(maxWidth: .infinity, alignment: .leading)
-                    .background(.white.opacity(0.06), in: RoundedRectangle(cornerRadius: 10))
-            }.accessibilityLabel("Edit text")
+            if model.selectedTextCount > 1 {
+                Label("\(model.selectedTextCount) text layers selected", systemImage: "square.stack.3d.up.fill")
+                    .font(.subheadline.weight(.semibold))
+                    .foregroundStyle(AppColors.accent)
+                    .padding(12).frame(maxWidth: .infinity, alignment: .leading)
+                    .background(AppColors.accent.opacity(0.1), in: RoundedRectangle(cornerRadius: 10))
+            } else {
+                Button(action: editContent) {
+                    HStack { Text(model.selectedText.flatMap { $0.text.isEmpty ? nil : $0.text } ?? "Enter text").lineLimit(2); Spacer(); Image(systemName: "pencil") }
+                        .font(.subheadline).padding(12).frame(maxWidth: .infinity, alignment: .leading)
+                        .background(.white.opacity(0.06), in: RoundedRectangle(cornerRadius: 10))
+                }.accessibilityLabel("Edit text")
+            }
             tabs(sections, selection: $section)
             if let clip = model.selectedText {
                 switch section {
@@ -34,9 +42,37 @@ struct TextToolPanel: View {
                         }
                     }
                 case "Font":
-                    Button { fonts = true } label: {
-                        HStack { Text(FontRegistry.shared.familyName(clip.style.fontName)); Spacer(); Image(systemName: "chevron.down") }.frame(minHeight: 44)
-                    }.accessibilityLabel("Choose font")
+                    HStack(spacing: 8) {
+                        Button { fonts.toggle() } label: {
+                            HStack {
+                                Text(FontRegistry.shared.familyName(clip.style.fontName))
+                                    .font(clip.style.fontName.map { .custom($0, size: 16) } ?? .body)
+                                    .lineLimit(1)
+                                Spacer()
+                                Image(systemName: fonts ? "chevron.up" : "chevron.down")
+                                    .font(.caption.weight(.semibold))
+                            }
+                            .padding(.horizontal, 12).frame(maxWidth: .infinity, minHeight: 44)
+                            .background(.white.opacity(0.07), in: RoundedRectangle(cornerRadius: 9))
+                        }
+                        .accessibilityLabel(fonts ? "Close font menu" : "Choose font")
+                        .popover(isPresented: $fonts, attachmentAnchor: .rect(.bounds), arrowEdge: .top) {
+                            FontMenu(selected: model.selectedText?.style.fontName) { name in
+                                model.editText("Font") { $0.style.fontName = name }
+                            }
+                            .presentationCompactAdaptation(.popover)
+                        }
+                        VStack(spacing: 0) {
+                            Button { cycleFont(-1) } label: {
+                                Image(systemName: "chevron.up").frame(width: 38, height: 22)
+                            }.accessibilityLabel("Previous font")
+                            Button { cycleFont(1) } label: {
+                                Image(systemName: "chevron.down").frame(width: 38, height: 22)
+                            }.accessibilityLabel("Next font")
+                        }
+                        .font(.caption.weight(.bold))
+                        .background(.white.opacity(0.07), in: RoundedRectangle(cornerRadius: 9))
+                    }
                     Button { importer = true } label: {
                         HStack(spacing: 6) {
                             Label("Import TTF font", systemImage: "square.and.arrow.down")
@@ -123,7 +159,6 @@ struct TextToolPanel: View {
             Button("Remove All Animation", role: .destructive) { model.removeAllAnimation(); activeProperty = nil; selectedKeyframe = nil }
             Button("Cancel", role: .cancel) {}
         } message: { Text("Every animated property keeps the value you can see now.") }
-        .sheet(isPresented: $fonts) { FontBrowser(selected: model.selectedText?.style.fontName) { name in model.editText { $0.style.fontName = name } }.presentationDetents([.medium, .large]) }
         .fileImporter(isPresented: $importer, allowedContentTypes: [UTType(filenameExtension: "ttf") ?? .font]) { result in
             do { let name = try FontRegistry.shared.importFont(result.get()); model.editText { $0.style.fontName = name } }
             catch { fontError = error.localizedDescription }
@@ -132,6 +167,24 @@ struct TextToolPanel: View {
     }
     private var keyframeHeader: some View {
         KeyframeSectionHeader(model: model, help: $keyframeHelp, confirmsRemoveAll: $confirmsRemoveAll)
+    }
+
+    private func cycleFont(_ direction: Int) {
+        var choices: [String?] = [nil]
+        choices.append(contentsOf: FontRegistry.shared.entries().map { Optional($0.id) })
+        guard !choices.isEmpty else { return }
+        let selected = model.selectedText?.style.fontName
+        let current = choices.firstIndex { choice in
+            switch (choice, selected) {
+            case (nil, nil): return true
+            case (.some(let choice), .some(let selected)):
+                return FontRegistry.shared.familyName(choice) == FontRegistry.shared.familyName(selected)
+            default: return false
+            }
+        } ?? 0
+        let next = (current + direction + choices.count) % choices.count
+        model.editText("Font", immediate: true) { $0.style.fontName = choices[next] }
+        UISelectionFeedbackGenerator().selectionChanged()
     }
 
     private func animated(_ property: AnimatableProperty, _ range: ClosedRange<Double>) -> some View {
@@ -200,32 +253,59 @@ struct TextToolPanel: View {
     }
 }
 
-private struct FontBrowser: View {
+private struct FontMenu: View {
     let selected: String?
     let choose: (String?) -> Void
     @Environment(\.dismiss) private var dismiss
     @State private var query = ""
     @State private var entries: [FontRegistry.Entry] = []
     var body: some View {
-        NavigationStack {
-            List {
-                Button { choose(nil); dismiss() } label: { HStack { Text("System"); Spacer(); if selected == nil { Image(systemName: "checkmark") } } }
-                ForEach(entries.filter { query.isEmpty || $0.name.localizedCaseInsensitiveContains(query) || $0.family.localizedCaseInsensitiveContains(query) }) { font in
+        VStack(spacing: 10) {
+            HStack(spacing: 8) {
+                Image(systemName: "magnifyingglass").foregroundStyle(.secondary)
+                TextField("Search fonts", text: $query)
+                    .textInputAutocapitalization(.never)
+                    .autocorrectionDisabled()
+            }
+            .padding(.horizontal, 12).frame(height: 42)
+            .background(.black.opacity(0.28), in: RoundedRectangle(cornerRadius: 9))
+            ScrollView {
+                LazyVStack(spacing: 4) {
+                    fontRow(name: "System", fontName: nil, needsPro: false, isSelected: selected == nil)
+                    ForEach(entries.filter { query.isEmpty || $0.name.localizedCaseInsensitiveContains(query) || $0.family.localizedCaseInsensitiveContains(query) }) { font in
                     // Every face stays choosable: the point is to see the title
                     // set in it. The badge says which ones need Pro to export.
                     let needsPro = !ProStore.shared.hasPro
                         && ProAccessPolicy.fontRequiresPro(family: font.family)
-                    Button { choose(font.id); dismiss() } label: {
-                        HStack {
-                            Text(font.name).font(.custom(font.id, size: 17))
-                            if needsPro { ProBadge(compact: true) }
-                            Spacer()
-                            if selected != nil && FontRegistry.shared.familyName(selected) == font.family { Image(systemName: "checkmark") }
-                        }
+                        fontRow(name: font.name, fontName: font.id, needsPro: needsPro,
+                                isSelected: selected != nil && FontRegistry.shared.familyName(selected) == font.family)
                     }
                 }
-            }.searchable(text: $query).navigationTitle("Fonts").navigationBarTitleDisplayMode(.inline)
-                .toolbar { Button("Done") { dismiss() } }.task { entries = FontRegistry.shared.entries() }
-        }.preferredColorScheme(.dark)
+            }
+        }
+        .padding(12).frame(width: 330, height: 440)
+        .background(AppColors.surface)
+        .task { entries = FontRegistry.shared.entries() }
+        .preferredColorScheme(.dark)
+    }
+
+    private func fontRow(name: String, fontName: String?, needsPro: Bool, isSelected: Bool) -> some View {
+        Button {
+            if isSelected { dismiss() }
+            else { choose(fontName) }
+        } label: {
+            HStack(spacing: 8) {
+                Text(name).font(fontName.map { .custom($0, size: 18) } ?? .body)
+                    .lineLimit(1)
+                if needsPro { ProBadge(compact: true) }
+                Spacer()
+                if isSelected { Image(systemName: "checkmark").foregroundStyle(AppColors.accent) }
+            }
+            .padding(.horizontal, 10).frame(minHeight: 42)
+            .background(isSelected ? AppColors.accent.opacity(0.12) : .clear,
+                        in: RoundedRectangle(cornerRadius: 8))
+            .contentShape(Rectangle())
+        }
+        .accessibilityAddTraits(isSelected ? .isSelected : [])
     }
 }

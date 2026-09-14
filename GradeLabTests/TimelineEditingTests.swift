@@ -106,6 +106,37 @@ final class TimelineEditingTests: XCTestCase {
         XCTAssertEqual(project.timeline.videoClip(id: first)?.placement.duration, project.canvas.frameDuration)
         _ = try TimelineEditing.clips(in: project)
     }
+
+    func testTextLayerMagnetsToVideoCutsAndMarkers() throws {
+        var project = project()
+        let first = project.timeline.firstVideoClip!.id
+        _ = try TimelineEditing.split(first, at: .seconds(4), in: &project)
+        let textTrackID = UUID()
+        let text = TextClip(
+            placement: .init(id: UUID(), trackID: textTrackID,
+                             timelineStart: try .seconds(1), duration: try .seconds(2)),
+            text: "Title"
+        )
+        project.timeline.tracks.insert(.init(id: textTrackID, name: "Text", kind: .text, items: [.text(text)]), at: 0)
+        project.timeline.markers.append(.init(id: UUID(), time: try .seconds(8)))
+        let display = project.timeline.items.compactMap(TimelineDisplayClip.init)
+
+        XCTAssertEqual(
+            TimelineEditing.snapClipEdge(3.82, clips: display, markers: project.timeline.markers,
+                                         excluding: text.id, tolerance: 0.25),
+            4,
+            accuracy: 0.0001
+        )
+        XCTAssertEqual(
+            TimelineEditing.snapMovingClipStart(5.82, duration: 2, clips: display,
+                                                 markers: project.timeline.markers,
+                                                 excluding: text.id, tolerance: 0.25),
+            6,
+            accuracy: 0.0001,
+            "The title tail should attach to the marker at eight seconds."
+        )
+    }
+
     private func project() -> VideoProject {
         VideoProject(sourceURL: URL(fileURLWithPath: "/tmp/source.mov"), displayName: "Editing",
                      metadata: makeVideoMetadata(durationSeconds: 10))

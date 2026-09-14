@@ -27,9 +27,17 @@ struct TextCanvasControls: View {
             // Geometry uses the EVALUATED clip so the selection frame sits on the glyphs
             // you can actually see while animation is driving the frame.
             if let clip = model.evaluatedText, model.canEditSelection,
+               model.selectedClipIDs.count == 1,
                model.timelineTime >= clip.placement.timelineStart.seconds,
                model.timelineTime < ((try? clip.placement.range.end.seconds) ?? 0) {
-                let canvas = CGSize(width: model.project.canvas.width, height: model.project.canvas.height)
+                // Text is authored in the base preview's coordinate system.
+                // Using the full 4K canvas here made the selection frame half
+                // the size of the visible text even though the text itself
+                // looked right in the editor.
+                let canvas = SequenceComposition.previewRenderSize(
+                    width: model.project.canvas.width,
+                    height: model.project.canvas.height
+                )
                 let fit = min(view.size.width/canvas.width, view.size.height/canvas.height)
                 let offset = CGPoint(x: (view.size.width-canvas.width*fit)/2, y: (view.size.height-canvas.height*fit)/2)
                 let layout = TextRenderer.layout(clip, canvas: canvas)
@@ -57,11 +65,20 @@ struct TextCanvasControls: View {
                         // screen rather than an outdated base value.
                         if origin == nil { origin = clip.transform; model.playback.pause() }
                         guard let origin else { return }
-                        let x = snap(origin.positionX+value.translation.width/(canvas.width*fit), to: Self.positionStops, tolerance: Self.positionTolerance)
-                        let y = snap(origin.positionY+value.translation.height/(canvas.height*fit), to: Self.positionStops, tolerance: Self.positionTolerance)
-                        report(x: x.stop, y: y.stop)
-                        model.setAnimatableValue(.positionX, .number(x.value))
-                        model.setAnimatableValue(.positionY, .number(y.value))
+                        let rawX = origin.positionX+value.translation.width/(canvas.width*fit)
+                        let rawY = origin.positionY+value.translation.height/(canvas.height*fit)
+                        let aligned = align(clip: clip, x: rawX, y: rawY, canvas: canvas,
+                                            screenScale: fit,
+                                            others: model.visibleEvaluatedTexts.filter { $0.id != clip.id })
+                        let x = aligned.xGuide == nil
+                            ? snap(rawX, to: Self.positionStops, tolerance: Self.positionTolerance)
+                            : (aligned.x, aligned.xGuide)
+                        let y = aligned.yGuide == nil
+                            ? snap(rawY, to: Self.positionStops, tolerance: Self.positionTolerance)
+                            : (aligned.y, aligned.yGuide)
+                        report(x: x.1, y: y.1)
+                        model.setAnimatableValue(.positionX, .number(x.0))
+                        model.setAnimatableValue(.positionY, .number(y.0))
                     }.onEnded { _ in origin = nil; guides = (nil, nil); model.flushGradeHistory() })
                     .simultaneousGesture(MagnifyGesture().onChanged { value in
                         if initialScale == nil { initialScale = clip.transform.scale; model.playback.pause() }
@@ -107,6 +124,66 @@ struct TextCanvasControls: View {
     private func snap(_ value: Double, to stops: [Double], tolerance: Double) -> (value: Double, stop: Double?) {
         guard let nearest = stops.min(by: { abs($0-value) < abs($1-value) }), abs(nearest-value) <= tolerance else { return (value, nil) }
         return (nearest, nearest)
+    }
+
+    /// Aligns the moving layer's left/centre/right and top/centre/bottom to the
+    /// same anchors on every other title visible at this frame. Bounds include
+    /// scale and rotation, matching the selection outlines users line up by eye.
+    private func align(clip: TextClip, x: Double, y: Double, canvas: CGSize,
+                       screenScale: CGFloat, others: [TextClip])
+        -> (x: Double, y: Double, xGuide: Double?, yGuide: Double?) {
+        var proposed = clip
+        proposed.transform.positionX = x
+        proposed.transform.positionY = y
+        let moving = screenBounds(of: proposed, canvas: canvas)
+        let xAnchors = [moving.minX, moving.midX, moving.maxX]
+        let yAnchors = [moving.minY, moving.midY, moving.maxY]
+        let tolerance = 12 / max(screenScale, 0.001)
+        var bestX: (distance: CGFloat, delta: CGFloat, guide: CGFloat)?
+        var bestY: (distance: CGFloat, delta: CGFloat, guide: CGFloat)?
+        for other in others {
+            let bounds = screenBounds(of: other, canvas: canvas)
+            for source in xAnchors {
+                for target in [bounds.minX, bounds.midX, bounds.maxX] {
+                    let delta = target-source, distance = abs(delta)
+                    if distance <= tolerance && (bestX == nil || distance < bestX!.distance) {
+                        bestX = (distance, delta, target)
+                    }
+                }
+            }
+            for source in yAnchors {
+                for target in [bounds.minY, bounds.midY, bounds.maxY] {
+                    let delta = target-source, distance = abs(delta)
+                    if distance <= tolerance && (bestY == nil || distance < bestY!.distance) {
+                        bestY = (distance, delta, target)
+                    }
+                }
+            }
+        }
+        return (
+            x + Double(bestX?.delta ?? 0) / Double(canvas.width),
+            y + Double(bestY?.delta ?? 0) / Double(canvas.height),
+            bestX.map { Double($0.guide / canvas.width) },
+            bestY.map { Double($0.guide / canvas.height) }
+        )
+    }
+
+    /// Axis-aligned screen-space bounds in canvas units (origin at top-left).
+    private func screenBounds(of clip: TextClip, canvas: CGSize) -> CGRect {
+        let layout = TextRenderer.layout(clip, canvas: canvas)
+        let bounds = layout.fittedBounds.insetBy(dx: -max(6, clip.strokeWidth), dy: -6)
+        let transform = TextRenderer.placement(clip, bounds: layout.fittedBounds, canvas: canvas)
+        let points = [
+            CGPoint(x: bounds.minX, y: bounds.minY), CGPoint(x: bounds.maxX, y: bounds.minY),
+            CGPoint(x: bounds.maxX, y: bounds.maxY), CGPoint(x: bounds.minX, y: bounds.maxY)
+        ].map { point -> CGPoint in
+            let placed = point.applying(transform)
+            return CGPoint(x: placed.x, y: canvas.height-placed.y)
+        }
+        let xs = points.map(\.x), ys = points.map(\.y)
+        return CGRect(x: xs.min() ?? 0, y: ys.min() ?? 0,
+                      width: (xs.max() ?? 0)-(xs.min() ?? 0),
+                      height: (ys.max() ?? 0)-(ys.min() ?? 0))
     }
     private func report(x: Double?, y: Double?) {
         if x != guides.x || y != guides.y {

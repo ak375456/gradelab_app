@@ -17,7 +17,7 @@ struct EditorView: View {
     @State private var textAppearance = "Fill"
     @State private var typingText = false
     @FocusState private var textFocused: Bool
-    @State private var keyboardVisible = false
+    @State private var keyboardOverlap: CGFloat = 0
     @State private var clipOptions = false
     @StateObject private var filmstrip = FilmstripStore()
     @State private var assetFrames: [UUID: [UIImage]] = [:]
@@ -69,10 +69,7 @@ struct EditorView: View {
         GeometryReader { geometry in
             VStack(spacing: 0) {
                 header
-                if typingText {
-                    preview.frame(maxWidth: .infinity, maxHeight: .infinity)
-                    textInputDock
-                } else if geometry.size.width > geometry.size.height {
+                if geometry.size.width > geometry.size.height {
                     // Wide layout: preview and timeline on the left, tools on
                     // the right, with a draggable edge on each boundary.
                     HStack(spacing: 0) {
@@ -92,25 +89,28 @@ struct EditorView: View {
                                 ScopePanel(model: model, isRegularWidth: true,
                                            traceHeight: scopeHeight(geometry.size, regular: true))
                             }
-                            if !keyboardVisible {
-                                let showsTimeline = !colorMode && !transforms && !canvasTool && !speedTool
-                                if showsTimeline {
-                                    WorkspaceDivider(
-                                        orientation: .horizontal,
-                                        label: "Resize the timeline",
-                                        onResize: { delta in
-                                            // The handle sits above the bottom
-                                            // block, so dragging up gives the
-                                            // timeline the space.
-                                            setTimelineHeight(timelineHeight(geometry.size) - delta, in: geometry.size)
-                                        },
-                                        onBegin: beginWorkspaceResize,
-                                        onEnd: endWorkspaceResize,
-                                        onReset: { storedTimelineHeight = 0 })
-                                }
-                                transport
-                                if showsTimeline { timeline(height: timelineHeight(geometry.size)) }
+                            // iPad has enough room to keep the editing context
+                            // visible beside every inspector, like a desktop
+                            // NLE. Phone landscape keeps the compact behaviour
+                            // so its preview is not squeezed by two panels.
+                            let showsTimeline = UIDevice.current.userInterfaceIdiom == .pad
+                                || (!colorMode && !transforms && !canvasTool && !speedTool)
+                            if showsTimeline {
+                                WorkspaceDivider(
+                                    orientation: .horizontal,
+                                    label: "Resize the timeline",
+                                    onResize: { delta in
+                                        // The handle sits above the bottom
+                                        // block, so dragging up gives the
+                                        // timeline the space.
+                                        setTimelineHeight(timelineHeight(geometry.size) - delta, in: geometry.size)
+                                    },
+                                    onBegin: beginWorkspaceResize,
+                                    onEnd: endWorkspaceResize,
+                                    onReset: { storedTimelineHeight = 0 })
                             }
+                            transport
+                            if showsTimeline { timeline(height: timelineHeight(geometry.size)) }
                         }.frame(maxWidth: .infinity)
                         WorkspaceDivider(
                             orientation: .vertical,
@@ -123,7 +123,7 @@ struct EditorView: View {
                             onBegin: beginWorkspaceResize,
                             onEnd: endWorkspaceResize,
                             onReset: { storedInspectorWidth = 0 })
-                        VStack(spacing: 0) { inspector; if !keyboardVisible { modeBar } }
+                        VStack(spacing: 0) { inspector; modeBar }
                             .frame(width: inspectorWidth(geometry.size))
                     }
                 } else {
@@ -131,17 +131,15 @@ struct EditorView: View {
                     // below it. Dragging up is how a tool panel that needs the
                     // room - curves especially - gets it.
                     preview.frame(height: previewHeight(geometry.size))
-                    if !keyboardVisible {
-                        WorkspaceDivider(
-                            orientation: .horizontal,
-                            label: "Resize the preview",
-                            onResize: { delta in
-                                setPreviewHeight(previewHeight(geometry.size) + delta, in: geometry.size)
-                            },
-                            onBegin: beginWorkspaceResize,
-                            onEnd: endWorkspaceResize,
-                            onReset: { storedPreviewHeight = 0 })
-                    }
+                    WorkspaceDivider(
+                        orientation: .horizontal,
+                        label: "Resize the preview",
+                        onResize: { delta in
+                            setPreviewHeight(previewHeight(geometry.size) + delta, in: geometry.size)
+                        },
+                        onBegin: beginWorkspaceResize,
+                        onEnd: endWorkspaceResize,
+                        onReset: { storedPreviewHeight = 0 })
                     if scopesVisible {
                         WorkspaceDivider(
                             orientation: .horizontal,
@@ -156,10 +154,10 @@ struct EditorView: View {
                         ScopePanel(model: model, isRegularWidth: false,
                                    traceHeight: scopeHeight(geometry.size, regular: false))
                     }
-                    if !keyboardVisible { transport
-                    if !colorMode && !transforms && !canvasTool && !speedTool { timeline(height: automaticTimelineHeight) } }
+                    transport
+                    if !colorMode && !transforms && !canvasTool && !speedTool { timeline(height: automaticTimelineHeight) }
                     inspector
-                    if !keyboardVisible { modeBar }
+                    modeBar
                 }
             }
         }
@@ -257,9 +255,23 @@ struct EditorView: View {
 
     private var editorInputs: some View {
         editorLayout
+        // Keep the editing workspace at its authored size while the software
+        // keyboard floats over it. Only the text dock moves above the keyboard;
+        // the canvas and its framing do not jump or shrink.
+        .ignoresSafeArea(.keyboard, edges: .bottom)
+        .overlay(alignment: .bottom) {
+            if typingText {
+                textInputDock
+                    .padding(.bottom, keyboardOverlap)
+                    .transition(.move(edge: .bottom).combined(with: .opacity))
+            }
+        }
         .numericEntryHost()
-        .onReceive(NotificationCenter.default.publisher(for: UIResponder.keyboardWillShowNotification)) { _ in keyboardVisible = true }
-        .onReceive(NotificationCenter.default.publisher(for: UIResponder.keyboardWillHideNotification)) { _ in keyboardVisible = false }
+        .onReceive(NotificationCenter.default.publisher(for: UIResponder.keyboardWillChangeFrameNotification)) { note in
+            guard let frame = note.userInfo?[UIResponder.keyboardFrameEndUserInfoKey] as? CGRect else { return }
+            keyboardOverlap = max(0, UIScreen.main.bounds.maxY-frame.minY)
+        }
+        .onReceive(NotificationCenter.default.publisher(for: UIResponder.keyboardWillHideNotification)) { _ in keyboardOverlap = 0 }
         .toolbar { ToolbarItemGroup(placement: .keyboard) {
             if !typingText { Spacer(); Button("Done") { UIApplication.shared.sendAction(#selector(UIResponder.resignFirstResponder), to: nil, from: nil, for: nil) } }
         } }
@@ -328,8 +340,7 @@ struct EditorView: View {
             if case .text = model.selectedItem {
                 openTextTool()
             } else if model.selectedAudio != nil {
-                textMode = false
-                audioMode = true; colorMode = false; transforms = false; maskMode = false; canvasTool = false; speedTool = false; transitionMode = false
+                activate(.audio)
                 model.beginAudioEditing()
             }
         }
@@ -560,10 +571,19 @@ struct EditorView: View {
                     .disabled(model.isPreparingTimeline || !model.hasMedia)
                 Button { model.stepFrames(max(1, min(120, frameStep))) } label: { Image(systemName: "forward.end").frame(width: 44, height: 44) }
                     .accessibilityLabel("Forward \(frameStep) frames").disabled(model.isPreparingTimeline)
-                Text(String(format: "%.3fs", model.timelineTime)).font(.caption.monospacedDigit())
-                Text("/ " + TimecodeFormatter.string(from: model.project.timeline.duration.seconds)).font(.caption.monospacedDigit()).foregroundStyle(AppColors.textSecondary)
+                let frameRate = model.project.canvas.frameRate ?? model.project.metadata.bestFrameRate
+                Text(TimecodeFormatter.frameString(from: model.timelineTime, frameRate: frameRate))
+                    .font(.caption.monospacedDigit())
+                Text("/ " + TimecodeFormatter.frameString(
+                    from: model.project.timeline.duration.seconds, frameRate: frameRate))
+                    .font(.caption.monospacedDigit()).foregroundStyle(AppColors.textSecondary)
                 Spacer()
-                previewQualityButton
+                if UIDevice.current.userInterfaceIdiom == .pad {
+                    persistentTimelineActions
+                    previewQualityButton
+                } else {
+                    timelineActionsMenu
+                }
                 Button { comparePinned.toggle() } label: {
                     Image(systemName: "square.on.square").frame(width: 44, height: 44)
                         .foregroundStyle(comparePinned ? AppColors.accent : AppColors.textSecondary)
@@ -572,6 +592,93 @@ struct EditorView: View {
             }.padding(.horizontal, 8)
             if let error = model.playback.errorMessage { Text(error).font(.caption).foregroundStyle(AppColors.warning).padding(8) }
         }
+    }
+
+    /// Editing commands belong to the timeline, not to whichever inspector is
+    /// open. iPad can keep the three primary commands visible; a phone exposes
+    /// the same commands from one compact menu so the preview keeps its room.
+    private var persistentTimelineActions: some View {
+        HStack(spacing: 0) {
+            addMediaMenu
+            Button(action: model.split) {
+                Image(systemName: "scissors").frame(width: 40, height: 36)
+            }
+            .accessibilityLabel("Split at playhead")
+            .disabled(!model.canSplit)
+            Button(action: openTransitionTool) {
+                Image(systemName: "rectangle.2.swap").frame(width: 40, height: 36)
+            }
+            .accessibilityLabel("Add transition at playhead")
+            .disabled(!model.canUseTransitions || !warmup.isReady)
+        }
+        .font(.system(size: 14, weight: .medium))
+        .foregroundStyle(AppColors.textSecondary)
+        .background(AppColors.surfaceRaised, in: RoundedRectangle(cornerRadius: 9, style: .continuous))
+    }
+
+    private var addMediaMenu: some View {
+        Menu { addMediaActions } label: {
+            Group {
+                if model.isImporting { ProgressView() }
+                else { Image(systemName: "plus") }
+            }
+            .frame(width: UIDevice.current.userInterfaceIdiom == .pad ? 40 : 44,
+                   height: UIDevice.current.userInterfaceIdiom == .pad ? 36 : 44)
+        }
+        .accessibilityLabel("Add media")
+        .disabled(model.isImporting || !warmup.isReady)
+    }
+
+    @ViewBuilder private var addMediaActions: some View {
+        Button("Add audio from Files", systemImage: "waveform") { audioPicker = true }
+        Button("Add video after selection", systemImage: "film") {
+            importImage = false; importOverlay = false; mediaPicker = true
+        }
+        Button("Add video overlay", systemImage: "square.3.layers.3d") {
+            importImage = false; importOverlay = true; mediaPicker = true
+        }
+        Button("Add image overlay", systemImage: "photo") {
+            importImage = true; importOverlay = true; mediaPicker = true
+        }
+        Button("Add text", systemImage: "textformat") { openTextTool(); model.addText() }
+    }
+
+    private var timelineActionsMenu: some View {
+        Menu {
+            Menu("Add", systemImage: "plus") { addMediaActions }
+                .disabled(model.isImporting || !warmup.isReady)
+            Button("Split at playhead", systemImage: "scissors", action: model.split)
+                .disabled(!model.canSplit)
+            Button("Add transition", systemImage: "rectangle.2.swap", action: openTransitionTool)
+                .disabled(!model.canUseTransitions || !warmup.isReady)
+            Divider()
+            Button("Paste", systemImage: "doc.on.clipboard", action: model.pasteClip)
+                .disabled(model.clipboard == nil)
+            Button("Add or remove marker", systemImage: "bookmark", action: model.toggleMarker)
+            if model.selectedClipID != nil {
+                if model.selectedClipIDs.count == 1 {
+                    Menu("Clip options", systemImage: "ellipsis") { clipOptionActions }
+                }
+                Button(role: .destructive) { model.deleteClip() } label: {
+                    Label(model.selectedClipIDs.count > 1
+                          ? "Delete \(model.selectedClipIDs.count) clips" : "Delete clip",
+                          systemImage: "trash")
+                }.disabled(!model.canEditSelection)
+            }
+            Divider()
+            Picker("Playback quality", selection: Binding(
+                get: { model.playback.previewQuality },
+                set: { model.playback.previewQuality = $0 }
+            )) {
+                ForEach(PreviewQuality.allCases) { quality in
+                    Text(quality.title).tag(quality)
+                }
+            }
+        } label: {
+            Image(systemName: "ellipsis.circle").frame(width: 44, height: 44)
+        }
+        .accessibilityLabel("Timeline actions")
+        .disabled(model.isPreparingTimeline)
     }
 
     /// Preview resolution while playing. It changes nothing about the project,
@@ -618,11 +725,17 @@ struct EditorView: View {
                     assets: model.project.assets, assetFrames: assetFrames, waveforms: waveforms, sourceRange: model.project.primaryAsset.sourceRange,
                     minimumDuration: model.project.canvas.frameDuration?.seconds ?? 0.01, name: model.project.displayName,
                     currentTime: model.timelineTime, selectedID: model.selectedClipID,
+                    selectedIDs: model.selectedClipIDs,
                     selectedTransitionID: model.selectedTransitionID,
                     thumbnails: filmstrip.frames,
                     onSelect: { id in
                         model.selectClip(id: id)
                         if id == nil { colorMode = false; maskMode = false }
+                    },
+                    onSelectMany: { ids in
+                        model.selectClips(ids)
+                        if model.selectionContainsOnlyText { openTextTool() }
+                        else { activate(.timeline) }
                     },
                     onSelectTransition: { id in openTransitionTool(id: id) },
                     onDragSelect: { model.selectClip(id: $0, seek: false) },
@@ -667,53 +780,211 @@ struct EditorView: View {
         }
     }
 
-    private var modeButtons: some View {
-        ScrollView(.horizontal) {
-        HStack(spacing: 8) {
-            Button { textMode = false; audioMode = false; colorMode = false; transforms = false; maskMode = false; canvasTool = false; speedTool = false; transitionMode = false; model.flushGradeHistory() } label: { Text("Timeline") }
-                .frame(minHeight: 44)
-                .foregroundStyle(textMode || audioMode || colorMode || transforms || maskMode || canvasTool || speedTool || transitionMode ? AppColors.textSecondary : AppColors.accent)
-            Button(action: openTextTool) { Label("Text", systemImage: "textformat") }
-                .frame(minHeight: 44).foregroundStyle(textMode ? AppColors.accent : AppColors.textSecondary)
-                .disabled(!warmup.isReady)
-                .accessibilityLabel("Text tool").accessibilityAddTraits(textMode ? .isSelected : [])
-            Button { textMode = false; audioMode = true; colorMode = false; transforms = false; maskMode = false; canvasTool = false; speedTool = false; transitionMode = false; model.beginAudioEditing() } label: { Label("Audio", systemImage: "waveform") }
-                .frame(minHeight: 44).foregroundStyle(audioMode ? AppColors.accent : AppColors.textSecondary)
-                .disabled(!warmup.isReady)
-            Button { textMode = false; audioMode = false; colorMode = true; transforms = false; maskMode = false; canvasTool = false; speedTool = false; transitionMode = false; model.flushGradeHistory() } label: { Text("Color") }
-                .frame(minHeight: 44)
-                .foregroundStyle(colorMode ? AppColors.accent : AppColors.textSecondary)
-                .disabled(!model.canGrade)
-            Button { textMode = false; audioMode = false; colorMode = false; transforms = true; maskMode = false; canvasTool = false; speedTool = false; transitionMode = false; model.beginTransformEditing() } label: { Text("Transform") }
-                .frame(minHeight: 44).foregroundStyle(transforms ? AppColors.accent : AppColors.textSecondary)
-                .disabled(!model.canGrade || !warmup.isReady)
-            Button { textMode = false; audioMode = false; colorMode = false; transforms = false; maskMode = true; canvasTool = false; speedTool = false; transitionMode = false; model.beginLayerMaskEditing() } label: { Label("Mask", systemImage: "circle.dashed") }
-                .frame(minHeight: 44).foregroundStyle(maskMode ? AppColors.accent : AppColors.textSecondary)
-                .disabled(model.selectedClip == nil || !model.canEditSelection || !warmup.isReady)
-                .accessibilityLabel("Layer mask").accessibilityAddTraits(maskMode ? .isSelected : [])
-            Button { textMode = false; audioMode = false; colorMode = false; transforms = false; maskMode = false; canvasTool = false; speedTool = true; transitionMode = false; model.flushGradeHistory() } label: { Label("Speed", systemImage: "speedometer") }
-                .frame(minHeight: 44).foregroundStyle(speedTool ? AppColors.accent : AppColors.textSecondary)
-                .disabled(!model.canChangeSpeed)
-                .accessibilityLabel("Speed tool").accessibilityAddTraits(speedTool ? .isSelected : [])
-            Button(action: openTransitionTool) { Label("Transition", systemImage: "rectangle.2.swap") }
-                .frame(minHeight: 44).foregroundStyle(transitionMode ? AppColors.accent : AppColors.textSecondary)
-                .disabled(!model.canUseTransitions || !warmup.isReady)
-                .accessibilityLabel("Transitions at playhead")
-                .accessibilityAddTraits(transitionMode ? .isSelected : [])
-            Button { textMode = false; audioMode = false; colorMode = false; transforms = false; maskMode = false; canvasTool = true; speedTool = false; transitionMode = false; model.flushGradeHistory() } label: { Text("Canvas") }
-                .frame(minHeight: 44).foregroundStyle(canvasTool ? AppColors.accent : AppColors.textSecondary)
-            Spacer()
+    // MARK: - Mode bar
+
+    /// The bar's nine tools, in the order they are drawn.
+    ///
+    /// The modes themselves are still the eight `@State` booleans the rest of
+    /// this view reads. This only gives the bar a single list to draw and a
+    /// single place to switch, instead of nine buttons each clearing seven
+    /// flags by hand — which is how a tool used to end up half switched.
+    private enum EditorMode: String, CaseIterable, Identifiable {
+        case timeline, text, audio, color, transform, mask, speed, transition, canvas
+
+        var id: String { rawValue }
+
+        var title: String {
+            switch self {
+            case .timeline: return "Timeline"
+            case .text: return "Text"
+            case .audio: return "Audio"
+            case .color: return "Color"
+            case .transform: return "Transform"
+            case .mask: return "Mask"
+            case .speed: return "Speed"
+            case .transition: return "Transition"
+            case .canvas: return "Canvas"
+            }
+        }
+
+        var symbol: String {
+            switch self {
+            case .timeline: return "rectangle.split.3x1"
+            case .text: return "textformat"
+            case .audio: return "waveform"
+            case .color: return "camera.filters"
+            case .transform: return "crop.rotate"
+            case .mask: return "circle.dashed"
+            case .speed: return "speedometer"
+            case .transition: return "rectangle.2.swap"
+            case .canvas: return "aspectratio"
+            }
+        }
+
+        /// Tools that cannot run until the compositing shaders have been built.
+        var needsCompositor: Bool {
+            switch self {
+            case .text, .audio, .transform, .mask, .transition: return true
+            case .timeline, .color, .speed, .canvas: return false
+            }
+        }
+    }
+
+    private var activeMode: EditorMode {
+        if textMode { return .text }
+        if audioMode { return .audio }
+        if colorMode { return .color }
+        if transforms { return .transform }
+        if maskMode { return .mask }
+        if speedTool { return .speed }
+        if transitionMode { return .transition }
+        if canvasTool { return .canvas }
+        return .timeline
+    }
+
+    /// Sets all eight flags from one value, so no tool can be left half on.
+    private func activate(_ mode: EditorMode) {
+        textMode = mode == .text
+        audioMode = mode == .audio
+        colorMode = mode == .color
+        transforms = mode == .transform
+        maskMode = mode == .mask
+        canvasTool = mode == .canvas
+        speedTool = mode == .speed
+        transitionMode = mode == .transition
+    }
+
+    /// Why a tool cannot be used at this moment, or nil when it can.
+    ///
+    /// The bar says these out loud on tap instead of grouping a tool out in
+    /// silence. A dimmed control with no stated reason is what makes people
+    /// think an app is broken, and five of these nine can be unavailable.
+    private func unavailableReason(for mode: EditorMode) -> String? {
+        // Checked first: it is temporary, and it covers most of the list at once.
+        if mode.needsCompositor && !warmup.isReady {
+            return "Still preparing effects — first run only."
+        }
+        switch mode {
+        case .timeline, .canvas, .text, .audio:
+            return nil
+        case .color, .transform:
+            if model.selectedClip == nil { return "Select a clip in the timeline first." }
+            return model.canGrade ? nil : "This clip can’t be graded."
+        case .mask:
+            if model.selectedClip == nil { return "Select a clip in the timeline first." }
+            return model.canEditSelection ? nil : "This clip is locked."
+        case .speed:
+            return model.canChangeSpeed ? nil : "Select a video clip to change its speed."
+        case .transition:
+            return model.canUseTransitions ? nil : "Transitions need two clips meeting at the playhead."
+        }
+    }
+
+    /// Switching order matters: each case keeps the sequence the individual
+    /// buttons used, because which side of the switch `flushGradeHistory` falls
+    /// on decides how the undo entries either side of it are grouped.
+    private func select(_ mode: EditorMode) {
+        if let reason = unavailableReason(for: mode) { model.showStatus(reason); return }
+        switch mode {
+        case .text: openTextTool()
+        case .transition: openTransitionTool()
+        case .timeline, .color, .speed, .canvas:
+            activate(mode); model.flushGradeHistory()
+        case .audio:
+            activate(mode); model.beginAudioEditing()
+        case .transform:
+            activate(mode); model.beginTransformEditing()
+        case .mask:
+            activate(mode); model.beginLayerMaskEditing()
+        }
+    }
+
+    private func modeTab(_ mode: EditorMode) -> some View {
+        let selected = activeMode == mode
+        let unavailable = unavailableReason(for: mode) != nil
+        return Button { select(mode) } label: {
+            VStack(spacing: 2) {
+                Image(systemName: mode.symbol).font(.system(size: 15, weight: .medium))
+                Text(mode.title).font(.system(size: 9, weight: .medium)).lineLimit(1)
+            }
+            .padding(.horizontal, 7)
+            .frame(minWidth: 46)
+            .frame(height: 44)
+            .background(selected ? AppColors.accent.opacity(0.16) : .clear,
+                        in: RoundedRectangle(cornerRadius: 10, style: .continuous))
+            .foregroundStyle(selected ? AppColors.accent : AppColors.textSecondary)
+            // Unavailable rather than disabled: it still takes a tap, and
+            // answers it with the reason.
+            .opacity(unavailable ? 0.4 : 1)
+            .contentShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+        }
+        .id(mode)
+        .accessibilityLabel(mode.title)
+        .accessibilityAddTraits(selected ? .isSelected : [])
+        .accessibilityHint(unavailableReason(for: mode) ?? "")
+    }
+
+    /// The tools that belong to the open panel. Pinned outside the scroll view
+    /// so they are always on screen: behind nine scrolling tabs they were off
+    /// the end of the bar and, in Color, that hid Reset and the grade actions
+    /// entirely.
+    private var modeActions: some View {
+        HStack(spacing: 0) {
+            Rectangle().fill(AppColors.border)
+                .frame(width: AppSpacing.hairline, height: 26)
+                .padding(.horizontal, 4)
             if colorMode {
                 Button { help = true } label: {
-                    Image(systemName: "questionmark.circle").frame(width: 44, height: 44)
+                    Image(systemName: "questionmark.circle").frame(width: 38, height: 44)
                 }.accessibilityLabel("How to use \(model.selectedPanel.rawValue)")
                 GradeActionsMenu(model: model, onSaveGrade: { savingPreset = true })
-                Button("Reset", action: model.resetPanel).font(.caption).frame(minWidth: 44, minHeight: 44)
+                Button("Reset", action: model.resetPanel)
+                    .font(.caption.weight(.medium)).frame(minWidth: 40, minHeight: 44)
             } else {
-                Button { layers = true } label: { Image(systemName: "square.3.layers.3d").frame(width: 44, height: 44) }.accessibilityLabel("Layers")
+                Button { layers = true } label: {
+                    Image(systemName: "square.3.layers.3d").frame(width: 38, height: 44)
+                }.accessibilityLabel("Layers")
             }
-        }.font(.caption.weight(.medium)).fixedSize(horizontal: true, vertical: false).frame(minHeight: 44).padding(.horizontal, 12)
-        }.frame(height: 44).scrollIndicators(.hidden)
+        }
+        // Matched to the tab icons rather than left at body size, which is what
+        // an unstyled Image falls back to now that the bar sets no font itself.
+        .font(.system(size: 15, weight: .medium))
+        .foregroundStyle(AppColors.textSecondary)
+        .padding(.trailing, 8)
+    }
+
+    private var modeButtons: some View {
+        HStack(spacing: 0) {
+            ScrollViewReader { proxy in
+                ScrollView(.horizontal) {
+                    HStack(spacing: 4) {
+                        ForEach(EditorMode.allCases) { modeTab($0) }
+                    }
+                    .padding(.horizontal, 8)
+                }
+                .scrollIndicators(.hidden)
+                // Nine tools do not fit any phone, so the bar says so: the ends
+                // fade instead of cutting off square, which reads as "this
+                // continues" where a hairline indicator under a 44-point strip
+                // does not.
+                .mask(
+                    LinearGradient(stops: [
+                        .init(color: .clear, location: 0),
+                        .init(color: .black, location: 0.035),
+                        .init(color: .black, location: 0.945),
+                        .init(color: .clear, location: 1)
+                    ], startPoint: .leading, endPoint: .trailing)
+                )
+                // Switching tools from anywhere else — selecting a text clip,
+                // opening a transition from the timeline — must not leave the
+                // tool that is now open scrolled off the bar.
+                .onChange(of: activeMode, initial: true) { _, mode in
+                    withAnimation(.easeOut(duration: 0.22)) { proxy.scrollTo(mode, anchor: .center) }
+                }
+            }
+            modeActions
+        }
+        .frame(height: 52)
     }
 
     @ViewBuilder private var inspector: some View {
@@ -748,20 +1019,6 @@ struct EditorView: View {
             VStack(alignment: .leading, spacing: 8) {
                 ScrollView(.horizontal) {
                     HStack(spacing: 12) {
-                        Menu {
-                            Button("Add audio from Files", systemImage: "waveform") { audioPicker = true }
-                            Button("Add video after selection", systemImage: "film") { importImage = false; importOverlay = false; mediaPicker = true }
-                            Button("Add video overlay", systemImage: "square.3.layers.3d") { importImage = false; importOverlay = true; mediaPicker = true }
-                            Button("Add image overlay", systemImage: "photo") { importImage = true; importOverlay = true; mediaPicker = true }
-                            Button("Add text", systemImage: "textformat") { openTextTool(); model.addText() }
-                        } label: {
-                            if model.isImporting { ProgressView().frame(width: 44, height: 44) }
-                            else { Image(systemName: "plus").frame(width: 44, height: 44) }
-                        }.accessibilityLabel("Add media").disabled(model.isImporting || !warmup.isReady)
-                        Button(action: model.split) { Image(systemName: "scissors").frame(width: 44, height: 44) }
-                            .accessibilityLabel("Split at playhead").disabled(!model.canSplit)
-                        Button(action: openTransitionTool) { Image(systemName: "rectangle.2.swap").frame(width: 44, height: 44) }
-                            .accessibilityLabel("Add transition at playhead").disabled(!model.canUseTransitions)
                         Button(action: model.pasteClip) { Image(systemName: "doc.on.clipboard").frame(width: 44, height: 44) }
                             .accessibilityLabel("Paste").disabled(model.clipboard == nil)
                         Button(role: .destructive) { model.deleteClip() } label: { Image(systemName: "trash").frame(width: 44, height: 44) }
@@ -772,7 +1029,8 @@ struct EditorView: View {
                         Menu {
                             clipOptionActions
                         } label: { Image(systemName: "ellipsis").frame(width: 44, height: 44) }
-                            .accessibilityLabel("Clip options").disabled(model.selectedClipID == nil)
+                            .accessibilityLabel("Clip options")
+                            .disabled(model.selectedClipID == nil || model.selectedClipIDs.count != 1)
                     }.font(.subheadline).frame(minHeight: 44)
                 }.frame(height: 44).scrollIndicators(.hidden).disabled(model.isPreparingTimeline)
                 if audioMode {
@@ -793,20 +1051,18 @@ struct EditorView: View {
 
     private func openTextTool() {
         model.flushGradeHistory()
-        textMode = true; audioMode = false; colorMode = false; transforms = false; maskMode = false; canvasTool = false; speedTool = false; transitionMode = false
+        activate(.text)
     }
 
     private func openTransitionTool() {
         model.flushGradeHistory()
-        textMode = false; audioMode = false; colorMode = false; transforms = false
-        maskMode = false; canvasTool = false; speedTool = false; transitionMode = true
+        activate(.transition)
         model.prepareTransitionPanel()
     }
 
     private func openTransitionTool(id: UUID) {
         model.flushGradeHistory()
-        textMode = false; audioMode = false; colorMode = false; transforms = false
-        maskMode = false; canvasTool = false; speedTool = false; transitionMode = true
+        activate(.transition)
         model.selectTransition(id)
     }
 

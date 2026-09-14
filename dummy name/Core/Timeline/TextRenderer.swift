@@ -121,7 +121,27 @@ enum TextRenderer {
             .concatenating(.init(rotationAngle: -clip.transform.rotationDegrees * .pi/180))
             .concatenating(.init(translationX: clip.transform.positionX*canvas.width, y: (1-clip.transform.positionY)*canvas.height))
     }
-    static func image(_ clip: TextClip, canvas: CGSize) -> CIImage? {
+    /// Renders authored text into a composition surface.
+    ///
+    /// Text point sizes, strokes, shadows and decoration measurements are stored
+    /// in the editor's base-preview pixels. Export compositions are often larger
+    /// than that authoring canvas, while low-quality playback can be smaller.
+    /// Render in the authored coordinate system first and scale the finished
+    /// layer once so every output preserves what the editor showed.
+    static func image(
+        _ clip: TextClip,
+        canvas: CGSize,
+        authoredCanvas: CGSize? = nil
+    ) -> CIImage? {
+        if let authoredCanvas,
+           authoredCanvas.width > 0, authoredCanvas.height > 0,
+           authoredCanvas != canvas {
+            guard let authored = image(clip, canvas: authoredCanvas) else { return nil }
+            return authored.transformed(by: .init(
+                scaleX: canvas.width / authoredCanvas.width,
+                y: canvas.height / authoredCanvas.height
+            ))
+        }
         guard !clip.text.isEmpty else { return nil }
         // Cache raster content; dragging/resizing/rotating only changes the CI transform.
         var key = clip; key.transform = .init(); key.opacity = 1

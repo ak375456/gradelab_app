@@ -67,6 +67,20 @@ final class CompositorWarmupTests: XCTestCase {
         XCTAssertTrue(CompositorResources.isReady)
     }
 
+    /// Multi-clip playback bypasses `MetalVideoRenderer` and grades inside the
+    /// shared layer compositor. A look prepared only on the direct renderer's
+    /// context silently becomes the identity LUT there.
+    func testLookPreparationReachesSharedCompositorContext() async throws {
+        let identifier = try XCTUnwrap(LUTAsset.bundledCreativeLooks.first?.id)
+        let prepared = await CompositorResources.prepareLooks([identifier])
+        XCTAssertTrue(prepared)
+        let bundle = try CompositorResources.shared(
+            supplied: nil,
+            colorSpace: CompositorWarmup.workingColorSpace
+        )
+        XCTAssertTrue(bundle.context.luts.isReady(identifier))
+    }
+
     /// Running the body directly must succeed on a device with Metal, and must
     /// not throw or trap when called repeatedly.
     func testTheWarmUpBodyCompletes() {
