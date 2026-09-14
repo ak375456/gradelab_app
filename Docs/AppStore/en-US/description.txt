@@ -1,0 +1,43 @@
+Create cinematic photos and videos with GradeLab, a color grading editor for iPhone and iPad. Explore filters and LUTs, create your own presets, and bring a vintage film look or a clean, natural finish to your edits.
+
+From warm portraits to moody travel clips, shape the light, color and atmosphere of every frame. Start with a look you love, adjust its strength, then make it your own.
+
+CINEMATIC FILTERS & LUTs
+
+Explore looks such as Warm Cinema, Teal Orange and Soft Film. Preview LUT filters on your own photos and videos, control their intensity, and fine-tune the result. Import your own .cube LUT files to bring your favorite color styles into GradeLab.
+
+SAVE YOUR OWN PRESETS
+
+Turn your grading adjustments into reusable presets. Apply a style you've created to another photo or video and build a consistent look across your work.
+
+COLOR GRADING, YOUR WAY
+
+Adjust exposure, contrast, highlights, shadows, whites and blacks. Balance temperature and tint, and refine saturation and vibrance.
+
+Shape individual colors with eight-band HSL. Use color wheels to balance shadows, midtones and highlights. Fine-tune tones with Master and RGB curves, or make targeted adjustments with hue, saturation and luminance curves.
+
+Compare your edit with the original as you work. Check exposure and color with a histogram, waveform, RGB parade and vectorscope.
+
+VINTAGE TEXTURE & FILM EFFECTS
+
+Add film grain, soften highlights with bloom and glow, or create a film-inspired finish with halation. Refine your look with fade, sharpening and vignette, from subtle texture to a stronger cinematic style.
+
+EDIT VIDEO & PHOTOS
+
+Trim and split video clips, adjust playback speed, and add titles and audio. Build layered edits with overlays and blend modes. Animate supported text and transform settings with keyframes.
+
+Use built-in font families or import TTF fonts to make your titles your own. Edit photos with the same color controls you use for video.
+
+HDR, APPLE LOG & PRORES
+
+Work with supported HLG HDR and Apple Log video. Export ProRes 422 or ProRes 422 HQ on compatible devices, with available formats determined by your footage and hardware.
+
+FLEXIBLE EXPORTS
+
+Export video in 4K or at supported source resolutions, with frame rate and bitrate controls. Save full-resolution photos as JPEG, HEIC or lossless PNG.
+
+Feature and format availability depend on your source media and device capabilities.
+
+Privacy Policy: https://ak375456.github.io/gradelab/privacy.html
+App Terms: https://ak375456.github.io/gradelab/terms.html
+Terms of Use (EULA): https://www.apple.com/legal/internet-services/itunes/dev/stdeula/

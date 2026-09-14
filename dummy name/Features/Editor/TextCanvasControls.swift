@@ -1,0 +1,123 @@
+import SwiftUI
+import UIKit
+
+/// Canvas-space hit geometry follows the same layout/transform as export.
+struct TextCanvasControls: View {
+    @ObservedObject var model: EditorViewModel
+    let editContent: () -> Void
+    @State private var origin: VisualTransform?
+    @State private var initialScale: Double?
+    @State private var initialRotation: Double?
+    /// Normalized guide positions currently held by the magnet, drawn while dragging.
+    @State private var guides: (x: Double?, y: Double?) = (nil, nil)
+    @State private var rotationGuide: Double?
+
+    // Freeform placement with a magnet: edges, thirds and centre.
+    private static let positionStops: [Double] = [0, 1.0/3, 0.5, 2.0/3, 1]
+    private static let positionTolerance = 0.012
+    /// Multiples of 45 near the current value, so snapping works past a full turn too.
+    private func stops(around value: Double) -> [Double] {
+        let base = (value/45).rounded()
+        return (-2...2).map { (base + Double($0)) * 45 }
+    }
+    private static let rotationTolerance = 4.0
+
+    var body: some View {
+        GeometryReader { view in
+            // Geometry uses the EVALUATED clip so the selection frame sits on the glyphs
+            // you can actually see while animation is driving the frame.
+            if let clip = model.evaluatedText, model.canEditSelection,
+               model.timelineTime >= clip.placement.timelineStart.seconds,
+               model.timelineTime < ((try? clip.placement.range.end.seconds) ?? 0) {
+                let canvas = CGSize(width: model.project.canvas.width, height: model.project.canvas.height)
+                let fit = min(view.size.width/canvas.width, view.size.height/canvas.height)
+                let offset = CGPoint(x: (view.size.width-canvas.width*fit)/2, y: (view.size.height-canvas.height*fit)/2)
+                let layout = TextRenderer.layout(clip, canvas: canvas)
+                // Frame the glyphs, not the full wrapping width.
+                let frame = layout.fittedBounds.insetBy(dx: -max(6, clip.strokeWidth), dy: -6)
+                let placement = TextRenderer.placement(clip, bounds: layout.fittedBounds, canvas: canvas)
+                let corners = [CGPoint(x: frame.minX, y: frame.minY), CGPoint(x: frame.maxX, y: frame.minY), CGPoint(x: frame.maxX, y: frame.maxY), CGPoint(x: frame.minX, y: frame.maxY)].map { point in
+                    let p = point.applying(placement)
+                    return CGPoint(x: offset.x+p.x*fit, y: offset.y+(canvas.height-p.y)*fit)
+                }
+                let outline = Path { path in path.addLines(corners); path.closeSubpath() }
+                if let x = guides.x {
+                    Path { $0.move(to: CGPoint(x: offset.x+x*canvas.width*fit, y: offset.y)); $0.addLine(to: CGPoint(x: offset.x+x*canvas.width*fit, y: offset.y+canvas.height*fit)) }
+                        .stroke(.yellow.opacity(0.9), lineWidth: 1).allowsHitTesting(false)
+                }
+                if let y = guides.y {
+                    Path { $0.move(to: CGPoint(x: offset.x, y: offset.y+y*canvas.height*fit)); $0.addLine(to: CGPoint(x: offset.x+canvas.width*fit, y: offset.y+y*canvas.height*fit)) }
+                        .stroke(.yellow.opacity(0.9), lineWidth: 1).allowsHitTesting(false)
+                }
+                outline.fill(.white.opacity(0.001)).contentShape(outline)
+                    .overlay(outline.stroke(rotationGuide != nil ? .yellow : .cyan, style: StrokeStyle(lineWidth: 1, dash: [4, 3])))
+                    .gesture(DragGesture(minimumDistance: 2).onChanged { value in
+                        // The baseline is the EVALUATED transform at gesture start, so a
+                        // keyframe inserted between existing ones starts from what was on
+                        // screen rather than an outdated base value.
+                        if origin == nil { origin = clip.transform; model.playback.pause() }
+                        guard let origin else { return }
+                        let x = snap(origin.positionX+value.translation.width/(canvas.width*fit), to: Self.positionStops, tolerance: Self.positionTolerance)
+                        let y = snap(origin.positionY+value.translation.height/(canvas.height*fit), to: Self.positionStops, tolerance: Self.positionTolerance)
+                        report(x: x.stop, y: y.stop)
+                        model.setAnimatableValue(.positionX, .number(x.value))
+                        model.setAnimatableValue(.positionY, .number(y.value))
+                    }.onEnded { _ in origin = nil; guides = (nil, nil); model.flushGradeHistory() })
+                    .simultaneousGesture(MagnifyGesture().onChanged { value in
+                        if initialScale == nil { initialScale = clip.transform.scale; model.playback.pause() }
+                        model.setAnimatableValue(.scale, .number(min(6, max(0.05, initialScale! * value.magnification))))
+                    }.onEnded { _ in initialScale = nil; model.flushGradeHistory() })
+                    .simultaneousGesture(RotateGesture().onChanged { value in
+                        if initialRotation == nil { initialRotation = clip.transform.rotationDegrees; model.playback.pause() }
+                        // Accumulated, never wrapped into +/-180: a deliberate multi-turn
+                        // rotation must survive as real motion.
+                        let raw = initialRotation!+value.rotation.degrees
+                        let snapped = snap(raw, to: stops(around: raw), tolerance: Self.rotationTolerance)
+                        reportRotation(snapped.stop)
+                        model.setAnimatableValue(.rotation, .number(snapped.value))
+                    }.onEnded { _ in initialRotation = nil; rotationGuide = nil; model.flushGradeHistory() })
+                    .onTapGesture(count: 2, perform: editContent)
+                    .accessibilityLabel("Selected text. Drag to move, pinch to resize, rotate with two fingers.")
+                let center = CGPoint(x: offset.x+clip.transform.positionX*canvas.width*fit, y: offset.y+clip.transform.positionY*canvas.height*fit)
+                Circle().fill(.cyan).frame(width: 12, height: 12).frame(width: 44, height: 44).contentShape(Rectangle())
+                    .position(corners[1])
+                    .gesture(DragGesture(minimumDistance: 1, coordinateSpace: .named("textCanvas")).onChanged { value in
+                        if origin == nil { origin = clip.transform }
+                        let start = CGVector(dx: value.startLocation.x-center.x, dy: value.startLocation.y-center.y)
+                        let current = CGVector(dx: value.location.x-center.x, dy: value.location.y-center.y)
+                        let ratio = hypot(current.dx, current.dy)/max(1, hypot(start.dx, start.dy))
+                        let angle = (atan2(current.dy, current.dx)-atan2(start.dy, start.dx))*180 / .pi
+                        let raw = origin!.rotationDegrees+angle
+                        let snapped = snap(raw, to: stops(around: raw), tolerance: Self.rotationTolerance)
+                        reportRotation(snapped.stop)
+                        model.setAnimatableValue(.scale, .number(min(6, max(0.05, origin!.scale*ratio))))
+                        model.setAnimatableValue(.rotation, .number(snapped.value))
+                    }.onEnded { _ in origin = nil; rotationGuide = nil; model.flushGradeHistory() })
+                    .accessibilityLabel("Resize and rotate text")
+                Button { model.deleteClip() } label: {
+                    Image(systemName: "xmark").font(.system(size: 11, weight: .bold)).foregroundStyle(.black)
+                        .frame(width: 22, height: 22).background(Circle().fill(.cyan))
+                        .frame(width: 44, height: 44).contentShape(Rectangle())
+                }.position(corners[3]).accessibilityLabel("Delete text clip")
+            }
+        }.coordinateSpace(name: "textCanvas")
+    }
+
+    /// Returns the magnetised value and, when held, the stop it locked onto.
+    private func snap(_ value: Double, to stops: [Double], tolerance: Double) -> (value: Double, stop: Double?) {
+        guard let nearest = stops.min(by: { abs($0-value) < abs($1-value) }), abs(nearest-value) <= tolerance else { return (value, nil) }
+        return (nearest, nearest)
+    }
+    private func report(x: Double?, y: Double?) {
+        if x != guides.x || y != guides.y {
+            if (x != nil && x != guides.x) || (y != nil && y != guides.y) { UISelectionFeedbackGenerator().selectionChanged() }
+            guides = (x, y)
+        }
+    }
+    private func reportRotation(_ stop: Double?) {
+        if stop != rotationGuide {
+            if stop != nil { UISelectionFeedbackGenerator().selectionChanged() }
+            rotationGuide = stop
+        }
+    }
+}

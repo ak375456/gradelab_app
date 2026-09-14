@@ -1,0 +1,12 @@
+{
+  "images" : [
+    {
+      "filename" : "paywall-before.jpg",
+      "idiom" : "universal"
+    }
+  ],
+  "info" : {
+    "author" : "xcode",
+    "version" : 1
+  }
+}
