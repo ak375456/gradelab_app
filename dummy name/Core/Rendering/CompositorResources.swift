@@ -53,7 +53,22 @@ enum CompositorResources {
         "compositeTransitionAppleLog", "resolveAppleLogCanvas", "resolveAppleLogCanvas422"
     ]
 
+    /// Apple Log kernels that need a second, Apple Log 2 variant.
+    ///
+    /// Only the one kernel that performs the input transform. The rest of the
+    /// Apple Log compositor — the canvas resolve, the layer blend, the
+    /// transitions, the still composite — operates on the shared working space,
+    /// where Log 2 has already become the same signal, so specialising them
+    /// would compile identical code twice and lengthen a build that is already
+    /// the longest wait in the app.
+    static let appleLog2Names = ["compositeVideoAppleLog"]
+
     static var allNames: [String] { requiredNames + optionalNames }
+
+    /// The cache key for a composited Apple Log 2 kernel.
+    static func appleLog2Key(_ name: String) -> String {
+        AppleLogSpecialization.key(name, isLog2: true)
+    }
 
     /// One build, one waiter list. `NSCondition` rather than a plain lock so a
     /// second caller arriving mid-build waits for the first build instead of
@@ -137,18 +152,24 @@ enum CompositorResources {
     }
 
     private static func make(context: MetalContext, colorSpace: CGColorSpace) throws -> Bundle {
-        let names = allNames
+        // Each entry is the Metal function to compile and the key to file it
+        // under. They differ only for the Apple Log 2 specialisations, which are
+        // the same function compiled with a different function constant.
+        let jobs: [(function: String, key: String, isLog2: Bool)] =
+            allNames.map { ($0, $0, false) }
+            + appleLog2Names.map { ($0, appleLog2Key($0), true) }
         var states: [String: MTLComputePipelineState] = [:]
         let resultLock = NSLock()
         // Compiled in parallel. These are independent compiles and the device is
         // documented as thread-safe for pipeline creation, so doing them one at a
         // time left most of the CPU idle through the longest wait in the app.
-        DispatchQueue.concurrentPerform(iterations: names.count) { index in
-            let name = names[index]
-            guard let function = context.library.makeFunction(name: name),
-                  let state = try? context.device.makeComputePipelineState(function: function) else { return }
+        DispatchQueue.concurrentPerform(iterations: jobs.count) { index in
+            let job = jobs[index]
+            guard let state = AppleLogSpecialization.computePipeline(
+                job.function, isLog2: job.isLog2,
+                library: context.library, device: context.device) else { return }
             resultLock.lock()
-            states[name] = state
+            states[job.key] = state
             resultLock.unlock()
         }
         for name in requiredNames where states[name] == nil {

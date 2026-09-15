@@ -33,10 +33,23 @@ final class MetalVideoRenderer: NSObject, MTKViewDelegate, @unchecked Sendable {
     private lazy var gradeToTexture: [String: MTLComputePipelineState] = {
         var built: [String: MTLComputePipelineState] = [:]
         for name in ["gradeToTextureYUV", "gradeToTextureBGRA", "gradeToTextureHDR", "gradeToTextureAppleLog"] {
-            if let function = context.library.makeFunction(name: name),
-               let state = try? context.device.makeComputePipelineState(function: function) {
+            // Through the specialisation helper even for Apple Log: the Apple
+            // Log kernel references the Log 2 function constant, and Metal
+            // refuses to build a pipeline from a function that carries one
+            // unless constant values are supplied.
+            if let state = AppleLogSpecialization.computePipeline(
+                name, isLog2: false, library: context.library, device: context.device) {
                 built[name] = state
             }
+        }
+        // The Apple Log 2 variant of the same kernel, specialised by function
+        // constant. Built only for a Log 2 project, so an Apple Log or SDR
+        // project pays nothing for a format it will never open.
+        if colorMode == .appleLog2,
+           let state = AppleLogSpecialization.computePipeline(
+               "gradeToTextureAppleLog", isLog2: true,
+               library: context.library, device: context.device) {
+            built[AppleLogSpecialization.key("gradeToTextureAppleLog", isLog2: true)] = state
         }
         return built
     }()
@@ -128,7 +141,9 @@ final class MetalVideoRenderer: NSObject, MTKViewDelegate, @unchecked Sendable {
               let surfaces = effectSurfaces(width: size.width, height: size.height) else { return nil }
         let name: String
         switch textures.storage {
-        case .biPlanar: name = colorMode == .appleLog && !composited ? "gradeToTextureAppleLog" : "gradeToTextureYUV"
+        case .biPlanar: name = colorMode.isAppleLog && !composited
+            ? AppleLogSpecialization.key("gradeToTextureAppleLog", isLog2: colorMode == .appleLog2)
+            : "gradeToTextureYUV"
         case .bgra: name = "gradeToTextureBGRA"
         case .linearHalf: name = "gradeToTextureHDR"
         }
@@ -160,7 +175,7 @@ final class MetalVideoRenderer: NSObject, MTKViewDelegate, @unchecked Sendable {
         encoder.endEncoding()
         stateLock.lock(); let isStill = stillEffectSize != nil; stateLock.unlock()
         guard stage.encode(source: surfaces.0, destination: surfaces.1, grade: grade,
-                           workingSpace: colorMode.isHDR || (colorMode == .appleLog && !composited),
+                           workingSpace: colorMode.isHDR || (colorMode.isAppleLog && !composited),
                            blurLongEdge: isStill ? StillEffectGeometry.blurLongEdge : nil,
                            into: command) else { return nil }
         return surfaces.1
@@ -343,8 +358,10 @@ final class MetalVideoRenderer: NSObject, MTKViewDelegate, @unchecked Sendable {
             }
             // Apple Log renders to an ordinary Rec.709 drawable: the log
             // encoding is an input format, never something presented.
-            if colorMode == .appleLog,
-               let logFunction = context.library.makeFunction(name: "previewFragmentAppleLog") {
+            if colorMode.isAppleLog,
+               let logFunction = AppleLogSpecialization.makeFunction(
+                   "previewFragmentAppleLog", isLog2: colorMode == .appleLog2,
+                   library: context.library) {
                 appleLogPipeline = try makePipeline(fragment: logFunction)
             } else {
                 appleLogPipeline = nil
@@ -552,7 +569,7 @@ final class MetalVideoRenderer: NSObject, MTKViewDelegate, @unchecked Sendable {
     /// Warms every bundled look shortly after the editor opens, so selecting one
     /// is instant.
     func preloadLooks() {
-        let needsAppleLogRendering = colorMode == .appleLog
+        let needsAppleLogRendering = colorMode.isAppleLog
         Task.detached(priority: .utility) { [context, weak self] in
             // Apple's rendering LUT first when it is needed: until it lands the
             // preview falls back to a plain Rec.709 transfer, which is a
@@ -683,7 +700,7 @@ final class MetalVideoRenderer: NSObject, MTKViewDelegate, @unchecked Sendable {
             guard inFlight.wait(timeout: .now()) == .success else { return }
             var submitted = false
             defer { if !submitted { inFlight.signal() } }
-            if colorMode == .appleLog, !composited, appleLogRenderingLUT == nil { return }
+            if colorMode.isAppleLog, !composited, appleLogRenderingLUT == nil { return }
             guard let drawable = view.currentDrawable,
                   let renderPass = view.currentRenderPassDescriptor,
                   let textures = PixelBufferTextures(pixelBuffer: pixelBuffer, context: context),
@@ -716,7 +733,7 @@ final class MetalVideoRenderer: NSObject, MTKViewDelegate, @unchecked Sendable {
             // neighbours from, so grading and presenting split into two passes.
             // With no spatial effect switched on, none of this runs and the
             // single-pass route below is exactly what it always was.
-            if effected == nil, colorMode == .appleLog, !composited, let appleLogPipeline,
+            if effected == nil, colorMode.isAppleLog, !composited, let appleLogPipeline,
                case .biPlanar(_, let luma, _, let chroma) = textures.storage {
                 // Apple Log: its own input transform, then the same extended
                 // range grading path HLG uses, then Apple's rendering LUT.
@@ -751,7 +768,7 @@ final class MetalVideoRenderer: NSObject, MTKViewDelegate, @unchecked Sendable {
                     encoder.setFragmentTexture(curveTexture, index: 6)
                     locals.bindFragment(encoder)
                 }
-            } else if let effected, colorMode == .appleLog, !composited, let present = appleLogPresentPipeline {
+            } else if let effected, colorMode.isAppleLog, !composited, let present = appleLogPresentPipeline {
                 encoder.setRenderPipelineState(present)
                 encoder.setFragmentTexture(effected, index: 0)
                 encoder.setFragmentTexture(appleLogRenderingLUT, index: 4)
@@ -897,7 +914,9 @@ final class MetalVideoRenderer: NSObject, MTKViewDelegate, @unchecked Sendable {
 
         let name: String
         switch textures.storage {
-        case .biPlanar: name = colorMode == .appleLog && !composited ? "gradeToTextureAppleLog" : "gradeToTextureYUV"
+        case .biPlanar: name = colorMode.isAppleLog && !composited
+            ? AppleLogSpecialization.key("gradeToTextureAppleLog", isLog2: colorMode == .appleLog2)
+            : "gradeToTextureYUV"
         case .bgra: name = "gradeToTextureBGRA"
         case .linearHalf: name = "gradeToTextureHDR"
         }

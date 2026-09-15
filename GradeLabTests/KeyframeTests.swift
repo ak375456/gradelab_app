@@ -488,6 +488,27 @@ final class KeyframeTests: XCTestCase {
         XCTAssertEqual(TimelineTrack.sanitizedName("Café ünïcode 😀", kind: .text), "Café ünïcode 😀")
     }
 
+    func testDefaultTextLayerNameUsesItsVisibleText() throws {
+        var (project, id) = try textProject()
+        var clip = text(project, id)
+        clip.text = "  HI\nthere  "
+        try replace(clip, in: &project)
+
+        let track = try XCTUnwrap(project.timeline.tracks.first { $0.id == clip.placement.trackID })
+        XCTAssertEqual(track.layerDisplayName, "HI there")
+    }
+
+    func testCustomTextLayerNameOverridesItsVisibleText() throws {
+        var (project, id) = try textProject()
+        var clip = text(project, id)
+        clip.text = "HI"
+        try replace(clip, in: &project)
+        let index = try XCTUnwrap(project.timeline.tracks.firstIndex { $0.id == clip.placement.trackID })
+        project.timeline.tracks[index].name = "Opening title"
+
+        XCTAssertEqual(project.timeline.tracks[index].layerDisplayName, "Opening title")
+    }
+
     func testRenamingALayerChangesNothingElse() throws {
         var (project, id) = try textProject()
         let before = project

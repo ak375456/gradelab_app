@@ -1,43 +1,70 @@
-Create cinematic photos and videos with GradeLab, a color grading editor for iPhone and iPad. Explore filters and LUTs, create your own presets, and bring a vintage film look or a clean, natural finish to your edits.
+Turn everyday photos and videos into cinematic stories. GradeLab is a color grading editor for iPhone and iPad with LUT filters, vintage looks, professional color tools and video editing, all in one app.
 
-From warm portraits to moody travel clips, shape the light, color and atmosphere of every frame. Start with a look you love, adjust its strength, then make it your own.
+Pick a look, dial in its strength, then make it your own. From warm portraits and moody travel clips to soft film tones and retro aesthetics, GradeLab gives you full control over the light, color and atmosphere of every edit — across the whole frame or just one part of it.
 
-CINEMATIC FILTERS & LUTs
+CINEMATIC LUTS & VINTAGE FILTERS
+- Browse cinematic LUTs with live previews on your own photos and videos.
+- Explore signature looks like Warm Cinema, Teal Orange and Soft Film, plus a full collection of film-inspired LUTs.
+- Adjust look strength for a subtle finish or a bold cinematic style.
+- Import your own .cube LUT files and use them just like built-in looks.
+- Save your color grading as presets and apply them to any photo or video for a consistent style.
 
-Explore looks such as Warm Cinema, Teal Orange and Soft Film. Preview LUT filters on your own photos and videos, control their intensity, and fine-tune the result. Import your own .cube LUT files to bring your favorite color styles into GradeLab.
+PROFESSIONAL COLOR GRADING
+- Exposure, contrast, highlights, shadows, whites and blacks.
+- Temperature, tint, saturation and vibrance.
+- Eight-band HSL to shape individual colors.
+- Color wheels for shadows, midtones and highlights.
+- Master, Red, Green and Blue curves.
+- Hue, saturation and luminance curves for precise color control.
+- Fade, sharpening and vignette.
+- Before and after comparison as you edit.
 
-SAVE YOUR OWN PRESETS
+MASKS & LOCAL GRADING
+- Grade one part of the frame instead of the whole picture.
+- Ellipse, rectangle, gradient and freehand masks.
+- Feather the edge, set the strength, or invert a mask to grade everything outside it.
+- Stack several masks on one clip, each with its own grade.
+- Track a mask to a moving subject and let it follow through the shot, forward or backward.
+- Use the same masks on photos.
 
-Turn your grading adjustments into reusable presets. Apply a style you've created to another photo or video and build a consistent look across your work.
+KEYFRAMED COLOR GRADING
+- Animate the grade itself, so a look builds through a shot or falls away at the end.
+- Keyframe exposure, contrast, temperature, saturation, HSL, color wheels, vignette, curves, film effects and look strength.
+- Adjust any keyframe by hand, including motion created by mask tracking.
 
-COLOR GRADING, YOUR WAY
+TRANSITIONS
+- 45 transitions between clips: dissolves, dips, wipes, slides, zooms, blur dissolve, whip pan, film burn, glitch, prism, page turn and more.
+- Set the duration of every transition on the timeline.
 
-Adjust exposure, contrast, highlights, shadows, whites and blacks. Balance temperature and tint, and refine saturation and vibrance.
+FILM EFFECTS
+- Film grain, bloom, glow and halation for an authentic analog feel.
 
-Shape individual colors with eight-band HSL. Use color wheels to balance shadows, midtones and highlights. Fine-tune tones with Master and RGB curves, or make targeted adjustments with hue, saturation and luminance curves.
+PROFESSIONAL SCOPES
+- Histogram, waveform, RGB parade and vectorscope for accurate grading.
 
-Compare your edit with the original as you work. Check exposure and color with a histogram, waveform, RGB parade and vectorscope.
-
-VINTAGE TEXTURE & FILM EFFECTS
-
-Add film grain, soften highlights with bloom and glow, or create a film-inspired finish with halation. Refine your look with fade, sharpening and vignette, from subtle texture to a stronger cinematic style.
+APPLE LOG, HDR & PRORES
+- Grade Apple Log and Apple Log 2 footage, plus HLG HDR video.
+- Apple Log 2 from iPhone 17 Pro uses its own wide-gamut transform, never Apple Log's.
+- Export ProRes 422 and ProRes 422 HQ on compatible devices.
+- Export in 4K or your source resolution, with custom frame rate and bitrate.
 
 EDIT VIDEO & PHOTOS
+- Trim and split clips, change playback speed, and add titles and audio.
+- Grade photos with the same color tools you use for video.
+- Export photos as full-resolution JPEG, HEIC or lossless PNG.
+- No watermarks on your exports.
 
-Trim and split video clips, adjust playback speed, and add titles and audio. Build layered edits with overlays and blend modes. Animate supported text and transform settings with keyframes.
+TEXT, LAYERS & MOTION
+- Add titles with curated font families or your own imported TTF fonts.
+- Layer overlays with blend modes.
+- Mask a layer with an ellipse, rectangle or split line so the track underneath shows through.
+- Feather or invert a layer mask, and keyframe it into a wipe or reveal.
+- Animate text, transforms and color grading with keyframes.
 
-Use built-in font families or import TTF fonts to make your titles your own. Edit photos with the same color controls you use for video.
+Whether you're grading a travel vlog, a short film or a single portrait, GradeLab helps you create a look that's unmistakably yours.
 
-HDR, APPLE LOG & PRORES
-
-Work with supported HLG HDR and Apple Log video. Export ProRes 422 or ProRes 422 HQ on compatible devices, with available formats determined by your footage and hardware.
-
-FLEXIBLE EXPORTS
-
-Export video in 4K or at supported source resolutions, with frame rate and bitrate controls. Save full-resolution photos as JPEG, HEIC or lossless PNG.
-
-Feature and format availability depend on your source media and device capabilities.
+Feature and format availability depend on your source media and device capabilities. Some features require a subscription or one-time purchase.
 
 Privacy Policy: https://ak375456.github.io/gradelab/privacy.html
-App Terms: https://ak375456.github.io/gradelab/terms.html
 Terms of Use (EULA): https://www.apple.com/legal/internet-services/itunes/dev/stdeula/
+App Terms: https://ak375456.github.io/gradelab/terms.html

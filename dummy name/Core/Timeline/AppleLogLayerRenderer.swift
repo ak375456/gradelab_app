@@ -12,6 +12,16 @@ final class AppleLogLayerRenderer {
     static let functionNames = ["compositeVideoAppleLog", "compositeImageAppleLog", "blendAppleLogLayer",
                                 "compositeTransitionAppleLog", "resolveAppleLogCanvas", "resolveAppleLogCanvas422"]
 
+    /// The kernels this renderer needs for a given Log format.
+    ///
+    /// Only `compositeVideoAppleLog` differs between Apple Log and Apple Log 2 —
+    /// it is the one kernel that reads camera code values. Every other surface
+    /// here already carries linear BT.2020 light, which is what both formats
+    /// become after their input transform.
+    static func functionNames(isLog2: Bool) -> [String] {
+        functionNames.map { AppleLogSpecialization.key($0, isLog2: isLog2 && $0 == "compositeVideoAppleLog") }
+    }
+
     private static let cacheLock = NSLock()
     /// The rendering LUT, keyed by shader library so a test or the validator
     /// running against its own compiled source cannot hand its texture to the app.
@@ -22,8 +32,15 @@ final class AppleLogLayerRenderer {
     ///   from recompiling these six kernels, which is minutes of work on a cold
     ///   device. Nil compiles them, which is what the validator and tests do
     ///   against their own library.
-    init(context: MetalContext, prebuilt: [String: MTLComputePipelineState]? = nil) throws {
+    /// - Parameter isLog2: selects the Apple Log 2 input transform. A renderer
+    ///   is built for one Log format: the kernel is specialised at compile time,
+    ///   so a single timeline cannot mix Apple Log and Apple Log 2 sources
+    ///   through it. `LayerCompositor` rejects a mismatched clip rather than
+    ///   decoding it through the wrong primaries.
+    init(context: MetalContext, prebuilt: [String: MTLComputePipelineState]? = nil,
+         isLog2: Bool = false) throws {
         self.context = context
+        let required = Self.functionNames(isLog2: isLog2)
         Self.cacheLock.lock()
         defer { Self.cacheLock.unlock() }
         let key = ObjectIdentifier(context.library)
@@ -38,16 +55,22 @@ final class AppleLogLayerRenderer {
             renderingLUT = lut
             Self.cachedLUT[key] = lut
         }
-        if let prebuilt, Self.functionNames.allSatisfy({ prebuilt[$0] != nil }) {
-            pipelines = prebuilt.filter { Self.functionNames.contains($0.key) }
+        if let prebuilt, required.allSatisfy({ prebuilt[$0] != nil }) {
+            pipelines = prebuilt.filter { required.contains($0.key) }
             return
         }
         var built: [String: MTLComputePipelineState] = [:]
-        for name in Self.functionNames {
-            guard let function = context.library.makeFunction(name: name) else {
+        for key in required {
+            // The Log 2 variant is the Apple Log function compiled with a
+            // different function constant, so the key carries the suffix while
+            // the function name does not.
+            let isVariant = key.hasSuffix("AppleLog2")
+            let name = isVariant ? String(key.dropLast()) : key
+            guard let function = AppleLogSpecialization.makeFunction(
+                name, isLog2: isVariant, library: context.library) else {
                 throw GradeLabError.rendererInitializationFailed
             }
-            built[name] = try context.device.makeComputePipelineState(function: function)
+            built[key] = try context.device.makeComputePipelineState(function: function)
         }
         pipelines = built
     }

@@ -46,9 +46,16 @@ final class ColorPipelineSupportTests: XCTestCase {
                 bitDepth: 10
             )
         )
-        XCTAssertEqual(support.recognizedProfile, .appleLog2)
+        // Apple Log 2 is supported now, but the invariant this test exists for
+        // is unchanged and is the important half: it is supported *as itself*.
+        // It must never be classified as Apple Log, because that would decode it
+        // through BT.2020 primaries instead of Apple Wide Gamut.
+        XCTAssertEqual(support, .appleLog2Supported)
+        XCTAssertEqual(support.colorMode, .appleLog2)
         XCTAssertNotEqual(support, .appleLogSupported, "Apple Log 2 must never take the Apple Log path")
-        XCTAssertFalse(support.allowsGrading)
+        XCTAssertNotEqual(support.colorMode, .appleLog, "Apple Log 2 must not be graded as Apple Log")
+        XCTAssertTrue(support.allowsGrading)
+        XCTAssertFalse(support.isBlocking)
         XCTAssertTrue(support.notice?.contains("Apple Log 2") == true)
 
         // A Log format from another vendor stays honestly unsupported rather

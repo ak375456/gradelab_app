@@ -24,6 +24,7 @@ struct EditorView: View {
     @State private var waveforms: [UUID: [Float]] = [:]
     @State private var audioMode = false
     @State private var audioPicker = false
+    @State private var soundEffects = false
     @State private var audioURL: URL?
     @State private var mediaItem: PhotosPickerItem?
     @State private var mediaPicker = false
@@ -327,6 +328,11 @@ struct EditorView: View {
         .sheet(isPresented: $layers) { LayerControls(model: model).presentationDetents([.medium, .large]) }
         .sheet(isPresented: $settingsSheet) { EditorSettings() }
         .sheet(isPresented: $markers) { MarkerControls(model: model).presentationDetents([.medium]) }
+        .sheet(isPresented: $soundEffects) {
+            SoundEffectBrowser { url in audioURL = url }
+                .presentationDetents([.large])
+                .presentationDragIndicator(.visible)
+        }
     }
 
     var body: some View {
@@ -493,13 +499,13 @@ struct EditorView: View {
                 Text("ORIGINAL").font(.caption2.weight(.semibold)).tracking(1.5)
                     .padding(10).background(.black.opacity(0.65), in: Capsule()).padding(14)
                     .allowsHitTesting(false)
-            } else if model.previewStatus.projectMode == .appleLog {
+            } else if model.previewStatus.projectMode.isAppleLog {
                 // Log footage that has been correctly managed looks like an
                 // ordinary picture, which is the point — but it also means
                 // nothing on screen says the source is Log. The badge says it,
                 // rather than leaving a flat preview to imply it.
                 Button { colorInfo = true } label: {
-                    Text("APPLE LOG").font(.caption2.weight(.semibold)).tracking(1.2)
+                    Text(model.previewStatus.projectMode.badge).font(.caption2.weight(.semibold)).tracking(1.2)
                         .padding(.horizontal, 10).padding(.vertical, 6)
                         .background(.black.opacity(0.65), in: Capsule())
                         .foregroundStyle(AppColors.accent)
@@ -572,12 +578,29 @@ struct EditorView: View {
                 Button { model.stepFrames(max(1, min(120, frameStep))) } label: { Image(systemName: "forward.end").frame(width: 44, height: 44) }
                     .accessibilityLabel("Forward \(frameStep) frames").disabled(model.isPreparingTimeline)
                 let frameRate = model.project.canvas.frameRate ?? model.project.metadata.bestFrameRate
-                Text(TimecodeFormatter.frameString(from: model.timelineTime, frameRate: frameRate))
-                    .font(.caption.monospacedDigit())
-                Text("/ " + TimecodeFormatter.frameString(
+                // One Text, not two, and never compressed. As two views the
+                // position and the duration were separate layout units, so on a
+                // narrow phone SwiftUI shrank them ahead of the Spacer and broke
+                // a timecode across lines mid-value — "00:00:01:" above "08".
+                // Concatenation keeps the two-tone styling while making the
+                // whole readout indivisible; the priority and fixed size mean
+                // the trailing Spacer gives up its width first, which is what
+                // it is there for.
+                (Text(TimecodeFormatter.frameString(from: model.timelineTime, frameRate: frameRate))
+                 + Text(" / ").foregroundStyle(AppColors.textSecondary)
+                 + Text(TimecodeFormatter.frameString(
                     from: model.project.timeline.duration.seconds, frameRate: frameRate))
-                    .font(.caption.monospacedDigit()).foregroundStyle(AppColors.textSecondary)
-                Spacer()
+                    .foregroundStyle(AppColors.textSecondary))
+                    .font(.caption.monospacedDigit())
+                    // lineLimit stops the wrap outright; layoutPriority makes
+                    // the Spacer yield its width first; minimumScaleFactor is
+                    // the last resort on a narrow phone, where shrinking a
+                    // point or two beats truncating a timecode to "00:00:0…".
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.8)
+                    .layoutPriority(1)
+                    .accessibilityLabel("Position \(TimecodeFormatter.frameString(from: model.timelineTime, frameRate: frameRate)) of \(TimecodeFormatter.frameString(from: model.project.timeline.duration.seconds, frameRate: frameRate))")
+                Spacer(minLength: 0)
                 if UIDevice.current.userInterfaceIdiom == .pad {
                     persistentTimelineActions
                     previewQualityButton
@@ -630,6 +653,9 @@ struct EditorView: View {
     }
 
     @ViewBuilder private var addMediaActions: some View {
+        Button("Sound effects", systemImage: "waveform.badge.plus") {
+            model.playback.pause(); soundEffects = true
+        }
         Button("Add audio from Files", systemImage: "waveform") { audioPicker = true }
         Button("Add video after selection", systemImage: "film") {
             importImage = false; importOverlay = false; mediaPicker = true
@@ -1034,7 +1060,9 @@ struct EditorView: View {
                     }.font(.subheadline).frame(minHeight: 44)
                 }.frame(height: 44).scrollIndicators(.hidden).disabled(model.isPreparingTimeline)
                 if audioMode {
-                    AudioToolPanel(model: model, addAudio: { audioPicker = true }, showTracks: { layers = true },
+                    AudioToolPanel(model: model, addSoundEffect: {
+                        model.playback.pause(); soundEffects = true
+                    }, addAudio: { audioPicker = true }, showTracks: { layers = true },
                         waveformUnavailable: model.selectedAudio.map { waveforms[$0.assetID]?.isEmpty == true } ?? false)
                 } else {
                     Text("Hold, then drag sideways to move · Drag vertically for a layer · Drag edges to trim")

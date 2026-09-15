@@ -29,6 +29,9 @@ final class AppCoordinator: ObservableObject {
     @Published private(set) var imageProjects: [ImageProject] = []
     @Published private(set) var imageEditorModel: ImageEditorViewModel?
     @Published private(set) var analyzingFileName: String?
+    /// Which import is running, so the analysing screen names the right medium.
+    /// Set alongside `analyzingFileName` by whichever import began.
+    @Published private(set) var analyzingMedia: AnalyzingView.Media = .video
     @Published var alert: AlertState?
     /// Why the video library is empty, when it is empty because reading it
     /// failed rather than because nothing has been imported. Home needs the
@@ -70,13 +73,14 @@ final class AppCoordinator: ObservableObject {
 
     /// Imports a photograph and opens it straight in the grading workspace.
     ///
-    /// There is no analysis screen and no source-information step between the
-    /// two: a still has one thing to check — whether its colour can be handled —
-    /// and that is decided during the import, which either succeeds or explains
-    /// itself. Anything else would be a screen between the user and the picture.
+    /// There is no source-information step on the way: a still has one thing to
+    /// check — whether its colour can be handled — and that is decided during
+    /// the import, which either succeeds or explains itself. Anything else would
+    /// be a screen between the user and the picture.
     func importImage(from item: PhotosPickerItem) {
         importTask?.cancel()
         analyzingFileName = nil
+        analyzingMedia = .image
         withAnimation(.easeInOut(duration: 0.18)) { screen = .analyzing }
         importTask = Task { [weak self] in
             guard let self else { return }
@@ -216,6 +220,7 @@ final class AppCoordinator: ObservableObject {
         guard let item = items.first else { return }
         importTask?.cancel()
         analyzingFileName = nil
+        analyzingMedia = .video
         withAnimation(.easeInOut(duration: 0.18)) { screen = .analyzing }
 
         importTask = Task { [weak self] in

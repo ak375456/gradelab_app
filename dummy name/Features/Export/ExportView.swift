@@ -23,8 +23,8 @@ struct ExportView: View {
             return "10-bit HDR · \(encode) · HLG, BT.2020 · Timeline audio mixed to AAC"
         case .sdrWide:
             return "10-bit Rec.709 SDR · \(encode) · Timeline audio mixed to AAC"
-        case .appleLog:
-            return "Apple Log → Rec.709 SDR · 10-bit \(encode) · Timeline audio mixed to AAC"
+        case .appleLog, .appleLog2:
+            return "\(model.project.colorMode.title) → Rec.709 SDR · 10-bit \(encode) · Timeline audio mixed to AAC"
         case .sdr:
             return codec.usesBitRate
                 ? "8-bit Rec.709 SDR · Timeline audio mixed to AAC"
@@ -352,7 +352,7 @@ struct ExportView: View {
                 }
                 Text(model.project.colorMode.isWidePrecision
                      ? "This needs hardware HEVC Main 10 support at the selected size and frame rate."
-                     : "Requires a verified 8-bit Rec.709 SDR source and a supported hardware encoder. Try a smaller size or another codec.")
+                     : "Requires a supported 8-bit SDR source and a compatible hardware encoder. Try a smaller size or another codec.")
                     .font(AppTypography.caption).foregroundStyle(AppColors.textTertiary)
             }
             .frame(maxWidth: .infinity, alignment: .leading)

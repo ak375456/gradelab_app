@@ -46,6 +46,13 @@ final class VideoMetadataTests: XCTestCase {
         let untagged = makeMetadata(colorPrimaries: nil, transferFunction: nil)
         XCTAssertEqual(ColorPipelineSupport(metadata: untagged), .assumedRec709)
         XCTAssertTrue(ColorPipelineSupport(metadata: untagged).allowsGrading)
+        XCTAssertTrue(ColorPipelineSupport(metadata: untagged).notice?.contains("preview and export") == true)
+
+        let missingMatrix = makeVideoMetadata(yCbCrMatrix: nil)
+        XCTAssertEqual(ColorPipelineSupport(metadata: missingMatrix), .assumedRec709)
+
+        let conflictingMatrix = makeVideoMetadata(yCbCrMatrix: "BT.601")
+        XCTAssertFalse(ColorPipelineSupport(metadata: conflictingMatrix).allowsEditor)
 
         let hdr = makeMetadata(transferFunction: "ITU_R_2100_HLG", isHDR: true, bitDepth: 10)
         XCTAssertFalse(ColorPipelineSupport(metadata: hdr).allowsGrading)

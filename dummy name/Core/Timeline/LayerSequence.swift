@@ -23,11 +23,12 @@ extension SequenceComposition {
     }
 
     static func buildLayers(project: VideoProject, forExport: Bool, context: MetalContext? = nil) async throws -> Self {
-        if project.colorMode == .appleLog {
+        if project.colorMode.isAppleLog {
+            let expected: SourceColorProfile = project.colorMode == .appleLog2 ? .appleLog2 : .appleLog
             guard let identifier = project.metadata.logProfileIdentifier,
-                  SourceColorProfile.fromLogIdentifier(identifier) == .appleLog else {
+                  SourceColorProfile.fromLogIdentifier(identifier) == expected else {
                 throw GradeLabError.unsupportedExport(
-                    "This project is set to Apple Log, but the source declares no supported Apple Log profile. GradeLab does not infer Log from the picture.")
+                    "This project is set to \(expected.displayName), but the source declares no matching Log profile. GradeLab does not infer Log from the picture.")
             }
         }
         let clips = try TimelineEditing.clips(in: project)
@@ -44,7 +45,7 @@ extension SequenceComposition {
         for asset in project.assets where clips.contains(where: { $0.assetID == asset.id }) {
             if asset.stillImage != nil { continue }
             guard let metadata = asset.videoMetadata else { throw TimelineError.invalid("Missing video metadata.") }
-            sources[asset.id] = try await ExportSourceInspector.inspect(.init(url: asset.url, metadata: metadata), requireExportColorTags: forExport || (project.colorMode == .appleLog && metadata.logProfileIdentifier != nil))
+            sources[asset.id] = try await ExportSourceInspector.inspect(.init(url: asset.url, metadata: metadata), requireExportColorTags: forExport || (project.colorMode.isAppleLog && metadata.logProfileIdentifier != nil))
             try Task.checkCancellation()
         }
         var ids: [UUID: CMPersistentTrackID] = [:]
@@ -262,7 +263,7 @@ extension SequenceComposition {
         // AVFoundation builds the compositor itself and reads its surface
         // attributes before any instruction is seen, so the choice has to be
         // carried by the type.
-        if project.colorMode == .appleLog {
+        if project.colorMode.isAppleLog {
             vc.customVideoCompositorClass = forExport
                 ? AppleLogExportLayerCompositor.self : AppleLogLayerCompositor.self
         } else {
@@ -278,7 +279,7 @@ extension SequenceComposition {
             vc.colorPrimaries = AVVideoColorPrimaries_ITU_R_2020
             vc.colorTransferFunction = AVVideoTransferFunction_ITU_R_2100_HLG
             vc.colorYCbCrMatrix = AVVideoYCbCrMatrix_ITU_R_2020
-        } else if project.colorMode != .appleLog {
+        } else if !project.colorMode.isAppleLog {
             vc.colorPrimaries = AVVideoColorPrimaries_ITU_R_709_2
             vc.colorTransferFunction = AVVideoTransferFunction_ITU_R_709_2
             vc.colorYCbCrMatrix = AVVideoYCbCrMatrix_ITU_R_709_2
@@ -309,7 +310,7 @@ extension SequenceComposition {
             gradesBaked: true, audioMix: routing.makeMix(project),
             // Log is an input profile. This source now carries rendered Rec.709;
             // leaving it marked Log would apply the input transform a second time.
-            colorMode: project.colorMode == .appleLog ? .sdrWide : project.colorMode),
+            colorMode: project.colorMode.isAppleLog ? .sdrWide : project.colorMode),
             clips: clips, layerState: state, audioRouting: routing)
     }
 }

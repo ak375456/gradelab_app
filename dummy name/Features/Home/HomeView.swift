@@ -11,10 +11,22 @@ struct HomeView: View {
     @ObservedObject private var store = ProStore.shared
     @State private var paywall = false
 
+    /// The grade this screen is wearing, restored from the last time it was set.
+    @State private var grade = HomeScreenGrade.restored()
+    @State private var isGradingScreen = false
+    /// Persisted, because the mark should invite a tap once in the life of the
+    /// install rather than once per launch.
+    @AppStorage("home.screenGrade.discovered") private var hasFoundScreenGrade = false
+    @Environment(\.scenePhase) private var scenePhase
+
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: AppSpacing.xLarge) {
                 header
+                if isGradingScreen {
+                    ScreenGradePanel(grade: $grade, onClose: toggleScreenGrade)
+                        .transition(.scale(scale: 0.96, anchor: .top).combined(with: .opacity))
+                }
                 unlockPro
                 importHero
                 recentProjects
@@ -24,8 +36,12 @@ struct HomeView: View {
             .padding(.bottom, AppSpacing.xLarge)
         }
         .scrollIndicators(.hidden)
-        .background(AppColors.background.ignoresSafeArea())
+        .background(grade.background.ignoresSafeArea())
         .preferredColorScheme(.dark)
+        .environment(\.homeScreenGrade, grade)
+        // Lets the read-out on each grading slider be tapped for an exact value,
+        // the way the same slider behaves in the editor.
+        .numericEntryHost()
         .sheet(isPresented: $settings) { EditorSettings() }
         .sheet(isPresented: $paywall) { PaywallView() }
         .onChange(of: selectedItems) { _, newValue in
@@ -37,6 +53,25 @@ struct HomeView: View {
             guard let item else { return }
             coordinator.importImage(from: item)
             selectedImage = nil
+        }
+        // Catches the grade of someone who set it and then left without closing
+        // the panel, which the close handler alone would lose.
+        .onChange(of: scenePhase) { _, phase in
+            if phase != .active { grade.persist() }
+        }
+    }
+
+    /// Opening the panel is what counts as finding it: the invitation on the
+    /// mark stops for good at that point, whether or not anything gets graded.
+    private func toggleScreenGrade() {
+        withAnimation(.spring(response: 0.42, dampingFraction: 0.86)) {
+            isGradingScreen.toggle()
+        }
+
+        if isGradingScreen {
+            hasFoundScreenGrade = true
+        } else {
+            grade.persist()
         }
     }
 
@@ -94,7 +129,10 @@ struct HomeView: View {
 
     private var header: some View {
         HStack(alignment: .center, spacing: AppSpacing.compact) {
-            GradeLabMark()
+            GradeLabMark(grade: grade,
+                         isOpen: isGradingScreen,
+                         isInviting: !hasFoundScreenGrade,
+                         action: toggleScreenGrade)
             VStack(alignment: .leading, spacing: 2) {
                 Text("GradeLab")
                     .font(AppTypography.display)
@@ -103,12 +141,16 @@ struct HomeView: View {
                     .font(AppTypography.secondary)
                     .foregroundStyle(AppColors.textSecondary)
             }
+            .accessibilityElement(children: .combine)
+            .accessibilityAddTraits(.isHeader)
             Spacer()
             Button { settings = true } label: { Image(systemName: "gearshape").frame(width: 44, height: 44) }
                 .buttonStyle(.plain).accessibilityLabel("App settings")
         }
-        .accessibilityElement(children: .combine)
-        .accessibilityAddTraits(.isHeader)
+        // Two buttons and a title live here now that the mark is a control, so
+        // the row contains its children instead of collapsing them into one
+        // element that would bury both buttons behind the app's name.
+        .accessibilityElement(children: .contain)
     }
 
     private var importHero: some View {
@@ -117,7 +159,7 @@ struct HomeView: View {
                 Text("FROM CAMERA TO FINISH")
                     .font(AppTypography.sectionLabel)
                     .tracking(1.15)
-                    .foregroundStyle(AppColors.accent)
+                    .foregroundStyle(grade.accent)
                 Text("Shape the image.\nKeep the quality.")
                     .font(.system(.title, design: .default, weight: .semibold))
                     .foregroundStyle(AppColors.textPrimary)
@@ -133,7 +175,7 @@ struct HomeView: View {
                         .font(AppTypography.bodyEmphasized)
                         .foregroundStyle(AppColors.editorBackground)
                         .frame(maxWidth: .infinity, minHeight: 48)
-                        .background(AppColors.accent, in: RoundedRectangle(cornerRadius: AppCornerRadius.control, style: .continuous))
+                        .background(grade.accent, in: RoundedRectangle(cornerRadius: AppCornerRadius.control, style: .continuous))
                 }
                 .accessibilityHint("Opens the system video picker")
 
@@ -144,7 +186,7 @@ struct HomeView: View {
                         .font(AppTypography.bodyEmphasized)
                         .foregroundStyle(AppColors.textPrimary)
                         .frame(maxWidth: .infinity, minHeight: 48)
-                        .background(AppColors.surfaceRaised, in: RoundedRectangle(cornerRadius: AppCornerRadius.control, style: .continuous))
+                        .background(grade.surfaceRaised, in: RoundedRectangle(cornerRadius: AppCornerRadius.control, style: .continuous))
                         .overlay {
                             RoundedRectangle(cornerRadius: AppCornerRadius.control, style: .continuous)
                                 .strokeBorder(AppColors.border, lineWidth: 1)
@@ -164,7 +206,7 @@ struct HomeView: View {
         .padding(AppSpacing.large)
         .background {
             ZStack {
-                AppColors.surface
+                grade.surface
                 TechnicalGrid().opacity(0.28)
             }
         }
@@ -246,10 +288,11 @@ struct HomeView: View {
                 AppEmptyState(
                     title: "Projects couldn’t be loaded",
                     message: "\(libraryFailure)",
-                    systemImage: "exclamationmark.triangle"
+                    systemImage: "exclamationmark.triangle",
+                    tint: grade.accent
                 )
                 .frame(maxWidth: .infinity)
-                .appSurface()
+                .appSurface(fill: grade.surface)
             }
 
             if !recents.isEmpty {
@@ -274,10 +317,11 @@ struct HomeView: View {
                 AppEmptyState(
                     title: "No projects yet",
                     message: "Your imported clips, photographs and non-destructive grades will appear here.",
-                    systemImage: "rectangle.stack"
+                    systemImage: "rectangle.stack",
+                    tint: grade.accent
                 )
                 .frame(maxWidth: .infinity)
-                .appSurface()
+                .appSurface(fill: grade.surface)
             }
         }
         // Confirmed rather than undoable: deleting frees the imported copy of
@@ -324,41 +368,13 @@ struct HomeView: View {
     }
 }
 
-private struct GradeLabMark: View {
-    var body: some View {
-        ZStack {
-            RoundedRectangle(cornerRadius: 12, style: .continuous).fill(AppColors.surfaceRaised)
-            VStack(spacing: 6) {
-                MarkLine(dotOffset: -8)
-                MarkLine(dotOffset: 9)
-                MarkLine(dotOffset: -2)
-            }
-            .padding(11)
-        }
-        .frame(width: 52, height: 52)
-        .overlay {
-            RoundedRectangle(cornerRadius: 12, style: .continuous).strokeBorder(AppColors.border)
-        }
-        .accessibilityHidden(true)
-    }
-}
-
-private struct MarkLine: View {
-    let dotOffset: CGFloat
-    var body: some View {
-        ZStack {
-            Capsule().fill(AppColors.textTertiary).frame(height: 1)
-            Circle().fill(AppColors.accent).frame(width: 6, height: 6).offset(x: dotOffset)
-        }
-    }
-}
-
 private struct WorkflowStep: View {
     let number: String
     let label: String
+    @Environment(\.homeScreenGrade) private var grade
     var body: some View {
         VStack(alignment: .leading, spacing: 3) {
-            Text(number).font(AppTypography.caption.monospacedDigit()).foregroundStyle(AppColors.accent)
+            Text(number).font(AppTypography.caption.monospacedDigit()).foregroundStyle(grade.accent)
             Text(label).font(AppTypography.caption.weight(.medium)).foregroundStyle(AppColors.textSecondary)
         }
         .accessibilityElement(children: .combine)
@@ -396,6 +412,7 @@ private struct TechnicalGrid: View {
 /// stating figures that were true of a file rather than of the movie.
 private struct ProjectRow: View {
     let project: GradeProject
+    @Environment(\.homeScreenGrade) private var grade
 
     /// The movie's length, which is where the last clip ends — not the source's.
     private var durationLabel: String {
@@ -431,7 +448,7 @@ private struct ProjectRow: View {
                 .foregroundStyle(AppColors.textTertiary).accessibilityHidden(true)
         }
         .padding(AppSpacing.compact)
-        .appSurface()
+        .appSurface(fill: grade.surface)
         .contentShape(Rectangle())
         .accessibilityElement(children: .combine)
         .accessibilityLabel("\(project.displayName), \(resolutionLabel), \(frameRateLabel ?? "frame rate unknown"), \(durationLabel)")
@@ -441,7 +458,7 @@ private struct ProjectRow: View {
         if let path = project.thumbnailFileName, let image = UIImage(contentsOfFile: path) {
             Image(uiImage: image).resizable().scaledToFill()
         } else {
-            ZStack { AppColors.surfaceRaised; Image(systemName: "film").foregroundStyle(AppColors.textTertiary) }
+            ZStack { grade.surfaceRaised; Image(systemName: "film").foregroundStyle(AppColors.textTertiary) }
         }
     }
 }
@@ -455,6 +472,7 @@ private struct ProjectRow: View {
 /// repeated on every row.
 private struct ImageProjectRow: View {
     let project: ImageProject
+    @Environment(\.homeScreenGrade) private var grade
 
     private var metadata: ImageMetadata { project.metadata }
 
@@ -480,7 +498,7 @@ private struct ImageProjectRow: View {
                 .foregroundStyle(AppColors.textTertiary).accessibilityHidden(true)
         }
         .padding(AppSpacing.compact)
-        .appSurface()
+        .appSurface(fill: grade.surface)
         .contentShape(Rectangle())
         .accessibilityElement(children: .combine)
         .accessibilityLabel("\(project.displayName), photograph, \(metadata.resolutionLabel), \(metadata.formatLabel)")
@@ -490,7 +508,7 @@ private struct ImageProjectRow: View {
         if let path = project.thumbnailFileName, let image = UIImage(contentsOfFile: path) {
             Image(uiImage: image).resizable().scaledToFill()
         } else {
-            ZStack { AppColors.surfaceRaised; Image(systemName: "photo").foregroundStyle(AppColors.textTertiary) }
+            ZStack { grade.surfaceRaised; Image(systemName: "photo").foregroundStyle(AppColors.textTertiary) }
         }
     }
 }

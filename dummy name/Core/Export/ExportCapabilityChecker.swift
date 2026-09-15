@@ -68,6 +68,10 @@ struct ExportCapabilityChecker: Sendable {
 
             var issues: [String] = []
             var notes: [String] = []
+            let colorSupport = ColorPipelineSupport(metadata: asset.metadata)
+            if colorSupport == .assumedRec709, let notice = colorSupport.notice {
+                notes.append(notice)
+            }
             if !hardwareSupported {
                 issues.append(source.colorMode.isWidePrecision
                     ? "This iPhone cannot encode HEVC Main 10 at \(dimensions.width)×\(dimensions.height)\(fps.map { String(format: " at %.2f fps", $0) } ?? ""). Try a smaller size or a lower frame rate."

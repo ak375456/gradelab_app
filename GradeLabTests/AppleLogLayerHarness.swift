@@ -10,9 +10,14 @@ import Foundation
 final class AppleLogLayerHarness {
     let context: MetalContext
     let renderer: AppleLogLayerRenderer
-    init(context: MetalContext) throws {
+    /// Which Log format this harness decodes. Apple Log 2 differs from Apple Log
+    /// by the input transform only, so the same harness exercises both and any
+    /// difference in the result is the gamut matrix and nothing else.
+    let isLog2: Bool
+    init(context: MetalContext, isLog2: Bool = false) throws {
         self.context = context
-        renderer = try AppleLogLayerRenderer(context: context)
+        self.isLog2 = isLog2
+        renderer = try AppleLogLayerRenderer(context: context, isLog2: isLog2)
     }
     func texture(_ format: MTLPixelFormat, width: Int, height: Int) -> MTLTexture {
         let d = MTLTextureDescriptor.texture2DDescriptor(pixelFormat: format, width: width, height: height, mipmapped: false)
@@ -81,7 +86,8 @@ final class AppleLogLayerHarness {
         var layer = HDRLayerUniforms(transform: transform, sourceSize: sourceSize, canvasSize: size, opacity: opacity,
             blendAmount: blendAmount, sourceIsSDR: sourceIsSDR)
         var mask = LayerMaskUniforms(authoredMask)
-        try renderer.encode("compositeVideoAppleLog", into: command, width: width, height: height, tileSize: tile) { enc in
+        try renderer.encode(AppleLogSpecialization.key("compositeVideoAppleLog", isLog2: isLog2),
+                            into: command, width: width, height: height, tileSize: tile) { enc in
             enc.setTexture(y, index: 0); enc.setTexture(c, index: 1); enc.setTexture(working, index: 2)
             enc.setTexture(context.luts.texture(for: program.lookIdentifier), index: 3)
             enc.setTexture(py, index: 4); enc.setTexture(pc, index: 5)
@@ -112,7 +118,8 @@ final class AppleLogLayerHarness {
         let output = texture(.rgba32Float, width: width, height: height)
         let d = MTLRenderPipelineDescriptor()
         d.vertexFunction = context.library.makeFunction(name: "videoVertex")
-        d.fragmentFunction = context.library.makeFunction(name: "previewFragmentAppleLog")
+        d.fragmentFunction = AppleLogSpecialization.makeFunction(
+            "previewFragmentAppleLog", isLog2: isLog2, library: context.library)
         d.colorAttachments[0].pixelFormat = .rgba32Float
         let pipeline = try context.device.makeRenderPipelineState(descriptor: d)
         let textures = PixelBufferTextures(pixelBuffer: source, context: context)!

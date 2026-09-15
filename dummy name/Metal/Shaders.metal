@@ -1060,11 +1060,50 @@ inline float3 appleLogYCbCrToRGB(float y, float2 cbcr) {
     return float3(r, g, b);
 }
 
+// ---------------------------------------------------------------------------
+// Apple Log 2
+//
+// Apple Log 2 is the Apple Log transfer function on Apple Wide Gamut primaries
+// rather than BT.2020 — that is the whole of the difference, per Apple's
+// Apple Log 2 white paper and the ACES OCIO config, which reuses the Apple Log
+// curve for it and differs only by a 3x3.
+//
+// So the curve above is shared verbatim and this adds one matrix, selected by a
+// function constant. A function constant rather than a uniform for two reasons:
+// the choice is a property of the source file and cannot change between frames,
+// and specialisation means the Apple Log pipelines compile to *exactly* the code
+// they compiled to before — the branch does not exist in the v1 variant, so the
+// validated v1 path is untouched by construction rather than by inspection.
+// ---------------------------------------------------------------------------
+
+constant bool kAppleLog2Requested [[function_constant(0)]];
+constant bool kSourceIsAppleLog2 =
+    is_function_constant_defined(kAppleLog2Requested) ? kAppleLog2Requested : false;
+
+// Linear Apple Wide Gamut -> linear BT.2020, D65 to D65 so no chromatic
+// adaptation is involved. Written as columns, which is what float3x3 takes; the
+// rows are the matrix in Core/Grading/AppleLog.swift, which is the CPU reference
+// this is verified against.
+constant float3x3 kAppleWideGamutToBT2020 = float3x3(
+    float3( 1.0281009382,  0.0025203419, -0.0220875732),
+    float3( 0.0989788177,  1.1708496433, -0.0640503834),
+    float3(-0.1270797558, -0.1733699853,  1.0861379567));
+
 // The complete input transform: camera samples to the linear working space the
 // grading stage already uses, with diffuse white at 1.0.
+//
+// The gamut matrix is applied after the curve is undone and before the diffuse
+// white normalisation, because a primaries conversion is only meaningful in
+// linear light. Out-of-BT.2020 colour is carried through negative, not clipped:
+// the grade runs in unclamped float and can pull it back, and the display encode
+// at the end of the chain is where clamping already happens.
 inline float3 appleLogToWorking(float y, float2 cbcr) {
     float3 encoded = appleLogYCbCrToRGB(y, cbcr);
-    return appleLogDecode(encoded) / kAppleLogDiffuseWhite;
+    float3 scene = appleLogDecode(encoded);
+    if (kSourceIsAppleLog2) {
+        scene = kAppleWideGamutToBT2020 * scene;
+    }
+    return scene / kAppleLogDiffuseWhite;
 }
 
 // Working space -> Rec.709 display, through Apple's own rendering.

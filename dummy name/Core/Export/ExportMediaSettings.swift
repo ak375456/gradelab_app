@@ -30,7 +30,8 @@ enum ExportMediaSettings {
         if configuration.codec.usesBitRate {
             let profileLevel: CFString
             switch (source.colorMode, configuration.codec) {
-            case (.hdrHLG, _), (.sdrWide, _), (.appleLog, _): profileLevel = kVTProfileLevel_HEVC_Main10_AutoLevel
+            case (.hdrHLG, _), (.sdrWide, _), (.appleLog, _), (.appleLog2, _):
+                profileLevel = kVTProfileLevel_HEVC_Main10_AutoLevel
             case (.sdr, .hevc): profileLevel = kVTProfileLevel_HEVC_Main_AutoLevel
             case (.sdr, _): profileLevel = kVTProfileLevel_H264_High_AutoLevel
             }
@@ -97,7 +98,7 @@ enum ExportMediaSettings {
                 kCVPixelBufferMetalCompatibilityKey as String: true,
                 kCVPixelBufferIOSurfacePropertiesKey as String: [:]
             ]
-        case .appleLog:
+        case .appleLog, .appleLog2:
             // The camera's own encoding, untouched. AVFoundation has no Apple
             // Log conversion to offer — the format is identified by a separate
             // metadata key that the colour-conversion machinery does not read —
@@ -150,7 +151,7 @@ enum ExportMediaSettings {
                     kCVPixelFormatType_420YpCbCr10BiPlanarFullRange]
         case .hdrHLG:
             return [kCVPixelFormatType_64RGBAHalf]
-        case .appleLog:
+        case .appleLog, .appleLog2:
             // Read as the camera wrote it: 10-bit 4:2:2 log. The transform to
             // scene light happens on the GPU, in the same shader the preview
             // uses, so the two cannot disagree.
@@ -166,6 +167,7 @@ enum ExportMediaSettings {
         case .sdrWide: "10-bit 4:2:2"
         case .hdrHLG: "half-float HLG"
         case .appleLog: "10-bit 4:2:2 Apple Log"
+        case .appleLog2: "10-bit 4:2:2 Apple Log 2"
         }
     }
 

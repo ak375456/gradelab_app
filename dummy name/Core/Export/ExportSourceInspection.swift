@@ -103,7 +103,11 @@ enum ExportSourceInspector {
 
         if requireExportColorTags {
             try validateMetadata(source.metadata)
-            try validateVideoFormatDescriptions(formatDescriptions, colorMode: ProjectColorMode.default(for: source.metadata))
+            try validateVideoFormatDescriptions(
+                formatDescriptions,
+                colorMode: ProjectColorMode.default(for: source.metadata),
+                allowMissingRec709Tags: ColorPipelineSupport(metadata: source.metadata) == .assumedRec709
+            )
         } else {
             // Preview/editor path. This asks whether the source can be opened
             // at all, which is `allowsEditor` - deliberately wider than
@@ -194,7 +198,8 @@ enum ExportSourceInspector {
 
     private static func validateVideoFormatDescriptions(
         _ descriptions: [CMFormatDescription],
-        colorMode: ProjectColorMode
+        colorMode: ProjectColorMode,
+        allowMissingRec709Tags: Bool = false
     ) throws {
         guard !descriptions.isEmpty else {
             throw GradeLabError.unsupportedExport(
@@ -222,7 +227,7 @@ enum ExportSourceInspector {
             let depth = try verifiedBitDepth(description)
             switch colorMode {
             case .sdr:
-                try validateRec709(description)
+                try validateRec709(description, allowMissing: allowMissingRec709Tags)
                 guard depth <= 8 else {
                     throw GradeLabError.unsupportedExport(
                         "\(depth)-bit source video is not supported yet. This export path is 8-bit only."
@@ -244,15 +249,15 @@ enum ExportSourceInspector {
                         "This HLG source reports \(depth)-bit precision, which cannot be encoded as Main 10."
                     )
                 }
-            case .appleLog:
+            case .appleLog, .appleLog2:
                 // Verified from the file's own Log identifier rather than from
                 // the ordinary colour tags: Apple Log carries its identity in a
                 // separate extension, and the standard transfer tag says
                 // nothing useful about it.
-                try validateAppleLog(description)
+                try validateAppleLog(description, expecting: colorMode == .appleLog2 ? .appleLog2 : .appleLog)
                 guard depth >= 10 else {
                     throw GradeLabError.unsupportedExport(
-                        "This Apple Log source reports \(depth)-bit precision. Log needs at least 10 bits to survive the transform to scene light."
+                        "This \(colorMode.title) source reports \(depth)-bit precision. Log needs at least 10 bits to survive the transform to scene light."
                     )
                 }
             }
@@ -266,7 +271,10 @@ enum ExportSourceInspector {
     /// it: Apple's own Log identifier. Nothing is inferred from the codec, the
     /// bit depth or the ordinary colour tags, which for a Log file describe the
     /// container rather than the encoding.
-    private static func validateAppleLog(_ description: CMFormatDescription) throws {
+    private static func validateAppleLog(
+        _ description: CMFormatDescription,
+        expecting expected: SourceColorProfile = .appleLog
+    ) throws {
         let extensions = CMFormatDescriptionGetExtensions(description)
             .map { $0 as NSDictionary } ?? NSDictionary()
         let identifier = extensions[kCMFormatDescriptionExtension_LogTransferFunction]
@@ -276,13 +284,26 @@ enum ExportSourceInspector {
         // Refused rather than transformed on an assumption.
         guard let identifier else {
             throw GradeLabError.unsupportedExport(
-                "This project is set to Apple Log, but the source declares no Log profile. GradeLab does not apply the Apple Log transform to footage that does not identify itself as Apple Log."
+                "This project is set to \(expected.displayName), but the source declares no Log profile. GradeLab does not apply the Apple Log transform to footage that does not identify itself as Log."
             )
         }
         let declared = SourceColorProfile.fromLogIdentifier(identifier)
-        guard declared == .appleLog else {
+        guard declared == expected else {
             throw GradeLabError.unsupportedExport(
-                "This source declares itself as \(declared.displayName), not Apple Log, so it is not processed through the Apple Log transform."
+                "This source declares itself as \(declared.displayName), not \(expected.displayName), so it is not processed through the \(expected.displayName) transform."
+            )
+        }
+        // Both Apple Log formats carry Y'C'BC'R built with the BT.2020
+        // non-constant-luminance coefficients, and the shader inverts exactly
+        // those. Apple Wide Gamut has no registered matrix code point of its
+        // own, so Apple Log 2 signals BT.2020 here too — but it is checked
+        // rather than assumed, because getting it wrong would tint the chroma
+        // of every frame in a way that still looks like a plausible picture.
+        let matrix = extensions[kCMFormatDescriptionExtension_YCbCrMatrix]
+            .map { String(describing: $0) }
+        if let matrix, !matrix.contains("ITU_R_2020") {
+            throw GradeLabError.unsupportedExport(
+                "This \(expected.displayName) source declares a \(matrix) YCbCr matrix. GradeLab decodes Log chroma with the BT.2020 coefficients Apple specifies and will not reinterpret it."
             )
         }
     }
@@ -320,7 +341,10 @@ enum ExportSourceInspector {
                     contains: "ITU_R_2020", property: "the YCbCr matrix")
     }
 
-    private static func validateRec709(_ description: CMFormatDescription) throws {
+    private static func validateRec709(
+        _ description: CMFormatDescription,
+        allowMissing: Bool = false
+    ) throws {
         let extensions = CMFormatDescriptionGetExtensions(description)
             .map { $0 as NSDictionary } ?? NSDictionary()
         let extensionDescription = String(describing: extensions)
@@ -337,20 +361,34 @@ enum ExportSourceInspector {
 
         try requireRec709(
             extensions[kCMFormatDescriptionExtension_ColorPrimaries],
-            property: "color primaries"
+            property: "color primaries",
+            allowMissing: allowMissing
         )
         try requireRec709(
             extensions[kCMFormatDescriptionExtension_TransferFunction],
-            property: "transfer function"
+            property: "transfer function",
+            allowMissing: allowMissing
         )
         try requireRec709(
             extensions[kCMFormatDescriptionExtension_YCbCrMatrix],
-            property: "YCbCr matrix"
+            property: "YCbCr matrix",
+            allowMissing: allowMissing
         )
     }
 
-    private static func requireRec709(_ value: Any?, property: String) throws {
+    private static func requireRec709(
+        _ value: Any?,
+        property: String,
+        allowMissing: Bool = false
+    ) throws {
         guard let value else {
+            // Many otherwise ordinary 8-bit SDR camera files, including DJI
+            // H.264 clips, omit these optional declarations. The preview
+            // already decodes that narrowly verified case through the Rec.709
+            // path, and export writes explicit Rec.709 output tags. Accepting
+            // the same assumption here keeps both paths identical while any
+            // explicit conflicting value still fails below.
+            if allowMissing { return }
             throw GradeLabError.unsupportedExport(
                 "The source does not declare its \(property). Export is blocked to avoid an incorrect color conversion."
             )

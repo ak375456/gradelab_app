@@ -2,6 +2,7 @@ import SwiftUI
 
 struct AudioToolPanel: View {
     @ObservedObject var model: EditorViewModel
+    let addSoundEffect: () -> Void
     let addAudio: () -> Void
     let showTracks: () -> Void
     let waveformUnavailable: Bool
@@ -41,7 +42,10 @@ struct AudioToolPanel: View {
                         .font(.caption).foregroundStyle(.secondary)
                 }
                 HStack {
-                    Button(action: addAudio) { Label("Add audio", systemImage: "plus") }.disabled(model.isImporting)
+                    Button(action: addSoundEffect) { Label("Sounds", systemImage: "waveform.badge.plus") }
+                        .disabled(model.isImporting)
+                    Button(action: addAudio) { Label("Files", systemImage: "folder") }
+                        .disabled(model.isImporting)
                     if model.selectedAudio != nil { Button { Task { await model.detectBeats() } } label: { Label("Beats", systemImage: "waveform.path.ecg") } }
                     Spacer()
                     Button(action: showTracks) { Label("Tracks", systemImage: "slider.horizontal.3") }

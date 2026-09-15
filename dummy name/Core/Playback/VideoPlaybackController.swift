@@ -124,8 +124,11 @@ final class VideoPlaybackController: ObservableObject {
                     kCVPixelFormatType_422YpCbCr10BiPlanarVideoRange,
                 kCVPixelBufferMetalCompatibilityKey as String: true
             ]
-        case .appleLog:
-            // Apple Log ProRes is 4:2:2 10-bit. Full range is requested because
+        case .appleLog, .appleLog2:
+            // Apple Log ProRes is 4:2:2 10-bit. Apple Log 2 is the same
+            // container and the same code-value convention; only the primaries
+            // the values describe differ, which is a shader concern, not a
+            // decoder one. Full range is requested because
             // the white paper's reference table is in full-range codes (0 -> 0,
             // 1.0 -> 1023): asking for video range would squeeze the signal into
             // 64...940 and cost precision on the way in for nothing.

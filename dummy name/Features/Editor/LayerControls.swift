@@ -10,6 +10,7 @@ struct LayerControls: View {
             List {
                 Section {
                     ForEach(model.project.timeline.tracks) { track in
+                        let displayName = track.layerDisplayName
                         VStack(alignment: .leading, spacing: 6) {
                             HStack(spacing: 10) {
                                 // Selecting and renaming are separate targets, so tapping the
@@ -20,16 +21,20 @@ struct LayerControls: View {
                                         .foregroundStyle(model.selectedTrack?.id == track.id ? AppColors.accent : AppColors.textSecondary)
                                         .frame(width: 44, height: 44).contentShape(Rectangle())
                                 }
-                                .accessibilityLabel("Select \(track.name)")
+                                .accessibilityLabel("Select \(displayName)")
                                 .accessibilityAddTraits(model.selectedTrack?.id == track.id ? .isSelected : [])
-                                Button { draftName = track.name; renaming = track } label: {
+                                Button {
+                                    draftName = track.kind == .text && track.name == TimelineTrack.defaultName(for: .text)
+                                        ? "" : track.name
+                                    renaming = track
+                                } label: {
                                     HStack(spacing: 6) {
-                                        Text(track.name).lineLimit(1)
+                                        Text(displayName).lineLimit(1).truncationMode(.tail)
                                         Image(systemName: "pencil").font(.caption2).foregroundStyle(AppColors.textSecondary)
                                         Spacer(minLength: 0)
                                     }.frame(minHeight: 44).contentShape(Rectangle())
                                 }
-                                .accessibilityLabel("Rename \(track.name)")
+                                .accessibilityLabel("Rename \(displayName)")
                                 .accessibilityHint("Opens a field to type a new layer name")
                             }
                             HStack(spacing: 16) {
@@ -45,7 +50,7 @@ struct LayerControls: View {
                             }.foregroundStyle(.secondary)
                         }
                     }
-                } footer: { Text("Tap a layer's name to rename it. Top layers appear above lower layers. Hiding a layer also silences its linked audio. Locked layers still play and export, and can still be renamed.") }
+                } footer: { Text("Text layers use their on-screen text as the name until you rename them. Top layers appear above lower layers. Hiding a layer also silences its linked audio. Locked layers still play and export, and can still be renamed.") }
             }.buttonStyle(.plain).navigationTitle("Layers").navigationBarTitleDisplayMode(.inline)
                 .toolbar { Button("Done") { dismiss() } }.disabled(model.isPreparingTimeline)
                 .alert("Rename layer", isPresented: Binding(get: { renaming != nil }, set: { if !$0 { renaming = nil } }),
@@ -56,8 +61,10 @@ struct LayerControls: View {
                         .submitLabel(.done)
                     Button("Cancel", role: .cancel) { renaming = nil }
                     Button("Save") { model.renameTrack(track.id, to: draftName); renaming = nil }
-                } message: { _ in
-                    Text("This name appears in the timeline and in this list. Leaving it empty restores the default.")
+                } message: { track in
+                    Text(track.kind == .text
+                         ? "Set a custom layer name, or leave it empty to keep using the on-screen text."
+                         : "This name appears in the timeline and in this list. Leaving it empty restores the default.")
                 }
         }.preferredColorScheme(.dark)
     }

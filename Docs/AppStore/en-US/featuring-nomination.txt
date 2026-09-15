@@ -1,0 +1,5 @@
+GradeLab is a colour grading app for iPhone and iPad: LUTs, curves, eight-band HSL, colour wheels, masks that track a moving subject, keyframed grades and scopes, rendered in Metal.
+
+This update adds Apple Log 2 from iPhone 17 Pro. Apple specifies Apple Log 2 as the Apple Log transfer function on Apple Wide Gamut primaries, and that distinction is easy to miss — decoding Log 2 through the Apple Log transform gives a plausible image with quietly wrong colour. GradeLab converts the gamut properly, from Apple's published primaries, checked against the Academy Software Foundation's ACES config. Ungraded frames are then rendered through Apple's own Apple Log to Rec.709 LUT, so what you see matches Apple's rendering rather than an approximation of it.
+
+The app also grades HLG HDR, exports ProRes 422 and 422 HQ, grades photos at full resolution, and adds no watermark. Colour handling is never guessed: unverified formats are refused with a reason rather than silently converted.

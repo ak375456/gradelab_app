@@ -15,7 +15,14 @@ final class ProStore: ObservableObject {
     private var updatesTask: Task<Void, Never>?
     private var expiryTask: Task<Void, Never>?
 
-    var hasPro: Bool { true }
+    /// Pro access, from what the Apple Account actually owns.
+    ///
+    /// The two cases below partition `ProPlan.allCases` exactly, and
+    /// `refreshAccess` only ever admits verified, unrevoked, un-upgraded
+    /// entitlements for those IDs — so this is the whole of the question.
+    /// Callers that also care whether the check has finished read
+    /// `isCheckingAccess` separately rather than having it folded in here.
+    var hasPro: Bool { hasLifetime || hasSubscription }
     var hasLifetime: Bool { ownedIDs.contains(ProPlan.lifetime.id) }
     var hasSubscription: Bool { ProPlan.allCases.contains { $0 != .lifetime && ownedIDs.contains($0.id) } }
 

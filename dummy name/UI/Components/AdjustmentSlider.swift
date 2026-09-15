@@ -17,10 +17,12 @@ extension AdjustmentSlider where Accessory == EmptyView {
         range: ClosedRange<Float>,
         step: Float,
         neutralValue: Float = 0,
+        tint: Color = AppColors.accent,
         valueFormatter: @escaping (Float) -> String
     ) {
         self.init(value: value, title: title, range: range, step: step,
-                  neutralValue: neutralValue, valueFormatter: valueFormatter) { EmptyView() }
+                  neutralValue: neutralValue, tint: tint,
+                  valueFormatter: valueFormatter) { EmptyView() }
     }
 }
 
@@ -31,6 +33,11 @@ struct AdjustmentSlider<Accessory: View>: View {
     let range: ClosedRange<Float>
     let step: Float
     let neutralValue: Float
+    /// What the filled part of the rail and the read-out are coloured with.
+    /// Defaults to the brand accent, which is what every grading control in the
+    /// editor wants; the home screen passes its own grade's accent so the
+    /// controls agree with the screen they are re-colouring.
+    let tint: Color
     let valueFormatter: (Float) -> String
     /// Sits at the end of the header row, beside the read-out. The keyframe
     /// diamond goes here, so an animatable grading control is the ordinary
@@ -52,6 +59,7 @@ struct AdjustmentSlider<Accessory: View>: View {
         range: ClosedRange<Float>,
         step: Float,
         neutralValue: Float = 0,
+        tint: Color = AppColors.accent,
         valueFormatter: @escaping (Float) -> String,
         @ViewBuilder accessory: () -> Accessory
     ) {
@@ -60,6 +68,7 @@ struct AdjustmentSlider<Accessory: View>: View {
         self.range = range
         self.step = abs(step)
         self.neutralValue = min(max(neutralValue, range.lowerBound), range.upperBound)
+        self.tint = tint
         self.valueFormatter = valueFormatter
         self.accessory = accessory()
     }
@@ -76,7 +85,7 @@ struct AdjustmentSlider<Accessory: View>: View {
                 // Tap the read-out to type an exact value the drag cannot land on.
                 NumericEntryLabel(title: title, text: valueFormatter(value), value: Double(value),
                                   range: Double(range.lowerBound)...Double(range.upperBound),
-                                  tint: isNeutral(value) ? AppColors.textSecondary : AppColors.accent) { typed in
+                                  tint: isNeutral(value) ? AppColors.textSecondary : tint) { typed in
                     value = quantized(Float(typed))
                 }
                 .font(AppTypography.numeric)
@@ -119,7 +128,7 @@ struct AdjustmentSlider<Accessory: View>: View {
                     .padding(.trailing, sideInset * 2)
 
                 Capsule()
-                    .fill(AppColors.accent)
+                    .fill(tint)
                     .frame(width: activeWidth, height: 4)
                     .offset(x: activeStart)
 

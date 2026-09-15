@@ -28,7 +28,8 @@ struct ContentView: View {
             case .home:
                 HomeView(coordinator: coordinator).transition(.opacity)
             case .analyzing:
-                AnalyzingView(fileName: coordinator.analyzingFileName).transition(.opacity)
+                AnalyzingView(fileName: coordinator.analyzingFileName, media: coordinator.analyzingMedia)
+                    .transition(.opacity)
             case .source:
                 if let project = coordinator.activeProject {
                     SourceInfoView(

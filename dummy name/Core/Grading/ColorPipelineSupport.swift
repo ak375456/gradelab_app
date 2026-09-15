@@ -12,7 +12,8 @@ import Foundation
 enum ColorPipelineSupport: Equatable, Sendable {
     /// Fully tagged 8-bit Rec.709. Everything is available.
     case supported
-    /// 8-bit, incomplete tags. Preview interprets as Rec.709; export stays blocked.
+    /// Verified 8-bit SDR with incomplete tags. Preview and export consistently
+    /// interpret it as Rec.709 without modifying the source file.
     case assumedRec709
     /// HLG 10-bit. Decoded, previewed and graded at full precision. Export is
     /// still gated separately until the Main10 encode path exists, so the
@@ -24,6 +25,10 @@ enum ColorPipelineSupport: Equatable, Sendable {
     /// Apple Log, decoded through Apple's published transfer function into
     /// scene-linear BT.2020 and graded there.
     case appleLogSupported
+    /// Apple Log 2: the same transfer function decoded into scene light, then a
+    /// gamut conversion from Apple Wide Gamut into the BT.2020 working space the
+    /// Apple Log path already grades and delivers in.
+    case appleLog2Supported
     /// No validated path. Blocked, with an actionable reason.
     case unsupported(reason: String)
     /// The source is identified exactly — the app knows precisely what it is —
@@ -48,10 +53,7 @@ enum ColorPipelineSupport: Equatable, Sendable {
             self = .appleLogSupported
             return
         case .appleLog2:
-            self = .recognizedUnsupported(
-                profile: profile,
-                reason: "This is Apple Log 2 footage, which is not supported yet. It is a different colour space from Apple Log — wider primaries as well as a different curve — so it is never processed through the Apple Log transform."
-            )
+            self = .appleLog2Supported
             return
         case .otherLog:
             self = .unsupported(
@@ -108,7 +110,14 @@ enum ColorPipelineSupport: Equatable, Sendable {
             self = .unsupported(reason: "The \(transfer) transfer function is not yet supported for grading.")
             return
         }
-        if metadata.colorPrimaries == nil || metadata.transferFunction == nil {
+        if let matrix = metadata.yCbCrMatrix,
+           matrix != "BT.709" {
+            self = .unsupported(reason: "The \(matrix) YCbCr matrix is not yet supported for grading.")
+            return
+        }
+        if metadata.colorPrimaries == nil
+            || metadata.transferFunction == nil
+            || metadata.yCbCrMatrix == nil {
             self = .assumedRec709
         } else {
             self = .supported
@@ -118,7 +127,8 @@ enum ColorPipelineSupport: Equatable, Sendable {
     /// Whether the grading tools may be used.
     var allowsGrading: Bool {
         switch self {
-        case .supported, .assumedRec709, .hdrSupported, .sdrWideSupported, .appleLogSupported: true
+        case .supported, .assumedRec709, .hdrSupported, .sdrWideSupported,
+             .appleLogSupported, .appleLog2Supported: true
         case .unsupported, .recognizedUnsupported: false
         }
     }
@@ -127,7 +137,8 @@ enum ColorPipelineSupport: Equatable, Sendable {
     /// `allowsGrading`: an HLG source can be viewed before it can be graded.
     var allowsEditor: Bool {
         switch self {
-        case .supported, .assumedRec709, .hdrSupported, .sdrWideSupported, .appleLogSupported: true
+        case .supported, .assumedRec709, .hdrSupported, .sdrWideSupported,
+             .appleLogSupported, .appleLog2Supported: true
         case .unsupported, .recognizedUnsupported: false
         }
     }
@@ -138,6 +149,7 @@ enum ColorPipelineSupport: Equatable, Sendable {
         case .hdrSupported: .hdrHLG
         case .sdrWideSupported: .sdrWide
         case .appleLogSupported: .appleLog
+        case .appleLog2Supported: .appleLog2
         case .supported, .assumedRec709, .unsupported, .recognizedUnsupported: .sdr
         }
     }
@@ -163,13 +175,15 @@ enum ColorPipelineSupport: Equatable, Sendable {
         case .supported:
             nil
         case .assumedRec709:
-            "This 8-bit source is missing complete color tags. Preview uses an explicitly labeled Rec.709 compatibility interpretation; export remains blocked unless the file declares its color properties."
+            "This 8-bit SDR source has incomplete color tags. GradeLab uses the standard Rec.709 interpretation consistently for preview and export; the original file remains unchanged."
         case .hdrSupported(let transfer):
             "\(transfer) HDR is decoded, previewed and graded at full 10-bit precision. HDR export is still being validated and stays disabled until then — this source is never converted to SDR without you choosing it."
         case .sdrWideSupported(let depth):
             "This \(depth)-bit Rec.709 source is decoded, graded and exported at full precision — the colour handling is the same as any SDR clip, and nothing is reduced to 8-bit along the way."
         case .appleLogSupported:
             "Apple Log is decoded with Apple's published transfer function into scene light, graded there, and delivered as Rec.709. The log encoding is never graded directly."
+        case .appleLog2Supported:
+            "Apple Log 2 uses the same transfer function as Apple Log on wider primaries, so it is decoded to scene light, converted from Apple Wide Gamut to BT.2020, and graded and delivered exactly as Apple Log is. Colour beyond BT.2020 is carried through the grade and only clips at the final Rec.709 encode."
         case .unsupported(let reason):
             reason
         case .recognizedUnsupported(_, let reason):

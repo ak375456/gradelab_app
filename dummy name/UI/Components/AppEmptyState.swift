@@ -9,6 +9,8 @@ struct AppEmptyState: View {
     let title: LocalizedStringKey
     let message: LocalizedStringKey
     let systemImage: String
+    /// The brand accent unless a screen is wearing a grade of its own.
+    var tint: Color = AppColors.accent
     var actionTitle: LocalizedStringKey?
     var action: (() -> Void)?
 
@@ -16,12 +18,12 @@ struct AppEmptyState: View {
         VStack(spacing: AppSpacing.standard) {
             Image(systemName: systemImage)
                 .font(.system(size: 27, weight: .medium))
-                .foregroundStyle(AppColors.accent)
+                .foregroundStyle(tint)
                 .frame(width: 58, height: 58)
-                .background(AppColors.accentMuted, in: Circle())
+                .background(tint.opacity(0.16), in: Circle())
                 .overlay {
                     Circle()
-                        .strokeBorder(AppColors.accent.opacity(0.20), lineWidth: AppSpacing.hairline)
+                        .strokeBorder(tint.opacity(0.20), lineWidth: AppSpacing.hairline)
                 }
                 .accessibilityHidden(true)
 

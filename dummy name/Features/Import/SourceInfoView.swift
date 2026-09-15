@@ -152,29 +152,55 @@ struct SourceInfoView: View {
     /// anyone who wants to see or grade the untouched signal, with the cost
     /// stated rather than discovered.
     @ViewBuilder private var appleLogHandling: some View {
-        if let onSetColorMode, profile == .appleLog {
+        // Whichever Log format this source actually is. The decoded option has
+        // to carry the matching mode: offering ".appleLog" for Log 2 footage
+        // would decode it through BT.2020 primaries instead of Apple Wide Gamut.
+        let decodedMode: ProjectColorMode? = switch profile {
+        case .appleLog: .appleLog
+        case .appleLog2: .appleLog2
+        default: nil
+        }
+        if let onSetColorMode, let decodedMode {
             VStack(alignment: .leading, spacing: AppSpacing.compact) {
-                AppSectionHeader("Apple Log")
+                // Literal keys rather than the profile's display name, so both
+                // headings stay localisable.
+                if decodedMode == .appleLog2 {
+                    AppSectionHeader("Apple Log 2")
+                } else {
+                    AppSectionHeader("Apple Log")
+                }
                 VStack(alignment: .leading, spacing: AppSpacing.compact) {
                     Picker("Handling", selection: Binding(
-                        get: { project.colorMode == .appleLog ? ProjectColorMode.appleLog : .sdrWide },
+                        get: { project.colorMode.isAppleLog ? decodedMode : .sdrWide },
                         set: { onSetColorMode($0) }
                     )) {
-                        Text("Decode and render").tag(ProjectColorMode.appleLog)
+                        Text("Decode and render").tag(decodedMode)
                         Text("Original, as recorded").tag(ProjectColorMode.sdrWide)
                     }
                     .pickerStyle(.segmented)
-                    Text(project.colorMode == .appleLog
-                         ? "Apple's transfer function decodes the footage to scene light, and Apple's own display transform renders it to Rec.709. This is the picture the camera captured, and what export produces."
+                    Text(project.colorMode.isAppleLog
+                         ? decodedExplanation(for: decodedMode)
                          : "The Log signal is passed through untouched, so the picture stays flat and the grading tools work on Log values. Creative looks are built for Rec.709 and will not land correctly on it.")
                         .font(AppTypography.caption)
-                        .foregroundStyle(project.colorMode == .appleLog
+                        .foregroundStyle(project.colorMode.isAppleLog
                                          ? AppColors.textSecondary : AppColors.warning)
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .padding(AppSpacing.standard)
                 .appSurface()
             }
+        }
+    }
+
+    /// Apple Log 2 gets its own sentence because it genuinely does one more
+    /// thing: a gamut conversion. Saying "Apple Log" for both would be the kind
+    /// of near-truth that makes a colour problem hard to track down later.
+    private func decodedExplanation(for mode: ProjectColorMode) -> String {
+        switch mode {
+        case .appleLog2:
+            "Apple's transfer function decodes the footage to scene light, the primaries are converted from Apple Wide Gamut to BT.2020, and Apple's own display transform renders it to Rec.709. This is the picture the camera captured, and what export produces."
+        default:
+            "Apple's transfer function decodes the footage to scene light, and Apple's own display transform renders it to Rec.709. This is the picture the camera captured, and what export produces."
         }
     }
 

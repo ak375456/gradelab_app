@@ -29,6 +29,20 @@ struct TimelineTrack: Codable, Equatable, Identifiable, Sendable {
         }
     }
 
+    /// The Layers sheet describes a default text track by the words the viewer
+    /// will actually see. A deliberately renamed track keeps its custom name.
+    /// Text tracks normally contain one clip; after a split, the earliest clip
+    /// provides the stable row label.
+    var layerDisplayName: String {
+        guard kind == .text, name == Self.defaultName(for: .text) else { return name }
+        let firstText = items.compactMap { item -> TextClip? in
+            guard case .text(let clip) = item else { return nil }
+            return clip
+        }.min { $0.placement.timelineStart < $1.placement.timelineStart }
+        guard let firstText else { return name }
+        return Self.sanitizedName(firstText.text, kind: .text)
+    }
+
     func accepts(_ item: TimelineItem) -> Bool {
         switch (kind, item) {
         case (.mainVideo, .video), (.videoOverlay, .video), (.text, .text), (.audio, .audio): true

@@ -43,10 +43,20 @@ final class VideoExporter: @unchecked Sendable {
     /// the mode has to be carried rather than inferred.
     private var activeColorMode: ProjectColorMode = .sdr
     /// Apple Log to Rec.709, built on first use for an Apple Log export.
-    private lazy var appleLogSDR10Pipeline: MTLComputePipelineState? = {
-        guard let function = context.library.makeFunction(name: "gradeExportAppleLogSDR10") else { return nil }
-        return try? context.device.makeComputePipelineState(function: function)
-    }()
+    /// Keyed by Log format: the same kernel, specialised for the input
+    /// transform the source actually needs. Built on first use for that format,
+    /// so an Apple Log export never compiles the Log 2 variant and vice versa.
+    private var appleLogSDR10Pipelines: [String: MTLComputePipelineState] = [:]
+
+    private func appleLogSDR10Pipeline(isLog2: Bool) -> MTLComputePipelineState? {
+        let key = AppleLogSpecialization.key("gradeExportAppleLogSDR10", isLog2: isLog2)
+        if let built = appleLogSDR10Pipelines[key] { return built }
+        guard let state = AppleLogSpecialization.computePipeline(
+            "gradeExportAppleLogSDR10", isLog2: isLog2,
+            library: context.library, device: context.device) else { return nil }
+        appleLogSDR10Pipelines[key] = state
+        return state
+    }
     private let stateLock = NSLock()
     private var activeSession: ExportSession?
 
@@ -112,7 +122,7 @@ final class VideoExporter: @unchecked Sendable {
                 try session.checkCancellation()
 
                 activeColorMode = source.colorMode
-                if source.colorMode == .appleLog {
+                if source.colorMode.isAppleLog {
                     // Parsed once, off the frame loop: Apple's rendering LUT is
                     // 65 cubed.
                     context.luts.prepareRenderingLUT(named: AppleLogRendering.rec709LUTResourceName)
@@ -751,8 +761,9 @@ final class VideoExporter: @unchecked Sendable {
         destination: CVPixelBuffer,
         grade: FrameGrade
     ) throws {
-        guard let pipeline = appleLogSDR10Pipeline else {
-            throw GradeLabError.unsupportedExport("This device could not build the Apple Log export pipeline.")
+        guard let pipeline = appleLogSDR10Pipeline(isLog2: activeColorMode == .appleLog2) else {
+            throw GradeLabError.unsupportedExport(
+                "This device could not build the \(activeColorMode.title) export pipeline.")
         }
         guard let renderingLUT = context.luts.renderingTexture(
             named: AppleLogRendering.rec709LUTResourceName) else {
@@ -771,7 +782,9 @@ final class VideoExporter: @unchecked Sendable {
             guard let encodePipeline = effectPipelines["encodeAppleLogFromTexture"] else {
                 throw GradeLabError.rendererInitializationFailed
             }
-            try renderEffectedFrame(gradeKernel: "gradeToTextureAppleLog", width: luma.width, height: luma.height,
+            try renderEffectedFrame(gradeKernel: AppleLogSpecialization.key(
+                "gradeToTextureAppleLog", isLog2: activeColorMode == .appleLog2),
+                width: luma.width, height: luma.height,
                 grade: grade, workingSpace: true, bindSource: { encoder in
                     encoder.setTexture(luma, index: 0); encoder.setTexture(chroma, index: 1)
                 }, encode: { encoder, _ in
@@ -830,10 +843,19 @@ final class VideoExporter: @unchecked Sendable {
         var built: [String: MTLComputePipelineState] = [:]
         for name in ["gradeToTextureYUV", "gradeToTextureHDR", "gradeToTextureAppleLog", "encodeAppleLogFromTexture", "effectWriteBGRA",
                      "encodeSDR10FromTexture", "encodeHDRFromTexture"] {
-            if let function = context.library.makeFunction(name: name),
-               let state = try? context.device.makeComputePipelineState(function: function) {
+            // Via the specialisation helper: `gradeToTextureAppleLog` carries
+            // the Log 2 function constant, so a pipeline built from a plainly
+            // named copy of it is rejected by Metal.
+            if let state = AppleLogSpecialization.computePipeline(
+                name, isLog2: false, library: context.library, device: context.device) {
                 built[name] = state
             }
+        }
+        // The Apple Log 2 input transform for the effected export path.
+        if let state = AppleLogSpecialization.computePipeline(
+            "gradeToTextureAppleLog", isLog2: true,
+            library: context.library, device: context.device) {
+            built[AppleLogSpecialization.key("gradeToTextureAppleLog", isLog2: true)] = state
         }
         return built
     }()
@@ -1004,7 +1026,7 @@ final class VideoExporter: @unchecked Sendable {
         // way out. Checked before the wide-SDR branch below, which would
         // otherwise claim these frames — they are the same 10-bit YCbCr surface
         // and differ only in what the code values mean.
-        if activeColorMode == .appleLog {
+        if activeColorMode.isAppleLog {
             try renderAppleLogFrame(
                 luma: luma, chroma: chroma,
                 destination: destinationPixelBuffer,

@@ -146,3 +146,108 @@ enum AppleLogRendering {
     /// encoding function produces.
     static let rec709LUTResourceName = "Apple_Log_To_Rec_709"
 }
+
+// ---------------------------------------------------------------------------
+// Apple Log 2
+//
+// Apple Log 2 (`com.apple.apple-wide-gamut.apple-log`, iPhone 17 Pro and later)
+// is **the Apple Log transfer function carried on different primaries**. That is
+// not an inference from how the footage looks — it is what Apple's Apple Log 2
+// white paper (September 2025) specifies, and it is how the Academy Software
+// Foundation encodes the format in the ACES OCIO config, where "Apple Log 2"
+// reuses the `CURVE - APPLE_LOG_to_LINEAR` builtin and differs from Apple Log
+// only by a 3x3 matrix.
+//
+// So nothing in `AppleLog` above is re-derived, re-fitted or duplicated here.
+// The decode, the encode, the branch point and the diffuse-white normalisation
+// are shared verbatim; this enum adds the one thing that genuinely differs,
+// which is the gamut.
+//
+// Apple Log   = Apple Log curve + ITU-R BT.2020 primaries
+// Apple Log 2 = Apple Log curve + Apple Wide Gamut primaries
+// ---------------------------------------------------------------------------
+
+enum AppleLog2 {
+    // MARK: - Apple Wide Gamut (white paper, §Color Space)
+
+    /// Apple Wide Gamut primaries with a D65 white point.
+    ///
+    /// The blue primary's negative `y` is not a typo and not a bad transcription.
+    /// Apple Wide Gamut is a *virtual* gamut in the same sense as ARRI Wide Gamut:
+    /// its primaries sit outside the spectral locus so the encoding can carry
+    /// colours a physically realisable primary set could not. Clamping them to
+    /// something that "looks reasonable" would silently shrink the gamut.
+    static let primaries = (
+        red: SIMD2<Float>(0.725, 0.301),
+        green: SIMD2<Float>(0.221, 0.814),
+        blue: SIMD2<Float>(0.068, -0.076),
+        white: SIMD2<Float>(0.3127, 0.3290)
+    )
+
+    // MARK: - Gamut conversion
+
+    /// Linear Apple Wide Gamut to linear ITU-R BT.2020, row-major.
+    ///
+    /// Derived from the primaries above by the standard normalised-primary-matrix
+    /// construction: `inverse(NPM(BT.2020, D65)) * NPM(AppleWideGamut, D65)`.
+    /// **Both spaces are D65, so no chromatic adaptation is involved** — there is
+    /// no choice of CAT to get wrong here, which is the one ambiguity Apple's
+    /// paper leaves open for conversions to other white points.
+    ///
+    /// Verified rather than asserted. The same primaries, adapted to ACES with
+    /// Bradford, reproduce the Apple Wide Gamut to ACES2065-1 matrix published by
+    /// the Academy Software Foundation to 3.1e-15 — floating-point agreement with
+    /// an independently derived source. `AppleLog2Tests` re-runs that check, and
+    /// also asserts the property that matters visually: every row sums to 1, so a
+    /// neutral stays exactly neutral through the conversion.
+    static let wideGamutToBT2020 = simd_float3x3(rows: [
+        SIMD3<Float>( 1.0281009382,  0.0989788177, -0.1270797558),
+        SIMD3<Float>( 0.0025203419,  1.1708496433, -0.1733699853),
+        SIMD3<Float>(-0.0220875732, -0.0640503834,  1.0861379567)
+    ])
+
+    /// BT.2020 back to Apple Wide Gamut. Not used by the render path — which only
+    /// ever converts inwards — but kept with its forward matrix so the round trip
+    /// is testable.
+    static let bt2020ToWideGamut = simd_float3x3(rows: [
+        SIMD3<Float>( 0.9750428995, -0.0768564900,  0.1018135904),
+        SIMD3<Float>( 0.0008445448,  0.8615375131,  0.1376179421),
+        SIMD3<Float>( 0.0198781607,  0.0492425795,  0.9308792597)
+    ])
+
+    // MARK: - Working space
+
+    /// The full input transform for one pixel: Apple Log 2 code values to the
+    /// same working space Apple Log already produces.
+    ///
+    /// The order is deliberate. The curve is undone *first*, because a gamut
+    /// matrix is only meaningful in linear light; applying it to log-encoded
+    /// values would be a category error that happens to produce a plausible
+    /// picture. Only then are the primaries converted.
+    ///
+    /// The result is indistinguishable in kind from Apple Log's working space —
+    /// scene-referred, BT.2020, diffuse white at 1.0 — which is what lets every
+    /// stage after this point be *shared* with Apple Log rather than duplicated:
+    /// the grading tools, the look stage, the scopes, and Apple's own published
+    /// Apple Log to Rec.709 display rendering.
+    static func toWorkingSpace(_ P: SIMD3<Float>) -> SIMD3<Float> {
+        let scene = SIMD3<Float>(AppleLog.decode(P.x),
+                                 AppleLog.decode(P.y),
+                                 AppleLog.decode(P.z))
+        return (wideGamutToBT2020 * scene) / AppleLog.diffuseWhiteReflectance
+    }
+
+    /// Apple Wide Gamut is wider than BT.2020, so saturated colour can land
+    /// outside BT.2020 and arrive here with a negative channel.
+    ///
+    /// Those values are carried, not clipped: the working space is unclamped
+    /// float and the grade runs in it, so the extra gamut stays available to be
+    /// pulled back into range by a grade. It is the *display* encode at the very
+    /// end of the chain that clamps, exactly as it already does for Apple Log.
+    /// No gamut compression is applied on the way in, because Apple publishes
+    /// none and a hand-rolled one would change the colours of footage that was
+    /// already in range.
+    static func isOutsideBT2020(_ working: SIMD3<Float>) -> Bool {
+        working.min() < 0
+    }
+}

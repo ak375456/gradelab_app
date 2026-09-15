@@ -318,7 +318,7 @@ class LayerCompositor: NSObject, AVVideoCompositing, @unchecked Sendable {
         }
         try prepare(context: instruction.state.context)
         let (project, bypass) = instruction.state.snapshot()
-        if project.colorMode == .appleLog {
+        if project.colorMode.isAppleLog {
             try renderAppleLog(request, instruction: instruction, project: project, bypass: bypass)
             return
         }
@@ -974,7 +974,15 @@ extension LayerCompositor {
         guard let metal, let ci, let output = request.renderContext.newPixelBuffer() else {
             throw GradeLabError.rendererInitializationFailed
         }
-        if appleLogRenderer == nil { appleLogRenderer = try AppleLogLayerRenderer(context: metal, prebuilt: resources?.pipelines) }
+        // The Log format the timeline is being composited in. The kernel is
+        // specialised for one input transform, so this is fixed for the whole
+        // timeline and every clip is checked against it below.
+        let isLog2 = project.colorMode == .appleLog2
+        let expectedProfile: SourceColorProfile = isLog2 ? .appleLog2 : .appleLog
+        if appleLogRenderer == nil {
+            appleLogRenderer = try AppleLogLayerRenderer(
+                context: metal, prebuilt: resources?.pipelines, isLog2: isLog2)
+        }
         guard let renderer = appleLogRenderer, let command = metal.commandQueue.makeCommandBuffer() else {
             throw GradeLabError.rendererInitializationFailed
         }
@@ -1065,8 +1073,13 @@ extension LayerCompositor {
             }
             retained.append(textures)
             let profile = metadata.logProfileIdentifier.map(SourceColorProfile.fromLogIdentifier)
-            if let profile, profile != .appleLog {
-                throw GradeLabError.unsupportedExport("This Log profile is not supported in Apple Log layers.")
+            if let profile, profile != expectedProfile {
+                // Including the *other* Apple Log. The compositing kernel is
+                // compiled for one set of primaries, so a Log clip of the other
+                // kind would be decoded through the wrong gamut and come out
+                // subtly, plausibly wrong — which is worse than a refusal.
+                throw GradeLabError.unsupportedExport(
+                    "This timeline is \(expectedProfile.displayName), but this clip is \(profile.displayName). A timeline cannot mix the two Log formats.")
             }
             if profile == nil, metadata.transferFunction == "HLG" {
                 throw GradeLabError.unsupportedExport("HLG video cannot be interpreted as Rec.709 in an Apple Log timeline.")
@@ -1085,11 +1098,12 @@ extension LayerCompositor {
             }
             var layer = HDRLayerUniforms(transform: Self.transform(clip.transform, metadata: metadata, canvas: size),
                 sourceSize: sourceSize, canvasSize: size, opacity: clip.opacity,
-                blendAmount: amount, sourceIsSDR: profile != .appleLog)
+                blendAmount: amount, sourceIsSDR: profile != expectedProfile)
             var mask = LayerMaskUniforms(clip.layerMask)
             var grade = program.uniforms
             var yuv = YUVUniforms.make(for: frame, fallbackMatrix: metadata.yCbCrMatrix)
-            try renderer.encode("compositeVideoAppleLog", into: command, width: width, height: height) { encoder in
+            try renderer.encode(AppleLogSpecialization.key("compositeVideoAppleLog", isLog2: isLog2),
+                                into: command, width: width, height: height) { encoder in
                 encoder.setTexture(luma, index: 0); encoder.setTexture(chroma, index: 1)
                 encoder.setTexture(destination, index: 2)
                 encoder.setTexture(metal.luts.texture(for: program.lookIdentifier), index: 3)

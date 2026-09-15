@@ -12,10 +12,22 @@ final class CompositorWarmupTests: XCTestCase {
         let device = try XCTUnwrap(MTLCreateSystemDefaultDevice())
         let library = try XCTUnwrap(device.makeDefaultLibrary())
         for name in CompositorWarmup.pipelineNames {
-            let function = try XCTUnwrap(library.makeFunction(name: name),
-                                         "\(name) is warmed but no longer exists in the shader library.")
+            // Through the specialisation helper, because a shader carrying the
+            // Apple Log 2 function constant cannot build a pipeline unless
+            // constant values are supplied — for either Log format.
+            let function = try XCTUnwrap(
+                AppleLogSpecialization.makeFunction(name, isLog2: false, library: library),
+                "\(name) is warmed but no longer exists in the shader library.")
             XCTAssertNoThrow(try device.makeComputePipelineState(function: function),
                              "\(name) could not be built.")
+        }
+        // The Apple Log 2 variants are warmed alongside them and must build too.
+        for name in CompositorResources.appleLog2Names {
+            let function = try XCTUnwrap(
+                AppleLogSpecialization.makeFunction(name, isLog2: true, library: library),
+                "\(name) has no Apple Log 2 specialisation.")
+            XCTAssertNoThrow(try device.makeComputePipelineState(function: function),
+                             "The Apple Log 2 variant of \(name) could not be built.")
         }
     }
 

@@ -24,6 +24,15 @@ enum ProjectColorMode: String, Codable, Equatable, Sendable, CaseIterable {
     /// grading stage is shared — and delivered as Rec.709 SDR through Apple's
     /// own display rendering. Log is an input format here, never an output.
     case appleLog
+    /// Apple Log 2 source — the Apple Log curve on Apple Wide Gamut primaries.
+    ///
+    /// A separate case rather than a flavour of `.appleLog`, for the same reason
+    /// `.sdrWide` is separate from `.sdr`: the two share their working space,
+    /// their grading stage and their delivery exactly, and differ only in the
+    /// input transform. Keeping them distinct is what makes every switch in the
+    /// app state which one it means, and what stops a Log 2 clip from being
+    /// decoded through BT.2020 primaries because a check said `== .appleLog`.
+    case appleLog2
 
     /// The label shown to a person choosing between them.
     var title: String {
@@ -31,6 +40,7 @@ enum ProjectColorMode: String, Codable, Equatable, Sendable, CaseIterable {
         case .sdr, .sdrWide: "Convert to SDR"
         case .hdrHLG: "Keep HDR"
         case .appleLog: "Apple Log"
+        case .appleLog2: "Apple Log 2"
         }
     }
 
@@ -40,6 +50,7 @@ enum ProjectColorMode: String, Codable, Equatable, Sendable, CaseIterable {
         case .sdr, .sdrWide: "Creates a standard video for SDR viewing."
         case .hdrHLG: "Preserves HDR brightness and colour on compatible displays."
         case .appleLog: "Decodes Apple Log to scene light for grading, and delivers Rec.709."
+        case .appleLog2: "Decodes Apple Log 2 to scene light for grading, and delivers Rec.709."
         }
     }
 
@@ -50,10 +61,21 @@ enum ProjectColorMode: String, Codable, Equatable, Sendable, CaseIterable {
         case .sdrWide: "10-bit SDR"
         case .hdrHLG: "HDR"
         case .appleLog: "APPLE LOG"
+        case .appleLog2: "APPLE LOG 2"
         }
     }
 
     var isHDR: Bool { self == .hdrHLG }
+
+    /// True for both Log modes.
+    ///
+    /// Almost every question the pipeline asks about Log — which decoder format
+    /// to request, whether Apple's rendering LUT is needed, whether this frame
+    /// is camera code values rather than a picture — has the same answer for
+    /// both, because after the input transform they are the same signal. Only
+    /// the handful of places that choose the input transform itself need to
+    /// tell them apart, and those switch on the case.
+    var isAppleLog: Bool { self == .appleLog || self == .appleLog2 }
 }
 
 extension ProjectColorMode {
@@ -64,7 +86,11 @@ extension ProjectColorMode {
     /// being quietly treated as HLG — they are different transfer functions and
     /// would render wrongly. Apple Log has its own mode and its own transform.
     static func `default`(for metadata: VideoMetadata) -> ProjectColorMode {
-        if SourceColorProfile.detect(metadata: metadata) == .appleLog { return .appleLog }
+        switch SourceColorProfile.detect(metadata: metadata) {
+        case .appleLog: return .appleLog
+        case .appleLog2: return .appleLog2
+        default: break
+        }
         if canPreserveHDR(for: metadata) { return .hdrHLG }
         if usesWidePrecisionSDR(for: metadata) { return .sdrWide }
         return .sdr
@@ -84,7 +110,7 @@ extension ProjectColorMode {
 
     /// True when the pipeline must carry more than 8 bits. Colour handling is
     /// unchanged; only the decode, composition and encode containers widen.
-    var isWidePrecision: Bool { self == .sdrWide || self == .hdrHLG || self == .appleLog }
+    var isWidePrecision: Bool { self == .sdrWide || self == .hdrHLG || isAppleLog }
 
     /// Whether "Keep HDR" is a genuine option for this source.
     static func canPreserveHDR(for metadata: VideoMetadata) -> Bool {
