@@ -1153,6 +1153,16 @@
         }
       }
     },
+    "Answers there often come faster than by email, and feature requests get discussed in the open." : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Dort kommen Antworten oft schneller als per E-Mail, und Feature-Wünsche werden öffentlich diskutiert."
+          }
+        }
+      }
+    },
     "App settings" : {
       "localizations" : {
         "de" : {
@@ -1287,6 +1297,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Türkis"
+          }
+        }
+      }
+    },
+    "Ask questions, share your grading, and help decide what gets built next." : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Stell Fragen, zeig dein Grading und entscheide mit, was als Nächstes gebaut wird."
           }
         }
       }
@@ -2037,6 +2057,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Farbmodus: %@. Für Details tippen."
+          }
+        }
+      }
+    },
+    "Community" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Community"
           }
         }
       }

@@ -28,6 +28,10 @@ enum ProConfiguration {
     static let privacyPolicyURL = URL(string: "https://ak375456.github.io/gradelab/privacy.html")
     static let termsURL = URL(string: "https://ak375456.github.io/gradelab/terms.html")
     static let supportURL = URL(string: "https://ak375456.github.io/gradelab/support.html")
+    /// The subreddit. Deliberately outside `legalLinksReady`: nothing refuses
+    /// to work without it, so a dead community link must never block a purchase
+    /// the way a missing privacy policy does.
+    static let communityURL = URL(string: "https://www.reddit.com/r/GradeLabApp/")
     static var legalLinksReady: Bool { privacyPolicyURL != nil && termsURL != nil }
     // No timer. Change this in the update ending the founding campaign AND
     // change the existing lifetime product's price in App Store Connect.

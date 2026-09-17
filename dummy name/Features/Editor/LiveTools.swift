@@ -521,6 +521,19 @@ struct EditorSettings: View {
                 } header: { Text("Keyframes") }
                   footer: { Text("Keyframes belong to the clip, so they move, copy and split with it, and the preview always matches the export.") }
 
+                // Above About because someone with a question is usually
+                // better served by people who have already hit it than by a
+                // support email that only reaches me.
+                Section {
+                    if let url = ProConfiguration.communityURL {
+                        Link(destination: url) {
+                            settingsLink("r/GradeLabApp", "bubble.left.and.bubble.right",
+                                         String(localized: "Ask questions, share your grading, and help decide what gets built next."))
+                        }
+                    }
+                } header: { Text("Community") }
+                  footer: { Text("Answers there often come faster than by email, and feature requests get discussed in the open.") }
+
                 // Reachable from Settings as well as from the paywall. Someone
                 // looking for the privacy policy or a way to report a bug
                 // should not have to open a purchase screen to find either.

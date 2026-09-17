@@ -683,7 +683,8 @@ final class ProAccessPolicyTests: XCTestCase {
         let links: [(String, URL?)] = [
             ("privacy policy", ProConfiguration.privacyPolicyURL),
             ("terms", ProConfiguration.termsURL),
-            ("support", ProConfiguration.supportURL)
+            ("support", ProConfiguration.supportURL),
+            ("community", ProConfiguration.communityURL)
         ]
         for (name, value) in links {
             let url = try XCTUnwrap(value, "\(name) URL is missing")
