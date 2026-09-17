@@ -116,7 +116,7 @@ final class ImageExporter: @unchecked Sendable {
         if let identifier = advanced.lut { _ = context.luts.prepare(identifier) }
         guard let lut = context.luts.texture(for: advanced.lut),
               let curves = context.curves.texture(for: advanced.resolvedCurves) else {
-            throw GradeLabError.imageExportFailed("The look or curve tables could not be prepared.")
+            throw GradeLabError.imageExportFailed(String(localized: "The look or curve tables could not be prepared."))
         }
 
         var uniforms = GradeUniforms(settings: grade, bypass: false)
@@ -135,7 +135,7 @@ final class ImageExporter: @unchecked Sendable {
                        uniforms: uniforms, lut: lut, curves: curves)
             : nil
         if effectsActive, halo == nil {
-            throw GradeLabError.imageExportFailed("The finishing effects could not be prepared.")
+            throw GradeLabError.imageExportFailed(String(localized: "The finishing effects could not be prepared."))
         }
         progress?(0.15)
 
@@ -182,7 +182,7 @@ final class ImageExporter: @unchecked Sendable {
             releaseData: { _, pointer, _ in
                 UnsafeMutableRawPointer(mutating: pointer).deallocate()
             }) else {
-            throw GradeLabError.imageExportFailed("The graded pixels could not be assembled.")
+            throw GradeLabError.imageExportFailed(String(localized: "The graded pixels could not be assembled."))
         }
         handedOff = true
 
@@ -278,7 +278,7 @@ final class ImageExporter: @unchecked Sendable {
                width: padded.width, height: padded.height)
 
         guard let command = context.commandQueue.makeCommandBuffer() else {
-            throw GradeLabError.imageExportFailed("The GPU could not accept the export.")
+            throw GradeLabError.imageExportFailed(String(localized: "The GPU could not accept the export."))
         }
         command.label = "GradeLab still tile \(tile.x),\(tile.y)"
 
@@ -288,7 +288,7 @@ final class ImageExporter: @unchecked Sendable {
                                     Float(imageWidth), Float(imageHeight))
         let gradeTarget = effectsActive ? (surfaces.graded ?? surfaces.output) : surfaces.output
         guard let encoder = command.makeComputeCommandEncoder() else {
-            throw GradeLabError.imageExportFailed("The GPU could not accept the export.")
+            throw GradeLabError.imageExportFailed(String(localized: "The GPU could not accept the export."))
         }
         encoder.setComputePipelineState(gradePipeline)
         encoder.setTexture(surfaces.source, index: 0)
@@ -313,7 +313,7 @@ final class ImageExporter: @unchecked Sendable {
                 imageSize: imageSize,
                 surfaceSize: CGSize(width: padded.width, height: padded.height))
             guard let composite = command.makeComputeCommandEncoder() else {
-                throw GradeLabError.imageExportFailed("The GPU could not accept the export.")
+                throw GradeLabError.imageExportFailed(String(localized: "The GPU could not accept the export."))
             }
             composite.setComputePipelineState(compositePipeline)
             composite.setTexture(graded, index: 0)
@@ -328,7 +328,7 @@ final class ImageExporter: @unchecked Sendable {
         command.commit()
         command.waitUntilCompleted()
         guard command.status == .completed else {
-            throw GradeLabError.imageExportFailed("A tile of the image could not be rendered.")
+            throw GradeLabError.imageExportFailed(String(localized: "A tile of the image could not be rendered."))
         }
 
         // Read back only the central rectangle, straight into its place in the
@@ -418,7 +418,7 @@ final class ImageExporter: @unchecked Sendable {
         command.waitUntilCompleted()
         withExtendedLifetime(full.reference) {}
         guard command.status == .completed else {
-            throw GradeLabError.imageExportFailed("The finishing effects could not be prepared.")
+            throw GradeLabError.imageExportFailed(String(localized: "The finishing effects could not be prepared."))
         }
         return halo
     }
@@ -520,7 +520,7 @@ final class ImageExporter: @unchecked Sendable {
                     | CGBitmapInfo.byteOrder32Little.rawValue),
                 provider: provider, decode: nil, shouldInterpolate: false, intent: .defaultIntent
               ) else {
-            throw GradeLabError.imageExportFailed("The graded pixels could not be assembled.")
+            throw GradeLabError.imageExportFailed(String(localized: "The graded pixels could not be assembled."))
         }
 
         try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
@@ -531,7 +531,7 @@ final class ImageExporter: @unchecked Sendable {
 
         guard let destination = CGImageDestinationCreateWithURL(
             url as CFURL, configuration.format.utType.identifier as CFString, 1, nil) else {
-            throw GradeLabError.imageExportFailed("\(configuration.format.title) cannot be written on this device.")
+            throw GradeLabError.imageExportFailed(String(localized: "\(configuration.format.title) cannot be written on this device."))
         }
         var properties: [CFString: Any] = [
             kCGImagePropertyOrientation: 1
@@ -549,7 +549,7 @@ final class ImageExporter: @unchecked Sendable {
         CGImageDestinationAddImage(destination, image, properties as CFDictionary)
         guard CGImageDestinationFinalize(destination) else {
             try? FileManager.default.removeItem(at: url)
-            throw GradeLabError.imageExportFailed("The image could not be written.")
+            throw GradeLabError.imageExportFailed(String(localized: "The image could not be written."))
         }
         return url
     }

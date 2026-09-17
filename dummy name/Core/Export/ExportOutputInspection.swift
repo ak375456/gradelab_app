@@ -21,10 +21,10 @@ struct ExportOutputReport: Equatable, Sendable {
     }
 
     var summary: String {
-        let depth = bitDepth.map { "\($0)-bit" } ?? "unknown depth"
+        let depth = bitDepth.map { "\($0)-bit" } ?? String(localized: "unknown depth")
         let colour = [colorPrimaries, transferFunction, yCbCrMatrix]
             .compactMap { $0 }.joined(separator: " / ")
-        return "\(codec) \(depth) \(width)×\(height) · \(colour.isEmpty ? "untagged" : colour)"
+        return "\(codec) \(depth) \(width)×\(height) · \(colour.isEmpty ? String(localized: "untagged") : colour)"
     }
 }
 
@@ -33,7 +33,7 @@ enum ExportOutputInspector {
         let asset = AVURLAsset(url: url)
         guard let track = try await asset.loadTracks(withMediaType: .video).first,
               let description = try await track.load(.formatDescriptions).first else {
-            throw GradeLabError.exportFailed("The exported file has no readable video track.")
+            throw GradeLabError.exportFailed(String(localized: "The exported file has no readable video track."))
         }
         let dimensions = CMVideoFormatDescriptionGetDimensions(description)
         let extensions = CMFormatDescriptionGetExtensions(description).map { $0 as NSDictionary }
@@ -68,12 +68,12 @@ enum ExportOutputInspector {
         guard colorMode.isHDR else { return report }
         guard report.isHLGBT2020 else {
             throw GradeLabError.exportFailed(
-                "The exported file is not tagged as HLG BT.2020 — it reports \(report.summary). The file was written but its colour would be misread, so it is being reported as a failure rather than a success."
+                String(localized: "The exported file is not tagged as HLG BT.2020 — it reports \(report.summary). The file was written but its colour would be misread, so it is being reported as a failure rather than a success.")
             )
         }
         if let depth = report.bitDepth, depth < 10 {
             throw GradeLabError.exportFailed(
-                "The exported file reports \(depth)-bit precision, not 10-bit. Reported as a failure rather than a silent quality reduction."
+                String(localized: "The exported file reports \(depth)-bit precision, not 10-bit. Reported as a failure rather than a silent quality reduction.")
             )
         }
         return report

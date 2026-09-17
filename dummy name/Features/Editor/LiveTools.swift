@@ -99,9 +99,9 @@ struct LayerMaskPanel: View {
                             Text("Choose a shape to apply the mask immediately")
                                 .font(.subheadline.weight(.semibold))
                             HStack(spacing: 10) {
-                                addMaskButton("Linear", shape: .linear, icon: "line.diagonal")
-                                addMaskButton("Ellipse", shape: .ellipse, icon: "circle")
-                                addMaskButton("Rectangle", shape: .rectangle, icon: "rectangle")
+                                addMaskButton(String(localized: "Linear"), shape: .linear, icon: "line.diagonal")
+                                addMaskButton(String(localized: "Ellipse"), shape: .ellipse, icon: "circle")
+                                addMaskButton(String(localized: "Rectangle"), shape: .rectangle, icon: "rectangle")
                             }
                         }
                         .frame(maxWidth: .infinity, alignment: .leading)
@@ -527,20 +527,20 @@ struct EditorSettings: View {
                 Section {
                     if let url = ProConfiguration.supportURL {
                         Link(destination: url) {
-                            settingsLink("Support & contact", "questionmark.circle",
-                                         "Report a bug, request a feature, or restore a purchase.")
+                            settingsLink(String(localized: "Support & contact"), "questionmark.circle",
+                                         String(localized: "Report a bug, request a feature, or restore a purchase."))
                         }
                     }
                     if let url = ProConfiguration.privacyPolicyURL {
                         Link(destination: url) {
-                            settingsLink("Privacy Policy", "hand.raised",
-                                         "What GradeLab does with your information.")
+                            settingsLink(String(localized: "Privacy Policy"), "hand.raised",
+                                         String(localized: "What GradeLab does with your information."))
                         }
                     }
                     if let url = ProConfiguration.termsURL {
                         Link(destination: url) {
-                            settingsLink("Terms of Use", "doc.text",
-                                         "The agreement covering the app and purchases.")
+                            settingsLink(String(localized: "Terms of Use"), "doc.text",
+                                         String(localized: "The agreement covering the app and purchases."))
                         }
                     }
                 } header: { Text("About") }

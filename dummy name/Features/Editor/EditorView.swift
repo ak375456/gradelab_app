@@ -380,8 +380,8 @@ struct EditorView: View {
     /// follow the same context rather than always claiming the whole clip.
     private var resetAllMessage: String {
         model.selectedMaskID == nil
-            ? "Every colour adjustment on this clip goes back to neutral — look, curves, wheels, HSL and effects. The timeline, text and transforms are not affected."
-            : "Every colour adjustment on the selected mask goes back to neutral. The clip's own grade is not affected."
+            ? String(localized: "Every colour adjustment on this clip goes back to neutral — look, curves, wheels, HSL and effects. The timeline, text and transforms are not affected.")
+            : String(localized: "Every colour adjustment on the selected mask goes back to neutral. The clip's own grade is not affected.")
     }
 
     private var header: some View {
@@ -821,15 +821,15 @@ struct EditorView: View {
 
         var title: String {
             switch self {
-            case .timeline: return "Timeline"
-            case .text: return "Text"
-            case .audio: return "Audio"
-            case .color: return "Color"
-            case .transform: return "Transform"
-            case .mask: return "Mask"
-            case .speed: return "Speed"
-            case .transition: return "Transition"
-            case .canvas: return "Canvas"
+            case .timeline: return String(localized: "Timeline")
+            case .text: return String(localized: "Text")
+            case .audio: return String(localized: "Audio")
+            case .color: return String(localized: "Color")
+            case .transform: return String(localized: "Transform")
+            case .mask: return String(localized: "Mask")
+            case .speed: return String(localized: "Speed")
+            case .transition: return String(localized: "Transition")
+            case .canvas: return String(localized: "Canvas")
             }
         }
 

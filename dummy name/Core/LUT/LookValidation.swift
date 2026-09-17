@@ -18,12 +18,12 @@ enum LookValidation {
     static func check(_ cube: CubeLUT) throws -> Int {
         guard case .threeDimensional(let size) = cube.kind else {
             throw GradeLabError.invalidLUT(
-                "This is a 1D LUT. Looks need a 3D LUT — one with a LUT_3D_SIZE line."
+                String(localized: "This is a 1D LUT. Looks need a 3D LUT — one with a LUT_3D_SIZE line.")
             )
         }
         guard cube.values.count == size * size * size else {
             throw GradeLabError.invalidLUT(
-                "This LUT says it is size \(size) but contains \(cube.values.count) entries instead of \(size * size * size)."
+                String(localized: "This LUT says it is size \(size) but contains \(cube.values.count) entries instead of \(size * size * size).")
             )
         }
         // The shader samples the cube over 0...1. Rescaling for another domain is
@@ -32,15 +32,15 @@ enum LookValidation {
         guard cube.domainMinimum == SIMD3<Float>(repeating: 0),
               cube.domainMaximum == SIMD3<Float>(repeating: 1) else {
             throw GradeLabError.invalidLUT(
-                "This LUT uses a domain other than 0 to 1, which usually means it is a log or camera conversion LUT rather than a look."
+                String(localized: "This LUT uses a domain other than 0 to 1, which usually means it is a log or camera conversion LUT rather than a look.")
             )
         }
         for value in cube.values {
             guard value.x.isFinite, value.y.isFinite, value.z.isFinite else {
-                throw GradeLabError.invalidLUT("This LUT contains values that are not numbers.")
+                throw GradeLabError.invalidLUT(String(localized: "This LUT contains values that are not numbers."))
             }
             guard value.min() >= 0, value.max() <= 1 else {
-                throw GradeLabError.invalidLUT("This LUT contains values outside the 0 to 1 range.")
+                throw GradeLabError.invalidLUT(String(localized: "This LUT contains values outside the 0 to 1 range."))
             }
         }
         return size

@@ -28,7 +28,7 @@ extension SequenceComposition {
             guard let identifier = project.metadata.logProfileIdentifier,
                   SourceColorProfile.fromLogIdentifier(identifier) == expected else {
                 throw GradeLabError.unsupportedExport(
-                    "This project is set to \(expected.displayName), but the source declares no matching Log profile. GradeLab does not infer Log from the picture.")
+                    String(localized: "This project is set to \(expected.displayName), but the source declares no matching Log profile. GradeLab does not infer Log from the picture."))
             }
         }
         let clips = try TimelineEditing.clips(in: project)

@@ -90,7 +90,7 @@ private struct AudioFadeControls: View {
             HStack {
                 Label(title, systemImage: icon).font(.caption.weight(.semibold))
                 Spacer()
-                Text(value > 0.0005 ? String(format: "%.1fs", value) : "Off")
+                Text(value > 0.0005 ? String(format: "%.1fs", locale: .current, value) : "Off")
                     .font(.caption.monospacedDigit())
                     .foregroundStyle(value > 0.0005 ? Color.primary : Color.secondary)
             }
@@ -99,7 +99,7 @@ private struct AudioFadeControls: View {
                 range: 0...limit, resetValue: 0, label: title,
                 onEditingChanged: { if !$0 { model.flushGradeHistory() } })
                 .tint(.cyan)
-                .accessibilityValue(value > 0.0005 ? String(format: "%.1f seconds", value) : "off")
+                .accessibilityValue(value > 0.0005 ? String(format: String(localized: "%.1f seconds"), locale: .current, value) : "off")
                 .disabled(!model.canEditSelection)
         }
     }

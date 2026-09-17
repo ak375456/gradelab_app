@@ -7,6 +7,22 @@ struct TransitionPanel: View {
 
     private let categories = ["BASIC", "MOVEMENT", "CAMERA", "WIPES", "GEOMETRIC", "CREATIVE", "STYLIZED", "ADVANCED"]
 
+    /// Display only. These strings are matched against `TimelineTransitionType
+    /// .category`, so the identity has to stay English.
+    private static func categoryLabel(_ category: String) -> String {
+        switch category {
+        case "BASIC": String(localized: "BASIC")
+        case "MOVEMENT": String(localized: "MOVEMENT")
+        case "CAMERA": String(localized: "CAMERA")
+        case "WIPES": String(localized: "WIPES")
+        case "GEOMETRIC": String(localized: "GEOMETRIC")
+        case "CREATIVE": String(localized: "CREATIVE")
+        case "STYLIZED": String(localized: "STYLIZED")
+        case "ADVANCED": String(localized: "ADVANCED")
+        default: category
+        }
+    }
+
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
             HStack {
@@ -31,7 +47,7 @@ struct TransitionPanel: View {
                     HStack {
                         Text("Duration").font(.caption.weight(.semibold))
                         Spacer()
-                        Text(String(format: "%.2fs", transition.duration.seconds))
+                        Text(String(format: "%.2fs", locale: .current, transition.duration.seconds))
                             .font(.caption.monospacedDigit().weight(.semibold))
                     }
                     Slider(value: Binding(
@@ -54,7 +70,7 @@ struct TransitionPanel: View {
                 VStack(alignment: .leading, spacing: 14) {
                     transitionRow(title: nil, types: [])
                     ForEach(categories, id: \.self) { category in
-                        transitionRow(title: category,
+                        transitionRow(title: Self.categoryLabel(category),
                                       types: TimelineTransitionType.allCases.filter { $0.category == category })
                     }
                 }

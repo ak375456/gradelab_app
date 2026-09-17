@@ -80,7 +80,7 @@ struct MarkerControls: View {
                 ForEach(model.project.timeline.markers.sorted { $0.time < $1.time }) { marker in
                     HStack {
                         Button { model.seekTimeline(to: marker.time.seconds, finishing: true); dismiss() } label: {
-                            Label(String(format: "%.3f s", marker.time.seconds), systemImage: "bookmark.fill")
+                            Label(String(format: "%.3f s", locale: .current, marker.time.seconds), systemImage: "bookmark.fill")
                         }
                         Spacer()
                         Button(role: .destructive) { model.deleteMarker(marker.id) } label: { Image(systemName: "trash").frame(width: 44, height: 44) }.accessibilityLabel("Delete marker")
@@ -100,12 +100,12 @@ struct VideoTransformPanel: View {
         NavigationStack {
             Form {
                 Section("Position · canvas coordinates") {
-                    value("X", $clip.transform.positionX, -1...2)
-                    value("Y", $clip.transform.positionY, -1...2)
+                    value(String(localized: "X"), $clip.transform.positionX, -1...2)
+                    value(String(localized: "Y"), $clip.transform.positionY, -1...2)
                 }
                 Section("Transform") {
-                    value("Scale", $clip.transform.scale, 0.05...6)
-                    value("Rotation", $clip.transform.rotationDegrees, -180...180)
+                    value(String(localized: "Scale"), $clip.transform.scale, 0.05...6)
+                    value(String(localized: "Rotation"), $clip.transform.rotationDegrees, -180...180)
                     value("Opacity", $clip.opacity, 0...1)
                     Picker("Blend", selection: $clip.blendMode) {
                         ForEach(VisualBlendMode.allCases, id: \.self) { Text($0.rawValue.capitalized).tag($0) }

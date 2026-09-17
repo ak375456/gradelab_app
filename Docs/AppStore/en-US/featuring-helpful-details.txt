@@ -1,0 +1,5 @@
+Two things set GradeLab apart.
+
+It never guesses about colour. A format with no verified transform is refused with a reason, never quietly converted, and Apple Log 2 shipped only once its gamut was checked against the Academy Software Foundation's ACES config. Nobody's footage is rendered on an assumption.
+
+And the real work is free: Apple Log and HDR grading, every tool live on your own footage, and 1080p exports with no watermark. Someone with an iPhone and no budget can finish a film in it.

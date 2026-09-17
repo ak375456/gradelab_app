@@ -125,10 +125,10 @@ enum CurveType: String, Codable, CaseIterable, Identifiable, Sendable {
 
     var title: String {
         switch self {
-        case .master: "Master"
-        case .red: "Red"
-        case .green: "Green"
-        case .blue: "Blue"
+        case .master: String(localized: "Master")
+        case .red: String(localized: "Red")
+        case .green: String(localized: "Green")
+        case .blue: String(localized: "Blue")
         default: shortTitle
         }
     }

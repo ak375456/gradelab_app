@@ -196,11 +196,11 @@ struct HomeView: View {
             }
 
             HStack(spacing: AppSpacing.standard) {
-                WorkflowStep(number: "01", label: "Analyze")
+                WorkflowStep(number: "01", label: String(localized: "workflow.step.analyze", defaultValue: "Analyze"))
                 WorkflowConnector()
-                WorkflowStep(number: "02", label: "Grade")
+                WorkflowStep(number: "02", label: String(localized: "workflow.step.grade", defaultValue: "Grade"))
                 WorkflowConnector()
-                WorkflowStep(number: "03", label: "Export")
+                WorkflowStep(number: "03", label: String(localized: "workflow.step.export", defaultValue: "Export"))
             }
         }
         .padding(AppSpacing.large)

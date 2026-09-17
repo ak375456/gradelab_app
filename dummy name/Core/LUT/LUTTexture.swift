@@ -44,8 +44,52 @@ enum LUTTextureFactory {
         return try makeTexture(values: values, size: size, device: device)
     }
 
+    /// Builds a texture from a compiled look.
+    ///
+    /// The samples are already in the texture's own format, so this only has to
+    /// interleave the alpha channel Metal requires. There is no parsing, no
+    /// float round-trip and no quantisation here, because the quantisation
+    /// happened once when the look was compiled — which is what makes loading a
+    /// `.gclut` and parsing the `.cube` it came from produce the same texture
+    /// bit for bit.
+    static func makeTexture(from compiled: LUTBinary.Compiled, device: MTLDevice) throws -> MTLTexture {
+        let size = compiled.size
+        let count = size * size * size
+        guard compiled.samples.count == count * 3 else {
+            throw GradeLabError.invalidLUT(String(localized: "A compiled look of size \(size) needs \(count * 3) samples."))
+        }
+        var payload = [UInt16](repeating: 0, count: count * 4)
+        for index in 0..<count {
+            let source = index * 3
+            let base = index * 4
+            payload[base] = compiled.samples[source]
+            payload[base + 1] = compiled.samples[source + 1]
+            payload[base + 2] = compiled.samples[source + 2]
+            payload[base + 3] = UInt16.max
+        }
+        return try upload(payload: payload, size: size, device: device)
+    }
+
     private static func makeTexture(
         values: [SIMD3<Float>],
+        size: Int,
+        device: MTLDevice
+    ) throws -> MTLTexture {
+        // Four channels because Metal has no filterable three-channel format;
+        // alpha is unused and written as 1.
+        var payload = [UInt16](repeating: 0, count: size * size * size * 4)
+        for (index, value) in values.enumerated() {
+            let base = index * 4
+            payload[base] = LUTBinary.quantize(value.x)
+            payload[base + 1] = LUTBinary.quantize(value.y)
+            payload[base + 2] = LUTBinary.quantize(value.z)
+            payload[base + 3] = UInt16.max
+        }
+        return try upload(payload: payload, size: size, device: device)
+    }
+
+    private static func upload(
+        payload: [UInt16],
         size: Int,
         device: MTLDevice
     ) throws -> MTLTexture {
@@ -60,18 +104,7 @@ enum LUTTextureFactory {
         descriptor.storageMode = .shared
         #endif
         guard let texture = device.makeTexture(descriptor: descriptor) else {
-            throw GradeLabError.invalidLUT("Metal could not allocate a 3D LUT texture.")
-        }
-
-        // Four channels because Metal has no filterable three-channel format;
-        // alpha is unused and written as 1.
-        var payload = [UInt16](repeating: 0, count: size * size * size * 4)
-        for (index, value) in values.enumerated() {
-            let base = index * 4
-            payload[base] = quantize(value.x)
-            payload[base + 1] = quantize(value.y)
-            payload[base + 2] = quantize(value.z)
-            payload[base + 3] = UInt16.max
+            throw GradeLabError.invalidLUT(String(localized: "Metal could not allocate a 3D LUT texture."))
         }
 
         let bytesPerPixel = MemoryLayout<UInt16>.size * 4
@@ -86,10 +119,5 @@ enum LUTTextureFactory {
             )
         }
         return texture
-    }
-
-    private static func quantize(_ value: Float) -> UInt16 {
-        guard value.isFinite else { return 0 }
-        return UInt16(min(max(value, 0), 1) * Float(UInt16.max) + 0.5)
     }
 }

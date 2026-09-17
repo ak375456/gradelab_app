@@ -63,8 +63,7 @@ final class LUTLibrary: @unchecked Sendable {
             return false
         }
         do {
-            let cube = try CubeLUTParser().parse(contentsOf: url)
-            let texture = try LUTTextureFactory.makeTexture(from: cube, device: device)
+            let texture = try makeTexture(at: url)
             texture.label = "LUT \(asset.name)"
             lock.lock(); textures[identifier] = texture; lock.unlock()
             return true
@@ -99,13 +98,12 @@ final class LUTLibrary: @unchecked Sendable {
         if unavailable.contains(resourceName) { lock.unlock(); return nil }
         lock.unlock()
 
-        guard let url = Bundle.lutResources.url(forResource: resourceName, withExtension: "cube") else {
+        guard let url = Self.renderingLUTURL(named: resourceName) else {
             markUnavailable(resourceName, reason: "not bundled")
             return nil
         }
         do {
-            let cube = try CubeLUTParser().parse(contentsOf: url)
-            let texture = try LUTTextureFactory.makeTexture(from: cube, device: device)
+            let texture = try makeTexture(at: url)
             texture.label = "Rendering LUT \(resourceName)"
             lock.lock(); renderingTextures[resourceName] = texture; lock.unlock()
             return texture
@@ -129,6 +127,32 @@ final class LUTLibrary: @unchecked Sendable {
     /// loads the new contents instead of serving the old texture.
     func forget(_ identifier: String) {
         lock.lock(); textures[identifier] = nil; unavailable.remove(identifier); lock.unlock()
+    }
+
+    /// Builds a texture from whichever form of the look actually shipped.
+    ///
+    /// Compiled looks are the normal case. The text path stays because a
+    /// `.cube` dropped into the looks folder without being compiled has always
+    /// worked and must keep working, and because looks imported at runtime are
+    /// text — the user picks a `.cube` out of Files, not a GradeLab format.
+    private func makeTexture(at url: URL) throws -> MTLTexture {
+        if url.pathExtension.lowercased() == LUTBinary.fileExtension {
+            return try LUTTextureFactory.makeTexture(from: LUTBinary.decode(contentsOf: url), device: device)
+        }
+        return try LUTTextureFactory.makeTexture(from: CubeLUTParser().parse(contentsOf: url), device: device)
+    }
+
+    /// Technical transforms are addressed by resource name rather than through
+    /// a `LUTAsset`, so they resolve their compiled form here rather than in
+    /// `LUTAsset.url()`.
+    private static func renderingLUTURL(named resourceName: String) -> URL? {
+        if let root = Bundle.lutResources.resourceURL {
+            for candidate in ["\(resourceName).cube.\(LUTBinary.fileExtension)", "\(resourceName).cube"] {
+                let url = root.appendingPathComponent(candidate)
+                if FileManager.default.fileExists(atPath: url.path) { return url }
+            }
+        }
+        return Bundle.lutResources.url(forResource: resourceName, withExtension: "cube")
     }
 
     private func markUnavailable(_ identifier: String, reason: String) {

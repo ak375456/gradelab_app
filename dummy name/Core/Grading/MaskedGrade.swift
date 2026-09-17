@@ -28,10 +28,10 @@ enum MaskShape: String, Codable, CaseIterable, Identifiable, Sendable {
 
     var title: String {
         switch self {
-        case .ellipse: "Ellipse"
-        case .rectangle: "Rectangle"
-        case .linear: "Gradient"
-        case .freehand: "Freehand"
+        case .ellipse: String(localized: "Ellipse")
+        case .rectangle: String(localized: "Rectangle")
+        case .linear: String(localized: "Gradient")
+        case .freehand: String(localized: "Freehand")
         }
     }
 

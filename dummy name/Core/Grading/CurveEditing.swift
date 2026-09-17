@@ -164,16 +164,16 @@ extension CurveType {
     /// A one-line description of what this curve does, shown under the graph.
     var help: String {
         switch self {
-        case .master: "Overall tone. Lift a point to brighten that range; lower it to darken. Pull shadows down and highlights up for contrast."
-        case .red: "Red channel. Raising adds red; lowering leans cyan."
-        case .green: "Green channel. Raising adds green; lowering leans magenta."
-        case .blue: "Blue channel. Raising adds blue; lowering leans yellow."
-        case .hueVsHue: "Turn one color into another. Pick a hue, then drag its point up or down to rotate it. Neighbouring hues follow smoothly."
-        case .hueVsSaturation: "Saturation of one color. Pick a hue, then drag down to mute it or up to strengthen it."
-        case .hueVsLuma: "Brightness of one color. Pick a hue, then drag down to darken it — a deeper sky, for instance."
-        case .lumaVsSaturation: "Saturation by brightness. Pulling the left down mutes color in the shadows; the right does the same for highlights."
-        case .saturationVsSaturation: "Remaps saturation. Lowering the right compresses colors that are already strong; lifting the left brings up quiet ones."
-        case .saturationVsLuma: "Brightness by saturation. Lowering the right darkens the most colorful areas and leaves neutrals alone."
+        case .master: String(localized: "Overall tone. Lift a point to brighten that range; lower it to darken. Pull shadows down and highlights up for contrast.")
+        case .red: String(localized: "Red channel. Raising adds red; lowering leans cyan.")
+        case .green: String(localized: "Green channel. Raising adds green; lowering leans magenta.")
+        case .blue: String(localized: "Blue channel. Raising adds blue; lowering leans yellow.")
+        case .hueVsHue: String(localized: "Turn one color into another. Pick a hue, then drag its point up or down to rotate it. Neighbouring hues follow smoothly.")
+        case .hueVsSaturation: String(localized: "Saturation of one color. Pick a hue, then drag down to mute it or up to strengthen it.")
+        case .hueVsLuma: String(localized: "Brightness of one color. Pick a hue, then drag down to darken it — a deeper sky, for instance.")
+        case .lumaVsSaturation: String(localized: "Saturation by brightness. Pulling the left down mutes color in the shadows; the right does the same for highlights.")
+        case .saturationVsSaturation: String(localized: "Remaps saturation. Lowering the right compresses colors that are already strong; lifting the left brings up quiet ones.")
+        case .saturationVsLuma: String(localized: "Brightness by saturation. Lowering the right darkens the most colorful areas and leaves neutrals alone.")
         }
     }
 }

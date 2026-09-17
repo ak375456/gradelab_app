@@ -84,13 +84,13 @@ struct TextToolPanel: View {
                     animated(.fontSize, 6...2048)
                 case "Format":
                     HStack {
-                        toggle("Bold", symbol: "bold", \.style.isBold)
+                        toggle(String(localized: "Bold"), symbol: "bold", \.style.isBold)
                             .disabled(FontRegistry.shared.variant(clip.style.fontName, bold: !clip.style.isBold, italic: clip.style.isItalic) == nil)
                             .opacity(FontRegistry.shared.variant(clip.style.fontName, bold: !clip.style.isBold, italic: clip.style.isItalic) == nil ? 0.3 : 1)
-                        toggle("Italic", symbol: "italic", \.style.isItalic)
+                        toggle(String(localized: "Italic"), symbol: "italic", \.style.isItalic)
                             .disabled(FontRegistry.shared.variant(clip.style.fontName, bold: clip.style.isBold, italic: !clip.style.isItalic) == nil)
                             .opacity(FontRegistry.shared.variant(clip.style.fontName, bold: clip.style.isBold, italic: !clip.style.isItalic) == nil ? 0.3 : 1)
-                        toggle("Underline", symbol: "underline", \.style.isUnderlined)
+                        toggle(String(localized: "Underline"), symbol: "underline", \.style.isUnderlined)
                     }
                     Text("Bold and Italic are available only when this font includes that variation.").font(.caption2).foregroundStyle(.secondary)
                     Picker("Capitalization", selection: binding(\.style.caseMode)) { ForEach(TextStyle.CaseMode.allCases, id: \.self) { Text($0.rawValue.capitalized).tag($0) } }
@@ -101,7 +101,7 @@ struct TextToolPanel: View {
                     animated(.layoutWidth, 0.05...1.5)
                 case "Transform":
                     keyframeHeader
-                    number("Duration (s)", Binding(get: { model.selectedText?.placement.duration.seconds ?? 3 }, set: model.setTextDuration), 0.1...600, reset: 3)
+                    number(String(localized: "Duration (s)"), Binding(get: { model.selectedText?.placement.duration.seconds ?? 3 }, set: model.setTextDuration), 0.1...600, reset: 3)
                     animated(.positionX, -1...2)
                     animated(.positionY, -1...2)
                     animated(.scale, 0.05...6)
@@ -110,8 +110,8 @@ struct TextToolPanel: View {
                     animated(.heightScale, 0.1...6)
                     // Wide enough for two full turns by dragging; type more for further spins.
                     animated(.rotation, -720...720)
-                    number("Anchor X", value(\.transform.anchorX), 0...1, reset: 0.5)
-                    number("Anchor Y", value(\.transform.anchorY), 0...1, reset: 0.5)
+                    number(String(localized: "Anchor X"), value(\.transform.anchorX), 0...1, reset: 0.5)
+                    number(String(localized: "Anchor Y"), value(\.transform.anchorY), 0...1, reset: 0.5)
                     animated(.opacity, 0...1)
                     Picker("Blend", selection: binding(\.blendMode)) { ForEach(VisualBlendMode.allCases, id: \.self) { Text($0.rawValue.capitalized).tag($0) } }
                     Text("Drag text in the preview. Pinch to resize; turn with two fingers to rotate.").font(.caption).foregroundStyle(.secondary)
@@ -127,7 +127,7 @@ struct TextToolPanel: View {
                         if clip.gradient != nil {
                             ColorPicker("Start color", selection: colorBinding(gradient(\.start)), supportsOpacity: true).font(.caption).frame(minHeight: 44)
                             ColorPicker("End color", selection: colorBinding(gradient(\.end)), supportsOpacity: true).font(.caption).frame(minHeight: 44)
-                            number("Angle", gradient(\.angleDegrees), -180...180, reset: 90)
+                            number(String(localized: "Angle"), gradient(\.angleDegrees), -180...180, reset: 90)
                         } else {
                             Text("A gradient replaces the flat text color. Stroke, background, shadow and glow keep their own colors.")
                                 .font(.caption2).foregroundStyle(.secondary)
@@ -236,9 +236,22 @@ struct TextToolPanel: View {
             .background(model.selectedText?[keyPath: key] == true ? Color.cyan.opacity(0.2) : .clear, in: RoundedRectangle(cornerRadius: 8))
         }.accessibilityLabel(title).accessibilityValue(model.selectedText?[keyPath: key] == true ? "On" : "Off")
     }
+    /// Display only. The tab's identity stays the English string — `section` is
+    /// switched on and bound from outside this view — so localizing the array
+    /// itself would break the switch.
+    private static func tabLabel(_ value: String) -> String {
+        switch value {
+        case "Style": String(localized: "Style")
+        case "Font": String(localized: "Font")
+        case "Format": String(localized: "Format")
+        case "Transform": String(localized: "Transform")
+        case "Appearance": String(localized: "Appearance")
+        default: value
+        }
+    }
     private func tabs(_ values: [String], selection: Binding<String>) -> some View {
         ScrollView(.horizontal) { HStack(spacing: 16) { ForEach(values, id: \.self) { v in
-            Button(v) { selection.wrappedValue = v }.font(.caption.weight(.medium)).frame(minHeight: 36)
+            Button(Self.tabLabel(v)) { selection.wrappedValue = v }.font(.caption.weight(.medium)).frame(minHeight: 36)
                 .foregroundStyle(selection.wrappedValue == v ? Color.cyan : .secondary)
         } } }.scrollIndicators(.hidden)
     }

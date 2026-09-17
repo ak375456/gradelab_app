@@ -37,8 +37,8 @@ enum ProjectColorMode: String, Codable, Equatable, Sendable, CaseIterable {
     /// The label shown to a person choosing between them.
     var title: String {
         switch self {
-        case .sdr, .sdrWide: "Convert to SDR"
-        case .hdrHLG: "Keep HDR"
+        case .sdr, .sdrWide: String(localized: "Convert to SDR")
+        case .hdrHLG: String(localized: "Keep HDR")
         case .appleLog: "Apple Log"
         case .appleLog2: "Apple Log 2"
         }
@@ -47,10 +47,10 @@ enum ProjectColorMode: String, Codable, Equatable, Sendable, CaseIterable {
     /// One line, no colour science. The detail lives in Source Information.
     var explanation: String {
         switch self {
-        case .sdr, .sdrWide: "Creates a standard video for SDR viewing."
-        case .hdrHLG: "Preserves HDR brightness and colour on compatible displays."
-        case .appleLog: "Decodes Apple Log to scene light for grading, and delivers Rec.709."
-        case .appleLog2: "Decodes Apple Log 2 to scene light for grading, and delivers Rec.709."
+        case .sdr, .sdrWide: String(localized: "Creates a standard video for SDR viewing.")
+        case .hdrHLG: String(localized: "Preserves HDR brightness and colour on compatible displays.")
+        case .appleLog: String(localized: "Decodes Apple Log to scene light for grading, and delivers Rec.709.")
+        case .appleLog2: String(localized: "Decodes Apple Log 2 to scene light for grading, and delivers Rec.709.")
         }
     }
 

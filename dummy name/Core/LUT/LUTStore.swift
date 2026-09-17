@@ -40,12 +40,12 @@ enum LUTStore {
 
         guard source.pathExtension.lowercased() == "cube" else {
             throw GradeLabError.invalidLUT(
-                "\(source.lastPathComponent) is not a .cube file. Looks must be 3D .cube LUTs."
+                String(localized: "\(source.lastPathComponent) is not a .cube file. Looks must be 3D .cube LUTs.")
             )
         }
         let size = (try? source.resourceValues(forKeys: [.fileSizeKey]).fileSize) ?? 0
         guard size <= LookValidation.maximumFileSize else {
-            throw GradeLabError.invalidLUT("\(source.lastPathComponent) is too large to be a look LUT.")
+            throw GradeLabError.invalidLUT(String(localized: "\(source.lastPathComponent) is too large to be a look LUT."))
         }
 
         let text = try String(contentsOf: source, encoding: .utf8)
@@ -80,6 +80,6 @@ enum LUTStore {
                 return url
             }
         }
-        throw GradeLabError.invalidLUT("Too many looks share the name “\(base)”. Rename the file and try again.")
+        throw GradeLabError.invalidLUT(String(localized: "Too many looks share the name “\(base)”. Rename the file and try again."))
     }
 }

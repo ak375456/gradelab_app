@@ -170,11 +170,11 @@ struct CurvesPanel<Model: GradingModel>: View {
 
     private var guide: some View {
         VStack(alignment: .leading, spacing: 7) {
-            step(1, "Pick a curve above. Master, R, G and B shape tone and the three channels; the six color curves each target one hue, one saturation range, or one part of the tonal range.")
-            step(2, "Tap the graph to drop a point, then drag that point to shape the curve.")
-            step(3, "Tap a point to select it — the numbers above the graph are its exact values. Tap it again to remove it.")
-            step(4, "On the hue curves, the eyedropper samples a color straight off the picture and builds a selection around it: a centre point to drag, and one either side holding the neighbouring colors still.")
-            step(5, "Reset returns the curve to neutral. Drag anywhere off a point to scroll this panel.")
+            step(1, String(localized: "Pick a curve above. Master, R, G and B shape tone and the three channels; the six color curves each target one hue, one saturation range, or one part of the tonal range."))
+            step(2, String(localized: "Tap the graph to drop a point, then drag that point to shape the curve."))
+            step(3, String(localized: "Tap a point to select it — the numbers above the graph are its exact values. Tap it again to remove it."))
+            step(4, String(localized: "On the hue curves, the eyedropper samples a color straight off the picture and builds a selection around it: a centre point to drag, and one either side holding the neighbouring colors still."))
+            step(5, String(localized: "Reset returns the curve to neutral. Drag anywhere off a point to scroll this panel."))
         }
         .padding(AppSpacing.compact)
         .frame(maxWidth: .infinity, alignment: .leading)

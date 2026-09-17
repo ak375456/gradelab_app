@@ -6,7 +6,11 @@ enum MaskTrackingDirection: String, CaseIterable, Sendable, Identifiable {
     case backward, forward, both
     var id: String { rawValue }
     var title: String {
-        switch self { case .backward: "Track Backward"; case .forward: "Track Forward"; case .both: "Track Both Directions" }
+        switch self {
+        case .backward: String(localized: "Track Backward")
+        case .forward: String(localized: "Track Forward")
+        case .both: String(localized: "Track Both Directions")
+        }
     }
 }
 

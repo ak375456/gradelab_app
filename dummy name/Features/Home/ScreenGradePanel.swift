@@ -32,7 +32,7 @@ struct ScreenGradePanel: View {
 
             AdjustmentSlider(
                 value: $grade.hue,
-                title: "Hue",
+                title: String(localized: "Hue"),
                 range: HomeScreenGrade.hueRange,
                 step: 5,
                 tint: grade.accent,
@@ -41,7 +41,7 @@ struct ScreenGradePanel: View {
 
             AdjustmentSlider(
                 value: $grade.vibrance,
-                title: "Vibrance",
+                title: String(localized: "Vibrance"),
                 range: HomeScreenGrade.vibranceRange,
                 step: 5,
                 tint: grade.accent,
@@ -50,7 +50,7 @@ struct ScreenGradePanel: View {
 
             AdjustmentSlider(
                 value: $grade.lift,
-                title: "Lift",
+                title: String(localized: "Lift"),
                 range: HomeScreenGrade.liftRange,
                 step: 5,
                 tint: grade.accent,

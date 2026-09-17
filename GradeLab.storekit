@@ -11,6 +11,11 @@
           "description": "One purchase. Every Pro feature, forever.",
           "displayName": "Lifetime Pro",
           "locale": "en_US"
+        },
+        {
+          "description": "Einmal kaufen. Alle Pro-Funktionen für immer.",
+          "displayName": "Pro auf Lebenszeit",
+          "locale": "de_DE"
         }
       ],
       "productID": "com.aftab.gradelab.pro.lifetime",
@@ -46,6 +51,11 @@
               "description": "Every Pro feature, billed weekly.",
               "displayName": "Weekly",
               "locale": "en_US"
+            },
+            {
+              "description": "Alle Pro-Funktionen, wöchentlich abgerechnet.",
+              "displayName": "Wöchentlich",
+              "locale": "de_DE"
             }
           ],
           "productID": "com.aftab.gradelab.pro.weekly",
@@ -67,6 +77,11 @@
               "description": "Every Pro feature, billed monthly.",
               "displayName": "Monthly",
               "locale": "en_US"
+            },
+            {
+              "description": "Alle Pro-Funktionen, monatlich abgerechnet.",
+              "displayName": "Monatlich",
+              "locale": "de_DE"
             }
           ],
           "productID": "com.aftab.gradelab.pro.monthly",
@@ -88,6 +103,11 @@
               "description": "Every Pro feature, billed yearly.",
               "displayName": "Yearly",
               "locale": "en_US"
+            },
+            {
+              "description": "Alle Pro-Funktionen, jährlich abgerechnet.",
+              "displayName": "Jährlich",
+              "locale": "de_DE"
             }
           ],
           "productID": "com.aftab.gradelab.pro.yearly",

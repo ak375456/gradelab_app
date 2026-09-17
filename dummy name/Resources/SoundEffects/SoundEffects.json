@@ -1,85 +1,85 @@
 {
   "version": 1,
-  "generatedBy": "Scripts/BuildSoundEffectLibrary.sh",
+  "generatedBy": "Scripts/compile-sound-effects.sh",
   "effects": [
     {
       "id": "essential-1",
       "title": "Air Horn - Short Burst",
       "category": "Musical",
       "pack": "Essential Effects",
-      "resource": "essential_0001.mp3",
-      "duration": 0.783625
+      "resource": "essential_0001.m4a",
+      "duration": 0.782993
     },
     {
       "id": "essential-2",
       "title": "Air Horn - Short Low",
       "category": "Musical",
       "pack": "Essential Effects",
-      "resource": "essential_0002.mp3",
-      "duration": 0.757500
+      "resource": "essential_0002.m4a",
+      "duration": 0.757007
     },
     {
       "id": "essential-3",
       "title": "Air blowing",
       "category": "Other",
       "pack": "Essential Effects",
-      "resource": "essential_0003.mp3",
-      "duration": 1.697938
+      "resource": "essential_0003.m4a",
+      "duration": 1.698005
     },
     {
       "id": "essential-4",
       "title": "Alert - Chime",
       "category": "UI & Alerts",
       "pack": "Essential Effects",
-      "resource": "essential_0004.mp3",
-      "duration": 0.940375
+      "resource": "essential_0004.m4a",
+      "duration": 0.940000
     },
     {
       "id": "essential-5",
       "title": "Alert - Digital",
       "category": "UI & Alerts",
       "pack": "Essential Effects",
-      "resource": "essential_0005.mp3",
-      "duration": 1.697938
+      "resource": "essential_0005.m4a",
+      "duration": 1.698005
     },
     {
       "id": "essential-6",
       "title": "Alert - Elevator",
       "category": "UI & Alerts",
       "pack": "Essential Effects",
-      "resource": "essential_0006.mp3",
-      "duration": 1.253875
+      "resource": "essential_0006.m4a",
+      "duration": 1.253991
     },
     {
       "id": "essential-7",
       "title": "Alert - Idea",
       "category": "UI & Alerts",
       "pack": "Essential Effects",
-      "resource": "essential_0007.mp3",
-      "duration": 1.149375
+      "resource": "essential_0007.m4a",
+      "duration": 1.149002
     },
     {
       "id": "essential-8",
       "title": "Alert - Positive - Correct",
       "category": "UI & Alerts",
       "pack": "Essential Effects",
-      "resource": "essential_0008.mp3",
-      "duration": 0.783625
+      "resource": "essential_0008.m4a",
+      "duration": 0.782993
     },
     {
       "id": "essential-9",
       "title": "Alert - Positive - Retro Game",
       "category": "UI & Alerts",
       "pack": "Essential Effects",
-      "resource": "essential_0009.mp3",
-      "duration": 1.071000
+      "resource": "essential_0009.m4a",
+      "duration": 1.070998
     },
     {
       "id": "essential-10",
       "title": "Alert - Positive - Single Tone",
       "category": "UI & Alerts",
       "pack": "Essential Effects",
-      "resource": "essential_0010.mp3",
+      "resource": "essential_0010.m4a",
       "duration": 1.280000
     },
     {
@@ -87,151 +87,151 @@
       "title": "Alert - Sharp Twinkle",
       "category": "UI & Alerts",
       "pack": "Essential Effects",
-      "resource": "essential_0011.mp3",
-      "duration": 1.149375
+      "resource": "essential_0011.m4a",
+      "duration": 1.149002
     },
     {
       "id": "essential-12",
       "title": "Alert - Tense",
       "category": "UI & Alerts",
       "pack": "Essential Effects",
-      "resource": "essential_0012.mp3",
-      "duration": 1.828563
+      "resource": "essential_0012.m4a",
+      "duration": 1.828005
     },
     {
       "id": "essential-13",
       "title": "Alert - Three Tones  2",
       "category": "UI & Alerts",
       "pack": "Essential Effects",
-      "resource": "essential_0013.mp3",
-      "duration": 0.914250
+      "resource": "essential_0013.m4a",
+      "duration": 0.913991
     },
     {
       "id": "essential-14",
       "title": "Alert - Three Tones 1",
       "category": "UI & Alerts",
       "pack": "Essential Effects",
-      "resource": "essential_0014.mp3",
-      "duration": 0.653063
+      "resource": "essential_0014.m4a",
+      "duration": 0.652993
     },
     {
       "id": "essential-15",
       "title": "Alert - Two Tone",
       "category": "UI & Alerts",
       "pack": "Essential Effects",
-      "resource": "essential_0015.mp3",
-      "duration": 1.071000
+      "resource": "essential_0015.m4a",
+      "duration": 1.070998
     },
     {
       "id": "essential-16",
       "title": "Alert - Two-Tone - Dot Matrix",
       "category": "UI & Alerts",
       "pack": "Essential Effects",
-      "resource": "essential_0016.mp3",
-      "duration": 0.339563
+      "resource": "essential_0016.m4a",
+      "duration": 0.339002
     },
     {
       "id": "essential-17",
       "title": "Ambient - Background - People in an open room",
       "category": "Ambience",
       "pack": "Essential Effects",
-      "resource": "essential_0017.mp3",
-      "duration": 2.142000
+      "resource": "essential_0017.m4a",
+      "duration": 2.141995
     },
     {
       "id": "essential-18",
       "title": "Ambient - City Street 1",
       "category": "Ambience",
       "pack": "Essential Effects",
-      "resource": "essential_0018.mp3",
-      "duration": 3.082438
+      "resource": "essential_0018.m4a",
+      "duration": 3.081995
     },
     {
       "id": "essential-19",
       "title": "Ambient - City Street 2",
       "category": "Ambience",
       "pack": "Essential Effects",
-      "resource": "essential_0019.mp3",
-      "duration": 8.176313
+      "resource": "essential_0019.m4a",
+      "duration": 8.176009
     },
     {
       "id": "essential-20",
       "title": "Ambient - City Street 3",
       "category": "Ambience",
       "pack": "Essential Effects",
-      "resource": "essential_0020.mp3",
-      "duration": 2.011375
+      "resource": "essential_0020.m4a",
+      "duration": 2.010998
     },
     {
       "id": "essential-21",
       "title": "Ambient - Crowd Murmur - Indoors 1",
       "category": "People",
       "pack": "Essential Effects",
-      "resource": "essential_0021.mp3",
-      "duration": 6.817938
+      "resource": "essential_0021.m4a",
+      "duration": 6.818005
     },
     {
       "id": "essential-22",
       "title": "Ambient - Crowd Murmur - Indoors 2",
       "category": "People",
       "pack": "Essential Effects",
-      "resource": "essential_0022.mp3",
-      "duration": 6.844063
+      "resource": "essential_0022.m4a",
+      "duration": 6.843991
     },
     {
       "id": "essential-23",
       "title": "Ambient - Crowd Murmur 1",
       "category": "People",
       "pack": "Essential Effects",
-      "resource": "essential_0023.mp3",
-      "duration": 7.131375
+      "resource": "essential_0023.m4a",
+      "duration": 7.130998
     },
     {
       "id": "essential-24",
       "title": "Ambient - Crowd Murmur 2",
       "category": "People",
       "pack": "Essential Effects",
-      "resource": "essential_0024.mp3",
-      "duration": 6.948563
+      "resource": "essential_0024.m4a",
+      "duration": 6.948005
     },
     {
       "id": "essential-25",
       "title": "Ambient - Forest 2",
       "category": "Nature",
       "pack": "Essential Effects",
-      "resource": "essential_0025.mp3",
-      "duration": 7.053063
+      "resource": "essential_0025.m4a",
+      "duration": 7.052993
     },
     {
       "id": "essential-26",
       "title": "Ambient - Forest",
       "category": "Nature",
       "pack": "Essential Effects",
-      "resource": "essential_0026.mp3",
-      "duration": 5.041625
+      "resource": "essential_0026.m4a",
+      "duration": 5.040998
     },
     {
       "id": "essential-27",
       "title": "Ambient - People in a Bar",
       "category": "Ambience",
       "pack": "Essential Effects",
-      "resource": "essential_0027.mp3",
-      "duration": 10.057125
+      "resource": "essential_0027.m4a",
+      "duration": 10.057007
     },
     {
       "id": "essential-28",
       "title": "Animals - Cow Moo 1",
       "category": "Animals",
       "pack": "Essential Effects",
-      "resource": "essential_0028.mp3",
-      "duration": 2.298750
+      "resource": "essential_0028.m4a",
+      "duration": 2.298005
     },
     {
       "id": "essential-29",
       "title": "Animals - Cow Moo 2",
       "category": "Animals",
       "pack": "Essential Effects",
-      "resource": "essential_0029.mp3",
+      "resource": "essential_0029.m4a",
       "duration": 1.440000
     },
     {
@@ -239,63 +239,63 @@
       "title": "Animals - Dog Bark - Big - Single",
       "category": "Animals",
       "pack": "Essential Effects",
-      "resource": "essential_0030.mp3",
-      "duration": 0.391813
+      "resource": "essential_0030.m4a",
+      "duration": 0.391995
     },
     {
       "id": "essential-31",
       "title": "Animals - Dog Bark - Small - Single",
       "category": "Animals",
       "pack": "Essential Effects",
-      "resource": "essential_0031.mp3",
-      "duration": 0.444063
+      "resource": "essential_0031.m4a",
+      "duration": 0.443991
     },
     {
       "id": "essential-32",
       "title": "Animals - Dog Barking 1",
       "category": "Animals",
       "pack": "Essential Effects",
-      "resource": "essential_0032.mp3",
-      "duration": 1.854688
+      "resource": "essential_0032.m4a",
+      "duration": 1.853991
     },
     {
       "id": "essential-33",
       "title": "Animals - Dog Barking 2",
       "category": "Animals",
       "pack": "Essential Effects",
-      "resource": "essential_0033.mp3",
-      "duration": 1.593438
+      "resource": "essential_0033.m4a",
+      "duration": 1.592993
     },
     {
       "id": "essential-34",
       "title": "Animals - Dog Barking 3",
       "category": "Animals",
       "pack": "Essential Effects",
-      "resource": "essential_0034.mp3",
-      "duration": 1.071000
+      "resource": "essential_0034.m4a",
+      "duration": 1.070998
     },
     {
       "id": "essential-35",
       "title": "Animals - Donkey",
       "category": "Animals",
       "pack": "Essential Effects",
-      "resource": "essential_0035.mp3",
-      "duration": 1.071000
+      "resource": "essential_0035.m4a",
+      "duration": 1.070998
     },
     {
       "id": "essential-36",
       "title": "Animals - Duck - Quack - Single 2",
       "category": "Animals",
       "pack": "Essential Effects",
-      "resource": "essential_0036.mp3",
-      "duration": 0.432000
+      "resource": "essential_0036.m4a",
+      "duration": 0.431995
     },
     {
       "id": "essential-37",
       "title": "Animals - Duck - Quack - Twice",
       "category": "Animals",
       "pack": "Essential Effects",
-      "resource": "essential_0037.mp3",
+      "resource": "essential_0037.m4a",
       "duration": 1.560000
     },
     {
@@ -303,7 +303,7 @@
       "title": "Animals - Duck - Quack Quack",
       "category": "Animals",
       "pack": "Essential Effects",
-      "resource": "essential_0038.mp3",
+      "resource": "essential_0038.m4a",
       "duration": 0.480000
     },
     {
@@ -311,327 +311,327 @@
       "title": "Animals - Sheep",
       "category": "Animals",
       "pack": "Essential Effects",
-      "resource": "essential_0039.mp3",
-      "duration": 1.071000
+      "resource": "essential_0039.m4a",
+      "duration": 1.070998
     },
     {
       "id": "essential-40",
       "title": "Applause - Large Crowd 1",
       "category": "People",
       "pack": "Essential Effects",
-      "resource": "essential_0040.mp3",
-      "duration": 3.134688
+      "resource": "essential_0040.m4a",
+      "duration": 3.133991
     },
     {
       "id": "essential-41",
       "title": "Applause - Large Crowd 2",
       "category": "People",
       "pack": "Essential Effects",
-      "resource": "essential_0041.mp3",
-      "duration": 2.612188
+      "resource": "essential_0041.m4a",
+      "duration": 2.611995
     },
     {
       "id": "essential-42",
       "title": "Applause - Small Group 1",
       "category": "Other",
       "pack": "Essential Effects",
-      "resource": "essential_0042.mp3",
-      "duration": 1.018750
+      "resource": "essential_0042.m4a",
+      "duration": 1.018005
     },
     {
       "id": "essential-43",
       "title": "Applause - Small Group 2",
       "category": "Other",
       "pack": "Essential Effects",
-      "resource": "essential_0043.mp3",
-      "duration": 3.134688
+      "resource": "essential_0043.m4a",
+      "duration": 3.133991
     },
     {
       "id": "essential-44",
       "title": "Applause - Small Group 3",
       "category": "Other",
       "pack": "Essential Effects",
-      "resource": "essential_0044.mp3",
-      "duration": 1.985250
+      "resource": "essential_0044.m4a",
+      "duration": 1.985011
     },
     {
       "id": "essential-45",
       "title": "Bell - Boxing - 4x",
       "category": "UI & Alerts",
       "pack": "Essential Effects",
-      "resource": "essential_0045.mp3",
-      "duration": 2.112000
+      "resource": "essential_0045.m4a",
+      "duration": 2.111995
     },
     {
       "id": "essential-46",
       "title": "Bell - Boxing - Double",
       "category": "UI & Alerts",
       "pack": "Essential Effects",
-      "resource": "essential_0046.mp3",
-      "duration": 1.152000
+      "resource": "essential_0046.m4a",
+      "duration": 1.151995
     },
     {
       "id": "essential-47",
       "title": "Bell - Boxing - Single",
       "category": "UI & Alerts",
       "pack": "Essential Effects",
-      "resource": "essential_0047.mp3",
-      "duration": 1.104000
+      "resource": "essential_0047.m4a",
+      "duration": 1.103991
     },
     {
       "id": "essential-48",
       "title": "Bell - Boxing - Triple",
       "category": "UI & Alerts",
       "pack": "Essential Effects",
-      "resource": "essential_0048.mp3",
-      "duration": 86.304000
+      "resource": "essential_0048.m4a",
+      "duration": 86.303991
     },
     {
       "id": "essential-49",
       "title": "Bird - Bawk",
       "category": "Animals",
       "pack": "Essential Effects",
-      "resource": "essential_0049.mp3",
-      "duration": 0.339563
+      "resource": "essential_0049.m4a",
+      "duration": 0.339002
     },
     {
       "id": "essential-50",
       "title": "Bird - Chirping",
       "category": "Animals",
       "pack": "Essential Effects",
-      "resource": "essential_0050.mp3",
-      "duration": 2.168125
+      "resource": "essential_0050.m4a",
+      "duration": 2.168005
     },
     {
       "id": "essential-51",
       "title": "Bird - Singing",
       "category": "Animals",
       "pack": "Essential Effects",
-      "resource": "essential_0051.mp3",
-      "duration": 1.071000
+      "resource": "essential_0051.m4a",
+      "duration": 1.070998
     },
     {
       "id": "essential-52",
       "title": "Bird - Whistle",
       "category": "Animals",
       "pack": "Essential Effects",
-      "resource": "essential_0052.mp3",
-      "duration": 0.862000
+      "resource": "essential_0052.m4a",
+      "duration": 0.861995
     },
     {
       "id": "essential-53",
       "title": "Bird Chirp - Two-Tone",
       "category": "Animals",
       "pack": "Essential Effects",
-      "resource": "essential_0053.mp3",
-      "duration": 0.339563
+      "resource": "essential_0053.m4a",
+      "duration": 0.339002
     },
     {
       "id": "essential-54",
       "title": "Bird",
       "category": "Animals",
       "pack": "Essential Effects",
-      "resource": "essential_0054.mp3",
-      "duration": 0.992625
+      "resource": "essential_0054.m4a",
+      "duration": 0.991995
     },
     {
       "id": "essential-55",
       "title": "Birds - Whistle",
       "category": "Animals",
       "pack": "Essential Effects",
-      "resource": "essential_0055.mp3",
-      "duration": 1.880813
+      "resource": "essential_0055.m4a",
+      "duration": 1.880998
     },
     {
       "id": "essential-56",
       "title": "Braam 1",
       "category": "Other",
       "pack": "Essential Effects",
-      "resource": "essential_0056.mp3",
-      "duration": 2.808000
+      "resource": "essential_0056.m4a",
+      "duration": 2.808005
     },
     {
       "id": "essential-57",
       "title": "Braam 2",
       "category": "Other",
       "pack": "Essential Effects",
-      "resource": "essential_0057.mp3",
-      "duration": 2.112000
+      "resource": "essential_0057.m4a",
+      "duration": 2.111995
     },
     {
       "id": "essential-58",
       "title": "Buzzer 1",
       "category": "Other",
       "pack": "Essential Effects",
-      "resource": "essential_0058.mp3",
-      "duration": 1.018750
+      "resource": "essential_0058.m4a",
+      "duration": 1.018005
     },
     {
       "id": "essential-59",
       "title": "Buzzer 2",
       "category": "Other",
       "pack": "Essential Effects",
-      "resource": "essential_0059.mp3",
-      "duration": 1.071000
+      "resource": "essential_0059.m4a",
+      "duration": 1.070998
     },
     {
       "id": "essential-60",
       "title": "Buzzer 3",
       "category": "Other",
       "pack": "Essential Effects",
-      "resource": "essential_0060.mp3",
-      "duration": 1.097125
+      "resource": "essential_0060.m4a",
+      "duration": 1.097007
     },
     {
       "id": "essential-61",
       "title": "Buzzer 4",
       "category": "Other",
       "pack": "Essential Effects",
-      "resource": "essential_0061.mp3",
-      "duration": 1.071000
+      "resource": "essential_0061.m4a",
+      "duration": 1.070998
     },
     {
       "id": "essential-62",
       "title": "Camera 1",
       "category": "Other",
       "pack": "Essential Effects",
-      "resource": "essential_0062.mp3",
-      "duration": 0.391813
+      "resource": "essential_0062.m4a",
+      "duration": 0.391995
     },
     {
       "id": "essential-63",
       "title": "Camera 2",
       "category": "Other",
       "pack": "Essential Effects",
-      "resource": "essential_0063.mp3",
-      "duration": 0.626938
+      "resource": "essential_0063.m4a",
+      "duration": 0.627007
     },
     {
       "id": "essential-64",
       "title": "Camera 3",
       "category": "Other",
       "pack": "Essential Effects",
-      "resource": "essential_0064.mp3",
-      "duration": 1.018750
+      "resource": "essential_0064.m4a",
+      "duration": 1.018005
     },
     {
       "id": "essential-65",
       "title": "Camera 4",
       "category": "Other",
       "pack": "Essential Effects",
-      "resource": "essential_0065.mp3",
-      "duration": 0.287313
+      "resource": "essential_0065.m4a",
+      "duration": 0.287007
     },
     {
       "id": "essential-66",
       "title": "Camera 5",
       "category": "Other",
       "pack": "Essential Effects",
-      "resource": "essential_0066.mp3",
-      "duration": 0.339563
+      "resource": "essential_0066.m4a",
+      "duration": 0.339002
     },
     {
       "id": "essential-67",
       "title": "Camera 6",
       "category": "Other",
       "pack": "Essential Effects",
-      "resource": "essential_0067.mp3",
-      "duration": 0.417938
+      "resource": "essential_0067.m4a",
+      "duration": 0.418005
     },
     {
       "id": "essential-68",
       "title": "Car - Alarm",
       "category": "Vehicles",
       "pack": "Essential Effects",
-      "resource": "essential_0068.mp3",
-      "duration": 2.136000
+      "resource": "essential_0068.m4a",
+      "duration": 2.136009
     },
     {
       "id": "essential-69",
       "title": "Car - Engine Start 1",
       "category": "Vehicles",
       "pack": "Essential Effects",
-      "resource": "essential_0069.mp3",
-      "duration": 1.488000
+      "resource": "essential_0069.m4a",
+      "duration": 1.488005
     },
     {
       "id": "essential-70",
       "title": "Car - Engine Starting 2",
       "category": "Vehicles",
       "pack": "Essential Effects",
-      "resource": "essential_0070.mp3",
-      "duration": 1.944000
+      "resource": "essential_0070.m4a",
+      "duration": 1.943991
     },
     {
       "id": "essential-71",
       "title": "Car - Horn Honking",
       "category": "Vehicles",
       "pack": "Essential Effects",
-      "resource": "essential_0071.mp3",
-      "duration": 1.906938
+      "resource": "essential_0071.m4a",
+      "duration": 1.907007
     },
     {
       "id": "essential-72",
       "title": "Car Door - Open Close",
       "category": "Vehicles",
       "pack": "Essential Effects",
-      "resource": "essential_0072.mp3",
-      "duration": 1.071000
+      "resource": "essential_0072.m4a",
+      "duration": 1.070998
     },
     {
       "id": "essential-73",
       "title": "Car Security - 2 Chirps",
       "category": "Vehicles",
       "pack": "Essential Effects",
-      "resource": "essential_0073.mp3",
-      "duration": 0.470188
+      "resource": "essential_0073.m4a",
+      "duration": 0.470000
     },
     {
       "id": "essential-74",
       "title": "Cat Meow 1",
       "category": "Other",
       "pack": "Essential Effects",
-      "resource": "essential_0074.mp3",
-      "duration": 1.880813
+      "resource": "essential_0074.m4a",
+      "duration": 1.880998
     },
     {
       "id": "essential-75",
       "title": "Cat Meow 2",
       "category": "Other",
       "pack": "Essential Effects",
-      "resource": "essential_0075.mp3",
-      "duration": 0.992625
+      "resource": "essential_0075.m4a",
+      "duration": 0.991995
     },
     {
       "id": "essential-76",
       "title": "Cat Meow 3",
       "category": "Other",
       "pack": "Essential Effects",
-      "resource": "essential_0076.mp3",
-      "duration": 1.175500
+      "resource": "essential_0076.m4a",
+      "duration": 1.175011
     },
     {
       "id": "essential-77",
       "title": "Cat Meow 4",
       "category": "Other",
       "pack": "Essential Effects",
-      "resource": "essential_0077.mp3",
-      "duration": 0.522438
+      "resource": "essential_0077.m4a",
+      "duration": 0.521995
     },
     {
       "id": "essential-78",
       "title": "Celebratory Jingle 1",
       "category": "Musical",
       "pack": "Essential Effects",
-      "resource": "essential_0078.mp3",
-      "duration": 2.638313
+      "resource": "essential_0078.m4a",
+      "duration": 2.638005
     },
     {
       "id": "essential-79",
       "title": "Celebratory Jingle 2",
       "category": "Musical",
       "pack": "Essential Effects",
-      "resource": "essential_0079.mp3",
+      "resource": "essential_0079.m4a",
       "duration": 1.280000
     },
     {
@@ -639,495 +639,495 @@
       "title": "Celebratory Jingle 3",
       "category": "Musical",
       "pack": "Essential Effects",
-      "resource": "essential_0080.mp3",
-      "duration": 3.317500
+      "resource": "essential_0080.m4a",
+      "duration": 3.317007
     },
     {
       "id": "essential-81",
       "title": "Censor Bleep",
       "category": "UI & Alerts",
       "pack": "Essential Effects",
-      "resource": "essential_0081.mp3",
-      "duration": 1.071000
+      "resource": "essential_0081.m4a",
+      "duration": 1.070998
     },
     {
       "id": "essential-82",
       "title": "Chime - Single",
       "category": "UI & Alerts",
       "pack": "Essential Effects",
-      "resource": "essential_0082.mp3",
-      "duration": 2.638313
+      "resource": "essential_0082.m4a",
+      "duration": 2.638005
     },
     {
       "id": "essential-83",
       "title": "Chimes - Hi Lo - Ding Dong",
       "category": "UI & Alerts",
       "pack": "Essential Effects",
-      "resource": "essential_0083.mp3",
-      "duration": 3.134688
+      "resource": "essential_0083.m4a",
+      "duration": 3.133991
     },
     {
       "id": "essential-84",
       "title": "Chimes - Melodic",
       "category": "UI & Alerts",
       "pack": "Essential Effects",
-      "resource": "essential_0084.mp3",
-      "duration": 2.821188
+      "resource": "essential_0084.m4a",
+      "duration": 2.820998
     },
     {
       "id": "essential-85",
       "title": "Chimes - Musical",
       "category": "UI & Alerts",
       "pack": "Essential Effects",
-      "resource": "essential_0085.mp3",
-      "duration": 2.142000
+      "resource": "essential_0085.m4a",
+      "duration": 2.141995
     },
     {
       "id": "essential-86",
       "title": "Clap - Single 2",
       "category": "Hits",
       "pack": "Essential Effects",
-      "resource": "essential_0086.mp3",
-      "duration": 0.522438
+      "resource": "essential_0086.m4a",
+      "duration": 0.521995
     },
     {
       "id": "essential-87",
       "title": "Clap - Single 3",
       "category": "Hits",
       "pack": "Essential Effects",
-      "resource": "essential_0087.mp3",
-      "duration": 0.182813
+      "resource": "essential_0087.m4a",
+      "duration": 0.182993
     },
     {
       "id": "essential-88",
       "title": "Clap - Single",
       "category": "Hits",
       "pack": "Essential Effects",
-      "resource": "essential_0088.mp3",
-      "duration": 0.417938
+      "resource": "essential_0088.m4a",
+      "duration": 0.418005
     },
     {
       "id": "essential-89",
       "title": "Clapping - Fast",
       "category": "Hits",
       "pack": "Essential Effects",
-      "resource": "essential_0089.mp3",
-      "duration": 0.914250
+      "resource": "essential_0089.m4a",
+      "duration": 0.913991
     },
     {
       "id": "essential-90",
       "title": "Click - Single",
       "category": "UI & Alerts",
       "pack": "Essential Effects",
-      "resource": "essential_0090.mp3",
-      "duration": 0.287313
+      "resource": "essential_0090.m4a",
+      "duration": 0.287007
     },
     {
       "id": "essential-91",
       "title": "Combo - bell creak drop",
       "category": "UI & Alerts",
       "pack": "Essential Effects",
-      "resource": "essential_0091.mp3",
-      "duration": 2.115875
+      "resource": "essential_0091.m4a",
+      "duration": 2.116009
     },
     {
       "id": "essential-92",
       "title": "Correct - Synthetic Chime",
       "category": "Glitches",
       "pack": "Essential Effects",
-      "resource": "essential_0092.mp3",
-      "duration": 0.914250
+      "resource": "essential_0092.m4a",
+      "duration": 0.913991
     },
     {
       "id": "essential-93",
       "title": "Crash 1",
       "category": "Other",
       "pack": "Essential Effects",
-      "resource": "essential_0093.mp3",
-      "duration": 1.175500
+      "resource": "essential_0093.m4a",
+      "duration": 1.175011
     },
     {
       "id": "essential-94",
       "title": "Crash 2",
       "category": "Other",
       "pack": "Essential Effects",
-      "resource": "essential_0094.mp3",
-      "duration": 0.626938
+      "resource": "essential_0094.m4a",
+      "duration": 0.627007
     },
     {
       "id": "essential-95",
       "title": "Crash 3",
       "category": "Other",
       "pack": "Essential Effects",
-      "resource": "essential_0095.mp3",
-      "duration": 1.332188
+      "resource": "essential_0095.m4a",
+      "duration": 1.331995
     },
     {
       "id": "essential-96",
       "title": "Crash 4",
       "category": "Other",
       "pack": "Essential Effects",
-      "resource": "essential_0096.mp3",
-      "duration": 1.776313
+      "resource": "essential_0096.m4a",
+      "duration": 1.776009
     },
     {
       "id": "essential-97",
       "title": "Creak - Short",
       "category": "Other",
       "pack": "Essential Effects",
-      "resource": "essential_0097.mp3",
-      "duration": 0.705250
+      "resource": "essential_0097.m4a",
+      "duration": 0.705011
     },
     {
       "id": "essential-98",
       "title": "Cricket Chirp - Single",
       "category": "Animals",
       "pack": "Essential Effects",
-      "resource": "essential_0098.mp3",
-      "duration": 0.470188
+      "resource": "essential_0098.m4a",
+      "duration": 0.470000
     },
     {
       "id": "essential-99",
       "title": "Cricket Chirping - Fast",
       "category": "Animals",
       "pack": "Essential Effects",
-      "resource": "essential_0099.mp3",
-      "duration": 1.071000
+      "resource": "essential_0099.m4a",
+      "duration": 1.070998
     },
     {
       "id": "essential-100",
       "title": "Cricket Chirping - Isolated",
       "category": "Animals",
       "pack": "Essential Effects",
-      "resource": "essential_0100.mp3",
-      "duration": 1.880813
+      "resource": "essential_0100.m4a",
+      "duration": 1.880998
     },
     {
       "id": "essential-101",
       "title": "Crickets Chirping -  Country Night",
       "category": "Animals",
       "pack": "Essential Effects",
-      "resource": "essential_0101.mp3",
-      "duration": 2.142000
+      "resource": "essential_0101.m4a",
+      "duration": 2.141995
     },
     {
       "id": "essential-102",
       "title": "Crickets Chirping - Country Night 2",
       "category": "Animals",
       "pack": "Essential Effects",
-      "resource": "essential_0102.mp3",
-      "duration": 2.142000
+      "resource": "essential_0102.m4a",
+      "duration": 2.141995
     },
     {
       "id": "essential-103",
       "title": "Crowd - Cheering - Children",
       "category": "People",
       "pack": "Essential Effects",
-      "resource": "essential_0103.mp3",
-      "duration": 2.011375
+      "resource": "essential_0103.m4a",
+      "duration": 2.010998
     },
     {
       "id": "essential-104",
       "title": "Crowd - Cheering - Large 1",
       "category": "People",
       "pack": "Essential Effects",
-      "resource": "essential_0104.mp3",
-      "duration": 2.063625
+      "resource": "essential_0104.m4a",
+      "duration": 2.062993
     },
     {
       "id": "essential-105",
       "title": "Crowd - Cheering - Large 2",
       "category": "People",
       "pack": "Essential Effects",
-      "resource": "essential_0105.mp3",
-      "duration": 3.578750
+      "resource": "essential_0105.m4a",
+      "duration": 3.578005
     },
     {
       "id": "essential-106",
       "title": "Crowd - Cheering - Screams - Fade out",
       "category": "People",
       "pack": "Essential Effects",
-      "resource": "essential_0106.mp3",
-      "duration": 6.765688
+      "resource": "essential_0106.m4a",
+      "duration": 6.765011
     },
     {
       "id": "essential-107",
       "title": "Crowd - Disappointed Groans",
       "category": "People",
       "pack": "Essential Effects",
-      "resource": "essential_0107.mp3",
-      "duration": 4.440813
+      "resource": "essential_0107.m4a",
+      "duration": 4.440998
     },
     {
       "id": "essential-108",
       "title": "Crowd - Disgusted",
       "category": "People",
       "pack": "Essential Effects",
-      "resource": "essential_0108.mp3",
-      "duration": 4.153438
+      "resource": "essential_0108.m4a",
+      "duration": 4.152993
     },
     {
       "id": "essential-109",
       "title": "Crowd - Noise Applause Whistle - Outdoors",
       "category": "People",
       "pack": "Essential Effects",
-      "resource": "essential_0109.mp3",
-      "duration": 3.056313
+      "resource": "essential_0109.m4a",
+      "duration": 3.056009
     },
     {
       "id": "essential-110",
       "title": "Crowd - Unhappy",
       "category": "People",
       "pack": "Essential Effects",
-      "resource": "essential_0110.mp3",
-      "duration": 2.533875
+      "resource": "essential_0110.m4a",
+      "duration": 2.533991
     },
     {
       "id": "essential-111",
       "title": "Crumple",
       "category": "Other",
       "pack": "Essential Effects",
-      "resource": "essential_0111.mp3",
-      "duration": 1.071000
+      "resource": "essential_0111.m4a",
+      "duration": 1.070998
     },
     {
       "id": "essential-112",
       "title": "DJ Record Scratch",
       "category": "Other",
       "pack": "Essential Effects",
-      "resource": "essential_0112.mp3",
-      "duration": 0.626938
+      "resource": "essential_0112.m4a",
+      "duration": 0.627007
     },
     {
       "id": "essential-113",
       "title": "DJ Record Scratching Turntables",
       "category": "Other",
       "pack": "Essential Effects",
-      "resource": "essential_0113.mp3",
-      "duration": 2.063625
+      "resource": "essential_0113.m4a",
+      "duration": 2.062993
     },
     {
       "id": "essential-114",
       "title": "Deflating",
       "category": "Other",
       "pack": "Essential Effects",
-      "resource": "essential_0114.mp3",
-      "duration": 1.227750
+      "resource": "essential_0114.m4a",
+      "duration": 1.227007
     },
     {
       "id": "essential-115",
       "title": "Digital Glitch 1",
       "category": "Glitches",
       "pack": "Essential Effects",
-      "resource": "essential_0115.mp3",
-      "duration": 0.417938
+      "resource": "essential_0115.m4a",
+      "duration": 0.418005
     },
     {
       "id": "essential-116",
       "title": "Digital Glitch 2",
       "category": "Glitches",
       "pack": "Essential Effects",
-      "resource": "essential_0116.mp3",
-      "duration": 1.071000
+      "resource": "essential_0116.m4a",
+      "duration": 1.070998
     },
     {
       "id": "essential-117",
       "title": "Digital Glitch 3",
       "category": "Glitches",
       "pack": "Essential Effects",
-      "resource": "essential_0117.mp3",
-      "duration": 1.541188
+      "resource": "essential_0117.m4a",
+      "duration": 1.540998
     },
     {
       "id": "essential-118",
       "title": "Digital Glitch 4",
       "category": "Glitches",
       "pack": "Essential Effects",
-      "resource": "essential_0118.mp3",
-      "duration": 0.862000
+      "resource": "essential_0118.m4a",
+      "duration": 0.861995
     },
     {
       "id": "essential-119",
       "title": "Digital Glitch 5",
       "category": "Glitches",
       "pack": "Essential Effects",
-      "resource": "essential_0119.mp3",
-      "duration": 6.582813
+      "resource": "essential_0119.m4a",
+      "duration": 6.582993
     },
     {
       "id": "essential-120",
       "title": "Digital Glitch 5 (Alternate)",
       "category": "Glitches",
       "pack": "Essential Effects",
-      "resource": "essential_0120.mp3",
-      "duration": 1.008000
+      "resource": "essential_0120.m4a",
+      "duration": 1.008005
     },
     {
       "id": "essential-121",
       "title": "Digital Glitch 6",
       "category": "Glitches",
       "pack": "Essential Effects",
-      "resource": "essential_0121.mp3",
-      "duration": 2.586063
+      "resource": "essential_0121.m4a",
+      "duration": 2.586009
     },
     {
       "id": "essential-122",
       "title": "Digital Glitch 7",
       "category": "Glitches",
       "pack": "Essential Effects",
-      "resource": "essential_0122.mp3",
-      "duration": 0.914250
+      "resource": "essential_0122.m4a",
+      "duration": 0.913991
     },
     {
       "id": "essential-123",
       "title": "Digital Glitch 7 (Alternate)",
       "category": "Glitches",
       "pack": "Essential Effects",
-      "resource": "essential_0123.mp3",
-      "duration": 0.696000
+      "resource": "essential_0123.m4a",
+      "duration": 0.696009
     },
     {
       "id": "essential-124",
       "title": "Digital Glitch 8",
       "category": "Glitches",
       "pack": "Essential Effects",
-      "resource": "essential_0124.mp3",
-      "duration": 1.071000
+      "resource": "essential_0124.m4a",
+      "duration": 1.070998
     },
     {
       "id": "essential-125",
       "title": "Ding - Single - Bright",
       "category": "UI & Alerts",
       "pack": "Essential Effects",
-      "resource": "essential_0125.mp3",
-      "duration": 2.142000
+      "resource": "essential_0125.m4a",
+      "duration": 2.141995
     },
     {
       "id": "essential-126",
       "title": "Ding - Single 1",
       "category": "UI & Alerts",
       "pack": "Essential Effects",
-      "resource": "essential_0126.mp3",
-      "duration": 0.783625
+      "resource": "essential_0126.m4a",
+      "duration": 0.782993
     },
     {
       "id": "essential-127",
       "title": "Ding - Single 2",
       "category": "UI & Alerts",
       "pack": "Essential Effects",
-      "resource": "essential_0127.mp3",
-      "duration": 1.224000
+      "resource": "essential_0127.m4a",
+      "duration": 1.223991
     },
     {
       "id": "essential-128",
       "title": "Ding - Stutter",
       "category": "UI & Alerts",
       "pack": "Essential Effects",
-      "resource": "essential_0128.mp3",
-      "duration": 1.854688
+      "resource": "essential_0128.m4a",
+      "duration": 1.853991
     },
     {
       "id": "essential-129",
       "title": "Ding - Suction",
       "category": "UI & Alerts",
       "pack": "Essential Effects",
-      "resource": "essential_0129.mp3",
-      "duration": 1.619563
+      "resource": "essential_0129.m4a",
+      "duration": 1.619002
     },
     {
       "id": "essential-130",
       "title": "Disappointed 1",
       "category": "Other",
       "pack": "Essential Effects",
-      "resource": "essential_0130.mp3",
-      "duration": 0.862000
+      "resource": "essential_0130.m4a",
+      "duration": 0.861995
     },
     {
       "id": "essential-131",
       "title": "Disappointed 2",
       "category": "Other",
       "pack": "Essential Effects",
-      "resource": "essential_0131.mp3",
-      "duration": 0.444063
+      "resource": "essential_0131.m4a",
+      "duration": 0.443991
     },
     {
       "id": "essential-132",
       "title": "Disappointed 3",
       "category": "Other",
       "pack": "Essential Effects",
-      "resource": "essential_0132.mp3",
-      "duration": 2.716688
+      "resource": "essential_0132.m4a",
+      "duration": 2.716009
     },
     {
       "id": "essential-133",
       "title": "Disappointed Groan",
       "category": "Other",
       "pack": "Essential Effects",
-      "resource": "essential_0133.mp3",
-      "duration": 0.914250
+      "resource": "essential_0133.m4a",
+      "duration": 0.913991
     },
     {
       "id": "essential-134",
       "title": "Disappointment - Spoken - Awe",
       "category": "Other",
       "pack": "Essential Effects",
-      "resource": "essential_0134.mp3",
-      "duration": 0.835875
+      "resource": "essential_0134.m4a",
+      "duration": 0.836009
     },
     {
       "id": "essential-135",
       "title": "Dizzy",
       "category": "Other",
       "pack": "Essential Effects",
-      "resource": "essential_0135.mp3",
-      "duration": 0.835875
+      "resource": "essential_0135.m4a",
+      "duration": 0.836009
     },
     {
       "id": "essential-136",
       "title": "Door - Closing - Spring Thumps",
       "category": "Hits",
       "pack": "Essential Effects",
-      "resource": "essential_0136.mp3",
-      "duration": 3.657125
+      "resource": "essential_0136.m4a",
+      "duration": 3.657007
     },
     {
       "id": "essential-137",
       "title": "Door - Closing - Squeak",
       "category": "Foley",
       "pack": "Essential Effects",
-      "resource": "essential_0137.mp3",
-      "duration": 2.115875
+      "resource": "essential_0137.m4a",
+      "duration": 2.116009
     },
     {
       "id": "essential-138",
       "title": "Door - Closing 1",
       "category": "Foley",
       "pack": "Essential Effects",
-      "resource": "essential_0138.mp3",
-      "duration": 0.862000
+      "resource": "essential_0138.m4a",
+      "duration": 0.861995
     },
     {
       "id": "essential-139",
       "title": "Door - Closing 2",
       "category": "Foley",
       "pack": "Essential Effects",
-      "resource": "essential_0139.mp3",
-      "duration": 0.626938
+      "resource": "essential_0139.m4a",
+      "duration": 0.627007
     },
     {
       "id": "essential-140",
       "title": "Door - Closing 3",
       "category": "Foley",
       "pack": "Essential Effects",
-      "resource": "essential_0140.mp3",
-      "duration": 0.574688
+      "resource": "essential_0140.m4a",
+      "duration": 0.573991
     },
     {
       "id": "essential-141",
       "title": "Door - Closing 4",
       "category": "Foley",
       "pack": "Essential Effects",
-      "resource": "essential_0141.mp3",
+      "resource": "essential_0141.m4a",
       "duration": 1.280000
     },
     {
@@ -1135,399 +1135,399 @@
       "title": "Door - Closing 5",
       "category": "Foley",
       "pack": "Essential Effects",
-      "resource": "essential_0142.mp3",
-      "duration": 1.515063
+      "resource": "essential_0142.m4a",
+      "duration": 1.515011
     },
     {
       "id": "essential-143",
       "title": "Door - Closing 6",
       "category": "Foley",
       "pack": "Essential Effects",
-      "resource": "essential_0143.mp3",
-      "duration": 0.339563
+      "resource": "essential_0143.m4a",
+      "duration": 0.339002
     },
     {
       "id": "essential-144",
       "title": "Door - Opening 1",
       "category": "Foley",
       "pack": "Essential Effects",
-      "resource": "essential_0144.mp3",
-      "duration": 0.862000
+      "resource": "essential_0144.m4a",
+      "duration": 0.861995
     },
     {
       "id": "essential-145",
       "title": "Door - Opening 2",
       "category": "Foley",
       "pack": "Essential Effects",
-      "resource": "essential_0145.mp3",
-      "duration": 1.697938
+      "resource": "essential_0145.m4a",
+      "duration": 1.698005
     },
     {
       "id": "essential-146",
       "title": "Door - Opening 3",
       "category": "Foley",
       "pack": "Essential Effects",
-      "resource": "essential_0146.mp3",
-      "duration": 0.862000
+      "resource": "essential_0146.m4a",
+      "duration": 0.861995
     },
     {
       "id": "essential-147",
       "title": "Door - Opening 4",
       "category": "Foley",
       "pack": "Essential Effects",
-      "resource": "essential_0147.mp3",
-      "duration": 0.679125
+      "resource": "essential_0147.m4a",
+      "duration": 0.679002
     },
     {
       "id": "essential-148",
       "title": "Door - Opening 5",
       "category": "Foley",
       "pack": "Essential Effects",
-      "resource": "essential_0148.mp3",
-      "duration": 2.089750
+      "resource": "essential_0148.m4a",
+      "duration": 2.090000
     },
     {
       "id": "essential-149",
       "title": "Door - Slam - Large Metal",
       "category": "Foley",
       "pack": "Essential Effects",
-      "resource": "essential_0149.mp3",
-      "duration": 2.063625
+      "resource": "essential_0149.m4a",
+      "duration": 2.062993
     },
     {
       "id": "essential-150",
       "title": "Door - Slam 2",
       "category": "Foley",
       "pack": "Essential Effects",
-      "resource": "essential_0150.mp3",
-      "duration": 1.462813
+      "resource": "essential_0150.m4a",
+      "duration": 1.462993
     },
     {
       "id": "essential-151",
       "title": "Doorbell - 1",
       "category": "Foley",
       "pack": "Essential Effects",
-      "resource": "essential_0151.mp3",
-      "duration": 2.246500
+      "resource": "essential_0151.m4a",
+      "duration": 2.246009
     },
     {
       "id": "essential-152",
       "title": "Doorbell - 2",
       "category": "Foley",
       "pack": "Essential Effects",
-      "resource": "essential_0152.mp3",
-      "duration": 2.168125
+      "resource": "essential_0152.m4a",
+      "duration": 2.168005
     },
     {
       "id": "essential-153",
       "title": "Doorbell - 3",
       "category": "Foley",
       "pack": "Essential Effects",
-      "resource": "essential_0153.mp3",
-      "duration": 2.168125
+      "resource": "essential_0153.m4a",
+      "duration": 2.168005
     },
     {
       "id": "essential-154",
       "title": "Doorbell - 4",
       "category": "Foley",
       "pack": "Essential Effects",
-      "resource": "essential_0154.mp3",
-      "duration": 1.697938
+      "resource": "essential_0154.m4a",
+      "duration": 1.698005
     },
     {
       "id": "essential-155",
       "title": "Doorbell - 5",
       "category": "Foley",
       "pack": "Essential Effects",
-      "resource": "essential_0155.mp3",
-      "duration": 1.697938
+      "resource": "essential_0155.m4a",
+      "duration": 1.698005
     },
     {
       "id": "essential-156",
       "title": "Dramatic Buildup - Sliced",
       "category": "Other",
       "pack": "Essential Effects",
-      "resource": "essential_0156.mp3",
-      "duration": 2.063625
+      "resource": "essential_0156.m4a",
+      "duration": 2.062993
     },
     {
       "id": "essential-157",
       "title": "Dramatic Buildup 1",
       "category": "Other",
       "pack": "Essential Effects",
-      "resource": "essential_0157.mp3",
-      "duration": 1.880813
+      "resource": "essential_0157.m4a",
+      "duration": 1.880998
     },
     {
       "id": "essential-158",
       "title": "Dramatic Buildup 2",
       "category": "Other",
       "pack": "Essential Effects",
-      "resource": "essential_0158.mp3",
-      "duration": 0.940375
+      "resource": "essential_0158.m4a",
+      "duration": 0.940000
     },
     {
       "id": "essential-159",
       "title": "Dramatic Buildup 3",
       "category": "Other",
       "pack": "Essential Effects",
-      "resource": "essential_0159.mp3",
-      "duration": 1.071000
+      "resource": "essential_0159.m4a",
+      "duration": 1.070998
     },
     {
       "id": "essential-160",
       "title": "Dramatic Buildup 4",
       "category": "Other",
       "pack": "Essential Effects",
-      "resource": "essential_0160.mp3",
-      "duration": 1.933063
+      "resource": "essential_0160.m4a",
+      "duration": 1.932993
     },
     {
       "id": "essential-161",
       "title": "Dramatic Buildup Reveal",
       "category": "Other",
       "pack": "Essential Effects",
-      "resource": "essential_0161.mp3",
-      "duration": 4.075063
+      "resource": "essential_0161.m4a",
+      "duration": 4.075011
     },
     {
       "id": "essential-162",
       "title": "Dramatic Buildup Whip - 1",
       "category": "Hits",
       "pack": "Essential Effects",
-      "resource": "essential_0162.mp3",
-      "duration": 1.854688
+      "resource": "essential_0162.m4a",
+      "duration": 1.853991
     },
     {
       "id": "essential-163",
       "title": "Dramatic Buildup Whip - 2",
       "category": "Hits",
       "pack": "Essential Effects",
-      "resource": "essential_0163.mp3",
-      "duration": 2.063625
+      "resource": "essential_0163.m4a",
+      "duration": 2.062993
     },
     {
       "id": "essential-164",
       "title": "Dramatic Buildup Whip - 3",
       "category": "Hits",
       "pack": "Essential Effects",
-      "resource": "essential_0164.mp3",
-      "duration": 0.940375
+      "resource": "essential_0164.m4a",
+      "duration": 0.940000
     },
     {
       "id": "essential-165",
       "title": "Dramatic Cue 1",
       "category": "Other",
       "pack": "Essential Effects",
-      "resource": "essential_0165.mp3",
-      "duration": 0.862000
+      "resource": "essential_0165.m4a",
+      "duration": 0.861995
     },
     {
       "id": "essential-166",
       "title": "Dramatic Cue 2",
       "category": "Other",
       "pack": "Essential Effects",
-      "resource": "essential_0166.mp3",
-      "duration": 1.071000
+      "resource": "essential_0166.m4a",
+      "duration": 1.070998
     },
     {
       "id": "essential-167",
       "title": "Dramatic Cue 3",
       "category": "Other",
       "pack": "Essential Effects",
-      "resource": "essential_0167.mp3",
-      "duration": 1.071000
+      "resource": "essential_0167.m4a",
+      "duration": 1.070998
     },
     {
       "id": "essential-168",
       "title": "Dramatic",
       "category": "Other",
       "pack": "Essential Effects",
-      "resource": "essential_0168.mp3",
-      "duration": 1.071000
+      "resource": "essential_0168.m4a",
+      "duration": 1.070998
     },
     {
       "id": "essential-169",
       "title": "Drop - Echo Rhythmic",
       "category": "Other",
       "pack": "Essential Effects",
-      "resource": "essential_0169.mp3",
-      "duration": 2.821188
+      "resource": "essential_0169.m4a",
+      "duration": 2.820998
     },
     {
       "id": "essential-170",
       "title": "Drop - Whip",
       "category": "Hits",
       "pack": "Essential Effects",
-      "resource": "essential_0170.mp3",
-      "duration": 0.940375
+      "resource": "essential_0170.m4a",
+      "duration": 0.940000
     },
     {
       "id": "essential-171",
       "title": "Drop 2",
       "category": "Other",
       "pack": "Essential Effects",
-      "resource": "essential_0171.mp3",
-      "duration": 1.149375
+      "resource": "essential_0171.m4a",
+      "duration": 1.149002
     },
     {
       "id": "essential-172",
       "title": "Drop 3",
       "category": "Other",
       "pack": "Essential Effects",
-      "resource": "essential_0172.mp3",
-      "duration": 0.679125
+      "resource": "essential_0172.m4a",
+      "duration": 0.679002
     },
     {
       "id": "essential-173",
       "title": "Drop 4",
       "category": "Other",
       "pack": "Essential Effects",
-      "resource": "essential_0173.mp3",
-      "duration": 0.417938
+      "resource": "essential_0173.m4a",
+      "duration": 0.418005
     },
     {
       "id": "essential-174",
       "title": "Drum Hit - Cymbal - Single",
       "category": "Hits",
       "pack": "Essential Effects",
-      "resource": "essential_0174.mp3",
-      "duration": 0.574688
+      "resource": "essential_0174.m4a",
+      "duration": 0.573991
     },
     {
       "id": "essential-175",
       "title": "Drum Hit - Single",
       "category": "Hits",
       "pack": "Essential Effects",
-      "resource": "essential_0175.mp3",
-      "duration": 0.470188
+      "resource": "essential_0175.m4a",
+      "duration": 0.470000
     },
     {
       "id": "essential-176",
       "title": "Drum Hits and Cymbal",
       "category": "Hits",
       "pack": "Essential Effects",
-      "resource": "essential_0176.mp3",
-      "duration": 1.750188
+      "resource": "essential_0176.m4a",
+      "duration": 1.750000
     },
     {
       "id": "essential-177",
       "title": "Drum Roll and Cymbal",
       "category": "Musical",
       "pack": "Essential Effects",
-      "resource": "essential_0177.mp3",
-      "duration": 1.828563
+      "resource": "essential_0177.m4a",
+      "duration": 1.828005
     },
     {
       "id": "essential-178",
       "title": "Drumroll 1",
       "category": "Musical",
       "pack": "Essential Effects",
-      "resource": "essential_0178.mp3",
-      "duration": 3.048000
+      "resource": "essential_0178.m4a",
+      "duration": 3.048005
     },
     {
       "id": "essential-179",
       "title": "Drumroll 2",
       "category": "Musical",
       "pack": "Essential Effects",
-      "resource": "essential_0179.mp3",
-      "duration": 3.264000
+      "resource": "essential_0179.m4a",
+      "duration": 3.263991
     },
     {
       "id": "essential-180",
       "title": "Drumroll 3",
       "category": "Musical",
       "pack": "Essential Effects",
-      "resource": "essential_0180.mp3",
-      "duration": 3.048000
+      "resource": "essential_0180.m4a",
+      "duration": 3.048005
     },
     {
       "id": "essential-181",
       "title": "Drums - Trouble",
       "category": "Musical",
       "pack": "Essential Effects",
-      "resource": "essential_0181.mp3",
-      "duration": 1.071000
+      "resource": "essential_0181.m4a",
+      "duration": 1.070998
     },
     {
       "id": "essential-182",
       "title": "Drums 1",
       "category": "Musical",
       "pack": "Essential Effects",
-      "resource": "essential_0182.mp3",
-      "duration": 2.142000
+      "resource": "essential_0182.m4a",
+      "duration": 2.141995
     },
     {
       "id": "essential-183",
       "title": "Drums 2",
       "category": "Musical",
       "pack": "Essential Effects",
-      "resource": "essential_0183.mp3",
-      "duration": 2.089750
+      "resource": "essential_0183.m4a",
+      "duration": 2.090000
     },
     {
       "id": "essential-184",
       "title": "Electrified",
       "category": "Other",
       "pack": "Essential Effects",
-      "resource": "essential_0184.mp3",
-      "duration": 1.515063
+      "resource": "essential_0184.m4a",
+      "duration": 1.515011
     },
     {
       "id": "essential-185",
       "title": "Electronic Beeps - Echo",
       "category": "Other",
       "pack": "Essential Effects",
-      "resource": "essential_0185.mp3",
-      "duration": 2.324875
+      "resource": "essential_0185.m4a",
+      "duration": 2.325011
     },
     {
       "id": "essential-186",
       "title": "Exhale 2",
       "category": "People",
       "pack": "Essential Effects",
-      "resource": "essential_0186.mp3",
-      "duration": 2.951813
+      "resource": "essential_0186.m4a",
+      "duration": 2.951995
     },
     {
       "id": "essential-187",
       "title": "Exhale",
       "category": "People",
       "pack": "Essential Effects",
-      "resource": "essential_0187.mp3",
-      "duration": 0.862000
+      "resource": "essential_0187.m4a",
+      "duration": 0.861995
     },
     {
       "id": "essential-188",
       "title": "Explosion - Distant 1",
       "category": "Action",
       "pack": "Essential Effects",
-      "resource": "essential_0188.mp3",
-      "duration": 0.940375
+      "resource": "essential_0188.m4a",
+      "duration": 0.940000
     },
     {
       "id": "essential-189",
       "title": "Explosion - Distant 2",
       "category": "Action",
       "pack": "Essential Effects",
-      "resource": "essential_0189.mp3",
-      "duration": 1.097125
+      "resource": "essential_0189.m4a",
+      "duration": 1.097007
     },
     {
       "id": "essential-190",
       "title": "Explosion - Distant 3",
       "category": "Action",
       "pack": "Essential Effects",
-      "resource": "essential_0190.mp3",
-      "duration": 0.914250
+      "resource": "essential_0190.m4a",
+      "duration": 0.913991
     },
     {
       "id": "essential-191",
       "title": "Explosion - Distant 4",
       "category": "Action",
       "pack": "Essential Effects",
-      "resource": "essential_0191.mp3",
+      "resource": "essential_0191.m4a",
       "duration": 1.280000
     },
     {
@@ -1535,503 +1535,503 @@
       "title": "Explosion - Launch Hit Sizzle",
       "category": "Hits",
       "pack": "Essential Effects",
-      "resource": "essential_0192.mp3",
-      "duration": 2.586063
+      "resource": "essential_0192.m4a",
+      "duration": 2.586009
     },
     {
       "id": "essential-193",
       "title": "Explosion 1",
       "category": "Action",
       "pack": "Essential Effects",
-      "resource": "essential_0193.mp3",
-      "duration": 1.593438
+      "resource": "essential_0193.m4a",
+      "duration": 1.592993
     },
     {
       "id": "essential-194",
       "title": "Explosion 2",
       "category": "Action",
       "pack": "Essential Effects",
-      "resource": "essential_0194.mp3",
-      "duration": 1.071000
+      "resource": "essential_0194.m4a",
+      "duration": 1.070998
     },
     {
       "id": "essential-195",
       "title": "Explosion 3",
       "category": "Action",
       "pack": "Essential Effects",
-      "resource": "essential_0195.mp3",
-      "duration": 3.317500
+      "resource": "essential_0195.m4a",
+      "duration": 3.317007
     },
     {
       "id": "essential-196",
       "title": "Explosion 4",
       "category": "Action",
       "pack": "Essential Effects",
-      "resource": "essential_0196.mp3",
-      "duration": 2.011375
+      "resource": "essential_0196.m4a",
+      "duration": 2.010998
     },
     {
       "id": "essential-197",
       "title": "Explosion 5",
       "category": "Action",
       "pack": "Essential Effects",
-      "resource": "essential_0197.mp3",
-      "duration": 1.332188
+      "resource": "essential_0197.m4a",
+      "duration": 1.331995
     },
     {
       "id": "essential-198",
       "title": "Explosion 6",
       "category": "Action",
       "pack": "Essential Effects",
-      "resource": "essential_0198.mp3",
-      "duration": 2.089750
+      "resource": "essential_0198.m4a",
+      "duration": 2.090000
     },
     {
       "id": "essential-199",
       "title": "Explosion 7",
       "category": "Action",
       "pack": "Essential Effects",
-      "resource": "essential_0199.mp3",
-      "duration": 1.071000
+      "resource": "essential_0199.m4a",
+      "duration": 1.070998
     },
     {
       "id": "essential-200",
       "title": "Floor Creak - Low",
       "category": "Other",
       "pack": "Essential Effects",
-      "resource": "essential_0200.mp3",
-      "duration": 0.417938
+      "resource": "essential_0200.m4a",
+      "duration": 0.418005
     },
     {
       "id": "essential-201",
       "title": "Fly By - Low",
       "category": "Other",
       "pack": "Essential Effects",
-      "resource": "essential_0201.mp3",
-      "duration": 4.032000
+      "resource": "essential_0201.m4a",
+      "duration": 4.031995
     },
     {
       "id": "essential-202",
       "title": "Fly By - Wobbly",
       "category": "Other",
       "pack": "Essential Effects",
-      "resource": "essential_0202.mp3",
-      "duration": 2.533875
+      "resource": "essential_0202.m4a",
+      "duration": 2.533991
     },
     {
       "id": "essential-203",
       "title": "Footsteps - Creepy",
       "category": "Foley",
       "pack": "Essential Effects",
-      "resource": "essential_0203.mp3",
-      "duration": 9.116688
+      "resource": "essential_0203.m4a",
+      "duration": 9.116009
     },
     {
       "id": "essential-204",
       "title": "Footsteps - Fast",
       "category": "Foley",
       "pack": "Essential Effects",
-      "resource": "essential_0204.mp3",
-      "duration": 1.149375
+      "resource": "essential_0204.m4a",
+      "duration": 1.149002
     },
     {
       "id": "essential-205",
       "title": "Footsteps - Slow to Fast",
       "category": "Foley",
       "pack": "Essential Effects",
-      "resource": "essential_0205.mp3",
-      "duration": 10.396688
+      "resource": "essential_0205.m4a",
+      "duration": 10.396009
     },
     {
       "id": "essential-206",
       "title": "Footsteps - Water",
       "category": "Nature",
       "pack": "Essential Effects",
-      "resource": "essential_0206.mp3",
-      "duration": 4.989375
+      "resource": "essential_0206.m4a",
+      "duration": 4.989002
     },
     {
       "id": "essential-207",
       "title": "Footsteps",
       "category": "Foley",
       "pack": "Essential Effects",
-      "resource": "essential_0207.mp3",
-      "duration": 2.612188
+      "resource": "essential_0207.m4a",
+      "duration": 2.611995
     },
     {
       "id": "essential-208",
       "title": "Gasp - Female 1",
       "category": "People",
       "pack": "Essential Effects",
-      "resource": "essential_0208.mp3",
-      "duration": 0.522438
+      "resource": "essential_0208.m4a",
+      "duration": 0.521995
     },
     {
       "id": "essential-209",
       "title": "Gasp - Female 2",
       "category": "People",
       "pack": "Essential Effects",
-      "resource": "essential_0209.mp3",
-      "duration": 0.914250
+      "resource": "essential_0209.m4a",
+      "duration": 0.913991
     },
     {
       "id": "essential-210",
       "title": "Gasp - Female 3",
       "category": "People",
       "pack": "Essential Effects",
-      "resource": "essential_0210.mp3",
-      "duration": 0.548563
+      "resource": "essential_0210.m4a",
+      "duration": 0.548005
     },
     {
       "id": "essential-211",
       "title": "Gasp - Male 1",
       "category": "People",
       "pack": "Essential Effects",
-      "resource": "essential_0211.mp3",
-      "duration": 0.653063
+      "resource": "essential_0211.m4a",
+      "duration": 0.652993
     },
     {
       "id": "essential-212",
       "title": "Gasp - Male 2",
       "category": "People",
       "pack": "Essential Effects",
-      "resource": "essential_0212.mp3",
-      "duration": 0.444063
+      "resource": "essential_0212.m4a",
+      "duration": 0.443991
     },
     {
       "id": "essential-213",
       "title": "Gasp - Male 3",
       "category": "People",
       "pack": "Essential Effects",
-      "resource": "essential_0213.mp3",
-      "duration": 0.626938
+      "resource": "essential_0213.m4a",
+      "duration": 0.627007
     },
     {
       "id": "essential-214",
       "title": "Glass Breaking 1",
       "category": "Other",
       "pack": "Essential Effects",
-      "resource": "essential_0214.mp3",
-      "duration": 0.862000
+      "resource": "essential_0214.m4a",
+      "duration": 0.861995
     },
     {
       "id": "essential-215",
       "title": "Glass Breaking 2",
       "category": "Other",
       "pack": "Essential Effects",
-      "resource": "essential_0215.mp3",
-      "duration": 0.783625
+      "resource": "essential_0215.m4a",
+      "duration": 0.782993
     },
     {
       "id": "essential-216",
       "title": "Glass Breaking 3",
       "category": "Other",
       "pack": "Essential Effects",
-      "resource": "essential_0216.mp3",
-      "duration": 1.384438
+      "resource": "essential_0216.m4a",
+      "duration": 1.383991
     },
     {
       "id": "essential-217",
       "title": "Glass Breaking 4",
       "category": "Other",
       "pack": "Essential Effects",
-      "resource": "essential_0217.mp3",
-      "duration": 0.470188
+      "resource": "essential_0217.m4a",
+      "duration": 0.470000
     },
     {
       "id": "essential-218",
       "title": "Grating 1",
       "category": "Other",
       "pack": "Essential Effects",
-      "resource": "essential_0218.mp3",
-      "duration": 0.626938
+      "resource": "essential_0218.m4a",
+      "duration": 0.627007
     },
     {
       "id": "essential-219",
       "title": "Grating 2",
       "category": "Other",
       "pack": "Essential Effects",
-      "resource": "essential_0219.mp3",
-      "duration": 0.679125
+      "resource": "essential_0219.m4a",
+      "duration": 0.679002
     },
     {
       "id": "essential-220",
       "title": "Growl",
       "category": "Other",
       "pack": "Essential Effects",
-      "resource": "essential_0220.mp3",
-      "duration": 1.227750
+      "resource": "essential_0220.m4a",
+      "duration": 1.227007
     },
     {
       "id": "essential-221",
       "title": "Grunt",
       "category": "People",
       "pack": "Essential Effects",
-      "resource": "essential_0221.mp3",
-      "duration": 0.626938
+      "resource": "essential_0221.m4a",
+      "duration": 0.627007
     },
     {
       "id": "essential-222",
       "title": "Gun - 12ga - Pump 2",
       "category": "Action",
       "pack": "Essential Effects",
-      "resource": "essential_0222.mp3",
-      "duration": 0.626938
+      "resource": "essential_0222.m4a",
+      "duration": 0.627007
     },
     {
       "id": "essential-223",
       "title": "Gun - 12ga - Pump",
       "category": "Action",
       "pack": "Essential Effects",
-      "resource": "essential_0223.mp3",
-      "duration": 0.783625
+      "resource": "essential_0223.m4a",
+      "duration": 0.782993
     },
     {
       "id": "essential-224",
       "title": "Gun - Loading",
       "category": "Action",
       "pack": "Essential Effects",
-      "resource": "essential_0224.mp3",
-      "duration": 0.548563
+      "resource": "essential_0224.m4a",
+      "duration": 0.548005
     },
     {
       "id": "essential-225",
       "title": "Gun - Racking",
       "category": "Action",
       "pack": "Essential Effects",
-      "resource": "essential_0225.mp3",
-      "duration": 0.287313
+      "resource": "essential_0225.m4a",
+      "duration": 0.287007
     },
     {
       "id": "essential-226",
       "title": "Gunshot - 10",
       "category": "Action",
       "pack": "Essential Effects",
-      "resource": "essential_0226.mp3",
-      "duration": 0.992625
+      "resource": "essential_0226.m4a",
+      "duration": 0.991995
     },
     {
       "id": "essential-227",
       "title": "Gunshot - 9mm - Single 1",
       "category": "Action",
       "pack": "Essential Effects",
-      "resource": "essential_0227.mp3",
-      "duration": 0.653063
+      "resource": "essential_0227.m4a",
+      "duration": 0.652993
     },
     {
       "id": "essential-228",
       "title": "Gunshot - 9mm - Single 2",
       "category": "Action",
       "pack": "Essential Effects",
-      "resource": "essential_0228.mp3",
-      "duration": 0.679125
+      "resource": "essential_0228.m4a",
+      "duration": 0.679002
     },
     {
       "id": "essential-229",
       "title": "Gunshot - 9mm - Single 3",
       "category": "Action",
       "pack": "Essential Effects",
-      "resource": "essential_0229.mp3",
-      "duration": 0.548563
+      "resource": "essential_0229.m4a",
+      "duration": 0.548005
     },
     {
       "id": "essential-230",
       "title": "Gunshot - 9mm - Single 4",
       "category": "Action",
       "pack": "Essential Effects",
-      "resource": "essential_0230.mp3",
-      "duration": 1.071000
+      "resource": "essential_0230.m4a",
+      "duration": 1.070998
     },
     {
       "id": "essential-231",
       "title": "Gunshot - Crisp",
       "category": "Action",
       "pack": "Essential Effects",
-      "resource": "essential_0231.mp3",
-      "duration": 0.914250
+      "resource": "essential_0231.m4a",
+      "duration": 0.913991
     },
     {
       "id": "essential-232",
       "title": "Gunshot - Large - 2",
       "category": "Action",
       "pack": "Essential Effects",
-      "resource": "essential_0232.mp3",
-      "duration": 2.115875
+      "resource": "essential_0232.m4a",
+      "duration": 2.116009
     },
     {
       "id": "essential-233",
       "title": "Gunshot - Large",
       "category": "Action",
       "pack": "Essential Effects",
-      "resource": "essential_0233.mp3",
-      "duration": 1.854688
+      "resource": "essential_0233.m4a",
+      "duration": 1.853991
     },
     {
       "id": "essential-234",
       "title": "Gunshot - Pump and Fire",
       "category": "Action",
       "pack": "Essential Effects",
-      "resource": "essential_0234.mp3",
-      "duration": 1.097125
+      "resource": "essential_0234.m4a",
+      "duration": 1.097007
     },
     {
       "id": "essential-235",
       "title": "Gunshot - Single - Large",
       "category": "Action",
       "pack": "Essential Effects",
-      "resource": "essential_0235.mp3",
-      "duration": 1.071000
+      "resource": "essential_0235.m4a",
+      "duration": 1.070998
     },
     {
       "id": "essential-236",
       "title": "Gunshots - Machine Gun - Short Burst",
       "category": "Action",
       "pack": "Essential Effects",
-      "resource": "essential_0236.mp3",
-      "duration": 1.488938
+      "resource": "essential_0236.m4a",
+      "duration": 1.489002
     },
     {
       "id": "essential-237",
       "title": "Gunshots - Machine Gun - Short Burst (Alternate)",
       "category": "Action",
       "pack": "Essential Effects",
-      "resource": "essential_0237.mp3",
-      "duration": 0.816000
+      "resource": "essential_0237.m4a",
+      "duration": 0.816009
     },
     {
       "id": "essential-238",
       "title": "Gunshots - Machine Gun - Tapping",
       "category": "Action",
       "pack": "Essential Effects",
-      "resource": "essential_0238.mp3",
-      "duration": 0.862000
+      "resource": "essential_0238.m4a",
+      "duration": 0.861995
     },
     {
       "id": "essential-239",
       "title": "Gunshots - Machine Gun",
       "category": "Action",
       "pack": "Essential Effects",
-      "resource": "essential_0239.mp3",
-      "duration": 2.351000
+      "resource": "essential_0239.m4a",
+      "duration": 2.350998
     },
     {
       "id": "essential-240",
       "title": "Gunshots - Rapid Fire",
       "category": "Action",
       "pack": "Essential Effects",
-      "resource": "essential_0240.mp3",
-      "duration": 2.063625
+      "resource": "essential_0240.m4a",
+      "duration": 2.062993
     },
     {
       "id": "essential-241",
       "title": "Harp Glissando - Crisp Echo",
       "category": "Musical",
       "pack": "Essential Effects",
-      "resource": "essential_0241.mp3",
-      "duration": 1.384438
+      "resource": "essential_0241.m4a",
+      "duration": 1.383991
     },
     {
       "id": "essential-242",
       "title": "Harp Glissando - Horror",
       "category": "Musical",
       "pack": "Essential Effects",
-      "resource": "essential_0242.mp3",
-      "duration": 1.906938
+      "resource": "essential_0242.m4a",
+      "duration": 1.907007
     },
     {
       "id": "essential-243",
       "title": "Harp Glissando",
       "category": "Musical",
       "pack": "Essential Effects",
-      "resource": "essential_0243.mp3",
-      "duration": 0.992625
+      "resource": "essential_0243.m4a",
+      "duration": 0.991995
     },
     {
       "id": "essential-244",
       "title": "Heartbeat - Single lub dub",
       "category": "Other",
       "pack": "Essential Effects",
-      "resource": "essential_0244.mp3",
-      "duration": 0.914250
+      "resource": "essential_0244.m4a",
+      "duration": 0.913991
     },
     {
       "id": "essential-245",
       "title": "Heartbeat",
       "category": "Other",
       "pack": "Essential Effects",
-      "resource": "essential_0245.mp3",
-      "duration": 2.142000
+      "resource": "essential_0245.m4a",
+      "duration": 2.141995
     },
     {
       "id": "essential-246",
       "title": "Helicopter 1",
       "category": "Vehicles",
       "pack": "Essential Effects",
-      "resource": "essential_0246.mp3",
-      "duration": 1.097125
+      "resource": "essential_0246.m4a",
+      "duration": 1.097007
     },
     {
       "id": "essential-247",
       "title": "Helicopter 2",
       "category": "Vehicles",
       "pack": "Essential Effects",
-      "resource": "essential_0247.mp3",
-      "duration": 2.089750
+      "resource": "essential_0247.m4a",
+      "duration": 2.090000
     },
     {
       "id": "essential-248",
       "title": "Helicopter 3",
       "category": "Vehicles",
       "pack": "Essential Effects",
-      "resource": "essential_0248.mp3",
-      "duration": 2.142000
+      "resource": "essential_0248.m4a",
+      "duration": 2.141995
     },
     {
       "id": "essential-249",
       "title": "Helicopter 4",
       "category": "Vehicles",
       "pack": "Essential Effects",
-      "resource": "essential_0249.mp3",
-      "duration": 1.071000
+      "resource": "essential_0249.m4a",
+      "duration": 1.070998
     },
     {
       "id": "essential-250",
       "title": "Hit - Double",
       "category": "Hits",
       "pack": "Essential Effects",
-      "resource": "essential_0250.mp3",
-      "duration": 0.914250
+      "resource": "essential_0250.m4a",
+      "duration": 0.913991
     },
     {
       "id": "essential-251",
       "title": "Hit - Dull",
       "category": "Hits",
       "pack": "Essential Effects",
-      "resource": "essential_0251.mp3",
-      "duration": 0.235063
+      "resource": "essential_0251.m4a",
+      "duration": 0.235011
     },
     {
       "id": "essential-252",
       "title": "Hit - Fade Out 2",
       "category": "Hits",
       "pack": "Essential Effects",
-      "resource": "essential_0252.mp3",
-      "duration": 2.403250
+      "resource": "essential_0252.m4a",
+      "duration": 2.402993
     },
     {
       "id": "essential-253",
       "title": "Hit - Fade Out",
       "category": "Hits",
       "pack": "Essential Effects",
-      "resource": "essential_0253.mp3",
-      "duration": 1.071000
+      "resource": "essential_0253.m4a",
+      "duration": 1.070998
     },
     {
       "id": "essential-254",
       "title": "Hit - Fade Out (Alternate)",
       "category": "Hits",
       "pack": "Essential Effects",
-      "resource": "essential_0254.mp3",
+      "resource": "essential_0254.m4a",
       "duration": 0.840000
     },
     {
@@ -2039,63 +2039,63 @@
       "title": "Hit - Single",
       "category": "Hits",
       "pack": "Essential Effects",
-      "resource": "essential_0255.mp3",
-      "duration": 0.470188
+      "resource": "essential_0255.m4a",
+      "duration": 0.470000
     },
     {
       "id": "essential-256",
       "title": "Horn - Boat",
       "category": "Vehicles",
       "pack": "Essential Effects",
-      "resource": "essential_0256.mp3",
-      "duration": 2.847313
+      "resource": "essential_0256.m4a",
+      "duration": 2.847007
     },
     {
       "id": "essential-257",
       "title": "Horn - Steady",
       "category": "Musical",
       "pack": "Essential Effects",
-      "resource": "essential_0257.mp3",
-      "duration": 3.604875
+      "resource": "essential_0257.m4a",
+      "duration": 3.605011
     },
     {
       "id": "essential-258",
       "title": "Horn - Three  Notes - Wah Wah Waah - Sad",
       "category": "Musical",
       "pack": "Essential Effects",
-      "resource": "essential_0258.mp3",
-      "duration": 2.115875
+      "resource": "essential_0258.m4a",
+      "duration": 2.116009
     },
     {
       "id": "essential-259",
       "title": "Horn - Three Notes - Wah Wah Waah - Sad",
       "category": "Musical",
       "pack": "Essential Effects",
-      "resource": "essential_0259.mp3",
-      "duration": 2.063625
+      "resource": "essential_0259.m4a",
+      "duration": 2.062993
     },
     {
       "id": "essential-260",
       "title": "Horn - Weird",
       "category": "Musical",
       "pack": "Essential Effects",
-      "resource": "essential_0260.mp3",
-      "duration": 0.914250
+      "resource": "essential_0260.m4a",
+      "duration": 0.913991
     },
     {
       "id": "essential-261",
       "title": "Impact Hit - Launch",
       "category": "Hits",
       "pack": "Essential Effects",
-      "resource": "essential_0261.mp3",
-      "duration": 1.880813
+      "resource": "essential_0261.m4a",
+      "duration": 1.880998
     },
     {
       "id": "essential-262",
       "title": "Impact Hit - Sonic - Pipe",
       "category": "Hits",
       "pack": "Essential Effects",
-      "resource": "essential_0262.mp3",
+      "resource": "essential_0262.m4a",
       "duration": 1.280000
     },
     {
@@ -2103,23 +2103,23 @@
       "title": "Impact Hit 1",
       "category": "Hits",
       "pack": "Essential Effects",
-      "resource": "essential_0263.mp3",
-      "duration": 1.828563
+      "resource": "essential_0263.m4a",
+      "duration": 1.828005
     },
     {
       "id": "essential-264",
       "title": "Impact Hit 2",
       "category": "Hits",
       "pack": "Essential Effects",
-      "resource": "essential_0264.mp3",
-      "duration": 2.533875
+      "resource": "essential_0264.m4a",
+      "duration": 2.533991
     },
     {
       "id": "essential-265",
       "title": "Impact Hit 3",
       "category": "Hits",
       "pack": "Essential Effects",
-      "resource": "essential_0265.mp3",
+      "resource": "essential_0265.m4a",
       "duration": 1.280000
     },
     {
@@ -2127,223 +2127,223 @@
       "title": "Impact Hit 4",
       "category": "Hits",
       "pack": "Essential Effects",
-      "resource": "essential_0266.mp3",
-      "duration": 1.619563
+      "resource": "essential_0266.m4a",
+      "duration": 1.619002
     },
     {
       "id": "essential-267",
       "title": "Impact Hit",
       "category": "Hits",
       "pack": "Essential Effects",
-      "resource": "essential_0267.mp3",
-      "duration": 2.377125
+      "resource": "essential_0267.m4a",
+      "duration": 2.377007
     },
     {
       "id": "essential-268",
       "title": "Jammer",
       "category": "Other",
       "pack": "Essential Effects",
-      "resource": "essential_0268.mp3",
-      "duration": 1.632000
+      "resource": "essential_0268.m4a",
+      "duration": 1.631995
     },
     {
       "id": "essential-269",
       "title": "Jingle - Upbeat",
       "category": "Musical",
       "pack": "Essential Effects",
-      "resource": "essential_0269.mp3",
-      "duration": 2.612188
+      "resource": "essential_0269.m4a",
+      "duration": 2.611995
     },
     {
       "id": "essential-270",
       "title": "Knocking on Door",
       "category": "Foley",
       "pack": "Essential Effects",
-      "resource": "essential_0270.mp3",
-      "duration": 0.705250
+      "resource": "essential_0270.m4a",
+      "duration": 0.705011
     },
     {
       "id": "essential-271",
       "title": "Laser",
       "category": "Other",
       "pack": "Essential Effects",
-      "resource": "essential_0271.mp3",
-      "duration": 0.783625
+      "resource": "essential_0271.m4a",
+      "duration": 0.782993
     },
     {
       "id": "essential-272",
       "title": "Laughing - Female",
       "category": "People",
       "pack": "Essential Effects",
-      "resource": "essential_0272.mp3",
-      "duration": 6.896313
+      "resource": "essential_0272.m4a",
+      "duration": 6.896009
     },
     {
       "id": "essential-273",
       "title": "Laughter - Female 1",
       "category": "People",
       "pack": "Essential Effects",
-      "resource": "essential_0273.mp3",
-      "duration": 0.940375
+      "resource": "essential_0273.m4a",
+      "duration": 0.940000
     },
     {
       "id": "essential-274",
       "title": "Laughter - Female 2",
       "category": "People",
       "pack": "Essential Effects",
-      "resource": "essential_0274.mp3",
-      "duration": 1.906938
+      "resource": "essential_0274.m4a",
+      "duration": 1.907007
     },
     {
       "id": "essential-275",
       "title": "Laughter - Kid",
       "category": "People",
       "pack": "Essential Effects",
-      "resource": "essential_0275.mp3",
-      "duration": 1.018750
+      "resource": "essential_0275.m4a",
+      "duration": 1.018005
     },
     {
       "id": "essential-276",
       "title": "Laughter - Light Breathy Chuckle - Male",
       "category": "People",
       "pack": "Essential Effects",
-      "resource": "essential_0276.mp3",
-      "duration": 1.880813
+      "resource": "essential_0276.m4a",
+      "duration": 1.880998
     },
     {
       "id": "essential-277",
       "title": "Laughter - Male 2",
       "category": "People",
       "pack": "Essential Effects",
-      "resource": "essential_0277.mp3",
-      "duration": 3.892188
+      "resource": "essential_0277.m4a",
+      "duration": 3.891995
     },
     {
       "id": "essential-278",
       "title": "Laughter - Male 2 (Alternate)",
       "category": "People",
       "pack": "Essential Effects",
-      "resource": "essential_0278.mp3",
-      "duration": 0.984000
+      "resource": "essential_0278.m4a",
+      "duration": 0.983991
     },
     {
       "id": "essential-279",
       "title": "Laughter - Male 3",
       "category": "People",
       "pack": "Essential Effects",
-      "resource": "essential_0279.mp3",
-      "duration": 2.351000
+      "resource": "essential_0279.m4a",
+      "duration": 2.350998
     },
     {
       "id": "essential-280",
       "title": "Laughter - Male",
       "category": "People",
       "pack": "Essential Effects",
-      "resource": "essential_0280.mp3",
-      "duration": 1.985250
+      "resource": "essential_0280.m4a",
+      "duration": 1.985011
     },
     {
       "id": "essential-281",
       "title": "Laughter - Short Light Breathy Chuckle - Male",
       "category": "People",
       "pack": "Essential Effects",
-      "resource": "essential_0281.mp3",
-      "duration": 0.548563
+      "resource": "essential_0281.m4a",
+      "duration": 0.548005
     },
     {
       "id": "essential-282",
       "title": "Laughter - Silly Critter",
       "category": "People",
       "pack": "Essential Effects",
-      "resource": "essential_0282.mp3",
-      "duration": 1.071000
+      "resource": "essential_0282.m4a",
+      "duration": 1.070998
     },
     {
       "id": "essential-283",
       "title": "Machine",
       "category": "Other",
       "pack": "Essential Effects",
-      "resource": "essential_0283.mp3",
-      "duration": 1.384438
+      "resource": "essential_0283.m4a",
+      "duration": 1.383991
     },
     {
       "id": "essential-284",
       "title": "Machinery 1",
       "category": "Other",
       "pack": "Essential Effects",
-      "resource": "essential_0284.mp3",
-      "duration": 1.410563
+      "resource": "essential_0284.m4a",
+      "duration": 1.410000
     },
     {
       "id": "essential-285",
       "title": "Machinery 2",
       "category": "Other",
       "pack": "Essential Effects",
-      "resource": "essential_0285.mp3",
-      "duration": 2.063625
+      "resource": "essential_0285.m4a",
+      "duration": 2.062993
     },
     {
       "id": "essential-286",
       "title": "Metal Strings - Two Tone",
       "category": "Musical",
       "pack": "Essential Effects",
-      "resource": "essential_0286.mp3",
-      "duration": 0.835875
+      "resource": "essential_0286.m4a",
+      "duration": 0.836009
     },
     {
       "id": "essential-287",
       "title": "Metallic Dark",
       "category": "Other",
       "pack": "Essential Effects",
-      "resource": "essential_0287.mp3",
-      "duration": 0.940375
+      "resource": "essential_0287.m4a",
+      "duration": 0.940000
     },
     {
       "id": "essential-288",
       "title": "Monster Exhale - Short",
       "category": "People",
       "pack": "Essential Effects",
-      "resource": "essential_0288.mp3",
-      "duration": 1.176000
+      "resource": "essential_0288.m4a",
+      "duration": 1.176009
     },
     {
       "id": "essential-289",
       "title": "Mouse Click 2",
       "category": "UI & Alerts",
       "pack": "Essential Effects",
-      "resource": "essential_0289.mp3",
-      "duration": 0.313438
+      "resource": "essential_0289.m4a",
+      "duration": 0.312993
     },
     {
       "id": "essential-290",
       "title": "Mouse Click",
       "category": "UI & Alerts",
       "pack": "Essential Effects",
-      "resource": "essential_0290.mp3",
-      "duration": 0.313438
+      "resource": "essential_0290.m4a",
+      "duration": 0.312993
     },
     {
       "id": "essential-291",
       "title": "Mouse-Click - Double",
       "category": "UI & Alerts",
       "pack": "Essential Effects",
-      "resource": "essential_0291.mp3",
-      "duration": 0.522438
+      "resource": "essential_0291.m4a",
+      "duration": 0.521995
     },
     {
       "id": "essential-292",
       "title": "Music - Rave Beat - Muffled",
       "category": "Musical",
       "pack": "Essential Effects",
-      "resource": "essential_0292.mp3",
-      "duration": 2.899563
+      "resource": "essential_0292.m4a",
+      "duration": 2.899002
     },
     {
       "id": "essential-293",
       "title": "Music - Upbeat Classical Waltz 1",
       "category": "Musical",
       "pack": "Essential Effects",
-      "resource": "essential_0293.mp3",
+      "resource": "essential_0293.m4a",
       "duration": 5.120000
     },
     {
@@ -2351,663 +2351,663 @@
       "title": "Music - Upbeat Classical Waltz 2",
       "category": "Musical",
       "pack": "Essential Effects",
-      "resource": "essential_0294.mp3",
-      "duration": 4.989375
+      "resource": "essential_0294.m4a",
+      "duration": 4.989002
     },
     {
       "id": "essential-295",
       "title": "Music - Upbeat Classical Waltz 3",
       "category": "Musical",
       "pack": "Essential Effects",
-      "resource": "essential_0295.mp3",
-      "duration": 4.205688
+      "resource": "essential_0295.m4a",
+      "duration": 4.205011
     },
     {
       "id": "essential-296",
       "title": "Musical - Hip Hop Beat",
       "category": "Musical",
       "pack": "Essential Effects",
-      "resource": "essential_0296.mp3",
-      "duration": 2.904000
+      "resource": "essential_0296.m4a",
+      "duration": 2.903991
     },
     {
       "id": "essential-297",
       "title": "Musical - Rock Beat 1",
       "category": "Musical",
       "pack": "Essential Effects",
-      "resource": "essential_0297.mp3",
-      "duration": 2.112000
+      "resource": "essential_0297.m4a",
+      "duration": 2.111995
     },
     {
       "id": "essential-298",
       "title": "Musical - Rock Beat 2",
       "category": "Musical",
       "pack": "Essential Effects",
-      "resource": "essential_0298.mp3",
-      "duration": 2.184000
+      "resource": "essential_0298.m4a",
+      "duration": 2.183991
     },
     {
       "id": "essential-299",
       "title": "Musical 3 Notes - Horn - Old Timey",
       "category": "Musical",
       "pack": "Essential Effects",
-      "resource": "essential_0299.mp3",
-      "duration": 1.933063
+      "resource": "essential_0299.m4a",
+      "duration": 1.932993
     },
     {
       "id": "essential-300",
       "title": "Musical 3 Notes - Low",
       "category": "Musical",
       "pack": "Essential Effects",
-      "resource": "essential_0300.mp3",
-      "duration": 2.142000
+      "resource": "essential_0300.m4a",
+      "duration": 2.141995
     },
     {
       "id": "essential-301",
       "title": "Mystery",
       "category": "Other",
       "pack": "Essential Effects",
-      "resource": "essential_0301.mp3",
-      "duration": 0.862000
+      "resource": "essential_0301.m4a",
+      "duration": 0.861995
     },
     {
       "id": "essential-302",
       "title": "Next",
       "category": "Other",
       "pack": "Essential Effects",
-      "resource": "essential_0302.mp3",
-      "duration": 2.298750
+      "resource": "essential_0302.m4a",
+      "duration": 2.298005
     },
     {
       "id": "essential-303",
       "title": "Notification - Ding Dong",
       "category": "UI & Alerts",
       "pack": "Essential Effects",
-      "resource": "essential_0303.mp3",
-      "duration": 0.705250
+      "resource": "essential_0303.m4a",
+      "duration": 0.705011
     },
     {
       "id": "essential-304",
       "title": "Notification - Musical",
       "category": "UI & Alerts",
       "pack": "Essential Effects",
-      "resource": "essential_0304.mp3",
-      "duration": 2.821188
+      "resource": "essential_0304.m4a",
+      "duration": 2.820998
     },
     {
       "id": "essential-305",
       "title": "Notification - Two Tone 2",
       "category": "UI & Alerts",
       "pack": "Essential Effects",
-      "resource": "essential_0305.mp3",
-      "duration": 1.306063
+      "resource": "essential_0305.m4a",
+      "duration": 1.306009
     },
     {
       "id": "essential-306",
       "title": "Notification - Two Tone",
       "category": "UI & Alerts",
       "pack": "Essential Effects",
-      "resource": "essential_0306.mp3",
-      "duration": 0.470188
+      "resource": "essential_0306.m4a",
+      "duration": 0.470000
     },
     {
       "id": "essential-307",
       "title": "Organ Single",
       "category": "Musical",
       "pack": "Essential Effects",
-      "resource": "essential_0307.mp3",
-      "duration": 0.862000
+      "resource": "essential_0307.m4a",
+      "duration": 0.861995
     },
     {
       "id": "essential-308",
       "title": "Page Turning 2",
       "category": "Other",
       "pack": "Essential Effects",
-      "resource": "essential_0308.mp3",
-      "duration": 0.417938
+      "resource": "essential_0308.m4a",
+      "duration": 0.418005
     },
     {
       "id": "essential-309",
       "title": "Page Turning",
       "category": "Other",
       "pack": "Essential Effects",
-      "resource": "essential_0309.mp3",
-      "duration": 1.149375
+      "resource": "essential_0309.m4a",
+      "duration": 1.149002
     },
     {
       "id": "essential-310",
       "title": "Paper Rattling",
       "category": "Foley",
       "pack": "Essential Effects",
-      "resource": "essential_0310.mp3",
-      "duration": 2.246500
+      "resource": "essential_0310.m4a",
+      "duration": 2.246009
     },
     {
       "id": "essential-311",
       "title": "Party Horn Long",
       "category": "Musical",
       "pack": "Essential Effects",
-      "resource": "essential_0311.mp3",
-      "duration": 2.064000
+      "resource": "essential_0311.m4a",
+      "duration": 2.063991
     },
     {
       "id": "essential-312",
       "title": "Party Horn",
       "category": "Musical",
       "pack": "Essential Effects",
-      "resource": "essential_0312.mp3",
-      "duration": 0.984000
+      "resource": "essential_0312.m4a",
+      "duration": 0.983991
     },
     {
       "id": "essential-313",
       "title": "Piano - Bright - Single Tone",
       "category": "Other",
       "pack": "Essential Effects",
-      "resource": "essential_0313.mp3",
-      "duration": 1.488938
+      "resource": "essential_0313.m4a",
+      "duration": 1.489002
     },
     {
       "id": "essential-314",
       "title": "Piano",
       "category": "Other",
       "pack": "Essential Effects",
-      "resource": "essential_0314.mp3",
-      "duration": 1.750188
+      "resource": "essential_0314.m4a",
+      "duration": 1.750000
     },
     {
       "id": "essential-315",
       "title": "Plastic Wrap",
       "category": "Foley",
       "pack": "Essential Effects",
-      "resource": "essential_0315.mp3",
-      "duration": 1.071000
+      "resource": "essential_0315.m4a",
+      "duration": 1.070998
     },
     {
       "id": "essential-316",
       "title": "Pluck",
       "category": "Other",
       "pack": "Essential Effects",
-      "resource": "essential_0316.mp3",
-      "duration": 0.470188
+      "resource": "essential_0316.m4a",
+      "duration": 0.470000
     },
     {
       "id": "essential-317",
       "title": "Pop 1",
       "category": "Other",
       "pack": "Essential Effects",
-      "resource": "essential_0317.mp3",
-      "duration": 0.156688
+      "resource": "essential_0317.m4a",
+      "duration": 0.156009
     },
     {
       "id": "essential-318",
       "title": "Pop 2",
       "category": "Other",
       "pack": "Essential Effects",
-      "resource": "essential_0318.mp3",
-      "duration": 0.182813
+      "resource": "essential_0318.m4a",
+      "duration": 0.182993
     },
     {
       "id": "essential-319",
       "title": "Pop 3",
       "category": "Other",
       "pack": "Essential Effects",
-      "resource": "essential_0319.mp3",
-      "duration": 0.235063
+      "resource": "essential_0319.m4a",
+      "duration": 0.235011
     },
     {
       "id": "essential-320",
       "title": "Pop 4",
       "category": "Other",
       "pack": "Essential Effects",
-      "resource": "essential_0320.mp3",
-      "duration": 0.156688
+      "resource": "essential_0320.m4a",
+      "duration": 0.156009
     },
     {
       "id": "essential-321",
       "title": "Pop 5",
       "category": "Other",
       "pack": "Essential Effects",
-      "resource": "essential_0321.mp3",
-      "duration": 0.235063
+      "resource": "essential_0321.m4a",
+      "duration": 0.235011
     },
     {
       "id": "essential-322",
       "title": "Pounding  - Three Hits",
       "category": "Hits",
       "pack": "Essential Effects",
-      "resource": "essential_0322.mp3",
-      "duration": 1.619563
+      "resource": "essential_0322.m4a",
+      "duration": 1.619002
     },
     {
       "id": "essential-323",
       "title": "Press",
       "category": "Other",
       "pack": "Essential Effects",
-      "resource": "essential_0323.mp3",
-      "duration": 1.097125
+      "resource": "essential_0323.m4a",
+      "duration": 1.097007
     },
     {
       "id": "essential-324",
       "title": "Rain 1",
       "category": "Nature",
       "pack": "Essential Effects",
-      "resource": "essential_0324.mp3",
-      "duration": 2.011375
+      "resource": "essential_0324.m4a",
+      "duration": 2.010998
     },
     {
       "id": "essential-325",
       "title": "Rain 2",
       "category": "Nature",
       "pack": "Essential Effects",
-      "resource": "essential_0325.mp3",
-      "duration": 3.134688
+      "resource": "essential_0325.m4a",
+      "duration": 3.133991
     },
     {
       "id": "essential-326",
       "title": "Ratcheting",
       "category": "Other",
       "pack": "Essential Effects",
-      "resource": "essential_0326.mp3",
-      "duration": 0.757500
+      "resource": "essential_0326.m4a",
+      "duration": 0.757007
     },
     {
       "id": "essential-327",
       "title": "Rattle ",
       "category": "Other",
       "pack": "Essential Effects",
-      "resource": "essential_0327.mp3",
-      "duration": 0.992625
+      "resource": "essential_0327.m4a",
+      "duration": 0.991995
     },
     {
       "id": "essential-328",
       "title": "Record Scratch 1",
       "category": "Other",
       "pack": "Essential Effects",
-      "resource": "essential_0328.mp3",
-      "duration": 1.071000
+      "resource": "essential_0328.m4a",
+      "duration": 1.070998
     },
     {
       "id": "essential-329",
       "title": "Record Scratch 2",
       "category": "Other",
       "pack": "Essential Effects",
-      "resource": "essential_0329.mp3",
-      "duration": 6.426063
+      "resource": "essential_0329.m4a",
+      "duration": 6.426009
     },
     {
       "id": "essential-330",
       "title": "Record Scratch 2 (Alternate)",
       "category": "Other",
       "pack": "Essential Effects",
-      "resource": "essential_0330.mp3",
-      "duration": 1.104000
+      "resource": "essential_0330.m4a",
+      "duration": 1.103991
     },
     {
       "id": "essential-331",
       "title": "Record Scratch Short",
       "category": "Other",
       "pack": "Essential Effects",
-      "resource": "essential_0331.mp3",
-      "duration": 0.470188
+      "resource": "essential_0331.m4a",
+      "duration": 0.470000
     },
     {
       "id": "essential-332",
       "title": "Reveal - Musical",
       "category": "Musical",
       "pack": "Essential Effects",
-      "resource": "essential_0332.mp3",
-      "duration": 2.586063
+      "resource": "essential_0332.m4a",
+      "duration": 2.586009
     },
     {
       "id": "essential-333",
       "title": "Reveal - Strings",
       "category": "Musical",
       "pack": "Essential Effects",
-      "resource": "essential_0333.mp3",
-      "duration": 1.697938
+      "resource": "essential_0333.m4a",
+      "duration": 1.698005
     },
     {
       "id": "essential-334",
       "title": "Reveal - Surprise",
       "category": "Other",
       "pack": "Essential Effects",
-      "resource": "essential_0334.mp3",
-      "duration": 1.071000
+      "resource": "essential_0334.m4a",
+      "duration": 1.070998
     },
     {
       "id": "essential-335",
       "title": "Reveal",
       "category": "Other",
       "pack": "Essential Effects",
-      "resource": "essential_0335.mp3",
-      "duration": 1.332188
+      "resource": "essential_0335.m4a",
+      "duration": 1.331995
     },
     {
       "id": "essential-336",
       "title": "Rewind 1",
       "category": "Glitches",
       "pack": "Essential Effects",
-      "resource": "essential_0336.mp3",
-      "duration": 3.578750
+      "resource": "essential_0336.m4a",
+      "duration": 3.578005
     },
     {
       "id": "essential-337",
       "title": "Rewind 2",
       "category": "Glitches",
       "pack": "Essential Effects",
-      "resource": "essential_0337.mp3",
-      "duration": 0.548563
+      "resource": "essential_0337.m4a",
+      "duration": 0.548005
     },
     {
       "id": "essential-338",
       "title": "Rewind 3",
       "category": "Glitches",
       "pack": "Essential Effects",
-      "resource": "essential_0338.mp3",
-      "duration": 1.933063
+      "resource": "essential_0338.m4a",
+      "duration": 1.932993
     },
     {
       "id": "essential-339",
       "title": "Rimshot - Bad Joke 2",
       "category": "Other",
       "pack": "Essential Effects",
-      "resource": "essential_0339.mp3",
-      "duration": 1.776313
+      "resource": "essential_0339.m4a",
+      "duration": 1.776009
     },
     {
       "id": "essential-340",
       "title": "Rimshot - Bad Joke 3",
       "category": "Other",
       "pack": "Essential Effects",
-      "resource": "essential_0340.mp3",
-      "duration": 1.541188
+      "resource": "essential_0340.m4a",
+      "duration": 1.540998
     },
     {
       "id": "essential-341",
       "title": "Rimshot - Bad Joke",
       "category": "Other",
       "pack": "Essential Effects",
-      "resource": "essential_0341.mp3",
-      "duration": 1.697938
+      "resource": "essential_0341.m4a",
+      "duration": 1.698005
     },
     {
       "id": "essential-342",
       "title": "Rumble - Soft",
       "category": "Other",
       "pack": "Essential Effects",
-      "resource": "essential_0342.mp3",
-      "duration": 3.239125
+      "resource": "essential_0342.m4a",
+      "duration": 3.239002
     },
     {
       "id": "essential-343",
       "title": "Sad Trombone - Warped Echo",
       "category": "Other",
       "pack": "Essential Effects",
-      "resource": "essential_0343.mp3",
-      "duration": 4.153438
+      "resource": "essential_0343.m4a",
+      "duration": 4.152993
     },
     {
       "id": "essential-344",
       "title": "Sad Trombone 1",
       "category": "Other",
       "pack": "Essential Effects",
-      "resource": "essential_0344.mp3",
-      "duration": 2.977938
+      "resource": "essential_0344.m4a",
+      "duration": 2.978005
     },
     {
       "id": "essential-345",
       "title": "Sad Trombone 2",
       "category": "Other",
       "pack": "Essential Effects",
-      "resource": "essential_0345.mp3",
-      "duration": 0.862000
+      "resource": "essential_0345.m4a",
+      "duration": 0.861995
     },
     {
       "id": "essential-346",
       "title": "Sad Trombone 3",
       "category": "Other",
       "pack": "Essential Effects",
-      "resource": "essential_0346.mp3",
-      "duration": 3.813875
+      "resource": "essential_0346.m4a",
+      "duration": 3.813991
     },
     {
       "id": "essential-347",
       "title": "Scream - Female 1",
       "category": "People",
       "pack": "Essential Effects",
-      "resource": "essential_0347.mp3",
-      "duration": 1.488938
+      "resource": "essential_0347.m4a",
+      "duration": 1.489002
     },
     {
       "id": "essential-348",
       "title": "Scream - Female 2",
       "category": "People",
       "pack": "Essential Effects",
-      "resource": "essential_0348.mp3",
-      "duration": 1.097125
+      "resource": "essential_0348.m4a",
+      "duration": 1.097007
     },
     {
       "id": "essential-349",
       "title": "Scream - Group",
       "category": "People",
       "pack": "Essential Effects",
-      "resource": "essential_0349.mp3",
-      "duration": 1.985250
+      "resource": "essential_0349.m4a",
+      "duration": 1.985011
     },
     {
       "id": "essential-350",
       "title": "Scream - Male - Short",
       "category": "People",
       "pack": "Essential Effects",
-      "resource": "essential_0350.mp3",
-      "duration": 0.444063
+      "resource": "essential_0350.m4a",
+      "duration": 0.443991
     },
     {
       "id": "essential-351",
       "title": "Scream - Woo",
       "category": "People",
       "pack": "Essential Effects",
-      "resource": "essential_0351.mp3",
-      "duration": 0.783625
+      "resource": "essential_0351.m4a",
+      "duration": 0.782993
     },
     {
       "id": "essential-352",
       "title": "Scream 1",
       "category": "People",
       "pack": "Essential Effects",
-      "resource": "essential_0352.mp3",
-      "duration": 1.462813
+      "resource": "essential_0352.m4a",
+      "duration": 1.462993
     },
     {
       "id": "essential-353",
       "title": "Scream 2",
       "category": "People",
       "pack": "Essential Effects",
-      "resource": "essential_0353.mp3",
-      "duration": 1.488938
+      "resource": "essential_0353.m4a",
+      "duration": 1.489002
     },
     {
       "id": "essential-354",
       "title": "Screech Thud",
       "category": "Other",
       "pack": "Essential Effects",
-      "resource": "essential_0354.mp3",
-      "duration": 1.149375
+      "resource": "essential_0354.m4a",
+      "duration": 1.149002
     },
     {
       "id": "essential-355",
       "title": "Scurry",
       "category": "Other",
       "pack": "Essential Effects",
-      "resource": "essential_0355.mp3",
-      "duration": 0.417938
+      "resource": "essential_0355.m4a",
+      "duration": 0.418005
     },
     {
       "id": "essential-356",
       "title": "Shimmer - Bright",
       "category": "Other",
       "pack": "Essential Effects",
-      "resource": "essential_0356.mp3",
-      "duration": 2.324875
+      "resource": "essential_0356.m4a",
+      "duration": 2.325011
     },
     {
       "id": "essential-357",
       "title": "Shimmer - Creepy",
       "category": "Other",
       "pack": "Essential Effects",
-      "resource": "essential_0357.mp3",
-      "duration": 2.821188
+      "resource": "essential_0357.m4a",
+      "duration": 2.820998
     },
     {
       "id": "essential-358",
       "title": "Shimmer - Harsh",
       "category": "Other",
       "pack": "Essential Effects",
-      "resource": "essential_0358.mp3",
-      "duration": 2.220375
+      "resource": "essential_0358.m4a",
+      "duration": 2.220000
     },
     {
       "id": "essential-359",
       "title": "Shutdown 1",
       "category": "Other",
       "pack": "Essential Effects",
-      "resource": "essential_0359.mp3",
-      "duration": 0.992625
+      "resource": "essential_0359.m4a",
+      "duration": 0.991995
     },
     {
       "id": "essential-360",
       "title": "Shutdown 2",
       "category": "Other",
       "pack": "Essential Effects",
-      "resource": "essential_0360.mp3",
-      "duration": 0.705250
+      "resource": "essential_0360.m4a",
+      "duration": 0.705011
     },
     {
       "id": "essential-361",
       "title": "Shutdown 3",
       "category": "Other",
       "pack": "Essential Effects",
-      "resource": "essential_0361.mp3",
-      "duration": 0.862000
+      "resource": "essential_0361.m4a",
+      "duration": 0.861995
     },
     {
       "id": "essential-362",
       "title": "Shutdown 4",
       "category": "Other",
       "pack": "Essential Effects",
-      "resource": "essential_0362.mp3",
-      "duration": 0.940375
+      "resource": "essential_0362.m4a",
+      "duration": 0.940000
     },
     {
       "id": "essential-363",
       "title": "Siren 1",
       "category": "Action",
       "pack": "Essential Effects",
-      "resource": "essential_0363.mp3",
-      "duration": 2.184000
+      "resource": "essential_0363.m4a",
+      "duration": 2.183991
     },
     {
       "id": "essential-364",
       "title": "Siren 2",
       "category": "Action",
       "pack": "Essential Effects",
-      "resource": "essential_0364.mp3",
-      "duration": 2.136000
+      "resource": "essential_0364.m4a",
+      "duration": 2.136009
     },
     {
       "id": "essential-365",
       "title": "Siren 3",
       "category": "Action",
       "pack": "Essential Effects",
-      "resource": "essential_0365.mp3",
-      "duration": 1.152000
+      "resource": "essential_0365.m4a",
+      "duration": 1.151995
     },
     {
       "id": "essential-366",
       "title": "Siren 4",
       "category": "Action",
       "pack": "Essential Effects",
-      "resource": "essential_0366.mp3",
-      "duration": 2.976000
+      "resource": "essential_0366.m4a",
+      "duration": 2.976009
     },
     {
       "id": "essential-367",
       "title": "Siren Chirp",
       "category": "Action",
       "pack": "Essential Effects",
-      "resource": "essential_0367.mp3",
-      "duration": 0.552000
+      "resource": "essential_0367.m4a",
+      "duration": 0.551995
     },
     {
       "id": "essential-368",
       "title": "Sizzle",
       "category": "Other",
       "pack": "Essential Effects",
-      "resource": "essential_0368.mp3",
-      "duration": 1.854688
+      "resource": "essential_0368.m4a",
+      "duration": 1.853991
     },
     {
       "id": "essential-369",
       "title": "Slap - Single",
       "category": "Hits",
       "pack": "Essential Effects",
-      "resource": "essential_0369.mp3",
-      "duration": 0.522438
+      "resource": "essential_0369.m4a",
+      "duration": 0.521995
     },
     {
       "id": "essential-370",
       "title": "Slap",
       "category": "Hits",
       "pack": "Essential Effects",
-      "resource": "essential_0370.mp3",
-      "duration": 0.470188
+      "resource": "essential_0370.m4a",
+      "duration": 0.470000
     },
     {
       "id": "essential-371",
       "title": "Slice Impact Woosh",
       "category": "Whooshes",
       "pack": "Essential Effects",
-      "resource": "essential_0371.mp3",
-      "duration": 1.697938
+      "resource": "essential_0371.m4a",
+      "duration": 1.698005
     },
     {
       "id": "essential-372",
       "title": "Snap",
       "category": "Other",
       "pack": "Essential Effects",
-      "resource": "essential_0372.mp3",
-      "duration": 0.444063
+      "resource": "essential_0372.m4a",
+      "duration": 0.443991
     },
     {
       "id": "essential-373",
       "title": "Sneeze",
       "category": "Other",
       "pack": "Essential Effects",
-      "resource": "essential_0373.mp3",
-      "duration": 0.936000
+      "resource": "essential_0373.m4a",
+      "duration": 0.936009
     },
     {
       "id": "essential-374",
       "title": "Snore - Monster",
       "category": "People",
       "pack": "Essential Effects",
-      "resource": "essential_0374.mp3",
-      "duration": 2.977938
+      "resource": "essential_0374.m4a",
+      "duration": 2.978005
     },
     {
       "id": "essential-375",
       "title": "Sonic Launch",
       "category": "Glitches",
       "pack": "Essential Effects",
-      "resource": "essential_0375.mp3",
-      "duration": 0.757500
+      "resource": "essential_0375.m4a",
+      "duration": 0.757007
     },
     {
       "id": "essential-376",
       "title": "Sonic Launch (Alternate)",
       "category": "Glitches",
       "pack": "Essential Effects",
-      "resource": "essential_0376.mp3",
+      "resource": "essential_0376.m4a",
       "duration": 0.720000
     },
     {
@@ -3015,159 +3015,159 @@
       "title": "Sparkle",
       "category": "Other",
       "pack": "Essential Effects",
-      "resource": "essential_0377.mp3",
-      "duration": 1.071000
+      "resource": "essential_0377.m4a",
+      "duration": 1.070998
     },
     {
       "id": "essential-378",
       "title": "Stamp",
       "category": "Hits",
       "pack": "Essential Effects",
-      "resource": "essential_0378.mp3",
-      "duration": 0.417938
+      "resource": "essential_0378.m4a",
+      "duration": 0.418005
     },
     {
       "id": "essential-379",
       "title": "Static - Short Burst 2",
       "category": "Glitches",
       "pack": "Essential Effects",
-      "resource": "essential_0379.mp3",
-      "duration": 0.768000
+      "resource": "essential_0379.m4a",
+      "duration": 0.768005
     },
     {
       "id": "essential-380",
       "title": "Static 1",
       "category": "Glitches",
       "pack": "Essential Effects",
-      "resource": "essential_0380.mp3",
-      "duration": 1.071000
+      "resource": "essential_0380.m4a",
+      "duration": 1.070998
     },
     {
       "id": "essential-381",
       "title": "Static 2",
       "category": "Glitches",
       "pack": "Essential Effects",
-      "resource": "essential_0381.mp3",
-      "duration": 10.057125
+      "resource": "essential_0381.m4a",
+      "duration": 10.057007
     },
     {
       "id": "essential-382",
       "title": "Static 3",
       "category": "Glitches",
       "pack": "Essential Effects",
-      "resource": "essential_0382.mp3",
-      "duration": 3.888000
+      "resource": "essential_0382.m4a",
+      "duration": 3.888005
     },
     {
       "id": "essential-383",
       "title": "Static Short Burst",
       "category": "Glitches",
       "pack": "Essential Effects",
-      "resource": "essential_0383.mp3",
-      "duration": 0.653063
+      "resource": "essential_0383.m4a",
+      "duration": 0.652993
     },
     {
       "id": "essential-384",
       "title": "Stinger 1",
       "category": "Other",
       "pack": "Essential Effects",
-      "resource": "essential_0384.mp3",
-      "duration": 3.134688
+      "resource": "essential_0384.m4a",
+      "duration": 3.133991
     },
     {
       "id": "essential-385",
       "title": "Stinger 2",
       "category": "Other",
       "pack": "Essential Effects",
-      "resource": "essential_0385.mp3",
-      "duration": 2.142000
+      "resource": "essential_0385.m4a",
+      "duration": 2.141995
     },
     {
       "id": "essential-386",
       "title": "Stinger 3",
       "category": "Other",
       "pack": "Essential Effects",
-      "resource": "essential_0386.mp3",
-      "duration": 2.115875
+      "resource": "essential_0386.m4a",
+      "duration": 2.116009
     },
     {
       "id": "essential-387",
       "title": "Stinger 4",
       "category": "Other",
       "pack": "Essential Effects",
-      "resource": "essential_0387.mp3",
-      "duration": 1.097125
+      "resource": "essential_0387.m4a",
+      "duration": 1.097007
     },
     {
       "id": "essential-388",
       "title": "Stinger 5",
       "category": "Other",
       "pack": "Essential Effects",
-      "resource": "essential_0388.mp3",
-      "duration": 2.351000
+      "resource": "essential_0388.m4a",
+      "duration": 2.350998
     },
     {
       "id": "essential-389",
       "title": "String - Single",
       "category": "Musical",
       "pack": "Essential Effects",
-      "resource": "essential_0389.mp3",
-      "duration": 0.757500
+      "resource": "essential_0389.m4a",
+      "duration": 0.757007
     },
     {
       "id": "essential-390",
       "title": "Strings - Short",
       "category": "Musical",
       "pack": "Essential Effects",
-      "resource": "essential_0390.mp3",
-      "duration": 3.160813
+      "resource": "essential_0390.m4a",
+      "duration": 3.160998
     },
     {
       "id": "essential-391",
       "title": "Strings - Two Tone - Hi Lo",
       "category": "Musical",
       "pack": "Essential Effects",
-      "resource": "essential_0391.mp3",
-      "duration": 1.071000
+      "resource": "essential_0391.m4a",
+      "duration": 1.070998
     },
     {
       "id": "essential-392",
       "title": "Stunner",
       "category": "Other",
       "pack": "Essential Effects",
-      "resource": "essential_0392.mp3",
-      "duration": 1.071000
+      "resource": "essential_0392.m4a",
+      "duration": 1.070998
     },
     {
       "id": "essential-393",
       "title": "Suspense",
       "category": "Other",
       "pack": "Essential Effects",
-      "resource": "essential_0393.mp3",
-      "duration": 1.697938
+      "resource": "essential_0393.m4a",
+      "duration": 1.698005
     },
     {
       "id": "essential-394",
       "title": "Swish - Slicing",
       "category": "Other",
       "pack": "Essential Effects",
-      "resource": "essential_0394.mp3",
-      "duration": 1.149375
+      "resource": "essential_0394.m4a",
+      "duration": 1.149002
     },
     {
       "id": "essential-395",
       "title": "Swish 1",
       "category": "Other",
       "pack": "Essential Effects",
-      "resource": "essential_0395.mp3",
-      "duration": 2.232000
+      "resource": "essential_0395.m4a",
+      "duration": 2.231995
     },
     {
       "id": "essential-396",
       "title": "Swish 2",
       "category": "Other",
       "pack": "Essential Effects",
-      "resource": "essential_0396.mp3",
+      "resource": "essential_0396.m4a",
       "duration": 0.600000
     },
     {
@@ -3175,7 +3175,7 @@
       "title": "Swish 3",
       "category": "Other",
       "pack": "Essential Effects",
-      "resource": "essential_0397.mp3",
+      "resource": "essential_0397.m4a",
       "duration": 1.680000
     },
     {
@@ -3183,39 +3183,39 @@
       "title": "Swoosh - Crash",
       "category": "Whooshes",
       "pack": "Essential Effects",
-      "resource": "essential_0398.mp3",
-      "duration": 0.862000
+      "resource": "essential_0398.m4a",
+      "duration": 0.861995
     },
     {
       "id": "essential-399",
       "title": "Swoosh - Fast - With Thud",
       "category": "Whooshes",
       "pack": "Essential Effects",
-      "resource": "essential_0399.mp3",
-      "duration": 0.653063
+      "resource": "essential_0399.m4a",
+      "duration": 0.652993
     },
     {
       "id": "essential-400",
       "title": "Swoosh - Fast 1",
       "category": "Whooshes",
       "pack": "Essential Effects",
-      "resource": "essential_0400.mp3",
-      "duration": 0.679125
+      "resource": "essential_0400.m4a",
+      "duration": 0.679002
     },
     {
       "id": "essential-401",
       "title": "Swoosh - Quick - Low",
       "category": "Whooshes",
       "pack": "Essential Effects",
-      "resource": "essential_0401.mp3",
-      "duration": 0.783625
+      "resource": "essential_0401.m4a",
+      "duration": 0.782993
     },
     {
       "id": "essential-402",
       "title": "Swoosh - Sharp - Hit",
       "category": "Whooshes",
       "pack": "Essential Effects",
-      "resource": "essential_0402.mp3",
+      "resource": "essential_0402.m4a",
       "duration": 1.280000
     },
     {
@@ -3223,199 +3223,199 @@
       "title": "Swoosh - Sharp - Hit (Alternate)",
       "category": "Whooshes",
       "pack": "Essential Effects",
-      "resource": "essential_0403.mp3",
-      "duration": 0.816000
+      "resource": "essential_0403.m4a",
+      "duration": 0.816009
     },
     {
       "id": "essential-404",
       "title": "Swoosh",
       "category": "Whooshes",
       "pack": "Essential Effects",
-      "resource": "essential_0404.mp3",
-      "duration": 1.332188
+      "resource": "essential_0404.m4a",
+      "duration": 1.331995
     },
     {
       "id": "essential-405",
       "title": "Synth 1",
       "category": "Glitches",
       "pack": "Essential Effects",
-      "resource": "essential_0405.mp3",
-      "duration": 0.783625
+      "resource": "essential_0405.m4a",
+      "duration": 0.782993
     },
     {
       "id": "essential-406",
       "title": "Synth 2",
       "category": "Glitches",
       "pack": "Essential Effects",
-      "resource": "essential_0406.mp3",
-      "duration": 0.862000
+      "resource": "essential_0406.m4a",
+      "duration": 0.861995
     },
     {
       "id": "essential-407",
       "title": "Synth 3",
       "category": "Glitches",
       "pack": "Essential Effects",
-      "resource": "essential_0407.mp3",
-      "duration": 0.835875
+      "resource": "essential_0407.m4a",
+      "duration": 0.836009
     },
     {
       "id": "essential-408",
       "title": "Synth 4",
       "category": "Glitches",
       "pack": "Essential Effects",
-      "resource": "essential_0408.mp3",
-      "duration": 0.757500
+      "resource": "essential_0408.m4a",
+      "duration": 0.757007
     },
     {
       "id": "essential-409",
       "title": "Synth 5",
       "category": "Glitches",
       "pack": "Essential Effects",
-      "resource": "essential_0409.mp3",
-      "duration": 1.071000
+      "resource": "essential_0409.m4a",
+      "duration": 1.070998
     },
     {
       "id": "essential-410",
       "title": "Tape - Packing tape",
       "category": "Foley",
       "pack": "Essential Effects",
-      "resource": "essential_0410.mp3",
-      "duration": 1.018750
+      "resource": "essential_0410.m4a",
+      "duration": 1.018005
     },
     {
       "id": "essential-411",
       "title": "Thump",
       "category": "Hits",
       "pack": "Essential Effects",
-      "resource": "essential_0411.mp3",
-      "duration": 0.287313
+      "resource": "essential_0411.m4a",
+      "duration": 0.287007
     },
     {
       "id": "essential-412",
       "title": "Thunderstorm 1",
       "category": "Nature",
       "pack": "Essential Effects",
-      "resource": "essential_0412.mp3",
-      "duration": 5.067750
+      "resource": "essential_0412.m4a",
+      "duration": 5.067007
     },
     {
       "id": "essential-413",
       "title": "Thunderstorm 2",
       "category": "Nature",
       "pack": "Essential Effects",
-      "resource": "essential_0413.mp3",
-      "duration": 2.089750
+      "resource": "essential_0413.m4a",
+      "duration": 2.090000
     },
     {
       "id": "essential-414",
       "title": "Thunderstorm 3",
       "category": "Nature",
       "pack": "Essential Effects",
-      "resource": "essential_0414.mp3",
-      "duration": 2.115875
+      "resource": "essential_0414.m4a",
+      "duration": 2.116009
     },
     {
       "id": "essential-415",
       "title": "Toilet flushing 1",
       "category": "Foley",
       "pack": "Essential Effects",
-      "resource": "essential_0415.mp3",
-      "duration": 3.056325
+      "resource": "essential_0415.m4a",
+      "duration": 3.056009
     },
     {
       "id": "essential-416",
       "title": "Toilet flushing 2",
       "category": "Foley",
       "pack": "Essential Effects",
-      "resource": "essential_0416.mp3",
-      "duration": 2.089775
+      "resource": "essential_0416.m4a",
+      "duration": 2.090000
     },
     {
       "id": "essential-417",
       "title": "Toilet flushing 3",
       "category": "Foley",
       "pack": "Essential Effects",
-      "resource": "essential_0417.mp3",
-      "duration": 18.050600
+      "resource": "essential_0417.m4a",
+      "duration": 18.050000
     },
     {
       "id": "essential-418",
       "title": "Toilet flushing",
       "category": "Foley",
       "pack": "Essential Effects",
-      "resource": "essential_0418.mp3",
-      "duration": 3.056325
+      "resource": "essential_0418.m4a",
+      "duration": 3.056009
     },
     {
       "id": "essential-419",
       "title": "Train - Clicking on Tracks",
       "category": "Nature",
       "pack": "Essential Effects",
-      "resource": "essential_0419.mp3",
-      "duration": 2.089750
+      "resource": "essential_0419.m4a",
+      "duration": 2.090000
     },
     {
       "id": "essential-420",
       "title": "Train - Passing by",
       "category": "Nature",
       "pack": "Essential Effects",
-      "resource": "essential_0420.mp3",
-      "duration": 3.996688
+      "resource": "essential_0420.m4a",
+      "duration": 3.996009
     },
     {
       "id": "essential-421",
       "title": "Train Whistle - Passing By",
       "category": "Nature",
       "pack": "Essential Effects",
-      "resource": "essential_0421.mp3",
-      "duration": 1.906938
+      "resource": "essential_0421.m4a",
+      "duration": 1.907007
     },
     {
       "id": "essential-422",
       "title": "Train Whistle - Quick Toot",
       "category": "Nature",
       "pack": "Essential Effects",
-      "resource": "essential_0422.mp3",
-      "duration": 0.653063
+      "resource": "essential_0422.m4a",
+      "duration": 0.652993
     },
     {
       "id": "essential-423",
       "title": "Train Whistle - Short Burst",
       "category": "Nature",
       "pack": "Essential Effects",
-      "resource": "essential_0423.mp3",
-      "duration": 1.071000
+      "resource": "essential_0423.m4a",
+      "duration": 1.070998
     },
     {
       "id": "essential-424",
       "title": "Train Whistle - Toy",
       "category": "Nature",
       "pack": "Essential Effects",
-      "resource": "essential_0424.mp3",
-      "duration": 0.783625
+      "resource": "essential_0424.m4a",
+      "duration": 0.782993
     },
     {
       "id": "essential-425",
       "title": "Transition - Shriek",
       "category": "Other",
       "pack": "Essential Effects",
-      "resource": "essential_0425.mp3",
-      "duration": 0.835875
+      "resource": "essential_0425.m4a",
+      "duration": 0.836009
     },
     {
       "id": "essential-426",
       "title": "Transition - Wet",
       "category": "Other",
       "pack": "Essential Effects",
-      "resource": "essential_0426.mp3",
-      "duration": 1.071000
+      "resource": "essential_0426.m4a",
+      "duration": 1.070998
     },
     {
       "id": "essential-427",
       "title": "Twang 1",
       "category": "Other",
       "pack": "Essential Effects",
-      "resource": "essential_0427.mp3",
+      "resource": "essential_0427.m4a",
       "duration": 1.680000
     },
     {
@@ -3423,7 +3423,7 @@
       "title": "Twang 2",
       "category": "Other",
       "pack": "Essential Effects",
-      "resource": "essential_0428.mp3",
+      "resource": "essential_0428.m4a",
       "duration": 1.560000
     },
     {
@@ -3431,55 +3431,55 @@
       "title": "Twang 3",
       "category": "Other",
       "pack": "Essential Effects",
-      "resource": "essential_0429.mp3",
-      "duration": 1.776000
+      "resource": "essential_0429.m4a",
+      "duration": 1.776009
     },
     {
       "id": "essential-430",
       "title": "Typing 1",
       "category": "Foley",
       "pack": "Essential Effects",
-      "resource": "essential_0430.mp3",
-      "duration": 0.705250
+      "resource": "essential_0430.m4a",
+      "duration": 0.705011
     },
     {
       "id": "essential-431",
       "title": "Typing 2",
       "category": "Foley",
       "pack": "Essential Effects",
-      "resource": "essential_0431.mp3",
-      "duration": 1.828563
+      "resource": "essential_0431.m4a",
+      "duration": 1.828005
     },
     {
       "id": "essential-432",
       "title": "Typing 3",
       "category": "Foley",
       "pack": "Essential Effects",
-      "resource": "essential_0432.mp3",
-      "duration": 3.134688
+      "resource": "essential_0432.m4a",
+      "duration": 3.133991
     },
     {
       "id": "essential-433",
       "title": "Typing 4",
       "category": "Foley",
       "pack": "Essential Effects",
-      "resource": "essential_0433.mp3",
-      "duration": 4.048938
+      "resource": "essential_0433.m4a",
+      "duration": 4.049002
     },
     {
       "id": "essential-434",
       "title": "Typing 5",
       "category": "Foley",
       "pack": "Essential Effects",
-      "resource": "essential_0434.mp3",
-      "duration": 1.149375
+      "resource": "essential_0434.m4a",
+      "duration": 1.149002
     },
     {
       "id": "essential-435",
       "title": "Typing 6",
       "category": "Foley",
       "pack": "Essential Effects",
-      "resource": "essential_0435.mp3",
+      "resource": "essential_0435.m4a",
       "duration": 5.120000
     },
     {
@@ -3487,159 +3487,159 @@
       "title": "Typing 7",
       "category": "Foley",
       "pack": "Essential Effects",
-      "resource": "essential_0436.mp3",
-      "duration": 1.906938
+      "resource": "essential_0436.m4a",
+      "duration": 1.907007
     },
     {
       "id": "essential-437",
       "title": "Uh Oh - Spoken - Female",
       "category": "Other",
       "pack": "Essential Effects",
-      "resource": "essential_0437.mp3",
-      "duration": 1.018750
+      "resource": "essential_0437.m4a",
+      "duration": 1.018005
     },
     {
       "id": "essential-438",
       "title": "Uh Oh - Spoken - Male",
       "category": "Other",
       "pack": "Essential Effects",
-      "resource": "essential_0438.mp3",
-      "duration": 0.940375
+      "resource": "essential_0438.m4a",
+      "duration": 0.940000
     },
     {
       "id": "essential-439",
       "title": "Uh Oh - Spoken",
       "category": "Other",
       "pack": "Essential Effects",
-      "resource": "essential_0439.mp3",
-      "duration": 0.835875
+      "resource": "essential_0439.m4a",
+      "duration": 0.836009
     },
     {
       "id": "essential-440",
       "title": "Underwater Bubbles 2",
       "category": "Nature",
       "pack": "Essential Effects",
-      "resource": "essential_0440.mp3",
-      "duration": 1.384438
+      "resource": "essential_0440.m4a",
+      "duration": 1.383991
     },
     {
       "id": "essential-441",
       "title": "Underwater Bubbles 3",
       "category": "Nature",
       "pack": "Essential Effects",
-      "resource": "essential_0441.mp3",
-      "duration": 1.593438
+      "resource": "essential_0441.m4a",
+      "duration": 1.592993
     },
     {
       "id": "essential-442",
       "title": "Underwater Bubbles 4",
       "category": "Nature",
       "pack": "Essential Effects",
-      "resource": "essential_0442.mp3",
-      "duration": 0.757500
+      "resource": "essential_0442.m4a",
+      "duration": 0.757007
     },
     {
       "id": "essential-443",
       "title": "Underwater Bubbles",
       "category": "Nature",
       "pack": "Essential Effects",
-      "resource": "essential_0443.mp3",
-      "duration": 1.593438
+      "resource": "essential_0443.m4a",
+      "duration": 1.592993
     },
     {
       "id": "essential-444",
       "title": "Water - Drip - Single",
       "category": "Nature",
       "pack": "Essential Effects",
-      "resource": "essential_0444.mp3",
-      "duration": 0.835875
+      "resource": "essential_0444.m4a",
+      "duration": 0.836009
     },
     {
       "id": "essential-445",
       "title": "Water - Flowing",
       "category": "Nature",
       "pack": "Essential Effects",
-      "resource": "essential_0445.mp3",
-      "duration": 2.063625
+      "resource": "essential_0445.m4a",
+      "duration": 2.062993
     },
     {
       "id": "essential-446",
       "title": "Water - Impact Echo",
       "category": "Hits",
       "pack": "Essential Effects",
-      "resource": "essential_0446.mp3",
-      "duration": 1.645688
+      "resource": "essential_0446.m4a",
+      "duration": 1.645011
     },
     {
       "id": "essential-447",
       "title": "Water - Ocean Wave 2",
       "category": "Nature",
       "pack": "Essential Effects",
-      "resource": "essential_0447.mp3",
-      "duration": 1.828563
+      "resource": "essential_0447.m4a",
+      "duration": 1.828005
     },
     {
       "id": "essential-448",
       "title": "Water - Ocean Wave 3",
       "category": "Nature",
       "pack": "Essential Effects",
-      "resource": "essential_0448.mp3",
-      "duration": 2.011375
+      "resource": "essential_0448.m4a",
+      "duration": 2.010998
     },
     {
       "id": "essential-449",
       "title": "Water - Ocean Wave",
       "category": "Nature",
       "pack": "Essential Effects",
-      "resource": "essential_0449.mp3",
-      "duration": 2.142000
+      "resource": "essential_0449.m4a",
+      "duration": 2.141995
     },
     {
       "id": "essential-450",
       "title": "Water - Running",
       "category": "Nature",
       "pack": "Essential Effects",
-      "resource": "essential_0450.mp3",
-      "duration": 1.071000
+      "resource": "essential_0450.m4a",
+      "duration": 1.070998
     },
     {
       "id": "essential-451",
       "title": "Water - Stream 2",
       "category": "Nature",
       "pack": "Essential Effects",
-      "resource": "essential_0451.mp3",
-      "duration": 2.063625
+      "resource": "essential_0451.m4a",
+      "duration": 2.062993
     },
     {
       "id": "essential-452",
       "title": "Water - Stream 4",
       "category": "Nature",
       "pack": "Essential Effects",
-      "resource": "essential_0452.mp3",
-      "duration": 2.089750
+      "resource": "essential_0452.m4a",
+      "duration": 2.090000
     },
     {
       "id": "essential-453",
       "title": "Water - Stream",
       "category": "Nature",
       "pack": "Essential Effects",
-      "resource": "essential_0453.mp3",
-      "duration": 2.115875
+      "resource": "essential_0453.m4a",
+      "duration": 2.116009
     },
     {
       "id": "essential-454",
       "title": "Whip - Laser - Woosh",
       "category": "Whooshes",
       "pack": "Essential Effects",
-      "resource": "essential_0454.mp3",
-      "duration": 2.115875
+      "resource": "essential_0454.m4a",
+      "duration": 2.116009
     },
     {
       "id": "essential-455",
       "title": "Whip - Laser - Woosh (Alternate)",
       "category": "Whooshes",
       "pack": "Essential Effects",
-      "resource": "essential_0455.mp3",
+      "resource": "essential_0455.m4a",
       "duration": 1.320000
     },
     {
@@ -3647,15 +3647,15 @@
       "title": "Whip - Spring",
       "category": "Hits",
       "pack": "Essential Effects",
-      "resource": "essential_0456.mp3",
-      "duration": 0.992625
+      "resource": "essential_0456.m4a",
+      "duration": 0.991995
     },
     {
       "id": "essential-457",
       "title": "Whistle - Breathy",
       "category": "Other",
       "pack": "Essential Effects",
-      "resource": "essential_0457.mp3",
+      "resource": "essential_0457.m4a",
       "duration": 2.520000
     },
     {
@@ -3663,95 +3663,95 @@
       "title": "Whistle - Creepy",
       "category": "Other",
       "pack": "Essential Effects",
-      "resource": "essential_0458.mp3",
-      "duration": 2.925688
+      "resource": "essential_0458.m4a",
+      "duration": 2.925011
     },
     {
       "id": "essential-459",
       "title": "Whistle - Referee - 2",
       "category": "Other",
       "pack": "Essential Effects",
-      "resource": "essential_0459.mp3",
-      "duration": 1.056000
+      "resource": "essential_0459.m4a",
+      "duration": 1.056009
     },
     {
       "id": "essential-460",
       "title": "Whistle - Referee - Long",
       "category": "Other",
       "pack": "Essential Effects",
-      "resource": "essential_0460.mp3",
-      "duration": 1.944000
+      "resource": "essential_0460.m4a",
+      "duration": 1.943991
     },
     {
       "id": "essential-461",
       "title": "Whistle - Referee - X4",
       "category": "Other",
       "pack": "Essential Effects",
-      "resource": "essential_0461.mp3",
-      "duration": 1.344000
+      "resource": "essential_0461.m4a",
+      "duration": 1.343991
     },
     {
       "id": "essential-462",
       "title": "Whistle - Referee 1",
       "category": "Other",
       "pack": "Essential Effects",
-      "resource": "essential_0462.mp3",
-      "duration": 1.008000
+      "resource": "essential_0462.m4a",
+      "duration": 1.008005
     },
     {
       "id": "essential-463",
       "title": "Whiz - Hit",
       "category": "Whooshes",
       "pack": "Essential Effects",
-      "resource": "essential_0463.mp3",
-      "duration": 0.339563
+      "resource": "essential_0463.m4a",
+      "duration": 0.339002
     },
     {
       "id": "essential-464",
       "title": "Whoosh - Achievement",
       "category": "Whooshes",
       "pack": "Essential Effects",
-      "resource": "essential_0464.mp3",
-      "duration": 2.115875
+      "resource": "essential_0464.m4a",
+      "duration": 2.116009
     },
     {
       "id": "essential-465",
       "title": "Whoosh - Coarse - Harsh",
       "category": "Whooshes",
       "pack": "Essential Effects",
-      "resource": "essential_0465.mp3",
-      "duration": 0.444063
+      "resource": "essential_0465.m4a",
+      "duration": 0.443991
     },
     {
       "id": "essential-466",
       "title": "Whoosh - Double 2",
       "category": "Whooshes",
       "pack": "Essential Effects",
-      "resource": "essential_0466.mp3",
-      "duration": 0.783625
+      "resource": "essential_0466.m4a",
+      "duration": 0.782993
     },
     {
       "id": "essential-467",
       "title": "Whoosh - Double",
       "category": "Whooshes",
       "pack": "Essential Effects",
-      "resource": "essential_0467.mp3",
-      "duration": 0.522438
+      "resource": "essential_0467.m4a",
+      "duration": 0.521995
     },
     {
       "id": "essential-468",
       "title": "Whoosh - Echo",
       "category": "Whooshes",
       "pack": "Essential Effects",
-      "resource": "essential_0468.mp3",
-      "duration": 1.593438
+      "resource": "essential_0468.m4a",
+      "duration": 1.592993
     },
     {
       "id": "essential-469",
       "title": "Whoosh - Echo (Alternate)",
       "category": "Whooshes",
       "pack": "Essential Effects",
-      "resource": "essential_0469.mp3",
+      "resource": "essential_0469.m4a",
       "duration": 1.320000
     },
     {
@@ -3759,55 +3759,55 @@
       "title": "Whoosh - Fast - Sharp - Short",
       "category": "Whooshes",
       "pack": "Essential Effects",
-      "resource": "essential_0470.mp3",
-      "duration": 0.444063
+      "resource": "essential_0470.m4a",
+      "duration": 0.443991
     },
     {
       "id": "essential-471",
       "title": "Whoosh - Fast - Short - Low",
       "category": "Whooshes",
       "pack": "Essential Effects",
-      "resource": "essential_0471.mp3",
-      "duration": 0.705250
+      "resource": "essential_0471.m4a",
+      "duration": 0.705011
     },
     {
       "id": "essential-472",
       "title": "Whoosh - Fast Short Muffled",
       "category": "Whooshes",
       "pack": "Essential Effects",
-      "resource": "essential_0472.mp3",
-      "duration": 0.444063
+      "resource": "essential_0472.m4a",
+      "duration": 0.443991
     },
     {
       "id": "essential-473",
       "title": "Whoosh - Fast Short",
       "category": "Whooshes",
       "pack": "Essential Effects",
-      "resource": "essential_0473.mp3",
-      "duration": 0.287313
+      "resource": "essential_0473.m4a",
+      "duration": 0.287007
     },
     {
       "id": "essential-474",
       "title": "Whoosh - High",
       "category": "Whooshes",
       "pack": "Essential Effects",
-      "resource": "essential_0474.mp3",
-      "duration": 0.757500
+      "resource": "essential_0474.m4a",
+      "duration": 0.757007
     },
     {
       "id": "essential-475",
       "title": "Whoosh - Long - Laser",
       "category": "Whooshes",
       "pack": "Essential Effects",
-      "resource": "essential_0475.mp3",
-      "duration": 3.056313
+      "resource": "essential_0475.m4a",
+      "duration": 3.056009
     },
     {
       "id": "essential-476",
       "title": "Whoosh - Long - Laser (Alternate)",
       "category": "Whooshes",
       "pack": "Essential Effects",
-      "resource": "essential_0476.mp3",
+      "resource": "essential_0476.m4a",
       "duration": 2.760000
     },
     {
@@ -3815,159 +3815,159 @@
       "title": "Whoosh - Low - Distant",
       "category": "Whooshes",
       "pack": "Essential Effects",
-      "resource": "essential_0477.mp3",
-      "duration": 2.716688
+      "resource": "essential_0477.m4a",
+      "duration": 2.716009
     },
     {
       "id": "essential-478",
       "title": "Whoosh - Powerful",
       "category": "Whooshes",
       "pack": "Essential Effects",
-      "resource": "essential_0478.mp3",
-      "duration": 3.996688
+      "resource": "essential_0478.m4a",
+      "duration": 3.996009
     },
     {
       "id": "essential-479",
       "title": "Whoosh - Rattle",
       "category": "Whooshes",
       "pack": "Essential Effects",
-      "resource": "essential_0479.mp3",
-      "duration": 0.862000
+      "resource": "essential_0479.m4a",
+      "duration": 0.861995
     },
     {
       "id": "essential-480",
       "title": "Whoosh - Rebound",
       "category": "Whooshes",
       "pack": "Essential Effects",
-      "resource": "essential_0480.mp3",
-      "duration": 1.332188
+      "resource": "essential_0480.m4a",
+      "duration": 1.331995
     },
     {
       "id": "essential-481",
       "title": "Whoosh - Reverse - Struggling",
       "category": "Whooshes",
       "pack": "Essential Effects",
-      "resource": "essential_0481.mp3",
-      "duration": 2.481625
+      "resource": "essential_0481.m4a",
+      "duration": 2.480998
     },
     {
       "id": "essential-482",
       "title": "Whoosh - Short - Fast",
       "category": "Whooshes",
       "pack": "Essential Effects",
-      "resource": "essential_0482.mp3",
-      "duration": 0.235063
+      "resource": "essential_0482.m4a",
+      "duration": 0.235011
     },
     {
       "id": "essential-483",
       "title": "Whoosh - Sizzling",
       "category": "Whooshes",
       "pack": "Essential Effects",
-      "resource": "essential_0483.mp3",
-      "duration": 1.410563
+      "resource": "essential_0483.m4a",
+      "duration": 1.410000
     },
     {
       "id": "essential-484",
       "title": "Whoosh - Space Splat",
       "category": "Whooshes",
       "pack": "Essential Effects",
-      "resource": "essential_0484.mp3",
-      "duration": 1.071000
+      "resource": "essential_0484.m4a",
+      "duration": 1.070998
     },
     {
       "id": "essential-485",
       "title": "Whoosh - Spacecraft 2",
       "category": "Whooshes",
       "pack": "Essential Effects",
-      "resource": "essential_0485.mp3",
-      "duration": 1.253875
+      "resource": "essential_0485.m4a",
+      "duration": 1.253991
     },
     {
       "id": "essential-486",
       "title": "Whoosh - Spacecraft",
       "category": "Whooshes",
       "pack": "Essential Effects",
-      "resource": "essential_0486.mp3",
-      "duration": 1.253875
+      "resource": "essential_0486.m4a",
+      "duration": 1.253991
     },
     {
       "id": "essential-487",
       "title": "Whoosh 1",
       "category": "Whooshes",
       "pack": "Essential Effects",
-      "resource": "essential_0487.mp3",
-      "duration": 1.854688
+      "resource": "essential_0487.m4a",
+      "duration": 1.853991
     },
     {
       "id": "essential-488",
       "title": "Whoosh 10",
       "category": "Whooshes",
       "pack": "Essential Effects",
-      "resource": "essential_0488.mp3",
-      "duration": 1.488000
+      "resource": "essential_0488.m4a",
+      "duration": 1.488005
     },
     {
       "id": "essential-489",
       "title": "Whoosh 11",
       "category": "Whooshes",
       "pack": "Essential Effects",
-      "resource": "essential_0489.mp3",
-      "duration": 0.984000
+      "resource": "essential_0489.m4a",
+      "duration": 0.983991
     },
     {
       "id": "essential-490",
       "title": "Whoosh 2",
       "category": "Whooshes",
       "pack": "Essential Effects",
-      "resource": "essential_0490.mp3",
-      "duration": 1.227750
+      "resource": "essential_0490.m4a",
+      "duration": 1.227007
     },
     {
       "id": "essential-491",
       "title": "Whoosh 3",
       "category": "Whooshes",
       "pack": "Essential Effects",
-      "resource": "essential_0491.mp3",
-      "duration": 0.992625
+      "resource": "essential_0491.m4a",
+      "duration": 0.991995
     },
     {
       "id": "essential-492",
       "title": "Whoosh 4",
       "category": "Whooshes",
       "pack": "Essential Effects",
-      "resource": "essential_0492.mp3",
-      "duration": 1.593438
+      "resource": "essential_0492.m4a",
+      "duration": 1.592993
     },
     {
       "id": "essential-493",
       "title": "Whoosh 5",
       "category": "Whooshes",
       "pack": "Essential Effects",
-      "resource": "essential_0493.mp3",
-      "duration": 0.862000
+      "resource": "essential_0493.m4a",
+      "duration": 0.861995
     },
     {
       "id": "essential-494",
       "title": "Whoosh 6",
       "category": "Whooshes",
       "pack": "Essential Effects",
-      "resource": "essential_0494.mp3",
-      "duration": 1.541188
+      "resource": "essential_0494.m4a",
+      "duration": 1.540998
     },
     {
       "id": "essential-495",
       "title": "Whoosh 7",
       "category": "Whooshes",
       "pack": "Essential Effects",
-      "resource": "essential_0495.mp3",
-      "duration": 0.992625
+      "resource": "essential_0495.m4a",
+      "duration": 0.991995
     },
     {
       "id": "essential-496",
       "title": "Whoosh 8",
       "category": "Whooshes",
       "pack": "Essential Effects",
-      "resource": "essential_0496.mp3",
+      "resource": "essential_0496.m4a",
       "duration": 1.280000
     },
     {
@@ -3975,79 +3975,79 @@
       "title": "Whoosh 9",
       "category": "Whooshes",
       "pack": "Essential Effects",
-      "resource": "essential_0497.mp3",
-      "duration": 1.097125
+      "resource": "essential_0497.m4a",
+      "duration": 1.097007
     },
     {
       "id": "essential-498",
       "title": "Wind 1",
       "category": "Nature",
       "pack": "Essential Effects",
-      "resource": "essential_0498.mp3",
-      "duration": 4.989375
+      "resource": "essential_0498.m4a",
+      "duration": 4.989002
     },
     {
       "id": "essential-499",
       "title": "Wind 2",
       "category": "Nature",
       "pack": "Essential Effects",
-      "resource": "essential_0499.mp3",
-      "duration": 2.142000
+      "resource": "essential_0499.m4a",
+      "duration": 2.141995
     },
     {
       "id": "essential-500",
       "title": "Wind 3",
       "category": "Nature",
       "pack": "Essential Effects",
-      "resource": "essential_0500.mp3",
-      "duration": 1.410563
+      "resource": "essential_0500.m4a",
+      "duration": 1.410000
     },
     {
       "id": "essential-501",
       "title": "Wind",
       "category": "Nature",
       "pack": "Essential Effects",
-      "resource": "essential_0501.mp3",
-      "duration": 2.925688
+      "resource": "essential_0501.m4a",
+      "duration": 2.925011
     },
     {
       "id": "essential-502",
       "title": "Windup Hit",
       "category": "Hits",
       "pack": "Essential Effects",
-      "resource": "essential_0502.mp3",
-      "duration": 1.253875
+      "resource": "essential_0502.m4a",
+      "duration": 1.253991
     },
     {
       "id": "essential-503",
       "title": "Wood Cracking 2",
       "category": "Other",
       "pack": "Essential Effects",
-      "resource": "essential_0503.mp3",
-      "duration": 0.783625
+      "resource": "essential_0503.m4a",
+      "duration": 0.782993
     },
     {
       "id": "essential-504",
       "title": "Wood Cracking",
       "category": "Other",
       "pack": "Essential Effects",
-      "resource": "essential_0504.mp3",
-      "duration": 0.391813
+      "resource": "essential_0504.m4a",
+      "duration": 0.391995
     },
     {
       "id": "essential-505",
       "title": "Yawn",
       "category": "Other",
       "pack": "Essential Effects",
-      "resource": "essential_0505.mp3",
-      "duration": 4.153438
+      "resource": "essential_0505.m4a",
+      "duration": 4.152993
     },
     {
       "id": "essential-506",
       "title": "Zap - Piercing",
       "category": "Glitches",
       "pack": "Essential Effects",
-      "resource": "essential_0506.mp3",
+      "resource": "essential_0506.m4a",
       "duration": 0.480000
     },
     {
@@ -4055,64 +4055,64 @@
       "title": "Zap - Springy",
       "category": "Glitches",
       "pack": "Essential Effects",
-      "resource": "essential_0507.mp3",
-      "duration": 0.522438
+      "resource": "essential_0507.m4a",
+      "duration": 0.521995
     },
     {
       "id": "essential-508",
       "title": "Zap - Warbled",
       "category": "Glitches",
       "pack": "Essential Effects",
-      "resource": "essential_0508.mp3",
-      "duration": 1.104000
+      "resource": "essential_0508.m4a",
+      "duration": 1.103991
     },
     {
       "id": "essential-509",
       "title": "Zipper - Fast",
       "category": "Foley",
       "pack": "Essential Effects",
-      "resource": "essential_0509.mp3",
-      "duration": 0.417938
+      "resource": "essential_0509.m4a",
+      "duration": 0.418005
     },
     {
       "id": "essential-510",
       "title": "Zipper 1",
       "category": "Foley",
       "pack": "Essential Effects",
-      "resource": "essential_0510.mp3",
-      "duration": 0.940375
+      "resource": "essential_0510.m4a",
+      "duration": 0.940000
     },
     {
       "id": "essential-511",
       "title": "Zipper 2",
       "category": "Foley",
       "pack": "Essential Effects",
-      "resource": "essential_0511.mp3",
-      "duration": 0.548563
+      "resource": "essential_0511.m4a",
+      "duration": 0.548005
     },
     {
       "id": "essential-512",
       "title": "Zipper 3",
       "category": "Foley",
       "pack": "Essential Effects",
-      "resource": "essential_0512.mp3",
-      "duration": 0.862000
+      "resource": "essential_0512.m4a",
+      "duration": 0.861995
     },
     {
       "id": "essential-513",
       "title": "Zipper 4",
       "category": "Foley",
       "pack": "Essential Effects",
-      "resource": "essential_0513.mp3",
-      "duration": 0.574688
+      "resource": "essential_0513.m4a",
+      "duration": 0.573991
     },
     {
       "id": "essential-514",
       "title": "Zipper 5",
       "category": "Foley",
       "pack": "Essential Effects",
-      "resource": "essential_0514.mp3",
-      "duration": 0.548563
+      "resource": "essential_0514.m4a",
+      "duration": 0.548005
     },
     {
       "id": "sound-design-1",
@@ -4120,7 +4120,7 @@
       "category": "Cinematic Hits",
       "pack": "Sound Design Essentials",
       "resource": "sound_design_0001.m4a",
-      "duration": 6.071270
+      "duration": 6.082993
     },
     {
       "id": "sound-design-2",
@@ -4128,7 +4128,7 @@
       "category": "Cinematic Hits",
       "pack": "Sound Design Essentials",
       "resource": "sound_design_0002.m4a",
-      "duration": 6.000000
+      "duration": 6.013991
     },
     {
       "id": "sound-design-3",
@@ -4136,7 +4136,7 @@
       "category": "Cinematic Hits",
       "pack": "Sound Design Essentials",
       "resource": "sound_design_0003.m4a",
-      "duration": 10.000000
+      "duration": 10.008005
     },
     {
       "id": "sound-design-4",
@@ -4144,7 +4144,7 @@
       "category": "Cinematic Hits",
       "pack": "Sound Design Essentials",
       "resource": "sound_design_0004.m4a",
-      "duration": 5.500227
+      "duration": 5.502993
     },
     {
       "id": "sound-design-5",
@@ -4152,7 +4152,7 @@
       "category": "Cinematic Hits",
       "pack": "Sound Design Essentials",
       "resource": "sound_design_0005.m4a",
-      "duration": 6.285374
+      "duration": 6.291995
     },
     {
       "id": "sound-design-6",
@@ -4160,7 +4160,7 @@
       "category": "Cinematic Hits",
       "pack": "Sound Design Essentials",
       "resource": "sound_design_0006.m4a",
-      "duration": 5.864626
+      "duration": 5.873991
     },
     {
       "id": "sound-design-7",
@@ -4168,7 +4168,7 @@
       "category": "Cinematic Hits",
       "pack": "Sound Design Essentials",
       "resource": "sound_design_0007.m4a",
-      "duration": 6.614785
+      "duration": 6.617007
     },
     {
       "id": "sound-design-8",
@@ -4176,7 +4176,7 @@
       "category": "Cinematic Hits",
       "pack": "Sound Design Essentials",
       "resource": "sound_design_0008.m4a",
-      "duration": 10.500000
+      "duration": 10.518005
     },
     {
       "id": "sound-design-9",
@@ -4184,7 +4184,7 @@
       "category": "Cinematic Hits",
       "pack": "Sound Design Essentials",
       "resource": "sound_design_0009.m4a",
-      "duration": 9.500000
+      "duration": 9.520000
     },
     {
       "id": "sound-design-10",
@@ -4192,7 +4192,7 @@
       "category": "Cinematic Hits",
       "pack": "Sound Design Essentials",
       "resource": "sound_design_0010.m4a",
-      "duration": 8.743787
+      "duration": 8.753991
     },
     {
       "id": "sound-design-11",
@@ -4200,7 +4200,7 @@
       "category": "Cinematic Hits",
       "pack": "Sound Design Essentials",
       "resource": "sound_design_0011.m4a",
-      "duration": 8.000000
+      "duration": 8.010998
     },
     {
       "id": "sound-design-12",
@@ -4208,7 +4208,7 @@
       "category": "Cinematic Hits",
       "pack": "Sound Design Essentials",
       "resource": "sound_design_0012.m4a",
-      "duration": 4.000000
+      "duration": 4.017007
     },
     {
       "id": "sound-design-13",
@@ -4216,7 +4216,7 @@
       "category": "Foley",
       "pack": "Sound Design Essentials",
       "resource": "sound_design_0013.m4a",
-      "duration": 7.010408
+      "duration": 7.011995
     },
     {
       "id": "sound-design-14",
@@ -4224,7 +4224,7 @@
       "category": "Foley",
       "pack": "Sound Design Essentials",
       "resource": "sound_design_0014.m4a",
-      "duration": 13.920023
+      "duration": 13.931995
     },
     {
       "id": "sound-design-15",
@@ -4232,7 +4232,7 @@
       "category": "Foley",
       "pack": "Sound Design Essentials",
       "resource": "sound_design_0015.m4a",
-      "duration": 8.000000
+      "duration": 8.010998
     },
     {
       "id": "sound-design-16",
@@ -4240,7 +4240,7 @@
       "category": "Foley",
       "pack": "Sound Design Essentials",
       "resource": "sound_design_0016.m4a",
-      "duration": 6.875011
+      "duration": 6.896009
     },
     {
       "id": "sound-design-17",
@@ -4248,7 +4248,7 @@
       "category": "Foley",
       "pack": "Sound Design Essentials",
       "resource": "sound_design_0017.m4a",
-      "duration": 10.000000
+      "duration": 10.008005
     },
     {
       "id": "sound-design-18",
@@ -4256,7 +4256,7 @@
       "category": "Foley",
       "pack": "Sound Design Essentials",
       "resource": "sound_design_0018.m4a",
-      "duration": 0.750000
+      "duration": 0.766009
     },
     {
       "id": "sound-design-19",
@@ -4264,7 +4264,7 @@
       "category": "Foley",
       "pack": "Sound Design Essentials",
       "resource": "sound_design_0019.m4a",
-      "duration": 28.000000
+      "duration": 28.002993
     },
     {
       "id": "sound-design-20",
@@ -4272,7 +4272,7 @@
       "category": "Foley",
       "pack": "Sound Design Essentials",
       "resource": "sound_design_0020.m4a",
-      "duration": 8.000000
+      "duration": 8.010998
     },
     {
       "id": "sound-design-21",
@@ -4280,7 +4280,7 @@
       "category": "Foley",
       "pack": "Sound Design Essentials",
       "resource": "sound_design_0021.m4a",
-      "duration": 8.000000
+      "duration": 8.010998
     },
     {
       "id": "sound-design-22",
@@ -4288,7 +4288,7 @@
       "category": "Foley",
       "pack": "Sound Design Essentials",
       "resource": "sound_design_0022.m4a",
-      "duration": 14.000000
+      "duration": 14.000998
     },
     {
       "id": "sound-design-23",
@@ -4296,7 +4296,7 @@
       "category": "Foley",
       "pack": "Sound Design Essentials",
       "resource": "sound_design_0023.m4a",
-      "duration": 46.000000
+      "duration": 46.021995
     },
     {
       "id": "sound-design-24",
@@ -4304,7 +4304,7 @@
       "category": "Foley",
       "pack": "Sound Design Essentials",
       "resource": "sound_design_0024.m4a",
-      "duration": 8.635011
+      "duration": 8.638005
     },
     {
       "id": "sound-design-25",
@@ -4312,7 +4312,7 @@
       "category": "Foley",
       "pack": "Sound Design Essentials",
       "resource": "sound_design_0025.m4a",
-      "duration": 6.006508
+      "duration": 6.013991
     },
     {
       "id": "sound-design-26",
@@ -4320,7 +4320,7 @@
       "category": "Foley",
       "pack": "Sound Design Essentials",
       "resource": "sound_design_0026.m4a",
-      "duration": 11.000000
+      "duration": 11.006009
     },
     {
       "id": "sound-design-27",
@@ -4328,7 +4328,7 @@
       "category": "Foley",
       "pack": "Sound Design Essentials",
       "resource": "sound_design_0027.m4a",
-      "duration": 12.000000
+      "duration": 12.003991
     },
     {
       "id": "sound-design-28",
@@ -4336,7 +4336,7 @@
       "category": "Foley",
       "pack": "Sound Design Essentials",
       "resource": "sound_design_0028.m4a",
-      "duration": 6.506508
+      "duration": 6.525011
     },
     {
       "id": "sound-design-29",
@@ -4344,7 +4344,7 @@
       "category": "Foley",
       "pack": "Sound Design Essentials",
       "resource": "sound_design_0029.m4a",
-      "duration": 3.000499
+      "duration": 3.018005
     },
     {
       "id": "sound-design-30",
@@ -4352,7 +4352,7 @@
       "category": "Glitches",
       "pack": "Sound Design Essentials",
       "resource": "sound_design_0030.m4a",
-      "duration": 2.000000
+      "duration": 2.020000
     },
     {
       "id": "sound-design-31",
@@ -4360,7 +4360,7 @@
       "category": "Glitches",
       "pack": "Sound Design Essentials",
       "resource": "sound_design_0031.m4a",
-      "duration": 6.000000
+      "duration": 6.013991
     },
     {
       "id": "sound-design-32",
@@ -4368,7 +4368,7 @@
       "category": "Glitches",
       "pack": "Sound Design Essentials",
       "resource": "sound_design_0032.m4a",
-      "duration": 3.119478
+      "duration": 3.133991
     },
     {
       "id": "sound-design-33",
@@ -4376,7 +4376,7 @@
       "category": "Glitches",
       "pack": "Sound Design Essentials",
       "resource": "sound_design_0033.m4a",
-      "duration": 5.000000
+      "duration": 5.015011
     },
     {
       "id": "sound-design-34",
@@ -4384,7 +4384,7 @@
       "category": "Glitches",
       "pack": "Sound Design Essentials",
       "resource": "sound_design_0034.m4a",
-      "duration": 2.000000
+      "duration": 2.020000
     },
     {
       "id": "sound-design-35",
@@ -4392,7 +4392,7 @@
       "category": "Nature",
       "pack": "Sound Design Essentials",
       "resource": "sound_design_0035.m4a",
-      "duration": 7.007007
+      "duration": 7.011995
     },
     {
       "id": "sound-design-36",
@@ -4400,7 +4400,7 @@
       "category": "Nature",
       "pack": "Sound Design Essentials",
       "resource": "sound_design_0036.m4a",
-      "duration": 17.000000
+      "duration": 17.020000
     },
     {
       "id": "sound-design-37",
@@ -4408,7 +4408,7 @@
       "category": "Nature",
       "pack": "Sound Design Essentials",
       "resource": "sound_design_0037.m4a",
-      "duration": 13.000000
+      "duration": 13.002993
     },
     {
       "id": "sound-design-38",
@@ -4416,7 +4416,7 @@
       "category": "Nature",
       "pack": "Sound Design Essentials",
       "resource": "sound_design_0038.m4a",
-      "duration": 10.000000
+      "duration": 10.008005
     },
     {
       "id": "sound-design-39",
@@ -4424,7 +4424,7 @@
       "category": "Nature",
       "pack": "Sound Design Essentials",
       "resource": "sound_design_0039.m4a",
-      "duration": 24.000000
+      "duration": 24.009002
     },
     {
       "id": "sound-design-40",
@@ -4432,7 +4432,7 @@
       "category": "Nature",
       "pack": "Sound Design Essentials",
       "resource": "sound_design_0040.m4a",
-      "duration": 25.957392
+      "duration": 25.960000
     },
     {
       "id": "sound-design-41",
@@ -4440,7 +4440,7 @@
       "category": "Nature",
       "pack": "Sound Design Essentials",
       "resource": "sound_design_0041.m4a",
-      "duration": 15.008503
+      "duration": 15.022993
     },
     {
       "id": "sound-design-42",
@@ -4448,7 +4448,7 @@
       "category": "Nature",
       "pack": "Sound Design Essentials",
       "resource": "sound_design_0042.m4a",
-      "duration": 13.500000
+      "duration": 13.513991
     },
     {
       "id": "sound-design-43",
@@ -4456,7 +4456,7 @@
       "category": "Nature",
       "pack": "Sound Design Essentials",
       "resource": "sound_design_0043.m4a",
-      "duration": 33.920023
+      "duration": 33.923991
     },
     {
       "id": "sound-design-44",
@@ -4464,7 +4464,7 @@
       "category": "Nature",
       "pack": "Sound Design Essentials",
       "resource": "sound_design_0044.m4a",
-      "duration": 5.506009
+      "duration": 5.526009
     },
     {
       "id": "sound-design-45",
@@ -4472,7 +4472,7 @@
       "category": "Nature",
       "pack": "Sound Design Essentials",
       "resource": "sound_design_0045.m4a",
-      "duration": 10.010522
+      "duration": 10.030998
     },
     {
       "id": "sound-design-46",
@@ -4480,7 +4480,7 @@
       "category": "Nature",
       "pack": "Sound Design Essentials",
       "resource": "sound_design_0046.m4a",
-      "duration": 32.000000
+      "duration": 32.020000
     },
     {
       "id": "sound-design-47",
@@ -4488,7 +4488,7 @@
       "category": "Nature",
       "pack": "Sound Design Essentials",
       "resource": "sound_design_0047.m4a",
-      "duration": 45.728798
+      "duration": 45.742993
     },
     {
       "id": "sound-design-48",
@@ -4496,7 +4496,7 @@
       "category": "Nature",
       "pack": "Sound Design Essentials",
       "resource": "sound_design_0048.m4a",
-      "duration": 27.027007
+      "duration": 27.028005
     },
     {
       "id": "sound-design-49",
@@ -4504,7 +4504,7 @@
       "category": "Nature",
       "pack": "Sound Design Essentials",
       "resource": "sound_design_0049.m4a",
-      "duration": 6.383515
+      "duration": 6.385011
     },
     {
       "id": "sound-design-50",
@@ -4512,7 +4512,7 @@
       "category": "Nature",
       "pack": "Sound Design Essentials",
       "resource": "sound_design_0050.m4a",
-      "duration": 36.800726
+      "duration": 36.802993
     },
     {
       "id": "sound-design-51",
@@ -4520,7 +4520,7 @@
       "category": "Risers",
       "pack": "Sound Design Essentials",
       "resource": "sound_design_0051.m4a",
-      "duration": 9.500000
+      "duration": 9.520000
     },
     {
       "id": "sound-design-52",
@@ -4528,7 +4528,7 @@
       "category": "Risers",
       "pack": "Sound Design Essentials",
       "resource": "sound_design_0052.m4a",
-      "duration": 16.000000
+      "duration": 16.020998
     },
     {
       "id": "sound-design-53",
@@ -4536,7 +4536,7 @@
       "category": "Risers",
       "pack": "Sound Design Essentials",
       "resource": "sound_design_0053.m4a",
-      "duration": 9.500000
+      "duration": 9.520000
     },
     {
       "id": "sound-design-54",
@@ -4544,7 +4544,7 @@
       "category": "Risers",
       "pack": "Sound Design Essentials",
       "resource": "sound_design_0054.m4a",
-      "duration": 5.414082
+      "duration": 5.432993
     },
     {
       "id": "sound-design-55",
@@ -4552,7 +4552,7 @@
       "category": "Risers",
       "pack": "Sound Design Essentials",
       "resource": "sound_design_0055.m4a",
-      "duration": 5.031270
+      "duration": 5.038005
     },
     {
       "id": "sound-design-56",
@@ -4560,7 +4560,7 @@
       "category": "Soundscapes",
       "pack": "Sound Design Essentials",
       "resource": "sound_design_0056.m4a",
-      "duration": 16.000000
+      "duration": 16.020998
     },
     {
       "id": "sound-design-57",
@@ -4568,7 +4568,7 @@
       "category": "Soundscapes",
       "pack": "Sound Design Essentials",
       "resource": "sound_design_0057.m4a",
-      "duration": 33.272426
+      "duration": 33.273991
     },
     {
       "id": "sound-design-58",
@@ -4576,7 +4576,7 @@
       "category": "Soundscapes",
       "pack": "Sound Design Essentials",
       "resource": "sound_design_0058.m4a",
-      "duration": 23.906825
+      "duration": 23.916009
     },
     {
       "id": "sound-design-59",
@@ -4584,7 +4584,7 @@
       "category": "Soundscapes",
       "pack": "Sound Design Essentials",
       "resource": "sound_design_0059.m4a",
-      "duration": 5.079365
+      "duration": 5.085011
     },
     {
       "id": "sound-design-60",
@@ -4592,7 +4592,7 @@
       "category": "Soundscapes",
       "pack": "Sound Design Essentials",
       "resource": "sound_design_0060.m4a",
-      "duration": 28.000000
+      "duration": 28.002993
     },
     {
       "id": "sound-design-61",
@@ -4600,7 +4600,7 @@
       "category": "Soundscapes",
       "pack": "Sound Design Essentials",
       "resource": "sound_design_0061.m4a",
-      "duration": 28.000000
+      "duration": 28.002993
     },
     {
       "id": "sound-design-62",
@@ -4608,7 +4608,7 @@
       "category": "Soundscapes",
       "pack": "Sound Design Essentials",
       "resource": "sound_design_0062.m4a",
-      "duration": 27.300000
+      "duration": 27.306009
     },
     {
       "id": "sound-design-63",
@@ -4616,7 +4616,7 @@
       "category": "Soundscapes",
       "pack": "Sound Design Essentials",
       "resource": "sound_design_0063.m4a",
-      "duration": 26.000000
+      "duration": 26.006009
     },
     {
       "id": "sound-design-64",
@@ -4624,7 +4624,7 @@
       "category": "Soundscapes",
       "pack": "Sound Design Essentials",
       "resource": "sound_design_0064.m4a",
-      "duration": 21.000000
+      "duration": 21.013991
     },
     {
       "id": "sound-design-65",
@@ -4632,7 +4632,7 @@
       "category": "Soundscapes",
       "pack": "Sound Design Essentials",
       "resource": "sound_design_0065.m4a",
-      "duration": 24.000000
+      "duration": 24.009002
     },
     {
       "id": "sound-design-66",
@@ -4640,7 +4640,7 @@
       "category": "Soundscapes",
       "pack": "Sound Design Essentials",
       "resource": "sound_design_0066.m4a",
-      "duration": 26.000000
+      "duration": 26.006009
     },
     {
       "id": "sound-design-67",
@@ -4648,7 +4648,7 @@
       "category": "Soundscapes",
       "pack": "Sound Design Essentials",
       "resource": "sound_design_0067.m4a",
-      "duration": 16.000000
+      "duration": 16.020998
     },
     {
       "id": "sound-design-68",
@@ -4656,7 +4656,7 @@
       "category": "Soundscapes",
       "pack": "Sound Design Essentials",
       "resource": "sound_design_0068.m4a",
-      "duration": 17.000000
+      "duration": 17.020000
     },
     {
       "id": "sound-design-69",
@@ -4664,7 +4664,7 @@
       "category": "Soundscapes",
       "pack": "Sound Design Essentials",
       "resource": "sound_design_0069.m4a",
-      "duration": 18.000000
+      "duration": 18.018005
     },
     {
       "id": "sound-design-70",
@@ -4672,7 +4672,7 @@
       "category": "Soundscapes",
       "pack": "Sound Design Essentials",
       "resource": "sound_design_0070.m4a",
-      "duration": 17.594921
+      "duration": 17.600000
     },
     {
       "id": "sound-design-71",
@@ -4680,7 +4680,7 @@
       "category": "Sweeps",
       "pack": "Sound Design Essentials",
       "resource": "sound_design_0071.m4a",
-      "duration": 6.750000
+      "duration": 6.757007
     },
     {
       "id": "sound-design-72",
@@ -4688,7 +4688,7 @@
       "category": "Sweeps",
       "pack": "Sound Design Essentials",
       "resource": "sound_design_0072.m4a",
-      "duration": 6.000000
+      "duration": 6.013991
     },
     {
       "id": "sound-design-73",
@@ -4696,7 +4696,7 @@
       "category": "Sweeps",
       "pack": "Sound Design Essentials",
       "resource": "sound_design_0073.m4a",
-      "duration": 11.500000
+      "duration": 11.517007
     },
     {
       "id": "sound-design-74",
@@ -4704,7 +4704,7 @@
       "category": "Sweeps",
       "pack": "Sound Design Essentials",
       "resource": "sound_design_0074.m4a",
-      "duration": 6.500000
+      "duration": 6.500998
     },
     {
       "id": "sound-design-75",
@@ -4712,7 +4712,7 @@
       "category": "Sweeps",
       "pack": "Sound Design Essentials",
       "resource": "sound_design_0075.m4a",
-      "duration": 6.000000
+      "duration": 6.013991
     },
     {
       "id": "sound-design-76",
@@ -4720,7 +4720,7 @@
       "category": "Sweeps",
       "pack": "Sound Design Essentials",
       "resource": "sound_design_0076.m4a",
-      "duration": 12.000000
+      "duration": 12.003991
     },
     {
       "id": "sound-design-77",
@@ -4728,7 +4728,7 @@
       "category": "Sweeps",
       "pack": "Sound Design Essentials",
       "resource": "sound_design_0077.m4a",
-      "duration": 3.296213
+      "duration": 3.297007
     },
     {
       "id": "sound-design-78",
@@ -4736,7 +4736,7 @@
       "category": "Sweeps",
       "pack": "Sound Design Essentials",
       "resource": "sound_design_0078.m4a",
-      "duration": 6.000000
+      "duration": 6.013991
     },
     {
       "id": "sound-design-79",
@@ -4744,7 +4744,7 @@
       "category": "Sweeps",
       "pack": "Sound Design Essentials",
       "resource": "sound_design_0079.m4a",
-      "duration": 10.873492
+      "duration": 10.890000
     },
     {
       "id": "sound-design-80",
@@ -4752,7 +4752,7 @@
       "category": "Sweeps",
       "pack": "Sound Design Essentials",
       "resource": "sound_design_0080.m4a",
-      "duration": 7.821451
+      "duration": 7.825011
     },
     {
       "id": "sound-design-81",
@@ -4760,7 +4760,7 @@
       "category": "Sweeps",
       "pack": "Sound Design Essentials",
       "resource": "sound_design_0081.m4a",
-      "duration": 7.584240
+      "duration": 7.592993
     },
     {
       "id": "sound-design-82",
@@ -4768,7 +4768,7 @@
       "category": "Sweeps",
       "pack": "Sound Design Essentials",
       "resource": "sound_design_0082.m4a",
-      "duration": 12.000000
+      "duration": 12.003991
     },
     {
       "id": "sound-design-83",
@@ -4776,7 +4776,7 @@
       "category": "Sweeps",
       "pack": "Sound Design Essentials",
       "resource": "sound_design_0083.m4a",
-      "duration": 8.000000
+      "duration": 8.010998
     },
     {
       "id": "sound-design-84",
@@ -4784,7 +4784,7 @@
       "category": "Sweeps",
       "pack": "Sound Design Essentials",
       "resource": "sound_design_0084.m4a",
-      "duration": 8.000000
+      "duration": 8.010998
     },
     {
       "id": "sound-design-85",
@@ -4792,7 +4792,7 @@
       "category": "Sweeps",
       "pack": "Sound Design Essentials",
       "resource": "sound_design_0085.m4a",
-      "duration": 6.000000
+      "duration": 6.013991
     },
     {
       "id": "sound-design-86",
@@ -4800,7 +4800,7 @@
       "category": "Sweeps",
       "pack": "Sound Design Essentials",
       "resource": "sound_design_0086.m4a",
-      "duration": 19.383061
+      "duration": 19.388005
     },
     {
       "id": "sound-design-87",
@@ -4808,7 +4808,7 @@
       "category": "Sweeps",
       "pack": "Sound Design Essentials",
       "resource": "sound_design_0087.m4a",
-      "duration": 8.004989
+      "duration": 8.010998
     },
     {
       "id": "sound-design-88",
@@ -4816,7 +4816,7 @@
       "category": "Sweeps",
       "pack": "Sound Design Essentials",
       "resource": "sound_design_0088.m4a",
-      "duration": 3.500000
+      "duration": 3.506009
     },
     {
       "id": "sound-design-89",
@@ -4824,7 +4824,7 @@
       "category": "Sweeps",
       "pack": "Sound Design Essentials",
       "resource": "sound_design_0089.m4a",
-      "duration": 10.500000
+      "duration": 10.518005
     },
     {
       "id": "sound-design-90",
@@ -4832,7 +4832,7 @@
       "category": "Sweeps",
       "pack": "Sound Design Essentials",
       "resource": "sound_design_0090.m4a",
-      "duration": 11.500000
+      "duration": 11.517007
     },
     {
       "id": "sound-design-91",
@@ -4840,7 +4840,7 @@
       "category": "Sweeps",
       "pack": "Sound Design Essentials",
       "resource": "sound_design_0091.m4a",
-      "duration": 7.937506
+      "duration": 7.940998
     },
     {
       "id": "sound-design-92",
@@ -4848,7 +4848,7 @@
       "category": "Sweeps",
       "pack": "Sound Design Essentials",
       "resource": "sound_design_0092.m4a",
-      "duration": 9.000000
+      "duration": 9.009002
     },
     {
       "id": "sound-design-93",
@@ -4864,7 +4864,7 @@
       "category": "Sweeps",
       "pack": "Sound Design Essentials",
       "resource": "sound_design_0094.m4a",
-      "duration": 10.000000
+      "duration": 10.008005
     },
     {
       "id": "sound-design-95",
@@ -4872,7 +4872,7 @@
       "category": "Sweeps",
       "pack": "Sound Design Essentials",
       "resource": "sound_design_0095.m4a",
-      "duration": 10.000000
+      "duration": 10.008005
     },
     {
       "id": "sound-design-96",
@@ -4880,7 +4880,7 @@
       "category": "Whooshes",
       "pack": "Sound Design Essentials",
       "resource": "sound_design_0096.m4a",
-      "duration": 6.000000
+      "duration": 6.013991
     },
     {
       "id": "sound-design-97",
@@ -4888,7 +4888,7 @@
       "category": "Whooshes",
       "pack": "Sound Design Essentials",
       "resource": "sound_design_0097.m4a",
-      "duration": 9.000000
+      "duration": 9.009002
     },
     {
       "id": "sound-design-98",
@@ -4896,7 +4896,7 @@
       "category": "Whooshes",
       "pack": "Sound Design Essentials",
       "resource": "sound_design_0098.m4a",
-      "duration": 4.000000
+      "duration": 4.017007
     },
     {
       "id": "sound-design-99",
@@ -4904,7 +4904,7 @@
       "category": "Whooshes",
       "pack": "Sound Design Essentials",
       "resource": "sound_design_0099.m4a",
-      "duration": 8.000000
+      "duration": 8.010998
     },
     {
       "id": "sound-design-100",
@@ -4912,7 +4912,7 @@
       "category": "Whooshes",
       "pack": "Sound Design Essentials",
       "resource": "sound_design_0100.m4a",
-      "duration": 5.450000
+      "duration": 5.456009
     },
     {
       "id": "sound-design-101",
@@ -4920,7 +4920,7 @@
       "category": "Whooshes",
       "pack": "Sound Design Essentials",
       "resource": "sound_design_0101.m4a",
-      "duration": 4.000000
+      "duration": 4.017007
     },
     {
       "id": "sound-design-102",
@@ -4928,7 +4928,7 @@
       "category": "Whooshes",
       "pack": "Sound Design Essentials",
       "resource": "sound_design_0102.m4a",
-      "duration": 9.000000
+      "duration": 9.009002
     },
     {
       "id": "sound-design-103",
@@ -4936,7 +4936,7 @@
       "category": "Whooshes",
       "pack": "Sound Design Essentials",
       "resource": "sound_design_0103.m4a",
-      "duration": 4.000000
+      "duration": 4.017007
     },
     {
       "id": "sound-design-104",
@@ -4944,7 +4944,7 @@
       "category": "Whooshes",
       "pack": "Sound Design Essentials",
       "resource": "sound_design_0104.m4a",
-      "duration": 7.250000
+      "duration": 7.268005
     },
     {
       "id": "sound-design-105",
@@ -4952,7 +4952,7 @@
       "category": "Whooshes",
       "pack": "Sound Design Essentials",
       "resource": "sound_design_0105.m4a",
-      "duration": 3.500000
+      "duration": 3.506009
     },
     {
       "id": "sound-design-106",
@@ -4960,7 +4960,7 @@
       "category": "Whooshes",
       "pack": "Sound Design Essentials",
       "resource": "sound_design_0106.m4a",
-      "duration": 6.000000
+      "duration": 6.013991
     },
     {
       "id": "sound-design-107",
@@ -4968,7 +4968,7 @@
       "category": "Whooshes",
       "pack": "Sound Design Essentials",
       "resource": "sound_design_0107.m4a",
-      "duration": 6.500000
+      "duration": 6.500998
     },
     {
       "id": "sound-design-108",
@@ -4976,7 +4976,7 @@
       "category": "Whooshes",
       "pack": "Sound Design Essentials",
       "resource": "sound_design_0108.m4a",
-      "duration": 3.000000
+      "duration": 3.018005
     },
     {
       "id": "sound-design-109",
@@ -4984,7 +4984,7 @@
       "category": "Whooshes",
       "pack": "Sound Design Essentials",
       "resource": "sound_design_0109.m4a",
-      "duration": 6.372426
+      "duration": 6.385011
     },
     {
       "id": "sound-design-110",
@@ -4992,7 +4992,7 @@
       "category": "Whooshes",
       "pack": "Sound Design Essentials",
       "resource": "sound_design_0110.m4a",
-      "duration": 7.200000
+      "duration": 7.220998
     }
   ]
 }

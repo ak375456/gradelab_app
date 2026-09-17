@@ -5,18 +5,18 @@ enum ProPlan: String, CaseIterable, Identifiable, Sendable {
     var id: String { "com.aftab.gradelab.pro.\(rawValue)" }
     var title: String {
         switch self {
-        case .lifetime: "Lifetime Pro"
-        case .weekly: "Weekly"
-        case .monthly: "Monthly"
-        case .yearly: "Yearly"
+        case .lifetime: String(localized: "Lifetime Pro")
+        case .weekly: String(localized: "Weekly")
+        case .monthly: String(localized: "Monthly")
+        case .yearly: String(localized: "Yearly")
         }
     }
     var billingLabel: String {
         switch self {
-        case .lifetime: "one-time payment"
-        case .weekly: "per week · auto-renews"
-        case .monthly: "per month · auto-renews"
-        case .yearly: "per year · auto-renews"
+        case .lifetime: String(localized: "one-time payment")
+        case .weekly: String(localized: "per week · auto-renews")
+        case .monthly: String(localized: "per month · auto-renews")
+        case .yearly: String(localized: "per year · auto-renews")
         }
     }
 }
@@ -120,47 +120,47 @@ enum ProFeature: String, Identifiable, Sendable {
 
     var title: String {
         switch self {
-        case .membership: "Your color. Without limits."
-        case .premiumLook: "Make this look yours."
-        case .lutImport: "Bring your signature look."
-        case .fontImport: "Bring your own typography."
-        case .proResExport: "Finish in ProRes."
-        case .exportResolution: "Export at full resolution."
-        case .exportControls: "Take the encoder's controls."
-        case .photoFormat: "Deliver in any format."
-        case .colorCurves: "Grade like a colorist."
-        case .filmEffects: "Give it the texture of film."
-        case .gradePresets: "Keep the look you built."
-        case .scopes: "Read the picture, don't guess."
+        case .membership: String(localized: "Your color. Without limits.")
+        case .premiumLook: String(localized: "Make this look yours.")
+        case .lutImport: String(localized: "Bring your signature look.")
+        case .fontImport: String(localized: "Bring your own typography.")
+        case .proResExport: String(localized: "Finish in ProRes.")
+        case .exportResolution: String(localized: "Export at full resolution.")
+        case .exportControls: String(localized: "Take the encoder's controls.")
+        case .photoFormat: String(localized: "Deliver in any format.")
+        case .colorCurves: String(localized: "Grade like a colorist.")
+        case .filmEffects: String(localized: "Give it the texture of film.")
+        case .gradePresets: String(localized: "Keep the look you built.")
+        case .scopes: String(localized: "Read the picture, don't guess.")
         }
     }
 
     var detail: String {
         switch self {
         case .membership:
-            "Unlock premium looks, custom imports and full-resolution delivery."
+            String(localized: "Unlock premium looks, custom imports and full-resolution delivery.")
         case .premiumLook:
-            "Preview Pro looks freely. Unlock Pro to export them, or remove the look to keep exporting free."
+            String(localized: "Preview Pro looks freely. Unlock Pro to export them, or remove the look to keep exporting free.")
         case .lutImport:
-            "Import your own .cube LUTs and carry your style from one project to the next."
+            String(localized: "Import your own .cube LUTs and carry your style from one project to the next.")
         case .fontImport:
-            "Import custom TTF fonts for titles that feel like you. Bundled fonts remain free."
+            String(localized: "Import custom TTF fonts for titles that feel like you. Bundled fonts remain free.")
         case .proResExport:
-            "Unlock ProRes 422 and ProRes 422 HQ export on supported devices."
+            String(localized: "Unlock ProRes 422 and ProRes 422 HQ export on supported devices.")
         case .exportResolution:
-            "Free export runs up to 1080p with no watermark. Pro exports 4K and your source's own resolution."
+            String(localized: "Free export runs up to 1080p with no watermark. Pro exports 4K and your source's own resolution.")
         case .exportControls:
-            "Choose the frame rate and bitrate yourself instead of taking the defaults."
+            String(localized: "Choose the frame rate and bitrate yourself instead of taking the defaults.")
         case .photoFormat:
-            "Export stills as HEIC or lossless PNG. Full-resolution JPEG stays free."
+            String(localized: "Export stills as HEIC or lossless PNG. Full-resolution JPEG stays free.")
         case .colorCurves:
-            "Hue vs Hue, Hue vs Sat, Hue vs Luma, Luma vs Sat, Sat vs Sat and Sat vs Luma \u{2014} the curves that target one colour without touching the rest. Master, Red, Green and Blue stay free."
+            String(localized: "Hue vs Hue, Hue vs Sat, Hue vs Luma, Luma vs Sat, Sat vs Sat and Sat vs Luma \u{2014} the curves that target one colour without touching the rest. Master, Red, Green and Blue stay free.")
         case .filmEffects:
-            "Bloom, glow, halation and grain. Fade and sharpening stay free."
+            String(localized: "Bloom, glow, halation and grain. Fade and sharpening stay free.")
         case .gradePresets:
-            "Save a grade you like and bring it to any other project."
+            String(localized: "Save a grade you like and bring it to any other project.")
         case .scopes:
-            "Waveform, RGB parade and vectorscope. The histogram stays free."
+            String(localized: "Waveform, RGB parade and vectorscope. The histogram stays free.")
         }
     }
 }

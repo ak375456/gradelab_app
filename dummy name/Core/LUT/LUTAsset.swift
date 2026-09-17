@@ -48,6 +48,17 @@ struct LUTAsset: Equatable, Sendable, Identifiable {
     /// as common as `.cube` in look packs.
     var fileExtension: String { (filename as NSString).pathExtension }
 
+    /// The compiled form's filename.
+    ///
+    /// Deliberately the text filename with a suffix appended — `Nomad.cube`
+    /// compiles to `Nomad.cube.gclut` — rather than a replaced extension.
+    /// `filename` is this look's identity, and it is what `AdvancedGrade.lut`
+    /// saved into every project that uses the look; replacing the extension
+    /// would change that identity, and `Serenity.CUBE` and `Serenity.cube`
+    /// would both collapse onto the same compiled name. Appending keeps the
+    /// identity recoverable by removing exactly one extension.
+    var compiledFilename: String { "\(filename).\(LUTBinary.fileExtension)" }
+
     /// Imported looks resolve against Application Support; the rest against the
     /// app bundle.
     func url(in bundle: Bundle = .lutResources) -> URL? {
@@ -57,9 +68,16 @@ struct LUTAsset: Equatable, Sendable, Identifiable {
             // `url(forResource:withExtension:)`, which matches the extension
             // case-sensitively and so cannot find `Serenity.CUBE` when asked
             // for "cube". Names with spaces resolve here too.
-            if let direct = bundle.resourceURL?.appendingPathComponent(filename),
-               FileManager.default.fileExists(atPath: direct.path) {
-                return direct
+            //
+            // The compiled form wins wherever it shipped: it is the same look
+            // at a fifth of the bytes. The text form is still resolved after
+            // it, so a `.cube` dropped into the folder without being compiled
+            // keeps working exactly as it did.
+            if let root = bundle.resourceURL {
+                for candidate in [compiledFilename, filename] {
+                    let url = root.appendingPathComponent(candidate)
+                    if FileManager.default.fileExists(atPath: url.path) { return url }
+                }
             }
             return bundle.url(forResource: resourceName, withExtension: fileExtension)
         case .device:
@@ -80,7 +98,7 @@ struct LUTAsset: Equatable, Sendable, Identifiable {
             name: displayName(forResourceName: resourceName),
             filename: "\(resourceName).cube",
             category: "Imported",
-            summary: "Imported look.",
+            summary: String(localized: "Imported look."),
             inputColorSpace: "Rec.709 / working SDR",
             kind: .creative,
             origin: .device
@@ -125,10 +143,20 @@ extension LUTAsset {
         let contents = Bundle.lutResources.resourceURL.map {
             (try? FileManager.default.contentsOfDirectory(at: $0, includingPropertiesForKeys: nil)) ?? []
         } ?? []
+        // A look ships either compiled (`Nomad.cube.gclut`) or as plain text
+        // (`Nomad.cube`). Both are listed and reduced to the text filename,
+        // which is the look's identity either way, so a folder holding both
+        // forms of the same look still offers it once.
+        var seen = Set<String>()
         let discovered = contents
-            .filter { $0.pathExtension.lowercased() == "cube" }
-            .map { $0.lastPathComponent }
-            .filter { !known.contains(($0 as NSString).deletingPathExtension) }
+            .map(\.lastPathComponent)
+            .compactMap { name -> String? in
+                let identity = name.hasSuffix(".\(LUTBinary.fileExtension)")
+                    ? String(name.dropLast(LUTBinary.fileExtension.count + 1))
+                    : name
+                return (identity as NSString).pathExtension.lowercased() == "cube" ? identity : nil
+            }
+            .filter { !known.contains(($0 as NSString).deletingPathExtension) && seen.insert($0).inserted }
             .sorted { $0.localizedStandardCompare($1) == .orderedAscending }
             .map { filename in
                 let resourceName = (filename as NSString).deletingPathExtension
@@ -136,7 +164,7 @@ extension LUTAsset {
                     name: displayName(forResourceName: resourceName),
                     filename: filename,
                     category: "Imported",
-                    summary: "Imported look.",
+                    summary: String(localized: "Imported look."),
                     inputColorSpace: "Rec.709 / working SDR",
                     kind: .creative,
                     origin: .bundled
@@ -163,7 +191,7 @@ extension LUTAsset {
             name: "Warm Cinema",
             filename: "Warm_Cinema.cube",
             category: "Cinematic",
-            summary: "Warm, contrasty cinematic look with soft highlights and flattering skin tones.",
+            summary: String(localized: "Warm, contrasty cinematic look with soft highlights and flattering skin tones."),
             inputColorSpace: "Rec.709 / working SDR",
             kind: .creative
         ),
@@ -171,7 +199,7 @@ extension LUTAsset {
             name: "Teal Orange",
             filename: "Teal_Orange.cube",
             category: "Cinematic",
-            summary: "Restrained modern teal-shadow / warm-highlight look with controlled greens.",
+            summary: String(localized: "Restrained modern teal-shadow / warm-highlight look with controlled greens."),
             inputColorSpace: "Rec.709 / working SDR",
             kind: .creative
         ),
@@ -179,7 +207,7 @@ extension LUTAsset {
             name: "Soft Film",
             filename: "Soft_Film.cube",
             category: "Film-inspired",
-            summary: "Soft, slightly faded look with lifted blacks, muted colour and smooth highlights.",
+            summary: String(localized: "Soft, slightly faded look with lifted blacks, muted colour and smooth highlights."),
             inputColorSpace: "Rec.709 / working SDR",
             kind: .creative
         )

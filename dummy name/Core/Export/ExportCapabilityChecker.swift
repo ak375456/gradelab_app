@@ -74,7 +74,7 @@ struct ExportCapabilityChecker: Sendable {
             }
             if !hardwareSupported {
                 issues.append(source.colorMode.isWidePrecision
-                    ? "This iPhone cannot encode HEVC Main 10 at \(dimensions.width)×\(dimensions.height)\(fps.map { String(format: " at %.2f fps", $0) } ?? ""). Try a smaller size or a lower frame rate."
+                    ? "This iPhone cannot encode HEVC Main 10 at \(dimensions.width)×\(dimensions.height)\(fps.map { String(format: " at %.2f fps", locale: .current, $0) } ?? ""). Try a smaller size or a lower frame rate."
                     : "This iPhone cannot encode the selected codec, dimensions, and frame rate. Try H.264, 1080p, or a lower frame rate.")
             }
             if !acceptsVideo {

@@ -18,17 +18,18 @@ struct ExportView: View {
         // line is never a description of a codec the file is not written in.
         let codec = model.configuration.codec
         let encode = codec.usesBitRate ? "HEVC Main 10" : codec.rawValue
+        let audio = String(localized: "Timeline audio mixed to AAC")
         switch model.project.colorMode {
         case .hdrHLG:
-            return "10-bit HDR · \(encode) · HLG, BT.2020 · Timeline audio mixed to AAC"
+            return "10-bit HDR · \(encode) · HLG, BT.2020 · \(audio)"
         case .sdrWide:
-            return "10-bit Rec.709 SDR · \(encode) · Timeline audio mixed to AAC"
+            return "10-bit Rec.709 SDR · \(encode) · \(audio)"
         case .appleLog, .appleLog2:
-            return "\(model.project.colorMode.title) → Rec.709 SDR · 10-bit \(encode) · Timeline audio mixed to AAC"
+            return "\(model.project.colorMode.title) → Rec.709 SDR · 10-bit \(encode) · \(audio)"
         case .sdr:
             return codec.usesBitRate
-                ? "8-bit Rec.709 SDR · Timeline audio mixed to AAC"
-                : "Rec.709 SDR · \(encode) · Timeline audio mixed to AAC"
+                ? "8-bit Rec.709 SDR · \(audio)"
+                : "Rec.709 SDR · \(encode) · \(audio)"
         }
     }
 
@@ -38,11 +39,11 @@ struct ExportView: View {
             Group {
                 switch model.state {
                 case .preparing:
-                    progressView(title: "Preparing Export", progress: nil)
+                    progressView(title: String(localized: "Preparing Export"), progress: nil)
                 case .exporting(let progress):
-                    progressView(title: "Exporting", progress: progress)
+                    progressView(title: String(localized: "Exporting"), progress: progress)
                 case .finishing(let progress):
-                    progressView(title: "Finishing", progress: progress)
+                    progressView(title: String(localized: "Finishing"), progress: progress)
                 case .completed:
                     completionView
                 case .cancelled:
@@ -112,8 +113,8 @@ struct ExportView: View {
     }
 
     private var exportTitle: String {
-        if case .completed = model.state { return "Export Complete" }
-        return "Export"
+        if case .completed = model.state { return String(localized: "Export Complete") }
+        return String(localized: "Export")
     }
 
     private var configurationView: some View {
@@ -209,7 +210,7 @@ struct ExportView: View {
                 Text("Edited timelines render on the project’s frame grid. Source files remain unchanged.")
                     .font(.caption).foregroundStyle(.secondary)
                 Picker("Quality", selection: $model.configuration.qualityPreset) {
-                    ForEach(ExportConfiguration.QualityPreset.allCases, id: \.self) { Text($0.rawValue).tag($0) }
+                    ForEach(ExportConfiguration.QualityPreset.allCases, id: \.self) { Text($0.title).tag($0) }
                 }.disabled(model.configuration.videoBitRate != nil)
                 DisclosureGroup("Advanced bitrate") {
                     Toggle(isOn: Binding(get: { model.configuration.videoBitRate != nil }, set: { model.configuration.videoBitRate = $0 ? 30_000_000 : nil })) {
@@ -500,7 +501,7 @@ struct ExportView: View {
     private var outputTechnicalLine: String {
         let size = model.project.metadata.displaySize
         let dimensions = model.configuration.dimensions(width: Int(size.width), height: Int(size.height))
-        let frameRate = model.configuration.frameRate.value.map { "\(Int($0)) fps" } ?? model.project.metadata.frameRateLabel ?? "Original timing"
+        let frameRate = model.configuration.frameRate.value.map { "\(Int($0)) fps" } ?? model.project.metadata.frameRateLabel ?? String(localized: "Original timing")
         return "\(dimensions.width) × \(dimensions.height) • \(frameRate) • \(model.configuration.codec.rawValue)"
     }
 

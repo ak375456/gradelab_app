@@ -24,9 +24,9 @@ enum ImageExportFormat: String, CaseIterable, Identifiable, Codable, Sendable {
 
     var detail: String {
         switch self {
-        case .jpeg: "Universally readable. Lossy, with a quality setting."
-        case .heic: "About half the size of JPEG at the same quality. Lossy."
-        case .png: "Lossless, and much larger. For a master copy."
+        case .jpeg: String(localized: "Universally readable. Lossy, with a quality setting.")
+        case .heic: String(localized: "About half the size of JPEG at the same quality. Lossy.")
+        case .png: String(localized: "Lossless, and much larger. For a master copy.")
         }
     }
 

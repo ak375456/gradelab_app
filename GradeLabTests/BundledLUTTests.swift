@@ -15,7 +15,7 @@ final class BundledLUTTests: XCTestCase {
         URL(fileURLWithPath: #filePath)
             .deletingLastPathComponent()
             .deletingLastPathComponent()
-            .appendingPathComponent("dummy name/Resources/LUTs")
+            .appendingPathComponent("LUTSources")
             .appendingPathComponent(asset.filename)
     }
 
@@ -162,12 +162,18 @@ final class LookSettingsTests: XCTestCase {
 
     /// Every bundled look must resolve to a file inside the built app bundle,
     /// otherwise the picker would offer a look that silently does nothing.
-    func testBundledLooksResolveInsideTheAppBundle() {
+    ///
+    /// Compiled form specifically: shipping the `.cube` instead would still
+    /// work and so would pass a weaker check, while quietly putting the 73 MB
+    /// of text back into the download.
+    func testBundledLooksResolveInsideTheAppBundle() throws {
         for asset in LUTAsset.bundledCreativeLooks {
-            XCTAssertNotNil(
-                Bundle(for: EditorViewModel.self).url(forResource: asset.resourceName, withExtension: "cube"),
-                "\(asset.filename) is missing from the app bundle"
+            let url = try XCTUnwrap(asset.url(), "\(asset.filename) is missing from the app bundle")
+            XCTAssertEqual(
+                url.pathExtension, LUTBinary.fileExtension,
+                "\(asset.filename) shipped uncompiled"
             )
+            XCTAssertNoThrow(try LUTBinary.decode(contentsOf: url), "\(asset.filename) does not decode")
         }
     }
 
@@ -176,30 +182,38 @@ final class LookSettingsTests: XCTestCase {
     /// silently stop appearing in the picker.
     func testEveryBundledCubeIsOfferedAsALook() {
         let bundle = Bundle.lutResources
-        // Listed case-insensitively: a look shipped as `.CUBE` is just as valid
-        // as one shipped as `.cube`, and the test must not repeat the very
-        // case-sensitivity that used to hide them.
+        // Looks ship compiled, as `<name>.cube.gclut`. Removing that suffix
+        // recovers the `.cube` filename that is the look's identity and that
+        // every project using it has saved.
         let onDisk = Set(
             ((bundle.resourceURL.flatMap {
                 try? FileManager.default.contentsOfDirectory(at: $0, includingPropertiesForKeys: nil)
             }) ?? [])
-                .filter { $0.pathExtension.lowercased() == "cube" }
-                .map { $0.lastPathComponent }
+                .map(\.lastPathComponent)
+                .filter { $0.hasSuffix(".\(LUTBinary.fileExtension)") }
+                .map { String($0.dropLast(LUTBinary.fileExtension.count + 1)) }
         )
         let offered = Set(LUTAsset.bundledLooks.map(\.filename))
-        XCTAssertFalse(onDisk.isEmpty, "No .cube resources were bundled")
-        // Technical transforms ship in the same folder but are not looks: a
-        // colour-space conversion offered next to Warm Cinema would invite
-        // applying it to footage it means nothing for.
-        let technical = Set(onDisk.filter {
-            LUTAsset.technicalTransformResourceNames.contains(($0 as NSString).deletingPathExtension)
-        })
-        XCTAssertFalse(technical.isEmpty)
-        XCTAssertTrue(technical.isSubset(of: onDisk), "Technical transforms should be bundled")
-        XCTAssertEqual(onDisk.subtracting(technical), offered,
-                       "Bundled cubes and offered looks disagree")
-        XCTAssertTrue(offered.isDisjoint(with: technical),
-                      "A technical transform must never appear in the creative look list")
+        XCTAssertFalse(onDisk.isEmpty, "No compiled looks were bundled")
+        XCTAssertEqual(onDisk, offered, "Bundled looks and offered looks disagree")
+
+        // A technical transform must never reach the creative list. Nothing on
+        // the exclusion list ships any more — `Apple_Log_1` is a 1D curve the
+        // look stage cannot apply at all, so the compiler refuses it and it is
+        // no longer weight in the bundle — but the guard stays, because the
+        // looks folder is a drop-in and one could be added again tomorrow.
+        XCTAssertTrue(
+            offered.allSatisfy {
+                !LUTAsset.technicalTransformResourceNames.contains(($0 as NSString).deletingPathExtension)
+            },
+            "A technical transform appeared in the creative look list"
+        )
+        XCTAssertTrue(
+            onDisk.allSatisfy {
+                !LUTAsset.technicalTransformResourceNames.contains(($0 as NSString).deletingPathExtension)
+            },
+            "A LUT the app cannot apply is still being shipped"
+        )
 
         for asset in LUTAsset.bundledLooks {
             XCTAssertNotNil(asset.url(), "\(asset.filename) does not resolve")
@@ -353,6 +367,29 @@ final class LookImportTests: XCTestCase {
 /// same shader kernel the preview and export use, so a tile must actually match
 /// what applying that look does. A decorative swatch would mislead the choice.
 final class LookPreviewTests: XCTestCase {
+    /// Reads a look from whichever form actually shipped, the way `LUTLibrary`
+    /// does, so the comparison is against the bytes on the device rather than
+    /// against a source file the app never opens.
+    static func storedValues(of asset: LUTAsset) throws -> (size: Int, values: [SIMD3<Float>]) {
+        let url = try XCTUnwrap(asset.url(), "\(asset.filename) does not resolve")
+        if url.pathExtension.lowercased() == LUTBinary.fileExtension {
+            let compiled = try LUTBinary.decode(contentsOf: url)
+            let values = (0..<(compiled.samples.count / 3)).map { index in
+                SIMD3<Float>(
+                    Float(compiled.samples[index * 3]) / Float(UInt16.max),
+                    Float(compiled.samples[index * 3 + 1]) / Float(UInt16.max),
+                    Float(compiled.samples[index * 3 + 2]) / Float(UInt16.max)
+                )
+            }
+            return (compiled.size, values)
+        }
+        let cube = try CubeLUTParser().parse(contentsOf: url)
+        guard case .threeDimensional(let size) = cube.kind else {
+            throw GradeLabError.invalidLUT("\(asset.filename) is not a 3D LUT")
+        }
+        return (size, cube.values)
+    }
+
     private func makeSolidImage(_ value: UInt8, size: Int = 16) -> UIImage {
         UIGraphicsImageRenderer(size: CGSize(width: size, height: size)).image { context in
             let channel = CGFloat(value) / 255
@@ -387,10 +424,9 @@ final class LookPreviewTests: XCTestCase {
         let source = try XCTUnwrap(renderer.makeSourceTexture(from: makeSolidImage(128)))
 
         for asset in LUTAsset.bundledCreativeLooks {
-            let cube = try CubeLUTParser().parse(contentsOf: try XCTUnwrap(asset.url()))
-            guard case .threeDimensional(let size) = cube.kind else { return XCTFail("not 3D") }
+            let (size, values) = try Self.storedValues(of: asset)
             let grid = Int((128.0 / 255.0 * Double(size - 1)).rounded())
-            let expected = cube.values[grid + grid * size + grid * size * size]
+            let expected = values[grid + grid * size + grid * size * size]
 
             let tile = try XCTUnwrap(renderer.render(look: asset, source: source), asset.name)
             let actual = try centerPixel(tile)

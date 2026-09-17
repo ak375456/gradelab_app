@@ -33,9 +33,9 @@ struct PaywallView: View {
                         .font(.body).foregroundStyle(.white.opacity(0.7)).fixedSize(horizontal: false, vertical: true)
                 }
                 VStack(alignment: .leading, spacing: 16) {
-                    benefit("Color with character", "Premium cinematic looks and your own LUTs", "camera.filters")
-                    benefit("A professional finish", "4K and original-resolution export, your own frame rate and bitrate, and ProRes where supported", "film.stack")
-                    benefit("Make it personal", "Import custom fonts for your titles", "textformat")
+                    benefit(String(localized: "Color with character"), String(localized: "Premium cinematic looks and your own LUTs"), "camera.filters")
+                    benefit(String(localized: "A professional finish"), String(localized: "4K and original-resolution export, your own frame rate and bitrate, and ProRes where supported"), "film.stack")
+                    benefit(String(localized: "Make it personal"), String(localized: "Import custom fonts for your titles"), "textformat")
                 }
                 if store.hasPro {
                     Button("Back to creating") { dismiss() }.buttonStyle(ProPrimaryButtonStyle())
@@ -118,8 +118,18 @@ struct PaywallView: View {
     }
 
     private var purchaseTitle: String {
-        guard let product = selectedProduct else { return store.isLoading ? "Loading prices…" : "Plan unavailable" }
-        return selection == .lifetime ? "Unlock Lifetime · \(product.displayPrice)" : "Subscribe · \(product.displayPrice) / \(selection == .weekly ? "week" : selection == .monthly ? "month" : "year")"
+        guard let product = selectedProduct else {
+            return store.isLoading ? String(localized: "Loading prices…") : String(localized: "Plan unavailable")
+        }
+        if selection == .lifetime {
+            return String(localized: "Unlock Lifetime · \(product.displayPrice)")
+        }
+        let period = switch selection {
+        case .weekly: String(localized: "week")
+        case .monthly: String(localized: "month")
+        default: String(localized: "year")
+        }
+        return String(localized: "Subscribe · \(product.displayPrice) / \(period)")
     }
     /// The founding offer's small print.
     ///
@@ -130,7 +140,7 @@ struct PaywallView: View {
     /// invented reference price that App Review rejects, and the launch plan
     /// warns against it in the same breath as fake countdowns.
     private func foundingDetail(statingDiscount: Bool) -> String {
-        let promise = "Buy now and it stays yours forever, whatever the price becomes."
+        let promise = String(localized: "Buy now and it stays yours forever, whatever the price becomes.")
         let standard = ProConfiguration.standardLifetimeUSD
             .formatted(.currency(code: "USD").precision(.fractionLength(2)))
         guard statingDiscount else {
@@ -139,9 +149,9 @@ struct PaywallView: View {
             // see would be a number made up for effect. The standard price is
             // still named — it is the whole point of the offer — but named as
             // what it is, the US one.
-            return "The standard lifetime price is US\(standard). This price is for launch week only, as a thank-you to our founding users. \(promise)"
+            return String(localized: "The standard lifetime price is US\(standard). This price is for launch week only, as a thank-you to our founding users. \(promise)")
         }
-        return "This price is for launch week only — \(ProConfiguration.foundingDiscountPercent)% off the \(standard) standard lifetime price, as a thank-you to our founding users. \(promise)"
+        return String(localized: "This price is for launch week only — \(ProConfiguration.foundingDiscountPercent)% off the \(standard) standard lifetime price, as a thank-you to our founding users. \(promise)")
     }
 
     private func benefit(_ title: String, _ detail: String, _ icon: String) -> some View {
@@ -165,8 +175,10 @@ struct PaywallView: View {
         // PRICE" says an offer exists, "94% OFF" says how big it is, and the
         // second is the one that makes someone stop scrolling.
         let badge = founding
-            ? (statesDiscount ? "FOUNDING — \(ProConfiguration.foundingDiscountPercent)% OFF" : "FOUNDING PRICE")
-            : savings.map { "SAVE \($0)%" }
+            ? (statesDiscount
+                ? String(localized: "FOUNDING — \(ProConfiguration.foundingDiscountPercent)% OFF")
+                : String(localized: "FOUNDING PRICE"))
+            : savings.map { String(localized: "SAVE \($0)%") }
         return Button { selection = plan } label: {
             VStack(alignment: .leading, spacing: 10) {
                 HStack(alignment: .center, spacing: 12) {
@@ -457,13 +469,17 @@ struct ProRequirementList: View {
     /// pay today should be able to get their file out, and telling them how is
     /// what makes the 1080p tier a real offer instead of a tease.
     private var escapeHint: String {
-        let subject = features.count == 1 ? "it" : "them"
         guard features.contains(.exportResolution) else {
-            return "Remove \(subject) to keep exporting free."
+            // Two whole sentences rather than one with a pronoun slotted in:
+            // German inflects the pronoun with its referent, so an interpolated
+            // "it"/"them" cannot be translated correctly.
+            return features.count == 1
+                ? String(localized: "Remove it to keep exporting free.")
+                : String(localized: "Remove them to keep exporting free.")
         }
         return features.count == 1
-            ? "Export at 1080p or below to keep exporting free."
-            : "Export at 1080p or below, and remove the rest, to keep exporting free."
+            ? String(localized: "Export at 1080p or below to keep exporting free.")
+            : String(localized: "Export at 1080p or below, and remove the rest, to keep exporting free.")
     }
 }
 

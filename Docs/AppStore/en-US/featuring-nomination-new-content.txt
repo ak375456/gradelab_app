@@ -1,0 +1,5 @@
+Founding offer: Lifetime Pro is $1.99 — a one-time purchase, not a subscription — against a $34.99 standard lifetime price. It unlocks the whole app: premium LUT collections, film grain, bloom, glow and halation, the colour curves, imported .cube LUTs and TTF fonts, saved grade presets, ProRes and 4K export.
+
+The new content it accompanies is Apple Log 2 from iPhone 17 Pro. Apple specifies Log 2 as the Apple Log transfer function on Apple Wide Gamut primaries, and treating it as Apple Log yields a plausible image with quietly wrong colour. GradeLab converts the gamut from Apple's published primaries, checked against the Academy Software Foundation's ACES config, then renders through Apple's own Apple Log to Rec.709 LUT.
+
+The app is improved continuously: this update also made the look browser far faster to load, and recent ones added mask tracking, keyframed grading and 45 transitions. The free tier exports 1080p with no watermark.

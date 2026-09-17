@@ -16,7 +16,7 @@ import simd
 /// No simulator or app installation is required.
 @main
 struct ValidateLUT {
-    static let lutDirectory = "dummy name/Resources/LUTs"
+    static let lutDirectory = "LUTSources"
 
     static func main() throws {
         guard let device = MTLCreateSystemDefaultDevice(), let queue = device.makeCommandQueue() else {
@@ -142,7 +142,7 @@ struct ValidateLUT {
 
         // MARK: 2 - Every LUT in the resources tree
 
-        // Walks Resources/LUTs and its subfolders, so a `.cube` dropped into
+        // Walks LUTSources and its subfolders, so a `.cube` dropped into
         // Imported/ is checked by exactly the same rules as the generated ones.
         let fileManager = FileManager.default
         var files: [URL] = []

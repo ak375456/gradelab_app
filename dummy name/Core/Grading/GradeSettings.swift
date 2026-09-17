@@ -74,7 +74,18 @@ enum GradeParameter: String, CaseIterable, Codable, Identifiable, Sendable {
     ]
 
     var title: String {
-        rawValue.prefix(1).uppercased() + rawValue.dropFirst()
+        switch self {
+        case .exposure: String(localized: "Exposure")
+        case .contrast: String(localized: "Contrast")
+        case .highlights: String(localized: "Highlights")
+        case .shadows: String(localized: "Shadows")
+        case .whites: String(localized: "Whites")
+        case .blacks: String(localized: "Blacks")
+        case .temperature: String(localized: "Temperature")
+        case .tint: String(localized: "Tint")
+        case .saturation: String(localized: "Saturation")
+        case .vibrance: String(localized: "Vibrance")
+        }
     }
 
     /// UI ranges map to deliberately bounded shader transforms.
@@ -109,9 +120,9 @@ enum GradeParameter: String, CaseIterable, Codable, Identifiable, Sendable {
 
     func formatted(_ value: Float) -> String {
         if self == .exposure {
-            return String(format: "%+.2f", value)
+            return String(format: "%+.2f", locale: .current, value)
         }
-        return String(format: "%+.0f", value)
+        return String(format: "%+.0f", locale: .current, value)
     }
 
     var lowerLabel: String {

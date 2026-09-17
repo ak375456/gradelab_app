@@ -216,7 +216,7 @@ final class VideoExporter: @unchecked Sendable {
             codec: configuration.codec
         ) else {
             throw GradeLabError.unsupportedExport(
-                "This device cannot encode the selected configuration. Try another codec or lower dimensions."
+                String(localized: "This device cannot encode the selected configuration. Try another codec or lower dimensions.")
             )
         }
 
@@ -229,7 +229,7 @@ final class VideoExporter: @unchecked Sendable {
             #if DEBUG
             print("Could not create export reader/writer: \(error)")
             #endif
-            throw GradeLabError.exportFailed("The export session could not be prepared.")
+            throw GradeLabError.exportFailed(String(localized: "The export session could not be prepared."))
         }
         writer.shouldOptimizeForNetworkUse = configuration.optimizeForNetworkUse
 
@@ -244,7 +244,7 @@ final class VideoExporter: @unchecked Sendable {
         videoOutput.alwaysCopiesSampleData = false
         guard reader.canAdd(videoOutput) else {
             throw GradeLabError.unsupportedExport(
-                "The source video cannot be decoded as \(ExportMediaSettings.readerFormatDescription(colorMode: source.colorMode)) on this device."
+                String(localized: "The source video cannot be decoded as \(ExportMediaSettings.readerFormatDescription(colorMode: source.colorMode)) on this device.")
             )
         }
         reader.add(videoOutput)
@@ -255,7 +255,7 @@ final class VideoExporter: @unchecked Sendable {
         )
         guard writer.canApply(outputSettings: videoSettings, forMediaType: .video) else {
             throw GradeLabError.unsupportedExport(
-                "This device cannot apply the requested video export settings."
+                String(localized: "This device cannot apply the requested video export settings.")
             )
         }
         let videoInput = AVAssetWriterInput(mediaType: .video, outputSettings: videoSettings)
@@ -272,7 +272,7 @@ final class VideoExporter: @unchecked Sendable {
         }
         guard writer.canAdd(videoInput) else {
             throw GradeLabError.unsupportedExport(
-                "This device cannot encode a video track at the requested dimensions."
+                String(localized: "This device cannot encode a video track at the requested dimensions.")
             )
         }
         writer.add(videoInput)
@@ -344,21 +344,21 @@ final class VideoExporter: @unchecked Sendable {
             output.alwaysCopiesSampleData = false
             guard reader.canAdd(output) else {
                 throw GradeLabError.unsupportedExport(
-                    "Audio track \(index + 1) cannot be decoded for preservation."
+                    String(localized: "Audio track \(index + 1) cannot be decoded for preservation.")
                 )
             }
             reader.add(output)
 
             guard writer.canApply(outputSettings: settings, forMediaType: .audio) else {
                 throw GradeLabError.unsupportedExport(
-                    "Audio track \(index + 1) cannot be preserved as AAC with this configuration."
+                    String(localized: "Audio track \(index + 1) cannot be preserved as AAC with this configuration.")
                 )
             }
             guard encodedChannels <= 2 || settings[AVChannelLayoutKey] != nil else {
                 // Belt and braces for the crash above: never hand the input
                 // settings it will trap on, whatever `canApply` says.
                 throw GradeLabError.unsupportedExport(
-                    "Audio track \(index + 1) has \(encodedChannels) channels and no layout AAC can carry."
+                    String(localized: "Audio track \(index + 1) has \(encodedChannels) channels and no layout AAC can carry.")
                 )
             }
             let input = AVAssetWriterInput(
@@ -372,7 +372,7 @@ final class VideoExporter: @unchecked Sendable {
             // timestamps on appended audio samples, not a track timescale override.
             guard writer.canAdd(input) else {
                 throw GradeLabError.unsupportedExport(
-                    "Audio track \(index + 1) cannot be added to the output movie."
+                    String(localized: "Audio track \(index + 1) cannot be added to the output movie.")
                 )
             }
             writer.add(input)
@@ -403,7 +403,7 @@ final class VideoExporter: @unchecked Sendable {
         }
         guard pipeline.adaptor.pixelBufferPool != nil else {
             throw GradeLabError.exportFailed(
-                "The video encoder could not allocate its Metal-compatible frame pool."
+                String(localized: "The video encoder could not allocate its Metal-compatible frame pool.")
             )
         }
     }
@@ -497,7 +497,7 @@ final class VideoExporter: @unchecked Sendable {
             throw readerFailure(pipeline.reader)
         }
         guard frameCount > 0 else {
-            throw GradeLabError.exportFailed("The source video did not contain any decodable frames.")
+            throw GradeLabError.exportFailed(String(localized: "The source video did not contain any decodable frames."))
         }
 
         finalProgress = progress(
@@ -530,7 +530,7 @@ final class VideoExporter: @unchecked Sendable {
         let sampleBuffer = frame.sample
         guard CMSampleBufferDataIsReady(sampleBuffer),
               let sourcePixelBuffer = CMSampleBufferGetImageBuffer(sampleBuffer) else {
-            throw GradeLabError.exportFailed("A decoded source frame was unavailable.")
+            throw GradeLabError.exportFailed(String(localized: "A decoded source frame was unavailable."))
         }
 
         let presentationTime = frame.time
@@ -557,23 +557,23 @@ final class VideoExporter: @unchecked Sendable {
         // same places rather than being a different random field.
         grade.uniforms.setGrainSeed(presentationTime.seconds)
         guard presentationTime.isNumeric else {
-            throw GradeLabError.exportFailed("A source frame has an invalid presentation timestamp.")
+            throw GradeLabError.exportFailed(String(localized: "A source frame has an invalid presentation timestamp."))
         }
         let sourceFormat = CVPixelBufferGetPixelFormatType(sourcePixelBuffer)
         guard ExportMediaSettings.acceptedReaderFormats(colorMode: source.colorMode).contains(sourceFormat) else {
             throw GradeLabError.unsupportedExport(
-                "The decoder did not provide the required \(ExportMediaSettings.readerFormatDescription(colorMode: source.colorMode)) video frames."
+                String(localized: "The decoder did not provide the required \(ExportMediaSettings.readerFormatDescription(colorMode: source.colorMode)) video frames.")
             )
         }
         guard CVPixelBufferGetWidth(sourcePixelBuffer) == source.encodedWidth,
               CVPixelBufferGetHeight(sourcePixelBuffer) == source.encodedHeight else {
             throw GradeLabError.unsupportedExport(
-                "The decoder changed the source dimensions; export stopped instead of resizing silently."
+                String(localized: "The decoder changed the source dimensions; export stopped instead of resizing silently.")
             )
         }
 
         guard let pool = adaptor.pixelBufferPool else {
-            throw GradeLabError.exportFailed("The video encoder frame pool became unavailable.")
+            throw GradeLabError.exportFailed(String(localized: "The video encoder frame pool became unavailable."))
         }
         var optionalDestination: CVPixelBuffer?
         let allocationStatus = CVPixelBufferPoolCreatePixelBuffer(
@@ -583,9 +583,9 @@ final class VideoExporter: @unchecked Sendable {
         )
         guard allocationStatus == kCVReturnSuccess, let destination = optionalDestination else {
             if allocationStatus == kCVReturnWouldExceedAllocationThreshold {
-                throw GradeLabError.exportFailed("The video encoder could not recycle frame memory.")
+                throw GradeLabError.exportFailed(String(localized: "The video encoder could not recycle frame memory."))
             }
-            throw GradeLabError.exportFailed("The video encoder could not allocate an output frame.")
+            throw GradeLabError.exportFailed(String(localized: "The video encoder could not allocate an output frame."))
         }
 
         try render(
@@ -594,7 +594,7 @@ final class VideoExporter: @unchecked Sendable {
             grade: grade
         )
         guard adaptor.append(destination, withPresentationTime: presentationTime) else {
-            throw GradeLabError.exportFailed("The video encoder rejected a processed frame.")
+            throw GradeLabError.exportFailed(String(localized: "The video encoder rejected a processed frame."))
         }
         return .appended(presentationTime)
     }
@@ -613,7 +613,7 @@ final class VideoExporter: @unchecked Sendable {
         }
         guard CMSampleBufferDataIsReady(sampleBuffer) else {
             throw GradeLabError.exportFailed(
-                "Decoded audio for track \(trackNumber) was unavailable."
+                String(localized: "Decoded audio for track \(trackNumber) was unavailable.")
             )
         }
         guard input.append(encoderSample) else {
@@ -621,7 +621,7 @@ final class VideoExporter: @unchecked Sendable {
                 throw writerFailure(writer)
             }
             throw GradeLabError.exportFailed(
-                "The AAC encoder rejected audio from track \(trackNumber)."
+                String(localized: "The AAC encoder rejected audio from track \(trackNumber).")
             )
         }
         return true
@@ -639,18 +639,18 @@ final class VideoExporter: @unchecked Sendable {
         grade: FrameGrade
     ) throws {
         guard let hdrPipeline else {
-            throw GradeLabError.unsupportedExport("This device could not build the HDR export pipeline.")
+            throw GradeLabError.unsupportedExport(String(localized: "This device could not build the HDR export pipeline."))
         }
         guard CVPixelBufferGetPixelFormatType(destination) == kCVPixelFormatType_420YpCbCr10BiPlanarVideoRange else {
-            throw GradeLabError.exportFailed("The encoder frame pool did not provide 10-bit 4:2:0 surfaces.")
+            throw GradeLabError.exportFailed(String(localized: "The encoder frame pool did not provide 10-bit 4:2:0 surfaces."))
         }
         guard let lumaPlane = context.writableTexture(from: destination, pixelFormat: .r16Unorm, plane: 0),
               let chromaPlane = context.writableTexture(from: destination, pixelFormat: .rg16Unorm, plane: 1) else {
-            throw GradeLabError.exportFailed("Metal could not map the 10-bit encoder planes.")
+            throw GradeLabError.exportFailed(String(localized: "Metal could not map the 10-bit encoder planes."))
         }
         guard let commandBuffer = context.commandQueue.makeCommandBuffer(),
               let encoder = commandBuffer.makeComputeCommandEncoder() else {
-            throw GradeLabError.exportFailed("Metal could not create an export command buffer.")
+            throw GradeLabError.exportFailed(String(localized: "Metal could not create an export command buffer."))
         }
         commandBuffer.label = "GradeLab HDR Export Frame"
         encoder.label = "GradeLab gradeExportHDR"
@@ -704,15 +704,15 @@ final class VideoExporter: @unchecked Sendable {
         grade: FrameGrade
     ) throws {
         guard let sdr10Pipeline else {
-            throw GradeLabError.unsupportedExport("This device could not build the 10-bit export pipeline.")
+            throw GradeLabError.unsupportedExport(String(localized: "This device could not build the 10-bit export pipeline."))
         }
         guard let lumaPlane = context.writableTexture(from: destination, pixelFormat: .r16Unorm, plane: 0),
               let chromaPlane = context.writableTexture(from: destination, pixelFormat: .rg16Unorm, plane: 1) else {
-            throw GradeLabError.exportFailed("Metal could not map the 10-bit encoder planes.")
+            throw GradeLabError.exportFailed(String(localized: "Metal could not map the 10-bit encoder planes."))
         }
         guard let commandBuffer = context.commandQueue.makeCommandBuffer(),
               let encoder = commandBuffer.makeComputeCommandEncoder() else {
-            throw GradeLabError.exportFailed("Metal could not create an export command buffer.")
+            throw GradeLabError.exportFailed(String(localized: "Metal could not create an export command buffer."))
         }
         commandBuffer.label = "GradeLab 10-bit SDR Export Frame"
         encoder.label = "GradeLab gradeExportSDR10"
@@ -763,7 +763,7 @@ final class VideoExporter: @unchecked Sendable {
     ) throws {
         guard let pipeline = appleLogSDR10Pipeline(isLog2: activeColorMode == .appleLog2) else {
             throw GradeLabError.unsupportedExport(
-                "This device could not build the \(activeColorMode.title) export pipeline.")
+                String(localized: "This device could not build the \(activeColorMode.title) export pipeline."))
         }
         guard let renderingLUT = context.luts.renderingTexture(
             named: AppleLogRendering.rec709LUTResourceName) else {
@@ -771,12 +771,12 @@ final class VideoExporter: @unchecked Sendable {
             // there is no defined display transform, and inventing one would be
             // exactly the guess this pipeline exists to avoid.
             throw GradeLabError.unsupportedExport(
-                "Apple's Apple Log to Rec.709 rendering LUT could not be loaded, so the export has no defined display transform."
+                String(localized: "Apple's Apple Log to Rec.709 rendering LUT could not be loaded, so the export has no defined display transform.")
             )
         }
         guard let lumaPlane = context.writableTexture(from: destination, pixelFormat: .r16Unorm, plane: 0),
               let chromaPlane = context.writableTexture(from: destination, pixelFormat: .rg16Unorm, plane: 1) else {
-            throw GradeLabError.exportFailed("Metal could not map the 10-bit encoder planes.")
+            throw GradeLabError.exportFailed(String(localized: "Metal could not map the 10-bit encoder planes."))
         }
         if FilmEffectsStage.isActive(grade.uniforms) {
             guard let encodePipeline = effectPipelines["encodeAppleLogFromTexture"] else {
@@ -797,7 +797,7 @@ final class VideoExporter: @unchecked Sendable {
         }
         guard let commandBuffer = context.commandQueue.makeCommandBuffer(),
               let encoder = commandBuffer.makeComputeCommandEncoder() else {
-            throw GradeLabError.exportFailed("Metal could not create an export command buffer.")
+            throw GradeLabError.exportFailed(String(localized: "Metal could not create an export command buffer."))
         }
         commandBuffer.label = "GradeLab Apple Log Export Frame"
         encoder.label = "GradeLab gradeExportAppleLogSDR10"
@@ -909,12 +909,12 @@ final class VideoExporter: @unchecked Sendable {
               let gradePipeline = effectPipelines[gradeKernel],
               let surfaces = effectTextures(width: width, height: height),
               let command = context.commandQueue.makeCommandBuffer() else {
-            throw GradeLabError.exportFailed("Metal could not prepare the finishing-effects pass.")
+            throw GradeLabError.exportFailed(String(localized: "Metal could not prepare the finishing-effects pass."))
         }
         command.label = "GradeLab Export Frame (effects)"
         var gradeUniforms = grade.uniforms
         guard let gradeEncoder = command.makeComputeCommandEncoder() else {
-            throw GradeLabError.exportFailed("Metal could not create an export command buffer.")
+            throw GradeLabError.exportFailed(String(localized: "Metal could not create an export command buffer."))
         }
         gradeEncoder.setComputePipelineState(gradePipeline)
         bindSource(gradeEncoder)
@@ -928,11 +928,11 @@ final class VideoExporter: @unchecked Sendable {
 
         guard stage.encode(source: surfaces.0, destination: surfaces.1,
                            grade: gradeUniforms, workingSpace: workingSpace, into: command) else {
-            throw GradeLabError.exportFailed("The finishing-effects pass could not be encoded.")
+            throw GradeLabError.exportFailed(String(localized: "The finishing-effects pass could not be encoded."))
         }
 
         guard let encodeEncoder = command.makeComputeCommandEncoder() else {
-            throw GradeLabError.exportFailed("Metal could not create an export command buffer.")
+            throw GradeLabError.exportFailed(String(localized: "Metal could not create an export command buffer."))
         }
         encodeEncoder.setComputePipelineState(encodePipeline)
         encodeEncoder.setTexture(surfaces.1, index: 0)
@@ -962,7 +962,7 @@ final class VideoExporter: @unchecked Sendable {
             pixelBuffer: destinationPixelBuffer,
             context: context
         ) else {
-            throw GradeLabError.exportFailed("Metal could not map an export frame without copying it.")
+            throw GradeLabError.exportFailed(String(localized: "Metal could not map an export frame without copying it."))
         }
 
         let spatialEffects = FilmEffectsStage.isActive(grade.uniforms)
@@ -1010,7 +1010,7 @@ final class VideoExporter: @unchecked Sendable {
             luma = lumaTexture
             chroma = chromaTexture
         case .bgra, .linearHalf:
-            throw GradeLabError.unsupportedExport("Export requires an NV12 decoder surface.")
+            throw GradeLabError.unsupportedExport(String(localized: "Export requires an NV12 decoder surface."))
         }
 
         var yuvForEffects = YUVUniforms.make(for: sourcePixelBuffer, fallbackMatrix: "BT.709")
@@ -1072,7 +1072,7 @@ final class VideoExporter: @unchecked Sendable {
         case .bgra(_, let texture):
             destination = texture
         case .biPlanar, .linearHalf:
-            throw GradeLabError.exportFailed("The encoder frame pool did not provide BGRA surfaces.")
+            throw GradeLabError.exportFailed(String(localized: "The encoder frame pool did not provide BGRA surfaces."))
         }
 
         if spatialEffects, let encodePipeline = effectPipelines["effectWriteBGRA"] {
@@ -1091,7 +1091,7 @@ final class VideoExporter: @unchecked Sendable {
 
         guard let commandBuffer = context.commandQueue.makeCommandBuffer(),
               let encoder = commandBuffer.makeComputeCommandEncoder() else {
-            throw GradeLabError.exportFailed("Metal could not create an export command buffer.")
+            throw GradeLabError.exportFailed(String(localized: "Metal could not create an export command buffer."))
         }
         commandBuffer.label = "GradeLab Export Frame"
         encoder.label = "GradeLab gradeExportBGRA"
@@ -1132,7 +1132,7 @@ final class VideoExporter: @unchecked Sendable {
                 print("Metal export frame failed: \(error)")
             }
             #endif
-            throw GradeLabError.exportFailed("Metal could not process a video frame.")
+            throw GradeLabError.exportFailed(String(localized: "Metal could not process a video frame."))
         }
     }
 
@@ -1213,16 +1213,16 @@ final class VideoExporter: @unchecked Sendable {
             .appendingPathComponent("GradeLab-\(UUID().uuidString)")
             .appendingPathExtension(configuration.resolvedContainer.fileExtension)
         guard url.isFileURL else {
-            throw GradeLabError.exportFailed("The export destination must be a local file URL.")
+            throw GradeLabError.exportFailed(String(localized: "The export destination must be a local file URL."))
         }
         guard url.pathExtension.lowercased() == configuration.resolvedContainer.fileExtension else {
             throw GradeLabError.unsupportedExport(
-                "The destination extension must match the selected container."
+                String(localized: "The destination extension must match the selected container.")
             )
         }
         guard !FileManager.default.fileExists(atPath: url.path) else {
             throw GradeLabError.exportFailed(
-                "A file already exists at the selected export destination."
+                String(localized: "A file already exists at the selected export destination.")
             )
         }
         return url
@@ -1232,7 +1232,7 @@ final class VideoExporter: @unchecked Sendable {
         stateLock.lock()
         defer { stateLock.unlock() }
         guard activeSession == nil else {
-            throw GradeLabError.exportFailed("Another export is already in progress.")
+            throw GradeLabError.exportFailed(String(localized: "Another export is already in progress."))
         }
         activeSession = session
     }

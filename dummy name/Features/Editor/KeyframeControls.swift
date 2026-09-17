@@ -128,7 +128,7 @@ struct KeyframeGuide: View {
         }
     }
 
-    private func step(_ number: Int, _ title: String, _ detail: String) -> some View {
+    private func step(_ number: Int, _ title: LocalizedStringKey, _ detail: LocalizedStringKey) -> some View {
         HStack(alignment: .top, spacing: 12) {
             Text("\(number)").font(.caption.weight(.bold)).foregroundStyle(.black)
                 .frame(width: 22, height: 22).background(Circle().fill(AppColors.accent))
@@ -139,7 +139,7 @@ struct KeyframeGuide: View {
         }
     }
 
-    private func legend(_ state: EditorViewModel.KeyframeState, _ title: String, _ detail: String) -> some View {
+    private func legend(_ state: EditorViewModel.KeyframeState, _ title: LocalizedStringKey, _ detail: LocalizedStringKey) -> some View {
         HStack(alignment: .top, spacing: 12) {
             KeyframeDiamondIcon(state: state, size: 16).frame(width: 22, height: 22)
             VStack(alignment: .leading, spacing: 2) {
@@ -149,7 +149,7 @@ struct KeyframeGuide: View {
         }
     }
 
-    private func row(_ symbol: String, _ title: String, _ detail: String) -> some View {
+    private func row(_ symbol: String, _ title: LocalizedStringKey, _ detail: LocalizedStringKey) -> some View {
         HStack(alignment: .top, spacing: 12) {
             Image(systemName: symbol).font(.caption).foregroundStyle(AppColors.accent)
                 .frame(width: 22, height: 22)

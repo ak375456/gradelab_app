@@ -57,12 +57,12 @@ enum FilmEffectSlot: String, Hashable, Sendable, CaseIterable {
 
     var title: String {
         switch self {
-        case .fade: "Fade"
-        case .sharpness: "Sharpen"
-        case .bloom: "Bloom"
-        case .glow: "Glow"
-        case .halation: "Halation"
-        case .grain: "Grain"
+        case .fade: String(localized: "Fade")
+        case .sharpness: String(localized: "Sharpen")
+        case .bloom: String(localized: "Bloom")
+        case .glow: String(localized: "Glow")
+        case .halation: String(localized: "Halation")
+        case .grain: String(localized: "Grain")
         }
     }
 }
@@ -78,18 +78,18 @@ extension GradeSlot {
     var title: String {
         switch self {
         case .light(let parameter): parameter.title
-        case .hslHue(let band): "\(HueBand.name(band)) hue"
-        case .hslSaturation(let band): "\(HueBand.name(band)) saturation"
-        case .hslLuminance(let band): "\(HueBand.name(band)) lightness"
-        case .wheelHue(let wheel): "\(GradingWheel.name(wheel)) hue"
-        case .wheelStrength(let wheel): "\(GradingWheel.name(wheel)) color strength"
-        case .wheelBrightness(let wheel): "\(GradingWheel.name(wheel)) brightness"
-        case .vignetteAmount: "Vignette amount"
-        case .vignetteMidpoint: "Vignette midpoint"
-        case .vignetteFeather: "Vignette feather"
-        case .lookIntensity: "Look strength"
+        case .hslHue(let band): String(localized: "\(HueBand.name(band)) hue")
+        case .hslSaturation(let band): String(localized: "\(HueBand.name(band)) saturation")
+        case .hslLuminance(let band): String(localized: "\(HueBand.name(band)) lightness")
+        case .wheelHue(let wheel): String(localized: "\(GradingWheel.name(wheel)) hue")
+        case .wheelStrength(let wheel): String(localized: "\(GradingWheel.name(wheel)) color strength")
+        case .wheelBrightness(let wheel): String(localized: "\(GradingWheel.name(wheel)) brightness")
+        case .vignetteAmount: String(localized: "Vignette amount")
+        case .vignetteMidpoint: String(localized: "Vignette midpoint")
+        case .vignetteFeather: String(localized: "Vignette feather")
+        case .lookIntensity: String(localized: "Look strength")
         case .effect(let effect): effect.title
-        case .curve(let type): "\(type.title) curve"
+        case .curve(let type): String(localized: "\(type.title) curve")
         }
     }
 
@@ -164,14 +164,16 @@ extension GradeSlot {
 
 extension HueBand {
     static func name(_ index: Int) -> String {
-        names.indices.contains(index) ? names[index] : "Color"
+        names.indices.contains(index) ? names[index] : String(localized: "Color")
     }
 }
 
 extension GradingWheel {
-    static let names = ["Shadows", "Midtones", "Highlights"]
+    static var names: [String] {
+        [String(localized: "Shadows"), String(localized: "Midtones"), String(localized: "Highlights")]
+    }
     static func name(_ index: Int) -> String {
-        names.indices.contains(index) ? names[index] : "Wheel"
+        names.indices.contains(index) ? names[index] : String(localized: "Wheel")
     }
 }
 

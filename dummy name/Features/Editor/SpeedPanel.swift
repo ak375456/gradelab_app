@@ -53,7 +53,7 @@ struct SpeedPanel: View {
 
             AdjustmentSlider(
                 value: position,
-                title: "Speed",
+                title: String(localized: "Speed"),
                 range: Float(ClipSpeed.sliderRange.lowerBound)...Float(ClipSpeed.sliderRange.upperBound),
                 step: 0.005,
                 neutralValue: 0,
@@ -120,6 +120,6 @@ struct SpeedPanel: View {
 
     private var durationSummary: String {
         guard model.selectedClip != nil else { return "No clip selected" }
-        return String(format: "%.2fs source · %.2fs on the timeline", sourceSeconds, timelineSeconds)
+        return String(format: String(localized: "%.2fs source · %.2fs on the timeline"), locale: .current, sourceSeconds, timelineSeconds)
     }
 }

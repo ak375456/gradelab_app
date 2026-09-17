@@ -143,7 +143,7 @@ extension EditorViewModel {
             }
             let seconds = composition?.seconds ?? lost.seconds
             let minutes = Int(seconds / 60), remainder = seconds - Double(minutes * 60)
-            text = String(format: "Tracking lost at %02d:%05.2f. Reposition the mask, then continue.", minutes, remainder)
+            text = String(format: String(localized: "Tracking lost at %02d:%05.2f. Reposition the mask, then continue."), locale: .current, minutes, remainder)
             continueDirection = result.lastDirection
         } else if let message = result.message {
             text = message

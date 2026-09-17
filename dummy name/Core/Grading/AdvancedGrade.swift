@@ -11,7 +11,11 @@ struct HueBand: Codable, Equatable, Sendable {
     var hue: Float = 0
     var saturation: Float = 0
     var luminance: Float = 0
-    static let names = ["Red", "Orange", "Yellow", "Green", "Aqua", "Blue", "Purple", "Magenta"]
+    static var names: [String] {
+        [String(localized: "Red"), String(localized: "Orange"), String(localized: "Yellow"),
+         String(localized: "Green"), String(localized: "Aqua"), String(localized: "Blue"),
+         String(localized: "Purple"), String(localized: "Magenta")]
+    }
     static let centers: [Float] = [0, 30, 60, 120, 180, 240, 270, 300]
 }
 
@@ -29,7 +33,12 @@ enum GradeMaskShape: String, Codable, CaseIterable, Identifiable, Sendable {
     case rectangle
 
     var id: String { rawValue }
-    var title: String { rawValue.capitalized }
+    var title: String {
+        switch self {
+        case .ellipse: String(localized: "Ellipse")
+        case .rectangle: String(localized: "Rectangle")
+        }
+    }
 }
 
 struct GradeMask: Codable, Equatable, Sendable {

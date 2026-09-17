@@ -274,7 +274,7 @@ class LayerCompositor: NSObject, AVVideoCompositing, @unchecked Sendable {
             // highlight above diffuse white silently crushed.
             encoder.endEncoding()
             throw GradeLabError.unsupportedExport(
-                "An HDR frame reached the SDR compositing path. This is a bug; the frame was refused rather than clipped."
+                String(localized: "An HDR frame reached the SDR compositing path. This is a bug; the frame was refused rather than clipped.")
             )
         }
         encoder.setTexture(destination.texture, index: 2)
@@ -554,12 +554,12 @@ class LayerCompositor: NSObject, AVVideoCompositing, @unchecked Sendable {
               let videoPipeline = hdrVideoPipeline,
               let imagePipeline = hdrImagePipeline,
               let resolvePipeline = hdrResolvePipeline else {
-            throw GradeLabError.unsupportedExport("This device could not build the HDR compositing pipeline.")
+            throw GradeLabError.unsupportedExport(String(localized: "This device could not build the HDR compositing pipeline."))
         }
         guard let output = request.renderContext.newPixelBuffer(),
               CVPixelBufferGetPixelFormatType(output) == kCVPixelFormatType_64RGBAHalf,
               let destination = metal.packedTexture(from: output, pixelFormat: .rgba16Float) else {
-            throw GradeLabError.unsupportedExport("The HDR compositor needs half-float render surfaces.")
+            throw GradeLabError.unsupportedExport(String(localized: "The HDR compositor needs half-float render surfaces."))
         }
         let canvasSize = request.renderContext.size
         let canvases = try hdrCanvases(size: canvasSize, device: metal.device)
@@ -746,7 +746,7 @@ class LayerCompositor: NSObject, AVVideoCompositing, @unchecked Sendable {
                     throw TimelineError.invalid("A video layer frame is unavailable.")
                 }
                 guard let texture = metal.packedTexture(from: frame, pixelFormat: .rgba16Float) else {
-                    throw GradeLabError.unsupportedExport("An HDR source frame did not arrive as half-float.")
+                    throw GradeLabError.unsupportedExport(String(localized: "An HDR source frame did not arrive as half-float."))
                 }
                 retained.append(texture)
                 // Measured: a custom compositor is handed each source in its OWN
@@ -838,7 +838,7 @@ class LayerCompositor: NSObject, AVVideoCompositing, @unchecked Sendable {
     private static func requireNormalBlend(_ mode: VisualBlendMode) throws {
         guard mode != .normal else { return }
         throw GradeLabError.unsupportedExport(
-            "Blend modes other than Normal are not available in HDR projects yet. They are defined on 0-1 values, and an HDR image is not."
+            String(localized: "Blend modes other than Normal are not available in HDR projects yet. They are defined on 0-1 values, and an HDR image is not.")
         )
     }
 
@@ -1069,7 +1069,7 @@ extension LayerCompositor {
                   CVPixelBufferGetPixelFormatType(frame) == kCVPixelFormatType_422YpCbCr10BiPlanarFullRange,
                   let textures = PixelBufferTextures(pixelBuffer: frame, context: metal),
                   case .biPlanar(_, let luma, _, let chroma) = textures.storage else {
-                throw GradeLabError.unsupportedExport("Apple Log layers require untouched full-range 10-bit 4:2:2 source frames.")
+                throw GradeLabError.unsupportedExport(String(localized: "Apple Log layers require untouched full-range 10-bit 4:2:2 source frames."))
             }
             retained.append(textures)
             let profile = metadata.logProfileIdentifier.map(SourceColorProfile.fromLogIdentifier)
@@ -1079,10 +1079,10 @@ extension LayerCompositor {
                 // kind would be decoded through the wrong gamut and come out
                 // subtly, plausibly wrong — which is worse than a refusal.
                 throw GradeLabError.unsupportedExport(
-                    "This timeline is \(expectedProfile.displayName), but this clip is \(profile.displayName). A timeline cannot mix the two Log formats.")
+                    String(localized: "This timeline is \(expectedProfile.displayName), but this clip is \(profile.displayName). A timeline cannot mix the two Log formats."))
             }
             if profile == nil, metadata.transferFunction == "HLG" {
-                throw GradeLabError.unsupportedExport("HLG video cannot be interpreted as Rec.709 in an Apple Log timeline.")
+                throw GradeLabError.unsupportedExport(String(localized: "HLG video cannot be interpreted as Rec.709 in an Apple Log timeline."))
             }
             var partnerLuma = luma, partnerChroma = chroma
             var amount = 0.0
@@ -1184,7 +1184,7 @@ extension LayerCompositor {
                 encoder.setTexture(renderer.renderingLUT, index: 4)
             }
         } else {
-            throw GradeLabError.unsupportedExport("Apple Log layers need BGRA preview or 10-bit 4:2:2 export surfaces.")
+            throw GradeLabError.unsupportedExport(String(localized: "Apple Log layers need BGRA preview or 10-bit 4:2:2 export surfaces."))
         }
         // Composition-wide tags can relabel decoder inputs. Output tags belong
         // here, after the one and only Apple display transform has run.

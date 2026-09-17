@@ -1,9 +1,20 @@
 #!/bin/bash
+#
+# Builds the sound effect library from external WAV/MP3 collections.
+#
+# This produces the *sources*, not the files the app ships: point it at
+# SoundSources/ and then run Scripts/compile-sound-effects.sh, which encodes
+# them down and writes the bundled copies and their manifest. Running this alone
+# leaves the app unchanged.
+#
+# The original collections are not in this repo, so SoundSources/ is the master
+# copy — it is what every later re-encode starts from.
 
 set -euo pipefail
 
 if [[ $# -ne 3 ]]; then
     echo "Usage: $0 <essential-mp3-directory> <sound-design-wav-directory> <output-directory>" >&2
+    echo "       <output-directory> is normally SoundSources/; run compile-sound-effects.sh afterwards." >&2
     exit 64
 fi
 

@@ -22,10 +22,10 @@ enum ScopeType: String, CaseIterable, Identifiable, Sendable {
     /// What the scope measures, for the accessibility label.
     var summary: String {
         switch self {
-        case .histogram: "Distribution of red, green and blue levels"
-        case .waveform: "Luminance against horizontal image position"
-        case .rgbParade: "Red, green and blue levels against horizontal image position"
-        case .vectorscope: "Hue as angle and saturation as distance from centre"
+        case .histogram: String(localized: "Distribution of red, green and blue levels")
+        case .waveform: String(localized: "Luminance against horizontal image position")
+        case .rgbParade: String(localized: "Red, green and blue levels against horizontal image position")
+        case .vectorscope: String(localized: "Hue as angle and saturation as distance from centre")
         }
     }
 }

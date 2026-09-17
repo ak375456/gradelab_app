@@ -6,13 +6,13 @@ import VideoToolbox
 enum ExportMediaSettings {
     static func validate(_ configuration: ExportConfiguration) throws {
         guard configuration.resolution != .custom || (64...7680).contains(configuration.customLongEdge) else {
-            throw GradeLabError.unsupportedExport("Enter a longest edge from 64 to 7680 pixels.")
+            throw GradeLabError.unsupportedExport(String(localized: "Enter a longest edge from 64 to 7680 pixels."))
         }
         if let videoBitRate = configuration.videoBitRate, videoBitRate <= 0 {
-            throw GradeLabError.unsupportedExport("The requested video bit rate must be greater than zero.")
+            throw GradeLabError.unsupportedExport(String(localized: "The requested video bit rate must be greater than zero."))
         }
         guard configuration.audioBitRate > 0 else {
-            throw GradeLabError.unsupportedExport("The requested audio bit rate must be greater than zero.")
+            throw GradeLabError.unsupportedExport(String(localized: "The requested audio bit rate must be greater than zero."))
         }
     }
 

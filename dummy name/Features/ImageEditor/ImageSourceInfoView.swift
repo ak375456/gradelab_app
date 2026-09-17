@@ -30,7 +30,7 @@ struct ImageSourceInfoView: View {
                                     detail: "EXIF \(metadata.orientation)")
                         if let dpi = metadata.dpi, dpi > 0 {
                             AppDivider(inset: AppSpacing.standard)
-                            MetadataRow(label: "Resolution", value: String(format: "%.0f DPI", dpi))
+                            MetadataRow(label: "Resolution", value: String(format: "%.0f DPI", locale: .current, dpi))
                         }
                         if let created = metadata.creationDate {
                             AppDivider(inset: AppSpacing.standard)

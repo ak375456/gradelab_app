@@ -65,7 +65,7 @@ struct ImageMetadata: Codable, Equatable, Sendable {
     var resolutionLabel: String { "\(displayWidth) × \(displayHeight)" }
 
     var megapixelLabel: String {
-        megapixels >= 10 ? String(format: "%.0f MP", megapixels) : String(format: "%.1f MP", megapixels)
+        megapixels >= 10 ? String(format: "%.0f MP", locale: .current, megapixels) : String(format: "%.1f MP", locale: .current, megapixels)
     }
 
     /// A short name for the container: JPEG, HEIF, PNG.

@@ -369,7 +369,7 @@ final class TimelineCanvas: UIView, UIScrollViewDelegate, UIGestureRecognizerDel
             let x = geometry.x(for: tick)
             context.setStrokeColor(UIColor(white: 0.4, alpha: 1).cgColor)
             context.move(to: CGPoint(x: x, y: 23)); context.addLine(to: CGPoint(x: x, y: 29)); context.strokePath()
-            let label = interval < 0.1 ? String(format: "%.2fs", tick) : interval < 1 ? String(format: "%.1fs", tick) : String(format: "%02d:%02d", Int(tick)/60, Int(tick)%60)
+            let label = interval < 0.1 ? String(format: "%.2fs", locale: .current, tick) : interval < 1 ? String(format: "%.1fs", locale: .current, tick) : String(format: "%02d:%02d", Int(tick)/60, Int(tick)%60)
             (label as NSString).draw(at: CGPoint(x: x + 4, y: 6), withAttributes: [.font: UIFont.monospacedDigitSystemFont(ofSize: 10, weight: .regular), .foregroundColor: UIColor.lightGray])
             tick += interval
         }

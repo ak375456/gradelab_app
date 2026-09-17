@@ -31,6 +31,7 @@ struct SoundEffectBrowser: View {
                 && (query.isEmpty
                     || effect.title.localizedStandardContains(query)
                     || effect.category.localizedStandardContains(query)
+                    || Self.categoryLabel(effect.category).localizedStandardContains(query)
                     || effect.pack.localizedStandardContains(query))
         }.sorted { $0.title.localizedStandardCompare($1.title) == .orderedAscending }
     }
@@ -113,7 +114,7 @@ struct SoundEffectBrowser: View {
                 HStack(spacing: 7) {
                     ForEach(categories, id: \.self) { category in
                         Button { selectedCategory = category } label: {
-                            Text(category)
+                            Text(Self.categoryLabel(category))
                                 .font(.caption.weight(.semibold))
                                 .foregroundStyle(selectedCategory == category ? Color.black : AppColors.textSecondary)
                                 .padding(.horizontal, 11).padding(.vertical, 7)
@@ -145,7 +146,7 @@ struct SoundEffectBrowser: View {
             VStack(alignment: .leading, spacing: 4) {
                 Text(effect.title).font(.subheadline.weight(.medium)).lineLimit(1)
                 HStack(spacing: 5) {
-                    Text(effect.category)
+                    Text(Self.categoryLabel(effect.category))
                     Text("·")
                     Text(duration(effect.duration)).monospacedDigit()
                 }
@@ -172,9 +173,32 @@ struct SoundEffectBrowser: View {
 
     private func packLabel(_ pack: String) -> String {
         switch pack {
-        case "Essential Effects": "Essentials"
-        case "Sound Design Essentials": "Cinematic"
+        case "All": String(localized: "All")
+        case "Essential Effects": String(localized: "Essentials")
+        case "Sound Design Essentials": String(localized: "Cinematic")
         default: pack
+        }
+    }
+
+    /// Display only. The raw category drives `visibleEffects`, the "All" reset
+    /// in `onChange` and the search, so the identity has to stay English. The
+    /// effect titles themselves are catalogue data and stay as recorded.
+    static func categoryLabel(_ category: String) -> String {
+        switch category {
+        case "All": String(localized: "All")
+        case "Action": String(localized: "Action")
+        case "Ambience": String(localized: "Ambience")
+        case "Animals": String(localized: "Animals")
+        case "Cinematic Hits": String(localized: "Cinematic Hits")
+        case "Foley": String(localized: "Foley")
+        case "Glitches": String(localized: "Glitches")
+        case "Hits": String(localized: "Hits")
+        case "Musical": String(localized: "Musical")
+        case "Nature": String(localized: "Nature")
+        case "Other": String(localized: "Other")
+        case "People": String(localized: "People")
+        case "Risers": String(localized: "Risers")
+        default: category
         }
     }
 

@@ -62,7 +62,7 @@ enum SourceColorProfile: Equatable, Sendable {
         case .appleLog: "Apple Log"
         case .appleLog2: "Apple Log 2"
         case .otherLog(let identifier): Self.readableLogName(identifier)
-        case .unknown: "Unknown"
+        case .unknown: String(localized: "Unknown")
         }
     }
 
@@ -86,10 +86,10 @@ enum SourceColorProfile: Equatable, Sendable {
     /// How the dynamic range reads in Source Information.
     var dynamicRangeLabel: String {
         switch self {
-        case .appleLog, .appleLog2, .otherLog: "Log (scene-referred)"
+        case .appleLog, .appleLog2, .otherLog: String(localized: "Log (scene-referred)")
         case .hlgBT2020: "HDR"
         case .rec709, .rec709Wide: "SDR"
-        case .unknown: "Unknown"
+        case .unknown: String(localized: "Unknown")
         }
     }
 

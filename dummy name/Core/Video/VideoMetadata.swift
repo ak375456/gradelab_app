@@ -110,9 +110,9 @@ struct VideoMetadata: Codable, Equatable, Sendable {
         guard let fps, fps.isFinite, fps > 0 else { return nil }
         let rounded = fps.rounded()
         if abs(fps - rounded) < 0.01 {
-            return String(format: "%.0f FPS", rounded)
+            return String(format: "%.0f FPS", locale: .current, rounded)
         }
-        return String(format: "%.2f FPS", fps)
+        return String(format: "%.2f FPS", locale: .current, fps)
     }
 
     var resolutionLabel: String {
@@ -133,7 +133,7 @@ struct VideoMetadata: Codable, Equatable, Sendable {
 
     var bitrateLabel: String? {
         guard let estimatedBitrate, estimatedBitrate > 0 else { return nil }
-        return String(format: "%.0f Mbps", estimatedBitrate / 1_000_000)
+        return String(format: "%.0f Mbps", locale: .current, estimatedBitrate / 1_000_000)
     }
 
     var fileSizeLabel: String? {

@@ -156,7 +156,7 @@ struct CubeLUTParser: Sendable {
                       let red = Self.float(bytes, fields.starts[0], fields.ends[0], scratch: scratch),
                       let green = Self.float(bytes, fields.starts[1], fields.ends[1], scratch: scratch),
                       let blue = Self.float(bytes, fields.starts[2], fields.ends[2], scratch: scratch) else {
-                    throw GradeLabError.invalidLUT("Unrecognized or malformed data on line \(lineNumber).")
+                    throw GradeLabError.invalidLUT(String(localized: "Unrecognized or malformed data on line \(lineNumber)."))
                 }
                 values.append(SIMD3(red, green, blue))
                 continue
@@ -172,7 +172,7 @@ struct CubeLUTParser: Sendable {
             } else if Self.matches(bytes, keyStart, keyEnd, "LUT_1D_SIZE") {
                 guard fields.count == 2,
                       let size = Int(Self.text(bytes, fields.starts[1], fields.ends[1])), size >= 2 else {
-                    throw GradeLabError.invalidLUT("Invalid 1D size on line \(lineNumber).")
+                    throw GradeLabError.invalidLUT(String(localized: "Invalid 1D size on line \(lineNumber)."))
                 }
                 oneDimensionalSize = size
                 // A 1D LUT can be long; reserving avoids repeated growth.
@@ -181,7 +181,7 @@ struct CubeLUTParser: Sendable {
                 guard fields.count == 2,
                       let size = Int(Self.text(bytes, fields.starts[1], fields.ends[1])),
                       (2...65).contains(size) else {
-                    throw GradeLabError.invalidLUT("Invalid 3D size on line \(lineNumber).")
+                    throw GradeLabError.invalidLUT(String(localized: "Invalid 3D size on line \(lineNumber)."))
                 }
                 threeDimensionalSize = size
                 // The single biggest allocation win after the per-line Strings:
@@ -193,17 +193,17 @@ struct CubeLUTParser: Sendable {
             } else if Self.matches(bytes, keyStart, keyEnd, "DOMAIN_MAX") {
                 domainMaximum = try vector(bytes, fields, line: lineNumber, scratch: scratch)
             } else {
-                throw GradeLabError.invalidLUT("Unrecognized or malformed data on line \(lineNumber).")
+                throw GradeLabError.invalidLUT(String(localized: "Unrecognized or malformed data on line \(lineNumber)."))
             }
         }
 
         guard domainMinimum.x < domainMaximum.x,
               domainMinimum.y < domainMaximum.y,
               domainMinimum.z < domainMaximum.z else {
-            throw GradeLabError.invalidLUT("DOMAIN_MIN must be smaller than DOMAIN_MAX.")
+            throw GradeLabError.invalidLUT(String(localized: "DOMAIN_MIN must be smaller than DOMAIN_MAX."))
         }
         guard (oneDimensionalSize == nil) != (threeDimensionalSize == nil) else {
-            throw GradeLabError.invalidLUT("Declare exactly one LUT size.")
+            throw GradeLabError.invalidLUT(String(localized: "Declare exactly one LUT size."))
         }
 
         let kind: CubeLUT.Kind
@@ -215,11 +215,11 @@ struct CubeLUTParser: Sendable {
             kind = .oneDimensional(size: size)
             expectedCount = size
         } else {
-            throw GradeLabError.invalidLUT("Missing LUT size.")
+            throw GradeLabError.invalidLUT(String(localized: "Missing LUT size."))
         }
 
         guard values.count == expectedCount else {
-            throw GradeLabError.invalidLUT("Expected \(expectedCount) entries but found \(values.count).")
+            throw GradeLabError.invalidLUT(String(localized: "Expected \(expectedCount) entries but found \(values.count)."))
         }
         return CubeLUT(
             title: title,
@@ -238,7 +238,7 @@ struct CubeLUTParser: Sendable {
               let x = Self.float(bytes, fields.starts[1], fields.ends[1], scratch: scratch),
               let y = Self.float(bytes, fields.starts[2], fields.ends[2], scratch: scratch),
               let z = Self.float(bytes, fields.starts[3], fields.ends[3], scratch: scratch) else {
-            throw GradeLabError.invalidLUT("Invalid domain on line \(line).")
+            throw GradeLabError.invalidLUT(String(localized: "Invalid domain on line \(line)."))
         }
         return SIMD3(x, y, z)
     }

@@ -50,7 +50,7 @@ final class AppleLogLayerRenderer {
             context.luts.prepareRenderingLUT(named: AppleLogRendering.rec709LUTResourceName)
             guard let lut = context.luts.renderingTexture(named: AppleLogRendering.rec709LUTResourceName) else {
                 throw GradeLabError.unsupportedExport(
-                    "Apple's Apple Log to Rec.709 rendering LUT could not be loaded. Apple Log layers have no defined display transform without it.")
+                    String(localized: "Apple's Apple Log to Rec.709 rendering LUT could not be loaded. Apple Log layers have no defined display transform without it."))
             }
             renderingLUT = lut
             Self.cachedLUT[key] = lut

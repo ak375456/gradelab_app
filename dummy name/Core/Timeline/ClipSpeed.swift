@@ -78,11 +78,11 @@ enum ClipSpeed {
     static func label(_ speed: Double) -> String {
         let rounded = (speed * 100).rounded() / 100
         if rounded == rounded.rounded() {
-            return String(format: "%.0f×", rounded)
+            return String(format: "%.0f×", locale: .current, rounded)
         }
         if (rounded * 10).rounded() == rounded * 10 {
-            return String(format: "%.1f×", rounded)
+            return String(format: "%.1f×", locale: .current, rounded)
         }
-        return String(format: "%.2f×", rounded)
+        return String(format: "%.2f×", locale: .current, rounded)
     }
 }

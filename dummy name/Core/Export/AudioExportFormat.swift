@@ -20,7 +20,7 @@ enum AudioExportFormat {
               let description = CMSampleBufferGetFormatDescription(sample),
               CMFormatDescriptionGetMediaSubType(description) == kAudioFormatLinearPCM,
               CMSampleBufferGetOutputDuration(sample).isNumeric else {
-            throw GradeLabError.exportFailed("The source audio timing could not be prepared for export.")
+            throw GradeLabError.exportFailed(String(localized: "The source audio timing could not be prepared for export."))
         }
         var timing = CMSampleTimingInfo(
             duration: CMTimeMultiplyByRatio(CMSampleBufferGetOutputDuration(sample),
@@ -33,7 +33,7 @@ enum AudioExportFormat {
             sampleTimingEntryCount: 1, sampleTimingArray: &timing, sampleBufferOut: &result
         )
         guard status == noErr, let result else {
-            throw GradeLabError.exportFailed("The source audio timing could not be prepared for export.")
+            throw GradeLabError.exportFailed(String(localized: "The source audio timing could not be prepared for export."))
         }
         return result
     }
@@ -69,7 +69,7 @@ enum AudioExportFormat {
             extensions: nil, formatDescriptionOut: &repaired
         )
         guard status == noErr, let repaired else {
-            throw GradeLabError.unsupportedExport("The source audio format could not be prepared for export.")
+            throw GradeLabError.unsupportedExport(String(localized: "The source audio format could not be prepared for export."))
         }
         return repaired
     }

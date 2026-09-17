@@ -61,16 +61,26 @@ struct ExportConfiguration: Equatable, Sendable {
 
         var detail: String {
             switch self {
-            case .hevc: "Smaller files. Plays almost everywhere."
-            case .h264: "Largest compatibility, larger files."
-            case .proRes422HQ: "Mastering quality for further editing. Very large files."
-            case .proRes422: "Mastering quality, somewhat smaller than HQ."
+            case .hevc: String(localized: "Smaller files. Plays almost everywhere.")
+            case .h264: String(localized: "Largest compatibility, larger files.")
+            case .proRes422HQ: String(localized: "Mastering quality for further editing. Very large files.")
+            case .proRes422: String(localized: "Mastering quality, somewhat smaller than HQ.")
             }
         }
     }
 
     enum QualityPreset: String, Codable, Sendable, CaseIterable {
         case maximum = "Maximum", high = "High", compact = "Smaller file"
+
+        /// Display only. `rawValue` stays the persisted key so existing
+        /// projects keep decoding.
+        var title: String {
+            switch self {
+            case .maximum: String(localized: "Maximum")
+            case .high: String(localized: "High")
+            case .compact: String(localized: "Smaller file")
+            }
+        }
     }
 
     enum Container: String, CaseIterable, Sendable {

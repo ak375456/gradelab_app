@@ -31,9 +31,9 @@ enum PreviewQuality: String, CaseIterable, Identifiable, Sendable {
 
     var title: String {
         switch self {
-        case .low: "Low"
-        case .medium: "Medium"
-        case .full: "Full"
+        case .low: String(localized: "Low")
+        case .medium: String(localized: "Medium")
+        case .full: String(localized: "Full")
         }
     }
 
@@ -41,17 +41,17 @@ enum PreviewQuality: String, CaseIterable, Identifiable, Sendable {
     /// timecode without crowding it.
     var badge: String {
         switch self {
-        case .low: "Low"
-        case .medium: "Med"
-        case .full: "Full"
+        case .low: String(localized: "Low", comment: "Short preview-quality badge")
+        case .medium: String(localized: "Med", comment: "Short preview-quality badge")
+        case .full: String(localized: "Full", comment: "Short preview-quality badge")
         }
     }
 
     var detail: String {
         switch self {
-        case .low: "Plays at up to 960 px. Smoothest on 4K and layered timelines."
-        case .medium: "Plays at up to 1920 px."
-        case .full: "Plays at the project's own resolution."
+        case .low: String(localized: "Plays at up to 960 px. Smoothest on 4K and layered timelines.")
+        case .medium: String(localized: "Plays at up to 1920 px.")
+        case .full: String(localized: "Plays at the project's own resolution.")
         }
     }
 

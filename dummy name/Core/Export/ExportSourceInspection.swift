@@ -64,7 +64,7 @@ enum ExportSourceInspector {
                 throw GradeLabError.missingVideoTrack
             }
             throw GradeLabError.unsupportedExport(
-                "Videos containing multiple video tracks are not supported for export yet."
+                String(localized: "Videos containing multiple video tracks are not supported for export yet.")
             )
         }
 
@@ -89,7 +89,7 @@ enum ExportSourceInspector {
               videoTimeRange.duration.isNumeric,
               videoTimeRange.duration.seconds > 0 else {
             throw GradeLabError.unsupportedExport(
-                "The source video does not have a finite exportable duration."
+                String(localized: "The source video does not have a finite exportable duration.")
             )
         }
 
@@ -97,7 +97,7 @@ enum ExportSourceInspector {
         let height = Int(abs(naturalSize.height).rounded())
         guard width > 0, height > 0 else {
             throw GradeLabError.unsupportedExport(
-                "The source video does not report valid encoded dimensions."
+                String(localized: "The source video does not report valid encoded dimensions.")
             )
         }
 
@@ -135,7 +135,7 @@ enum ExportSourceInspector {
         }
         guard CMTimeCompare(sessionStartTime, .zero) >= 0 else {
             throw GradeLabError.unsupportedExport(
-                "Videos with negative source timestamps cannot yet be exported without retiming."
+                String(localized: "Videos with negative source timestamps cannot yet be exported without retiming.")
             )
         }
 
@@ -177,12 +177,12 @@ enum ExportSourceInspector {
         if metadata.isHDR == true {
             let transfer = metadata.transferFunction ?? "HDR"
             throw GradeLabError.unsupportedExport(
-                "\(transfer) export is not supported. Only HLG has a validated 10-bit HDR path."
+                String(localized: "\(transfer) export is not supported. Only HLG has a validated 10-bit HDR path.")
             )
         }
         if let bitDepth = metadata.bitDepth, bitDepth > 8 {
             throw GradeLabError.unsupportedExport(
-                "\(bitDepth)-bit source video is not supported yet. This export path is 8-bit only."
+                String(localized: "\(bitDepth)-bit source video is not supported yet. This export path is 8-bit only.")
             )
         }
         if let primaries = metadata.colorPrimaries, primaries != "BT.709" {
@@ -203,7 +203,7 @@ enum ExportSourceInspector {
     ) throws {
         guard !descriptions.isEmpty else {
             throw GradeLabError.unsupportedExport(
-                "The source color format could not be verified safely."
+                String(localized: "The source color format could not be verified safely.")
             )
         }
 
@@ -211,7 +211,7 @@ enum ExportSourceInspector {
         for description in descriptions {
             guard CMFormatDescriptionGetMediaType(description) == kCMMediaType_Video else {
                 throw GradeLabError.unsupportedExport(
-                    "The source contains an invalid video format description."
+                    String(localized: "The source contains an invalid video format description.")
                 )
             }
 
@@ -219,7 +219,7 @@ enum ExportSourceInspector {
             if let firstDimensions,
                (firstDimensions.width != dimensions.width || firstDimensions.height != dimensions.height) {
                 throw GradeLabError.unsupportedExport(
-                    "Videos that change encoded dimensions mid-stream are not supported yet."
+                    String(localized: "Videos that change encoded dimensions mid-stream are not supported yet.")
                 )
             }
             firstDimensions = firstDimensions ?? dimensions
@@ -230,7 +230,7 @@ enum ExportSourceInspector {
                 try validateRec709(description, allowMissing: allowMissingRec709Tags)
                 guard depth <= 8 else {
                     throw GradeLabError.unsupportedExport(
-                        "\(depth)-bit source video is not supported yet. This export path is 8-bit only."
+                        String(localized: "\(depth)-bit source video is not supported yet. This export path is 8-bit only.")
                     )
                 }
             case .sdrWide:
@@ -239,14 +239,14 @@ enum ExportSourceInspector {
                 try validateRec709(description)
                 guard depth > 8 else {
                     throw GradeLabError.unsupportedExport(
-                        "This source reports \(depth)-bit precision, so it does not need the wide path."
+                        String(localized: "This source reports \(depth)-bit precision, so it does not need the wide path.")
                     )
                 }
             case .hdrHLG:
                 try validateHLG(description)
                 guard depth >= 10 else {
                     throw GradeLabError.unsupportedExport(
-                        "This HLG source reports \(depth)-bit precision, which cannot be encoded as Main 10."
+                        String(localized: "This HLG source reports \(depth)-bit precision, which cannot be encoded as Main 10.")
                     )
                 }
             case .appleLog, .appleLog2:
@@ -257,7 +257,7 @@ enum ExportSourceInspector {
                 try validateAppleLog(description, expecting: colorMode == .appleLog2 ? .appleLog2 : .appleLog)
                 guard depth >= 10 else {
                     throw GradeLabError.unsupportedExport(
-                        "This \(colorMode.title) source reports \(depth)-bit precision. Log needs at least 10 bits to survive the transform to scene light."
+                        String(localized: "This \(colorMode.title) source reports \(depth)-bit precision. Log needs at least 10 bits to survive the transform to scene light.")
                     )
                 }
             }
@@ -284,13 +284,13 @@ enum ExportSourceInspector {
         // Refused rather than transformed on an assumption.
         guard let identifier else {
             throw GradeLabError.unsupportedExport(
-                "This project is set to \(expected.displayName), but the source declares no Log profile. GradeLab does not apply the Apple Log transform to footage that does not identify itself as Log."
+                String(localized: "This project is set to \(expected.displayName), but the source declares no Log profile. GradeLab does not apply the Apple Log transform to footage that does not identify itself as Log.")
             )
         }
         let declared = SourceColorProfile.fromLogIdentifier(identifier)
         guard declared == expected else {
             throw GradeLabError.unsupportedExport(
-                "This source declares itself as \(declared.displayName), not \(expected.displayName), so it is not processed through the \(expected.displayName) transform."
+                String(localized: "This source declares itself as \(declared.displayName), not \(expected.displayName), so it is not processed through the \(expected.displayName) transform.")
             )
         }
         // Both Apple Log formats carry Y'C'BC'R built with the BT.2020
@@ -303,7 +303,7 @@ enum ExportSourceInspector {
             .map { String(describing: $0) }
         if let matrix, !matrix.contains("ITU_R_2020") {
             throw GradeLabError.unsupportedExport(
-                "This \(expected.displayName) source declares a \(matrix) YCbCr matrix. GradeLab decodes Log chroma with the BT.2020 coefficients Apple specifies and will not reinterpret it."
+                String(localized: "This \(expected.displayName) source declares a \(matrix) YCbCr matrix. GradeLab decodes Log chroma with the BT.2020 coefficients Apple specifies and will not reinterpret it.")
             )
         }
     }
@@ -316,20 +316,20 @@ enum ExportSourceInspector {
 
         guard codec == "hvc1" || codec == "hev1" else {
             throw GradeLabError.unsupportedExport(
-                "HDR export requires an HEVC source; this one is \(codec.uppercased())."
+                String(localized: "HDR export requires an HEVC source; this one is \(codec.uppercased()).")
             )
         }
         if codec == "dvh1" || codec == "dvhe"
             || extensionDescription.localizedCaseInsensitiveContains("DolbyVision") {
             throw GradeLabError.unsupportedExport(
-                "Dolby Vision is not supported. Its dynamic metadata cannot be carried through grading, and GradeLab will not attach stale metadata to graded frames."
+                String(localized: "Dolby Vision is not supported. Its dynamic metadata cannot be carried through grading, and GradeLab will not attach stale metadata to graded frames.")
             )
         }
 
         func require(_ value: Any?, contains token: String, property: String) throws {
             guard let value, String(describing: value).contains(token) else {
                 throw GradeLabError.unsupportedExport(
-                    "HDR export needs \(property) to be \(token); this source reports \(value.map { String(describing: $0) } ?? "nothing")."
+                    String(localized: "HDR export needs \(property) to be \(token); this source reports \(value.map { String(describing: $0) } ?? "nothing").")
                 )
             }
         }
@@ -355,7 +355,7 @@ enum ExportSourceInspector {
             || extensionDescription.localizedCaseInsensitiveContains("ContentLightLevelInfo")
             || extensionDescription.localizedCaseInsensitiveContains("DolbyVision") {
             throw GradeLabError.unsupportedExport(
-                "HDR or Dolby Vision source video is not supported yet."
+                String(localized: "HDR or Dolby Vision source video is not supported yet.")
             )
         }
 
@@ -390,7 +390,7 @@ enum ExportSourceInspector {
             // explicit conflicting value still fails below.
             if allowMissing { return }
             throw GradeLabError.unsupportedExport(
-                "The source does not declare its \(property). Export is blocked to avoid an incorrect color conversion."
+                String(localized: "The source does not declare its \(property). Export is blocked to avoid an incorrect color conversion.")
             )
         }
         let text = String(describing: value)
@@ -402,7 +402,7 @@ enum ExportSourceInspector {
 
     private static func unsupportedColorProperty(_ property: String, value: String) -> GradeLabError {
         GradeLabError.unsupportedExport(
-            "The source uses \(value) \(property). Only 8-bit Rec.709 SDR export is supported right now."
+            String(localized: "The source uses \(value) \(property). Only 8-bit Rec.709 SDR export is supported right now.")
         )
     }
 
@@ -450,7 +450,7 @@ enum ExportSourceInspector {
 
     private static func unverifiableBitDepth(_ codec: String) -> GradeLabError {
         GradeLabError.unsupportedExport(
-            "The \(codec.uppercased()) source bit depth could not be verified as 8-bit. Export is blocked to avoid flattening higher-bit-depth video."
+            String(localized: "The \(codec.uppercased()) source bit depth could not be verified as 8-bit. Export is blocked to avoid flattening higher-bit-depth video.")
         )
     }
 
@@ -473,7 +473,7 @@ enum ExportSourceInspector {
               CMFormatDescriptionGetMediaType(firstDescription) == kCMMediaType_Audio,
               let basicDescription = CMAudioFormatDescriptionGetStreamBasicDescription(firstDescription) else {
             throw GradeLabError.unsupportedExport(
-                "A source audio track has an unreadable format and cannot be preserved."
+                String(localized: "A source audio track has an unreadable format and cannot be preserved.")
             )
         }
 
@@ -481,7 +481,7 @@ enum ExportSourceInspector {
         let channelCount = Int(basicDescription.pointee.mChannelsPerFrame)
         guard sampleRate.isFinite, sampleRate > 0, channelCount > 0 else {
             throw GradeLabError.unsupportedExport(
-                "A source audio track has invalid channel or sample-rate information."
+                String(localized: "A source audio track has invalid channel or sample-rate information.")
             )
         }
 
@@ -490,7 +490,7 @@ enum ExportSourceInspector {
                   stream.pointee.mSampleRate == sampleRate,
                   Int(stream.pointee.mChannelsPerFrame) == channelCount else {
                 throw GradeLabError.unsupportedExport(
-                    "Audio tracks that change format mid-stream cannot be preserved yet."
+                    String(localized: "Audio tracks that change format mid-stream cannot be preserved yet.")
                 )
             }
         }
@@ -504,7 +504,7 @@ enum ExportSourceInspector {
 
         if channelCount > 2, channelLayout == nil {
             throw GradeLabError.unsupportedExport(
-                "A multichannel source audio track has no channel layout and cannot be preserved safely."
+                String(localized: "A multichannel source audio track has no channel layout and cannot be preserved safely.")
             )
         }
 

@@ -44,7 +44,7 @@ final class ExportFrameSampler {
         try Task.checkCancellation()
         guard let sample = output.copyNextSampleBuffer() else { return nil }
         guard CMSampleBufferGetPresentationTimeStamp(sample).isNumeric else {
-            throw GradeLabError.exportFailed("The source contains an invalid frame timestamp.")
+            throw GradeLabError.exportFailed(String(localized: "The source contains an invalid frame timestamp."))
         }
         return sample
     }

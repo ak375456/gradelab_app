@@ -68,23 +68,23 @@ struct FilmEffectParameter: Identifiable {
     var property: AnimatableProperty? { slot.flatMap { AnimatableProperty.effect($0) } }
 
     static let all: [FilmEffectParameter] = [
-        .init(id: "fade", name: "Fade",
-              detail: "Lifts the blacks toward a matte, washed-print look.",
+        .init(id: "fade", name: String(localized: "Fade"),
+              detail: String(localized: "Lifts the blacks toward a matte, washed-print look."),
               keyPath: \.fade),
-        .init(id: "sharpness", name: "Sharpen",
-              detail: "Local contrast at the edges. Past the middle it starts to show halos.",
+        .init(id: "sharpness", name: String(localized: "Sharpen"),
+              detail: String(localized: "Local contrast at the edges. Past the middle it starts to show halos."),
               keyPath: \.sharpness),
-        .init(id: "bloom", name: "Bloom",
-              detail: "Bright areas bleed into what surrounds them.",
+        .init(id: "bloom", name: String(localized: "Bloom"),
+              detail: String(localized: "Bright areas bleed into what surrounds them."),
               keyPath: \.bloom),
-        .init(id: "glow", name: "Glow",
-              detail: "A soft diffusion across the whole frame, not only the highlights.",
+        .init(id: "glow", name: String(localized: "Glow"),
+              detail: String(localized: "A soft diffusion across the whole frame, not only the highlights."),
               keyPath: \.glow),
-        .init(id: "halation", name: "Halation",
-              detail: "The red halo film gets around bright areas.",
+        .init(id: "halation", name: String(localized: "Halation"),
+              detail: String(localized: "The red halo film gets around bright areas."),
               keyPath: \.halation),
-        .init(id: "grain", name: "Grain",
-              detail: "Monochrome grain, strongest through the midtones as film is.",
+        .init(id: "grain", name: String(localized: "Grain"),
+              detail: String(localized: "Monochrome grain, strongest through the midtones as film is."),
               keyPath: \.grain)
     ]
 }

@@ -50,9 +50,9 @@ struct BeforeAfterSlider: View {
                         Rectangle().frame(width: width * split)
                     }
 
-                label("BEFORE", alignment: .leading)
+                label(String(localized: "BEFORE"), alignment: .leading)
                     .opacity(split > 0.18 ? 1 : 0)
-                label("AFTER", alignment: .trailing)
+                label(String(localized: "AFTER"), alignment: .trailing)
                     .opacity(split < 0.82 ? 1 : 0)
 
                 handle(width: width, height: geometry.size.height)
