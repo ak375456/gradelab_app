@@ -16,6 +16,24 @@
             "state" : "new",
             "value" : "GradeLab"
           }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "GradeLab"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "GradeLab"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "GradeLab"
+          }
         }
       }
     },
@@ -45,6 +63,24 @@
           "stringUnit" : {
             "state" : "new",
             "value" : "GradeLab needs permission to save your graded video or photo to Photos."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "GradeLab necesita permiso para guardar tu vídeo o tu foto etalonada en Fotos."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "GradeLab a besoin de votre autorisation pour enregistrer votre vidéo ou votre photo étalonnée dans Photos."
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "GradeLab ha bisogno dell'autorizzazione per salvare in Foto il tuo video o la tua foto con il grading applicato."
           }
         }
       }

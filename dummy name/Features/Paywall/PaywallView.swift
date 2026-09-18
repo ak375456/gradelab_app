@@ -185,7 +185,7 @@ struct PaywallView: View {
                     Image(systemName: selected ? "largecircle.fill.circle" : "circle")
                         .font(.title3).foregroundStyle(selected ? accent : .white.opacity(0.4))
                     VStack(alignment: .leading, spacing: 4) {
-                        Text(founding ? "Lifetime Pro" : plan.title).font(.headline)
+                        Text(founding ? String(localized: "Lifetime Pro") : plan.title).font(.headline)
                         Text(plan.billingLabel).font(.caption).foregroundStyle(.white.opacity(0.65))
                     }
                     Spacer(minLength: 4)
@@ -249,15 +249,15 @@ struct PaywallView: View {
     private func planAccessibilityLabel(
         _ plan: ProPlan, product: Product?, founding: Bool, savings: Int?, weekly: String?
     ) -> String {
-        var parts = [founding ? "Lifetime Pro" : plan.title]
+        var parts = [founding ? String(localized: "Lifetime Pro") : plan.title]
         if let standard = product.flatMap(store.standardPriceLabel) {
-            parts.append("Was \(standard)")
+            parts.append(String(localized: "Was \(standard)"))
         }
         if let price = product?.displayPrice { parts.append(price) }
         parts.append(plan.billingLabel)
-        if let weekly { parts.append("\(weekly) per week") }
-        if founding { parts.append("Founding price, launch week only") }
-        if let savings { parts.append("Saves \(savings) percent against the weekly plan") }
+        if let weekly { parts.append(String(localized: "\(weekly) per week")) }
+        if founding { parts.append(String(localized: "Founding price, launch week only")) }
+        if let savings { parts.append(String(localized: "Saves \(savings) percent against the weekly plan")) }
         return parts.joined(separator: ". ")
     }
     private var footer: some View {
