@@ -1,8 +1,80 @@
 import SwiftUI
 import UIKit
 
+/// The screen geometry of one selectable drawn layer.
+///
+/// Titles and shapes are dragged, pinched and rotated with identical rules, and
+/// they magnet onto each other's edges, so the handles are written once against
+/// this description instead of twice against two clip types. Everything here is
+/// in AUTHORED canvas units — the reduced preview surface text point sizes and
+/// shape dimensions are both stored in — never screen points.
+struct CanvasOverlay: Identifiable {
+    let id: UUID
+    var transform: VisualTransform
+    let range: TimelineRange
+    /// The bounds the anchor and placement are measured against: a title's
+    /// fitted line box, a shape's own box.
+    let anchorBounds: CGRect
+    /// The frame drawn around the selection, padded clear of the ink or outline.
+    let frame: CGRect
+    /// Whether a double tap opens a content editor. Only a title has content.
+    let editsContent: Bool
+
+    init(_ clip: TextClip, canvas: CGSize) {
+        let layout = TextRenderer.layout(clip, canvas: canvas)
+        id = clip.id
+        transform = clip.transform
+        range = clip.placement.range
+        anchorBounds = layout.fittedBounds
+        // Frame the glyphs, not the full wrapping width.
+        frame = layout.fittedBounds.insetBy(dx: -max(6, clip.strokeWidth), dy: -6)
+        editsContent = true
+    }
+
+    init(_ clip: ShapeClip, canvas: CGSize) {
+        let bounds = ShapeRenderer.bounds(clip)
+        id = clip.id
+        transform = clip.transform
+        range = clip.placement.range
+        anchorBounds = bounds
+        // A centred stroke hangs half its width outside the figure.
+        let pad = max(6, clip.strokeWidth/2)
+        frame = bounds.insetBy(dx: -pad, dy: -pad)
+        editsContent = false
+    }
+
+    func placement(canvas: CGSize) -> CGAffineTransform {
+        transform.placement(bounds: anchorBounds, canvas: canvas)
+    }
+
+    /// The same overlay proposed at another position, for the magnet to measure
+    /// before anything is written to the project.
+    func moved(x: Double, y: Double) -> CanvasOverlay {
+        var copy = self
+        copy.transform.positionX = x
+        copy.transform.positionY = y
+        return copy
+    }
+
+    /// Axis-aligned screen-space bounds in canvas units, origin at top-left.
+    func screenBounds(canvas: CGSize) -> CGRect {
+        let transform = placement(canvas: canvas)
+        let points = [
+            CGPoint(x: frame.minX, y: frame.minY), CGPoint(x: frame.maxX, y: frame.minY),
+            CGPoint(x: frame.maxX, y: frame.maxY), CGPoint(x: frame.minX, y: frame.maxY)
+        ].map { point -> CGPoint in
+            let placed = point.applying(transform)
+            return CGPoint(x: placed.x, y: canvas.height-placed.y)
+        }
+        let xs = points.map(\.x), ys = points.map(\.y)
+        return CGRect(x: xs.min() ?? 0, y: ys.min() ?? 0,
+                      width: (xs.max() ?? 0)-(xs.min() ?? 0),
+                      height: (ys.max() ?? 0)-(ys.min() ?? 0))
+    }
+}
+
 /// Canvas-space hit geometry follows the same layout/transform as export.
-struct TextCanvasControls: View {
+struct OverlayCanvasControls: View {
     @ObservedObject var model: EditorViewModel
     let editContent: () -> Void
     @State private var origin: VisualTransform?
@@ -24,27 +96,27 @@ struct TextCanvasControls: View {
 
     var body: some View {
         GeometryReader { view in
-            // Geometry uses the EVALUATED clip so the selection frame sits on the glyphs
-            // you can actually see while animation is driving the frame.
-            if let clip = model.evaluatedText, model.canEditSelection,
+            // Drawn layers are authored in the base preview's coordinate system.
+            // Using the full 4K canvas here made the selection frame half the
+            // size of the visible layer even though the layer itself looked
+            // right in the editor.
+            let canvas = SequenceComposition.previewRenderSize(
+                width: model.project.canvas.width,
+                height: model.project.canvas.height
+            )
+            // Geometry uses the EVALUATED layer so the selection frame sits on what
+            // you can actually see while animation is driving it.
+            if let overlay = selection(canvas: canvas), model.canEditSelection,
                model.selectedClipIDs.count == 1,
-               model.timelineTime >= clip.placement.timelineStart.seconds,
-               model.timelineTime < ((try? clip.placement.range.end.seconds) ?? 0) {
-                // Text is authored in the base preview's coordinate system.
-                // Using the full 4K canvas here made the selection frame half
-                // the size of the visible text even though the text itself
-                // looked right in the editor.
-                let canvas = SequenceComposition.previewRenderSize(
-                    width: model.project.canvas.width,
-                    height: model.project.canvas.height
-                )
+               model.timelineTime >= overlay.range.start.seconds,
+               model.timelineTime < ((try? overlay.range.end.seconds) ?? 0) {
                 let fit = min(view.size.width/canvas.width, view.size.height/canvas.height)
-                let offset = CGPoint(x: (view.size.width-canvas.width*fit)/2, y: (view.size.height-canvas.height*fit)/2)
-                let layout = TextRenderer.layout(clip, canvas: canvas)
-                // Frame the glyphs, not the full wrapping width.
-                let frame = layout.fittedBounds.insetBy(dx: -max(6, clip.strokeWidth), dy: -6)
-                let placement = TextRenderer.placement(clip, bounds: layout.fittedBounds, canvas: canvas)
-                let corners = [CGPoint(x: frame.minX, y: frame.minY), CGPoint(x: frame.maxX, y: frame.minY), CGPoint(x: frame.maxX, y: frame.maxY), CGPoint(x: frame.minX, y: frame.maxY)].map { point in
+                let offset = CGPoint(x: (view.size.width-canvas.width*fit)/2,
+                                     y: (view.size.height-canvas.height*fit)/2)
+                let placement = overlay.placement(canvas: canvas)
+                let frame = overlay.frame
+                let corners = [CGPoint(x: frame.minX, y: frame.minY), CGPoint(x: frame.maxX, y: frame.minY),
+                               CGPoint(x: frame.maxX, y: frame.maxY), CGPoint(x: frame.minX, y: frame.maxY)].map { point in
                     let p = point.applying(placement)
                     return CGPoint(x: offset.x+p.x*fit, y: offset.y+(canvas.height-p.y)*fit)
                 }
@@ -63,13 +135,12 @@ struct TextCanvasControls: View {
                         // The baseline is the EVALUATED transform at gesture start, so a
                         // keyframe inserted between existing ones starts from what was on
                         // screen rather than an outdated base value.
-                        if origin == nil { origin = clip.transform; model.playback.pause() }
+                        if origin == nil { origin = overlay.transform; model.playback.pause() }
                         guard let origin else { return }
                         let rawX = origin.positionX+value.translation.width/(canvas.width*fit)
                         let rawY = origin.positionY+value.translation.height/(canvas.height*fit)
-                        let aligned = align(clip: clip, x: rawX, y: rawY, canvas: canvas,
-                                            screenScale: fit,
-                                            others: model.visibleEvaluatedTexts.filter { $0.id != clip.id })
+                        let aligned = align(overlay: overlay, x: rawX, y: rawY, canvas: canvas,
+                                            screenScale: fit, others: peers(canvas: canvas, excluding: overlay.id))
                         let x = aligned.xGuide == nil
                             ? snap(rawX, to: Self.positionStops, tolerance: Self.positionTolerance)
                             : (aligned.x, aligned.xGuide)
@@ -81,11 +152,11 @@ struct TextCanvasControls: View {
                         model.setAnimatableValue(.positionY, .number(y.0))
                     }.onEnded { _ in origin = nil; guides = (nil, nil); model.flushGradeHistory() })
                     .simultaneousGesture(MagnifyGesture().onChanged { value in
-                        if initialScale == nil { initialScale = clip.transform.scale; model.playback.pause() }
+                        if initialScale == nil { initialScale = overlay.transform.scale; model.playback.pause() }
                         model.setAnimatableValue(.scale, .number(min(6, max(0.05, initialScale! * value.magnification))))
                     }.onEnded { _ in initialScale = nil; model.flushGradeHistory() })
                     .simultaneousGesture(RotateGesture().onChanged { value in
-                        if initialRotation == nil { initialRotation = clip.transform.rotationDegrees; model.playback.pause() }
+                        if initialRotation == nil { initialRotation = overlay.transform.rotationDegrees; model.playback.pause() }
                         // Accumulated, never wrapped into +/-180: a deliberate multi-turn
                         // rotation must survive as real motion.
                         let raw = initialRotation!+value.rotation.degrees
@@ -93,13 +164,16 @@ struct TextCanvasControls: View {
                         reportRotation(snapped.stop)
                         model.setAnimatableValue(.rotation, .number(snapped.value))
                     }.onEnded { _ in initialRotation = nil; rotationGuide = nil; model.flushGradeHistory() })
-                    .onTapGesture(count: 2, perform: editContent)
-                    .accessibilityLabel("Selected text. Drag to move, pinch to resize, rotate with two fingers.")
-                let center = CGPoint(x: offset.x+clip.transform.positionX*canvas.width*fit, y: offset.y+clip.transform.positionY*canvas.height*fit)
+                    .onTapGesture(count: 2) { if overlay.editsContent { editContent() } }
+                    .accessibilityLabel(overlay.editsContent
+                        ? "Selected text. Drag to move, pinch to resize, rotate with two fingers."
+                        : "Selected shape. Drag to move, pinch to resize, rotate with two fingers.")
+                let center = CGPoint(x: offset.x+overlay.transform.positionX*canvas.width*fit,
+                                     y: offset.y+overlay.transform.positionY*canvas.height*fit)
                 Circle().fill(.cyan).frame(width: 12, height: 12).frame(width: 44, height: 44).contentShape(Rectangle())
                     .position(corners[1])
-                    .gesture(DragGesture(minimumDistance: 1, coordinateSpace: .named("textCanvas")).onChanged { value in
-                        if origin == nil { origin = clip.transform }
+                    .gesture(DragGesture(minimumDistance: 1, coordinateSpace: .named("overlayCanvas")).onChanged { value in
+                        if origin == nil { origin = overlay.transform }
                         let start = CGVector(dx: value.startLocation.x-center.x, dy: value.startLocation.y-center.y)
                         let current = CGVector(dx: value.location.x-center.x, dy: value.location.y-center.y)
                         let ratio = hypot(current.dx, current.dy)/max(1, hypot(start.dx, start.dy))
@@ -110,14 +184,31 @@ struct TextCanvasControls: View {
                         model.setAnimatableValue(.scale, .number(min(6, max(0.05, origin!.scale*ratio))))
                         model.setAnimatableValue(.rotation, .number(snapped.value))
                     }.onEnded { _ in origin = nil; rotationGuide = nil; model.flushGradeHistory() })
-                    .accessibilityLabel("Resize and rotate text")
+                    .accessibilityLabel(overlay.editsContent ? "Resize and rotate text" : "Resize and rotate shape")
                 Button { model.deleteClip() } label: {
                     Image(systemName: "xmark").font(.system(size: 11, weight: .bold)).foregroundStyle(.black)
                         .frame(width: 22, height: 22).background(Circle().fill(.cyan))
                         .frame(width: 44, height: 44).contentShape(Rectangle())
-                }.position(corners[3]).accessibilityLabel("Delete text clip")
+                }
+                .position(corners[3])
+                .accessibilityLabel(overlay.editsContent ? "Delete text clip" : "Delete shape clip")
             }
-        }.coordinateSpace(name: "textCanvas")
+        }.coordinateSpace(name: "overlayCanvas")
+    }
+
+    /// Whichever drawn layer is selected, evaluated at the playhead.
+    private func selection(canvas: CGSize) -> CanvasOverlay? {
+        if let clip = model.evaluatedText { return CanvasOverlay(clip, canvas: canvas) }
+        if let clip = model.evaluatedShape { return CanvasOverlay(clip, canvas: canvas) }
+        return nil
+    }
+
+    /// Every other drawn layer visible at this frame. A title lines up on a
+    /// shape's edge and a shape on a title's, which is the whole point of
+    /// measuring both against one description.
+    private func peers(canvas: CGSize, excluding id: UUID) -> [CanvasOverlay] {
+        model.visibleEvaluatedTexts.filter { $0.id != id }.map { CanvasOverlay($0, canvas: canvas) }
+            + model.visibleEvaluatedShapes.filter { $0.id != id }.map { CanvasOverlay($0, canvas: canvas) }
     }
 
     /// Returns the magnetised value and, when held, the stop it locked onto.
@@ -127,22 +218,20 @@ struct TextCanvasControls: View {
     }
 
     /// Aligns the moving layer's left/centre/right and top/centre/bottom to the
-    /// same anchors on every other title visible at this frame. Bounds include
-    /// scale and rotation, matching the selection outlines users line up by eye.
-    private func align(clip: TextClip, x: Double, y: Double, canvas: CGSize,
-                       screenScale: CGFloat, others: [TextClip])
+    /// same anchors on every other drawn layer visible at this frame. Bounds
+    /// include scale and rotation, matching the selection outlines users line up
+    /// by eye.
+    private func align(overlay: CanvasOverlay, x: Double, y: Double, canvas: CGSize,
+                       screenScale: CGFloat, others: [CanvasOverlay])
         -> (x: Double, y: Double, xGuide: Double?, yGuide: Double?) {
-        var proposed = clip
-        proposed.transform.positionX = x
-        proposed.transform.positionY = y
-        let moving = screenBounds(of: proposed, canvas: canvas)
+        let moving = overlay.moved(x: x, y: y).screenBounds(canvas: canvas)
         let xAnchors = [moving.minX, moving.midX, moving.maxX]
         let yAnchors = [moving.minY, moving.midY, moving.maxY]
         let tolerance = 12 / max(screenScale, 0.001)
         var bestX: (distance: CGFloat, delta: CGFloat, guide: CGFloat)?
         var bestY: (distance: CGFloat, delta: CGFloat, guide: CGFloat)?
         for other in others {
-            let bounds = screenBounds(of: other, canvas: canvas)
+            let bounds = other.screenBounds(canvas: canvas)
             for source in xAnchors {
                 for target in [bounds.minX, bounds.midX, bounds.maxX] {
                     let delta = target-source, distance = abs(delta)
@@ -168,23 +257,6 @@ struct TextCanvasControls: View {
         )
     }
 
-    /// Axis-aligned screen-space bounds in canvas units (origin at top-left).
-    private func screenBounds(of clip: TextClip, canvas: CGSize) -> CGRect {
-        let layout = TextRenderer.layout(clip, canvas: canvas)
-        let bounds = layout.fittedBounds.insetBy(dx: -max(6, clip.strokeWidth), dy: -6)
-        let transform = TextRenderer.placement(clip, bounds: layout.fittedBounds, canvas: canvas)
-        let points = [
-            CGPoint(x: bounds.minX, y: bounds.minY), CGPoint(x: bounds.maxX, y: bounds.minY),
-            CGPoint(x: bounds.maxX, y: bounds.maxY), CGPoint(x: bounds.minX, y: bounds.maxY)
-        ].map { point -> CGPoint in
-            let placed = point.applying(transform)
-            return CGPoint(x: placed.x, y: canvas.height-placed.y)
-        }
-        let xs = points.map(\.x), ys = points.map(\.y)
-        return CGRect(x: xs.min() ?? 0, y: ys.min() ?? 0,
-                      width: (xs.max() ?? 0)-(xs.min() ?? 0),
-                      height: (ys.max() ?? 0)-(ys.min() ?? 0))
-    }
     private func report(x: Double?, y: Double?) {
         if x != guides.x || y != guides.y {
             if (x != nil && x != guides.x) || (y != nil && y != guides.y) { UISelectionFeedbackGenerator().selectionChanged() }

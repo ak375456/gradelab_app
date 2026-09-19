@@ -11,78 +11,96 @@ struct PaywallView: View {
     private var busy: Bool { store.isPurchasing || store.isRestoring }
 
     var body: some View {
-        ScrollView {
-            VStack(alignment: .leading, spacing: 24) {
-                HStack {
-                    Text("GRADELAB PRO").font(.caption.weight(.bold)).tracking(2).foregroundStyle(accent)
-                    Spacer()
-                    Button { dismiss() } label: {
-                        Image(systemName: "xmark").font(.body.weight(.medium)).frame(width: 44, height: 44)
-                            .background(.white.opacity(0.07), in: Circle())
-                    }.accessibilityLabel("Close paywall").disabled(busy)
-                }
-                VStack(alignment: .leading, spacing: 12) {
-                    BeforeAfterSlider()
-                    Text("Drag to compare. Every look in GradeLab is this one gesture away.")
-                        .font(.caption)
-                        .foregroundStyle(.white.opacity(0.55))
-                        .frame(maxWidth: .infinity, alignment: .center)
-                    Text(store.hasPro ? "You’re ready to create." : feature.title)
-                        .font(.system(.largeTitle, design: .rounded, weight: .bold)).fixedSize(horizontal: false, vertical: true)
-                    Text(store.hasPro ? (store.hasLifetime ? "Lifetime Pro is yours. Thank you for supporting GradeLab." : "Your subscription unlocks every Pro feature.") : feature.detail)
-                        .font(.body).foregroundStyle(.white.opacity(0.7)).fixedSize(horizontal: false, vertical: true)
-                }
-                VStack(alignment: .leading, spacing: 16) {
-                    benefit(String(localized: "Color with character"), String(localized: "Premium cinematic looks and your own LUTs"), "camera.filters")
-                    benefit(String(localized: "A professional finish"), String(localized: "4K and original-resolution export, your own frame rate and bitrate, and ProRes where supported"), "film.stack")
-                    benefit(String(localized: "Make it personal"), String(localized: "Import custom fonts for your titles"), "textformat")
-                }
-                if store.hasPro {
-                    Button("Back to creating") { dismiss() }.buttonStyle(ProPrimaryButtonStyle())
-                    if store.hasSubscription {
-                        Link("Manage Subscription", destination: URL(string: "https://apps.apple.com/account/subscriptions")!)
-                            .frame(maxWidth: .infinity, minHeight: 44)
+        // The sheet measures itself. The same paywall appears in a full-height
+        // sheet on iPhone and in a short form sheet on iPad, and the hero is
+        // capped against whichever it got so the headline and the first plan are
+        // always on the first screen.
+        GeometryReader { sheet in
+            ScrollView {
+                VStack(alignment: .leading, spacing: 24) {
+                    HStack {
+                        Text("GRADELAB PRO").font(.caption.weight(.bold)).tracking(2).foregroundStyle(accent)
+                        Spacer()
+                        Button { dismiss() } label: {
+                            Image(systemName: "xmark").font(.body.weight(.medium)).frame(width: 44, height: 44)
+                                .background(.white.opacity(0.07), in: Circle())
+                        }.accessibilityLabel("Close paywall").disabled(busy)
                     }
-                } else {
-                    VStack(spacing: 10) {
-                        ForEach(ProPlan.allCases) { plan in planRow(plan) }
+                    VStack(alignment: .leading, spacing: 12) {
+                        BeforeAfterSlider()
+                            .frame(maxWidth: .infinity, maxHeight: heroHeight(in: sheet.size))
+                        Text("Drag to compare. Every look in GradeLab is this one gesture away.")
+                            .font(.caption)
+                            .foregroundStyle(.white.opacity(0.55))
+                            .frame(maxWidth: .infinity, alignment: .center)
+                        Text(store.hasPro ? "You’re ready to create." : feature.title)
+                            .font(.system(.largeTitle, design: .rounded, weight: .bold)).fixedSize(horizontal: false, vertical: true)
+                        Text(store.hasPro ? (store.hasLifetime ? "Lifetime Pro is yours. Thank you for supporting GradeLab." : "Your subscription unlocks every Pro feature.") : feature.detail)
+                            .font(.body).foregroundStyle(.white.opacity(0.7)).fixedSize(horizontal: false, vertical: true)
                     }
-                    if let message = store.message {
-                        Text(message).font(.callout).foregroundStyle(accent).accessibilityLabel(message)
+                    VStack(alignment: .leading, spacing: 16) {
+                        benefit(String(localized: "Color with character"), String(localized: "Premium cinematic looks and your own LUTs"), "camera.filters")
+                        benefit(String(localized: "A professional finish"), String(localized: "4K and original-resolution export, your own frame rate and bitrate, and ProRes where supported"), "film.stack")
+                        benefit(String(localized: "Make it personal"), String(localized: "Import custom fonts for your titles"), "textformat")
                     }
-                    if store.products.isEmpty && !store.isLoading {
-                        Button("Retry loading prices") { Task { await store.loadProducts() } }
-                            .frame(maxWidth: .infinity, minHeight: 44)
-                    }
-                    VStack(spacing: 10) {
-                        Button {
-                            guard let selectedProduct else { return }
-                            Task { await store.purchase(selectedProduct) }
-                        } label: {
-                            HStack {
-                                if store.isPurchasing { ProgressView().tint(.black) }
-                                Text(purchaseTitle).fontWeight(.semibold)
-                            }.frame(maxWidth: .infinity)
+                    if store.hasPro {
+                        Button("Back to creating") { dismiss() }.buttonStyle(ProPrimaryButtonStyle())
+                        if store.hasSubscription {
+                            Link("Manage Subscription", destination: URL(string: "https://apps.apple.com/account/subscriptions")!)
+                                .frame(maxWidth: .infinity, minHeight: 44)
                         }
-                        .buttonStyle(ProPrimaryButtonStyle())
-                        .disabled(selectedProduct == nil || busy || store.isCheckingAccess || !ProConfiguration.legalLinksReady)
-                        Text(selection == .lifetime ? "One purchase. No subscription." : "Payment is charged to your Apple Account. Renews automatically until cancelled in account settings at least 24 hours before renewal.")
-                            .font(.caption).foregroundStyle(.white.opacity(0.6)).multilineTextAlignment(.center)
-                        if !ProConfiguration.legalLinksReady {
-                            Text("Purchases will open when our Terms and Privacy Policy are published.")
+                    } else {
+                        VStack(spacing: 10) {
+                            ForEach(ProPlan.allCases) { plan in planRow(plan) }
+                        }
+                        if let message = store.message {
+                            Text(message).font(.callout).foregroundStyle(accent).accessibilityLabel(message)
+                        }
+                        if store.products.isEmpty && !store.isLoading {
+                            Button("Retry loading prices") { Task { await store.loadProducts() } }
+                                .frame(maxWidth: .infinity, minHeight: 44)
+                        }
+                        VStack(spacing: 10) {
+                            Button {
+                                guard let selectedProduct else { return }
+                                Task { await store.purchase(selectedProduct) }
+                            } label: {
+                                HStack {
+                                    if store.isPurchasing { ProgressView().tint(.black) }
+                                    Text(purchaseTitle).fontWeight(.semibold)
+                                }.frame(maxWidth: .infinity)
+                            }
+                            .buttonStyle(ProPrimaryButtonStyle())
+                            .disabled(selectedProduct == nil || busy || store.isCheckingAccess || !ProConfiguration.legalLinksReady)
+                            Text(selection == .lifetime ? "One purchase. No subscription." : "Payment is charged to your Apple Account. Renews automatically until cancelled in account settings at least 24 hours before renewal.")
                                 .font(.caption).foregroundStyle(.white.opacity(0.6)).multilineTextAlignment(.center)
+                            if !ProConfiguration.legalLinksReady {
+                                Text("Purchases will open when our Terms and Privacy Policy are published.")
+                                    .font(.caption).foregroundStyle(.white.opacity(0.6)).multilineTextAlignment(.center)
+                            }
                         }
+                        indieNote
                     }
-                    indieNote
+                    footer
                 }
-                footer
+                .padding(24).frame(maxWidth: 560).frame(maxWidth: .infinity)
             }
-            .padding(24).frame(maxWidth: 560).frame(maxWidth: .infinity)
         }
         .background(Color(red: 0.035, green: 0.045, blue: 0.06).ignoresSafeArea())
         .foregroundStyle(.white).tint(accent).preferredColorScheme(.dark)
         .interactiveDismissDisabled(busy)
         .task { await store.refreshAccess(); await store.loadProducts() }
+    }
+
+    /// The tallest the comparison card may be in this sheet.
+    ///
+    /// Proportional rather than fixed, because the sheet's height is the thing
+    /// that varies: a full-height iPhone sheet can carry a large card, an iPad
+    /// form sheet is roughly 620 points tall and cannot. Under half the sheet
+    /// leaves the price and the buy button one short scroll away instead of a
+    /// screenful of photograph away.
+    func heroHeight(in sheet: CGSize) -> CGFloat {
+        max(150, min(sheet.height * 0.42, 320))
     }
 
     /// Who the money actually goes to.

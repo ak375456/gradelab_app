@@ -32,7 +32,7 @@ final class KeyframeTests: XCTestCase {
     }
 
     private func replace(_ clip: TextClip, in project: inout VideoProject) throws {
-        try TextEditing.replace(clip.id, with: clip, in: &project)
+        try OverlayEditing.replace(clip.id, with: clip, in: &project)
     }
 
     // MARK: - Evaluation boundaries
@@ -410,7 +410,7 @@ final class KeyframeTests: XCTestCase {
         source.animation = animation
         try replace(source, in: &project)
 
-        let rightID = try TextEditing.split(id, at: try seconds(4), in: &project)
+        let rightID = try OverlayEditing.split(id, at: try seconds(4), in: &project)
         let left = text(project, id), right = text(project, rightID)
         XCTAssertEqual(left.animation?.track(.opacity)?.keyframes, source.animation?.track(.opacity)?.keyframes)
         XCTAssertEqual(right.animation?.track(.opacity)?.keyframes, source.animation?.track(.opacity)?.keyframes,
@@ -436,14 +436,14 @@ final class KeyframeTests: XCTestCase {
         source.animation = animation
         try replace(source, in: &project)
 
-        try TextEditing.edit(id, operation: .trimStart, to: try seconds(3), in: &project)
+        try OverlayEditing.edit(id, operation: .trimStart, to: try seconds(3), in: &project)
         let trimmed = text(project, id)
         XCTAssertEqual(try XCTUnwrap(trimmed.animation?.startOffset.seconds), 1, accuracy: 1e-9)
         XCTAssertEqual(trimmed.animation?.track(.opacity)?.keyframes.count, 2, "a head trim discarded keyframes")
         XCTAssertEqual(trimmed.evaluated(at: try seconds(3)).opacity,
                        source.evaluated(at: try seconds(3)).opacity, accuracy: 1e-9)
 
-        try TextEditing.edit(id, operation: .trimStart, to: try seconds(2), in: &project)
+        try OverlayEditing.edit(id, operation: .trimStart, to: try seconds(2), in: &project)
         let restored = text(project, id)
         XCTAssertEqual(try XCTUnwrap(restored.animation?.startOffset.seconds), 0, accuracy: 1e-9)
         XCTAssertEqual(restored.evaluated(at: try seconds(2)).opacity,
@@ -467,7 +467,7 @@ final class KeyframeTests: XCTestCase {
         XCTAssertEqual(text(project, id).evaluated(at: try seconds(8)).opacity,
                        source.evaluated(at: try seconds(4)).opacity, accuracy: 1e-9)
 
-        let copyID = try TextEditing.paste(text(project, id), at: try seconds(20), in: &project)
+        let copyID = try OverlayEditing.paste(text(project, id), at: try seconds(20), in: &project)
         var copy = text(project, copyID)
         copy.animation?.update(.opacity) { $0.set(.number(0.25), at: .zero) }
         try replace(copy, in: &project)
@@ -592,7 +592,7 @@ final class KeyframeTests: XCTestCase {
             AnimationTrack(property: .fontSize, keyframes: [Keyframe(time: .zero, value: .number(999_999))])
         ])
         var second = project
-        try TextEditing.replace(id, with: outOfRange, in: &second)
+        try OverlayEditing.replace(id, with: outOfRange, in: &second)
         XCTAssertThrowsError(try second.validate())
 
     }

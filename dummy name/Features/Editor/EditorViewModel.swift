@@ -548,6 +548,12 @@ final class EditorViewModel: ObservableObject, GradingModel {
     var selectionContainsOnlyText: Bool {
         !selectedItems.isEmpty && selectedItems.allSatisfy { if case .text = $0 { true } else { false } }
     }
+    var selectedShapeCount: Int {
+        selectedItems.reduce(into: 0) { count, item in if case .shape = item { count += 1 } }
+    }
+    var selectionContainsOnlyShapes: Bool {
+        !selectedItems.isEmpty && selectedItems.allSatisfy { if case .shape = $0 { true } else { false } }
+    }
     var hasMedia: Bool { project.timeline.duration > .zero }
     var canEditSelection: Bool {
         let items = selectedItems
@@ -655,6 +661,91 @@ final class EditorViewModel: ObservableObject, GradingModel {
             return clip.id
         }
     }
+
+    // MARK: - Shapes
+    //
+    // A shape layer is a drawn overlay exactly as a title is: the same placement
+    // rules, the same track behaviour, and — because `ShapeClip` is an
+    // `AnimatableClip` — the same keyframes, read and written through the same
+    // routing below. Nothing here is shape-specific except what a shape IS.
+
+    func addShape(_ kind: ShapeKind = .rectangle) {
+        commit("Add shape", seekToSelection: true) { project in
+            let trackID = UUID()
+            let frame = try project.canvas.frameDuration ?? .seconds(1.0/30)
+            let end = project.timeline.duration
+            let start = max(.zero, min(try TimelineEditing.snapped(.seconds(self.timelineTime), frame: frame),
+                                       try max(.zero, end.subtracting(frame))))
+            let remaining = try end.subtracting(start)
+            let duration = remaining > .zero ? min(try .seconds(3), remaining) : try .seconds(3)
+            var clip = ShapeClip(placement: .init(id: UUID(), trackID: trackID,
+                                                  timelineStart: start, duration: duration), kind: kind)
+            // Sized against the canvas the shape is AUTHORED in — the same
+            // reduced preview surface its stroke and corner radius are measured
+            // in — so a new shape covers the same fraction of frame whatever the
+            // project's resolution.
+            let size = ShapeClip.defaultSize(for: kind, canvas: SequenceComposition.previewRenderSize(
+                width: project.canvas.width, height: project.canvas.height))
+            clip.width = size.width
+            clip.height = size.height
+            if kind == .rectangle { clip.cornerRadius = 0 }
+            project.timeline.tracks.insert(
+                .init(id: trackID, name: TimelineTrack.defaultName(for: .shape),
+                      kind: .shape, items: [.shape(clip)]), at: 0)
+            return clip.id
+        }
+    }
+
+    var selectedShape: ShapeClip? { if case .shape(let clip) = selectedItem { return clip }; return nil }
+
+    /// The shape as actually rendered at the playhead, for the canvas handles.
+    var evaluatedShape: ShapeClip? {
+        guard let clip = selectedShape else { return nil }
+        guard let local = clip.localTime(for: playheadTime) else { return clip }
+        return clip.evaluated(atLocal: local)
+    }
+
+    /// Every visible shape layer at the playhead, evaluated at that frame.
+    var visibleEvaluatedShapes: [ShapeClip] {
+        let time = playheadTime
+        return project.timeline.items.compactMap { item in
+            guard case .shape(let clip) = item,
+                  clip.placement.timelineStart <= time,
+                  let end = try? clip.placement.range.end,
+                  end > time else { return nil }
+            guard let local = clip.localTime(for: time) else { return clip }
+            return clip.evaluated(atLocal: local)
+        }
+    }
+
+    /// The shape counterpart of `editText`, with the same undo grouping.
+    func editShape(_ label: String = "Shape", immediate: Bool = false, _ edit: (inout ShapeClip) -> Void) {
+        guard canEditSelection, selectionContainsOnlyShapes else { return }
+        do {
+            var candidate = project
+            for item in selectedItems {
+                guard case .shape(var clip) = item else { continue }
+                edit(&clip)
+                try OverlayEditing.replace(clip.id, with: clip, in: &candidate)
+            }
+            try candidate.validate()
+            guard candidate != project else { return }
+            if gradeBaseline == nil { gradeBaseline = project; historyLabel = label }
+            project = candidate; project.updatedAt = .now
+            synchronizeRenderer()
+            gradeTask?.cancel()
+            if immediate { flushGradeHistory(); return }
+            gradeTask = Task { [weak self] in
+                do { try await Task.sleep(for: .milliseconds(650)) } catch { return }
+                self?.flushGradeHistory()
+            }
+        } catch { editError = error.localizedDescription }
+    }
+
+    func setShapeDuration(_ seconds: Double) {
+        guard let clip = selectedShape else { return }
+        editTiming(id: clip.id, operation: .trimEnd, seconds: clip.placement.timelineStart.seconds + seconds)
+    }
     func detectBeats() async {
         guard let audio = selectedAudio, let media = project.assets.first(where: { $0.id == audio.assetID }) else { return }
         do {
@@ -696,7 +787,7 @@ final class EditorViewModel: ObservableObject, GradingModel {
                 guard case .text(var clip) = item else { continue }
                 edit(&clip)
                 FontRegistry.shared.normalize(&clip.style)
-                try TextEditing.replace(clip.id, with: clip, in: &candidate)
+                try OverlayEditing.replace(clip.id, with: clip, in: &candidate)
             }
             try candidate.validate()
             guard candidate != project else { return }
@@ -731,6 +822,7 @@ final class EditorViewModel: ObservableObject, GradingModel {
     /// Read-only view of the clip the keyframe controls act on.
     var animationSelection: AnimationSnapshot? {
         if let clip = selectedText { return AnimationSnapshot(clip) }
+        if let clip = selectedShape { return AnimationSnapshot(clip) }
         if let clip = selectedClip { return AnimationSnapshot(clip) }
         return nil
     }
@@ -798,6 +890,7 @@ final class EditorViewModel: ObservableObject, GradingModel {
     private func applyAnimation(_ edit: AnimationEdit, label: String, immediate: Bool) {
         guard canEditSelection else { return }
         if selectedText != nil { editText(label, immediate: immediate) { $0.apply(edit) } }
+        else if selectedShape != nil { editShape(label, immediate: immediate) { $0.apply(edit) } }
         else if selectedClip != nil { changeVisual(label, immediate: immediate) { $0.apply(edit) } }
     }
 
@@ -1063,13 +1156,19 @@ final class EditorViewModel: ObservableObject, GradingModel {
         guard selectedClipIDs.count == 1, !isPreparingTimeline,
               let time = try? TimelineTime.seconds(timelineTime) else { return false }
         if selectedTrack?.kind == .audio { return AudioEditing.splitTarget(in: project, at: time, trackID: selectedTrackID) != nil }
-        if selectedTrack?.kind == .text { return TextEditing.splitTarget(in: project, at: time, trackID: selectedTrackID) != nil }
+        if selectedTrack?.kind == .text || selectedTrack?.kind == .shape {
+            return OverlayEditing.splitTarget(in: project, at: time, trackID: selectedTrackID) != nil
+        }
         return TimelineEditing.splitTarget(in: project, at: time, trackID: selectedTrack?.id) != nil
     }
     func split() {
-        if selectedTrack?.kind == .text {
-            guard let time = try? TimelineTime.seconds(timelineTime), let id = TextEditing.splitTarget(in: project, at: time, trackID: selectedTrackID) else { return }
-            commit("Split text") { try TextEditing.split(id, at: time, in: &$0) }; return
+        if selectedTrack?.kind == .text || selectedTrack?.kind == .shape {
+            guard let time = try? TimelineTime.seconds(timelineTime),
+                  let id = OverlayEditing.splitTarget(in: project, at: time, trackID: selectedTrackID) else { return }
+            commit(selectedTrack?.kind == .shape ? "Split shape" : "Split text") {
+                try OverlayEditing.split(id, at: time, in: &$0)
+            }
+            return
         }
         if selectedTrack?.kind == .audio {
             guard let time = try? TimelineTime.seconds(timelineTime), let id = AudioEditing.splitTarget(in: project, at: time, trackID: selectedTrackID) else { return }
@@ -1088,7 +1187,7 @@ final class EditorViewModel: ObservableObject, GradingModel {
         commit(cutting ? "Cut" : "Delete") {
             for target in targets where $0.timeline.item(id: target) != nil {
                 if $0.timeline.audioClip(id: target) != nil { try AudioEditing.replace(target, with: [], in: &$0) }
-                else if case .text = $0.timeline.item(id: target) { try TextEditing.delete(target, in: &$0) }
+                else if $0.timeline.item(id: target)?.isDrawnOverlay == true { try OverlayEditing.delete(target, in: &$0) }
                 else { try TimelineEditing.deleteClosingGaps(target, in: &$0) }
             }
             return nil
@@ -1101,7 +1200,8 @@ final class EditorViewModel: ObservableObject, GradingModel {
             switch clipboard {
             case .video(let clip): return try TimelineEditing.paste(clip, at: .seconds(self.timelineTime), in: &project)
             case .audio(let clip): return try AudioEditing.paste(clip, at: .seconds(self.timelineTime), trackID: self.selectedTrackID, in: &project)
-            case .text(let clip): return try TextEditing.paste(clip, at: .seconds(self.timelineTime), in: &project)
+            case .text(let clip): return try OverlayEditing.paste(clip, at: .seconds(self.timelineTime), in: &project)
+            case .shape(let clip): return try OverlayEditing.paste(clip, at: .seconds(self.timelineTime), in: &project)
             }
         }
     }
@@ -1196,7 +1296,8 @@ final class EditorViewModel: ObservableObject, GradingModel {
             switch item {
             case .video(let clip): return try TimelineEditing.paste(clip, at: clip.placement.range.end, in: &project)
             case .audio(let clip): return try AudioEditing.paste(clip, at: clip.placement.range.end, trackID: clip.placement.trackID, in: &project)
-            case .text(let clip): return try TextEditing.paste(clip, at: clip.placement.range.end, in: &project)
+            case .text(let clip): return try OverlayEditing.paste(clip, at: clip.placement.range.end, in: &project)
+            case .shape(let clip): return try OverlayEditing.paste(clip, at: clip.placement.range.end, in: &project)
             }
         }
     }
@@ -1207,8 +1308,8 @@ final class EditorViewModel: ObservableObject, GradingModel {
                 try AudioEditing.edit(id, operation: operation, to: time, clamping: true, in: &project)
                 return id
             }
-            if case .text = project.timeline.item(id: id) {
-                try TextEditing.edit(id, operation: operation, to: time, in: &project)
+            if project.timeline.item(id: id)?.isDrawnOverlay == true {
+                try OverlayEditing.edit(id, operation: operation, to: time, in: &project)
                 return id
             }
             switch operation {

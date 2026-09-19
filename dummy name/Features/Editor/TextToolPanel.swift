@@ -122,7 +122,7 @@ struct TextToolPanel: View {
                     case "Fill": animatedColor(.textColor); animated(.opacity, 0...1)
                     case "Gradient":
                         Toggle("Gradient fill", isOn: Binding(get: { clip.gradient != nil }, set: { on in
-                            model.editText { c in c.gradient = on ? (c.gradient ?? .init(start: c.color, end: TextGradient().end)) : nil }
+                            model.editText { c in c.gradient = on ? (c.gradient ?? .init(start: c.color, end: GradientFill().end)) : nil }
                         })).font(.caption).frame(minHeight: 44)
                         if clip.gradient != nil {
                             ColorPicker("Start color", selection: colorBinding(gradient(\.start)), supportsOpacity: true).font(.caption).frame(minHeight: 44)
@@ -205,7 +205,7 @@ struct TextToolPanel: View {
         })
     }
     private func value(_ key: WritableKeyPath<TextClip, Double>) -> Binding<Double> { binding(key) }
-    private func gradient<T>(_ key: WritableKeyPath<TextGradient, T>) -> Binding<T> {
+    private func gradient<T>(_ key: WritableKeyPath<GradientFill, T>) -> Binding<T> {
         Binding(get: { (model.selectedText?.gradient ?? .init())[keyPath: key] }, set: { v in model.editText { c in
             var g = c.gradient ?? .init(); g[keyPath: key] = v; c.gradient = g
         } })

@@ -15,6 +15,9 @@ struct EditorView: View {
     @State private var textMode = false
     @State private var textSection = "Style"
     @State private var textAppearance = "Fill"
+    @State private var shapeMode = false
+    @State private var shapeSection = "Shape"
+    @State private var shapeAppearance = "Fill"
     @State private var typingText = false
     @FocusState private var textFocused: Bool
     @State private var keyboardOverlap: CGFloat = 0
@@ -156,7 +159,24 @@ struct EditorView: View {
                                    traceHeight: scopeHeight(geometry.size, regular: false))
                     }
                     transport
-                    if !colorMode && !transforms && !canvasTool && !speedTool { timeline(height: automaticTimelineHeight) }
+                    if !colorMode && !transforms && !canvasTool && !speedTool {
+                        timeline(height: compactTimelineHeight(geometry.size))
+                        // The handle sits UNDER the timeline here, where the
+                        // wide layout puts it above: dragging down gives the
+                        // timeline the room and dragging up hands it to the tool
+                        // panel, which is what someone shortening the timeline to
+                        // reach a control below it is actually asking for.
+                        WorkspaceDivider(
+                            orientation: .horizontal,
+                            label: "Resize the timeline",
+                            onResize: { delta in
+                                setCompactTimelineHeight(compactTimelineHeight(geometry.size) + delta,
+                                                         in: geometry.size)
+                            },
+                            onBegin: beginWorkspaceResize,
+                            onEnd: endWorkspaceResize,
+                            onReset: { storedTimelineHeight = 0 })
+                    }
                     inspector
                     modeBar
                 }
@@ -203,6 +223,32 @@ struct EditorView: View {
 
     private func setTimelineHeight(_ value: CGFloat, in size: CGSize) {
         storedTimelineHeight = Double(clampedTimelineHeight(value, in: size))
+    }
+
+    /// The timeline's height in the TALL layout, where it shares the window with
+    /// the picture above it and the tool panel below rather than sitting beside
+    /// a panel of its own.
+    private func compactTimelineHeight(_ size: CGSize) -> CGFloat {
+        // An untouched workspace keeps exactly the height this layout has always
+        // used. Only a size someone dragged is clamped — adding a handle must
+        // not quietly resize a timeline nobody asked to resize.
+        guard storedTimelineHeight > 0 else { return automaticTimelineHeight }
+        return clampedCompactTimelineHeight(CGFloat(storedTimelineHeight), in: size)
+    }
+
+    /// The floor keeps one row readable. The ceiling is half of what the picture
+    /// has left over, so a drag can never squeeze the tool panel — and with it
+    /// the handle that would undo the drag — off the bottom of the screen; but
+    /// never below the automatic height either, so the handle can always be
+    /// dragged back to where it started.
+    private func clampedCompactTimelineHeight(_ value: CGFloat, in size: CGSize) -> CGFloat {
+        let lower: CGFloat = 76
+        let ceiling = max(automaticTimelineHeight, (size.height - previewHeight(size)) * 0.5)
+        return min(max(value, lower), max(lower, ceiling))
+    }
+
+    private func setCompactTimelineHeight(_ value: CGFloat, in size: CGSize) {
+        storedTimelineHeight = Double(clampedCompactTimelineHeight(value, in: size))
     }
 
     private func previewHeight(_ size: CGSize) -> CGFloat {
@@ -345,6 +391,8 @@ struct EditorView: View {
             typingText = false; textFocused = false
             if case .text = model.selectedItem {
                 openTextTool()
+            } else if case .shape = model.selectedItem {
+                openShapeTool()
             } else if model.selectedAudio != nil {
                 activate(.audio)
                 model.beginAudioEditing()
@@ -467,13 +515,13 @@ struct EditorView: View {
 
     private var preview: some View {
         ZStack(alignment: .topLeading) {
-            PreviewViewport(inspectionEnabled: model.selectedText == nil && !model.isPickingCurveHue && !maskMode && !localMaskMode && !maskedGradeMode) {
+            PreviewViewport(inspectionEnabled: model.selectedText == nil && model.selectedShape == nil && !model.isPickingCurveHue && !maskMode && !localMaskMode && !maskedGradeMode) {
                 ZStack {
                 MetalPreviewView(renderer: model.renderer, settings: model.settings,
                              showsOriginal: model.showsOriginal, isPlaying: model.playback.isPlaying,
                              redrawTime: model.playback.currentTime, frameUpdateID: model.playback.frameUpdateID,
                              isActive: scenePhase == .active && !model.showsExport)
-                    if !typingText { TextCanvasControls(model: model, editContent: { typingText = true }) }
+                    if !typingText { OverlayCanvasControls(model: model, editContent: { typingText = true }) }
                     if localMaskMode && !model.showsOriginal {
                         GradeMaskOverlay(model: model, displayedRect: model.renderer.displayedVideoRect)
                     }
@@ -667,6 +715,7 @@ struct EditorView: View {
             importImage = true; importOverlay = true; mediaPicker = true
         }
         Button("Add text", systemImage: "textformat") { openTextTool(); model.addText() }
+        Button("Add shape", systemImage: "square.on.circle") { openShapeTool(); model.addShape() }
     }
 
     private var timelineActionsMenu: some View {
@@ -739,8 +788,8 @@ struct EditorView: View {
     /// The height the timeline takes when nobody has resized it: enough for the
     /// tracks that exist, capped so it never crowds out the picture.
     private var automaticTimelineHeight: CGFloat {
-        min(audioMode || textMode ? 156 : 230,
-            model.project.timeline.tracks.reduce(CGFloat(36)) { $0 + ($1.kind == .text ? 38 : 76) })
+        min(audioMode || textMode || shapeMode ? 156 : 230,
+            model.project.timeline.tracks.reduce(CGFloat(36)) { $0 + ($1.kind.isDrawnOverlay ? 38 : 76) })
     }
 
     private func timeline(height: CGFloat) -> some View {
@@ -761,6 +810,7 @@ struct EditorView: View {
                     onSelectMany: { ids in
                         model.selectClips(ids)
                         if model.selectionContainsOnlyText { openTextTool() }
+                        else if model.selectionContainsOnlyShapes { openShapeTool() }
                         else { activate(.timeline) }
                     },
                     onSelectTransition: { id in openTransitionTool(id: id) },
@@ -808,14 +858,14 @@ struct EditorView: View {
 
     // MARK: - Mode bar
 
-    /// The bar's nine tools, in the order they are drawn.
+    /// The bar's ten tools, in the order they are drawn.
     ///
     /// The modes themselves are still the eight `@State` booleans the rest of
     /// this view reads. This only gives the bar a single list to draw and a
     /// single place to switch, instead of nine buttons each clearing seven
     /// flags by hand — which is how a tool used to end up half switched.
     private enum EditorMode: String, CaseIterable, Identifiable {
-        case timeline, text, audio, color, transform, mask, speed, transition, canvas
+        case timeline, text, shape, audio, color, transform, mask, speed, transition, canvas
 
         var id: String { rawValue }
 
@@ -823,6 +873,7 @@ struct EditorView: View {
             switch self {
             case .timeline: return String(localized: "Timeline")
             case .text: return String(localized: "Text")
+            case .shape: return String(localized: "Shape")
             case .audio: return String(localized: "Audio")
             case .color: return String(localized: "Color")
             case .transform: return String(localized: "Transform")
@@ -837,6 +888,7 @@ struct EditorView: View {
             switch self {
             case .timeline: return "rectangle.split.3x1"
             case .text: return "textformat"
+            case .shape: return "square.on.circle"
             case .audio: return "waveform"
             case .color: return "camera.filters"
             case .transform: return "crop.rotate"
@@ -850,7 +902,7 @@ struct EditorView: View {
         /// Tools that cannot run until the compositing shaders have been built.
         var needsCompositor: Bool {
             switch self {
-            case .text, .audio, .transform, .mask, .transition: return true
+            case .text, .shape, .audio, .transform, .mask, .transition: return true
             case .timeline, .color, .speed, .canvas: return false
             }
         }
@@ -858,6 +910,7 @@ struct EditorView: View {
 
     private var activeMode: EditorMode {
         if textMode { return .text }
+        if shapeMode { return .shape }
         if audioMode { return .audio }
         if colorMode { return .color }
         if transforms { return .transform }
@@ -871,6 +924,7 @@ struct EditorView: View {
     /// Sets all eight flags from one value, so no tool can be left half on.
     private func activate(_ mode: EditorMode) {
         textMode = mode == .text
+        shapeMode = mode == .shape
         audioMode = mode == .audio
         colorMode = mode == .color
         transforms = mode == .transform
@@ -891,7 +945,7 @@ struct EditorView: View {
             return "Still preparing effects — first run only."
         }
         switch mode {
-        case .timeline, .canvas, .text, .audio:
+        case .timeline, .canvas, .text, .shape, .audio:
             return nil
         case .color, .transform:
             if model.selectedClip == nil { return "Select a clip in the timeline first." }
@@ -913,6 +967,7 @@ struct EditorView: View {
         if let reason = unavailableReason(for: mode) { model.showStatus(reason); return }
         switch mode {
         case .text: openTextTool()
+        case .shape: openShapeTool()
         case .transition: openTransitionTool()
         case .timeline, .color, .speed, .canvas:
             activate(mode); model.flushGradeHistory()
@@ -1036,6 +1091,34 @@ struct EditorView: View {
                 }.scrollIndicators(.visible)
             }
         }
+        else if shapeMode {
+            VStack(spacing: 0) {
+                HStack {
+                    Text("Shape").font(.caption.weight(.semibold))
+                    Spacer()
+                    Menu {
+                        ForEach(ShapeKind.allCases) { kind in
+                            Button(kind.title) { openShapeTool(); model.addShape(kind) }
+                        }
+                    } label: {
+                        Label("Add shape", systemImage: "plus").font(.caption.weight(.medium)).frame(minHeight: 44)
+                    }
+                    .disabled(model.isPreparingTimeline)
+                    .accessibilityLabel("Add shape")
+                }.padding(.horizontal, 20)
+                ScrollView {
+                    if case .shape = model.selectedItem {
+                        ShapeToolPanel(model: model, section: $shapeSection, appearance: $shapeAppearance)
+                            .id(model.selectedClipID)
+                            .disabled(!model.canEditSelection)
+                    } else {
+                        Text("Add a shape or select a shape clip in the timeline to edit it.")
+                            .font(.subheadline).foregroundStyle(AppColors.textSecondary)
+                            .frame(maxWidth: .infinity, alignment: .leading).padding(20)
+                    }
+                }.scrollIndicators(.visible)
+            }
+        }
         else if speedTool { SpeedPanel(model: model) }
         else if maskMode { LayerMaskPanel(model: model) }
         else if transforms { LiveTransformPanel(model: model) }
@@ -1080,6 +1163,11 @@ struct EditorView: View {
     private func openTextTool() {
         model.flushGradeHistory()
         activate(.text)
+    }
+
+    private func openShapeTool() {
+        model.flushGradeHistory()
+        activate(.shape)
     }
 
     private func openTransitionTool() {

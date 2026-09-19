@@ -1272,6 +1272,82 @@
         }
       }
     },
+    "%lld shape layers selected" : {
+      "localizations" : {
+        "de" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld Formebene ausgewählt"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld Formebenen ausgewählt"
+                }
+              }
+            }
+          }
+        },
+        "es" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld capa de forma seleccionada"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld capas de forma seleccionadas"
+                }
+              }
+            }
+          }
+        },
+        "fr" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld calque de forme sélectionné"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld calques de forme sélectionnés"
+                }
+              }
+            }
+          }
+        },
+        "it" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld livello di forma selezionato"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld livelli di forma selezionati"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "%lld sounds · available offline" : {
       "localizations" : {
         "de" : {
@@ -1740,6 +1816,62 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Esiste già un file nella destinazione di esportazione scelta."
+          }
+        }
+      }
+    },
+    "A fill color with zero opacity leaves an outline-only shape. Set a stroke width under Stroke." : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Eine Füllfarbe mit null Deckkraft ergibt eine Form, die nur aus ihrer Kontur besteht. Die Konturstärke stellst du unter „Kontur“ ein."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Un color de relleno con opacidad cero deja una forma hecha solo de contorno. Ajusta el grosor en Contorno."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Une couleur de remplissage à opacité nulle laisse une forme réduite à son contour. Réglez son épaisseur dans Contour."
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Un colore di riempimento con opacità zero lascia una forma fatta solo di contorno. Imposta lo spessore in Contorno."
+          }
+        }
+      }
+    },
+    "A gradient replaces the flat fill. Stroke, shadow and glow keep their own colors." : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ein Verlauf ersetzt die einfarbige Füllung. Kontur, Schatten und Glow behalten ihre eigenen Farben."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Un degradado sustituye al relleno plano. El contorno, la sombra y el glow conservan sus propios colores."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Un dégradé remplace le remplissage uni. Le contour, l'ombre et le glow conservent leurs propres couleurs."
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Un gradiente sostituisce il riempimento pieno. Contorno, ombra e glow mantengono i propri colori."
           }
         }
       }
@@ -2250,6 +2382,34 @@
         }
       }
     },
+    "Add a shape or select a shape clip in the timeline to edit it." : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Füge eine Form hinzu oder wähle einen Formclip in der Timeline aus, um sie zu bearbeiten."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Añade una forma o selecciona un clip de forma en la línea de tiempo para editarlo."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ajoutez une forme ou sélectionnez un clip de forme dans la timeline pour le modifier."
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Aggiungi una forma o seleziona una clip di forma nella timeline per modificarla."
+          }
+        }
+      }
+    },
     "Add a title or select a text clip in the timeline to edit it." : {
       "localizations" : {
         "de" : {
@@ -2470,6 +2630,34 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Aggiungi o rimuovi marcatore alla testina"
+          }
+        }
+      }
+    },
+    "Add shape" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Form hinzufügen"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Añadir forma"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ajouter une forme"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Aggiungi forma"
           }
         }
       }
@@ -3665,6 +3853,34 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Acqua"
+          }
+        }
+      }
+    },
+    "Arrow" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Pfeil"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Flecha"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Flèche"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Freccia"
           }
         }
       }
@@ -6049,6 +6265,34 @@
         }
       }
     },
+    "Corners" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ecken"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Vértices"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Sommets"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Vertici"
+          }
+        }
+      }
+    },
     "Create a grade and save it here." : {
       "localizations" : {
         "de" : {
@@ -6819,6 +7063,34 @@
         }
       }
     },
+    "Delete shape clip" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Formclip löschen"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Eliminar el clip de forma"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Supprimer le clip de forme"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Elimina la clip di forma"
+          }
+        }
+      }
+    },
     "Delete text clip" : {
       "localizations" : {
         "de" : {
@@ -7267,6 +7539,34 @@
         }
       }
     },
+    "Drag the shape in the preview. Pinch to resize; turn with two fingers to rotate." : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Zieh die Form in der Vorschau. Zusammenziehen ändert die Größe; mit zwei Fingern drehen."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Arrastra la forma en la previsualización. Pellizca para redimensionarla; gírala con dos dedos."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Faites glisser la forme dans l'aperçu. Pincez pour la redimensionner ; tournez à deux doigts pour la faire pivoter."
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Trascina la forma nell'anteprima. Pizzica per ridimensionarla; ruotala con due dita."
+          }
+        }
+      }
+    },
     "Drag the shape on the picture to position it." : {
       "localizations" : {
         "de" : {
@@ -7431,6 +7731,34 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Trascina per ridimensionare. Doppio tocco per ripristinare la dimensione automatica."
+          }
+        }
+      }
+    },
+    "Drag to the end for fully rounded. A square shape becomes a circle; a wider one becomes a capsule." : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Zieh bis ans Ende für vollständig abgerundet. Eine quadratische Form wird zum Kreis, eine breitere zur Kapsel."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Arrastra hasta el final para redondearla del todo. Una forma cuadrada se convierte en un círculo; una más ancha, en una cápsula."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Faites glisser jusqu'au bout pour un arrondi complet. Une forme carrée devient un cercle ; une forme plus large devient une capsule."
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Trascina fino in fondo per arrotondarla del tutto. Una forma quadrata diventa un cerchio; una più larga diventa una capsula."
           }
         }
       }
@@ -8747,6 +9075,34 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "File"
+          }
+        }
+      }
+    },
+    "Fill" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Füllung"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Relleno"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Remplissage"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Riempimento"
           }
         }
       }
@@ -11887,6 +12243,34 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Luce"
+          }
+        }
+      }
+    },
+    "Line" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Linie"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Línea"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ligne"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Linea"
           }
         }
       }
@@ -15125,6 +15509,62 @@
         }
       }
     },
+    "Points" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Zacken"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Puntas"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Branches"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Punte"
+          }
+        }
+      }
+    },
+    "Polygon" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Polygon"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Polígono"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Polygone"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Poligono"
+          }
+        }
+      }
+    },
     "Position · canvas coordinates" : {
       "localizations" : {
         "de" : {
@@ -16304,6 +16744,34 @@
         }
       }
     },
+    "Remove all animation from this shape?" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Alle Animationen aus dieser Form entfernen?"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "¿Quitar toda la animación de esta forma?"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Retirer toute l'animation de cette forme ?"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Rimuovere tutta l'animazione da questa forma?"
+          }
+        }
+      }
+    },
     "Remove all animation from this text?" : {
       "localizations" : {
         "de" : {
@@ -17112,6 +17580,34 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Reimposta la trasformazione"
+          }
+        }
+      }
+    },
+    "Resize and rotate shape" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Form skalieren und drehen"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Redimensionar y girar la forma"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Redimensionner et faire pivoter la forme"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ridimensiona e ruota la forma"
           }
         }
       }
@@ -18236,6 +18732,34 @@
         }
       }
     },
+    "Selected shape. Drag to move, pinch to resize, rotate with two fingers." : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ausgewählte Form. Ziehen zum Bewegen, Zusammenziehen für die Größe, mit zwei Fingern drehen."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Forma seleccionada. Arrastra para mover, pellizca para redimensionar, gira con dos dedos."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Forme sélectionnée. Faites glisser pour déplacer, pincez pour redimensionner, tournez à deux doigts pour faire pivoter."
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Forma selezionata. Trascina per spostare, pizzica per ridimensionare, ruota con due dita."
+          }
+        }
+      }
+    },
     "Selected text. Drag to move, pinch to resize, rotate with two fingers." : {
       "localizations" : {
         "de" : {
@@ -18456,6 +18980,34 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Impostazioni"
+          }
+        }
+      }
+    },
+    "Shadow" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Schatten"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Sombra"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ombre"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ombra"
           }
         }
       }
@@ -19412,6 +19964,34 @@
         }
       }
     },
+    "Star" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Stern"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Estrella"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Étoile"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Stella"
+          }
+        }
+      }
+    },
     "Start color" : {
       "localizations" : {
         "de" : {
@@ -19604,6 +20184,34 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Ferma l'animazione della proprietà e conserva il valore attualmente visibile."
+          }
+        }
+      }
+    },
+    "Stroke" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Kontur"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Contorno"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Contour"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Contorno"
           }
         }
       }
@@ -23214,6 +23822,34 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "TRANSIZIONI"
+          }
+        }
+      }
+    },
+    "Triangle" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Dreieck"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Triángulo"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Triangle"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Triangolo"
           }
         }
       }

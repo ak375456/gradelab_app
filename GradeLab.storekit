@@ -16,6 +16,21 @@
           "description": "Einmal kaufen. Alle Pro-Funktionen für immer.",
           "displayName": "Pro auf Lebenszeit",
           "locale": "de_DE"
+        },
+        {
+          "description": "Un seul achat. Toutes les fonctions Pro.",
+          "displayName": "Pro à vie",
+          "locale": "fr_FR"
+        },
+        {
+          "description": "Una sola compra. Todas las funciones Pro.",
+          "displayName": "Pro de por vida",
+          "locale": "es_ES"
+        },
+        {
+          "description": "Un solo acquisto. Tutte le funzioni Pro.",
+          "displayName": "Pro a vita",
+          "locale": "it_IT"
         }
       ],
       "productID": "com.aftab.gradelab.pro.lifetime",
@@ -56,6 +71,21 @@
               "description": "Alle Pro-Funktionen, wöchentlich abgerechnet.",
               "displayName": "Wöchentlich",
               "locale": "de_DE"
+            },
+            {
+              "description": "Toutes les fonctions Pro, chaque semaine.",
+              "displayName": "Hebdomadaire",
+              "locale": "fr_FR"
+            },
+            {
+              "description": "Todas las funciones Pro, cada semana.",
+              "displayName": "Semanal",
+              "locale": "es_ES"
+            },
+            {
+              "description": "Tutte le funzioni Pro, ogni settimana.",
+              "displayName": "Settimanale",
+              "locale": "it_IT"
             }
           ],
           "productID": "com.aftab.gradelab.pro.weekly",
@@ -82,6 +112,21 @@
               "description": "Alle Pro-Funktionen, monatlich abgerechnet.",
               "displayName": "Monatlich",
               "locale": "de_DE"
+            },
+            {
+              "description": "Toutes les fonctions Pro, chaque mois.",
+              "displayName": "Mensuel",
+              "locale": "fr_FR"
+            },
+            {
+              "description": "Todas las funciones Pro, cada mes.",
+              "displayName": "Mensual",
+              "locale": "es_ES"
+            },
+            {
+              "description": "Tutte le funzioni Pro, ogni mese.",
+              "displayName": "Mensile",
+              "locale": "it_IT"
             }
           ],
           "productID": "com.aftab.gradelab.pro.monthly",
@@ -108,6 +153,21 @@
               "description": "Alle Pro-Funktionen, jährlich abgerechnet.",
               "displayName": "Jährlich",
               "locale": "de_DE"
+            },
+            {
+              "description": "Toutes les fonctions Pro, chaque année.",
+              "displayName": "Annuel",
+              "locale": "fr_FR"
+            },
+            {
+              "description": "Todas las funciones Pro, cada año.",
+              "displayName": "Anual",
+              "locale": "es_ES"
+            },
+            {
+              "description": "Tutte le funzioni Pro, ogni anno.",
+              "displayName": "Annuale",
+              "locale": "it_IT"
             }
           ],
           "productID": "com.aftab.gradelab.pro.yearly",

@@ -75,11 +75,11 @@ final class TimelineCanvas: UIView, UIScrollViewDelegate, UIGestureRecognizerDel
     var assetFrames: [UUID: [UIImage]] = [:]
     var waveforms: [UUID: [Float]] = [:]
     // Text rows are short: a title needs a label, not a filmstrip-sized band.
-    private static let textClipHeight: CGFloat = 30
+    private static let overlayClipHeight: CGFloat = 30
     private static let mediaClipHeight: CGFloat = 68
     private static let rowGap: CGFloat = 8
     private func clipHeight(_ track: TimelineTrack?) -> CGFloat {
-        track?.kind == .text ? Self.textClipHeight : Self.mediaClipHeight
+        track?.kind.isDrawnOverlay == true ? Self.overlayClipHeight : Self.mediaClipHeight
     }
     private func clipHeight(trackID: UUID) -> CGFloat { clipHeight(tracks.first { $0.id == trackID }) }
     /// Cumulative top of a row within the scrolled content, so rows may differ in height.
@@ -473,7 +473,7 @@ final class TimelineCanvas: UIView, UIScrollViewDelegate, UIGestureRecognizerDel
         let clipRect = CGRect(x: left, y: 36, width: max(1, right-left), height: height)
         context.saveGState()
         context.clip(to: clipRect.intersection(bounds))
-        context.setFillColor((clip.isAudio ? UIColor.systemBlue.withAlphaComponent(0.25) : clip.isText ? UIColor.systemPurple.withAlphaComponent(0.3) : UIColor(white: 0.18, alpha: 1)).cgColor)
+        context.setFillColor((clip.isAudio ? UIColor.systemBlue.withAlphaComponent(0.25) : clip.isText ? UIColor.systemPurple.withAlphaComponent(0.3) : clip.isShape ? UIColor.systemTeal.withAlphaComponent(0.3) : UIColor(white: 0.18, alpha: 1)).cgColor)
         context.fill(clipRect.intersection(bounds))
         let cellWidth = 72.0
         var cell = max(0, Int(floor(-left / cellWidth)))
@@ -543,14 +543,14 @@ final class TimelineCanvas: UIView, UIScrollViewDelegate, UIGestureRecognizerDel
         }
         let labelHeight: CGFloat = min(22, height)
         let labelTop = 36+height-labelHeight
-        if !clip.isText {
+        if !clip.isDrawnOverlay {
             context.setFillColor(UIColor.black.withAlphaComponent(0.65).cgColor)
             context.fill(CGRect(x: max(left, 0), y: labelTop, width: min(right, bounds.width)-max(left, 0), height: labelHeight))
         }
-        let label = (isLocked(clip) && clip.isText ? "🔒 " : "")
+        let label = (isLocked(clip) && clip.isDrawnOverlay ? "🔒 " : "")
             + (clip.isMuted ? "Muted · " : clip.isAudio || clip.embeddedAudio != nil ? "♫  " : "") + name
-        // Media keeps its original baseline inside the dark strip; text centres in its short row.
-        let labelY = clip.isText ? 36+(height-13)/2 : labelTop+3
+        // Media keeps its original baseline inside the dark strip; a drawn overlay centres in its short row.
+        let labelY = clip.isDrawnOverlay ? 36+(height-13)/2 : labelTop+3
         (label as NSString).draw(at: CGPoint(x: max(left, 0)+8, y: labelY),
             withAttributes: [.font: UIFont.systemFont(ofSize: 11, weight: .medium), .foregroundColor: UIColor.white])
         context.restoreGState()
@@ -669,7 +669,7 @@ final class TimelineCanvas: UIView, UIScrollViewDelegate, UIGestureRecognizerDel
             let rawTarget = max(0, base + recognizer.translation(in: self).x / zoom)
             // A title belongs to the edit, not just its otherwise-empty text
             // row. Its handles therefore see every picture cut and marker.
-            let trackFilter = ghost.clip.isText ? nil : ghost.clip.placement.trackID
+            let trackFilter = ghost.clip.isDrawnOverlay ? nil : ghost.clip.placement.trackID
             let proposed = TimelineEditing.snapClipEdge(
                 rawTarget, clips: clips, markers: markers, excluding: ghost.clip.id,
                 trackID: trackFilter, playhead: currentTime, tolerance: 14/zoom)
@@ -692,7 +692,7 @@ final class TimelineCanvas: UIView, UIScrollViewDelegate, UIGestureRecognizerDel
                 let previousLimit = (ripples
                     ? neighbours.map { $0.placement.timelineStart.seconds + minimumDuration }
                     : neighbours.compactMap { try? $0.placement.range.end.seconds }).max() ?? 0
-                let sourceLimit = ghost.clip.isText ? 0 : start - ghost.clip.sourceRange.start.seconds + (sourceRange?.start.seconds ?? 0)
+                let sourceLimit = ghost.clip.isDrawnOverlay ? 0 : start - ghost.clip.sourceRange.start.seconds + (sourceRange?.start.seconds ?? 0)
                 target = max(max(previousLimit, sourceLimit), min(target, end - minimumDuration))
             }
             if ghost.operation == .trimEnd {
@@ -700,7 +700,7 @@ final class TimelineCanvas: UIView, UIScrollViewDelegate, UIGestureRecognizerDel
                     : clips.filter { $0.id != ghost.clip.id && $0.placement.trackID == ghost.clip.placement.trackID && $0.placement.timelineStart.seconds >= end }
                         .map { $0.placement.timelineStart.seconds }.min() ?? .greatestFiniteMagnitude
                 let isStill = assets.first(where: { $0.id == ghost.clip.assetID })?.stillImage != nil
-                let sourceEnd = isStill || ghost.clip.isText ? Double.greatestFiniteMagnitude : ((try? sourceRange?.end.seconds) ?? end)
+                let sourceEnd = isStill || ghost.clip.isDrawnOverlay ? Double.greatestFiniteMagnitude : ((try? sourceRange?.end.seconds) ?? end)
                 let clipSourceEnd = (try? ghost.clip.sourceRange.end.seconds) ?? end
                 target = min(min(nextStart, end + sourceEnd - clipSourceEnd), max(target, start + minimumDuration))
             }
@@ -748,7 +748,7 @@ final class TimelineCanvas: UIView, UIScrollViewDelegate, UIGestureRecognizerDel
             dragPoint = recognizer.location(in: self)
             if hypot(dragPoint.x-holdOrigin.x, dragPoint.y-holdOrigin.y) > 8 { hasMoved = true }
             if layerDropTarget != nil ||
-                (ghost.map { !$0.clip.isAudio && !$0.clip.isText } == true && abs(dragPoint.y-holdOrigin.y) > 24 &&
+                (ghost.map { !$0.clip.isAudio && !$0.clip.isDrawnOverlay } == true && abs(dragPoint.y-holdOrigin.y) > 24 &&
                  abs(dragPoint.y-holdOrigin.y) > abs(dragPoint.x-holdOrigin.x)*1.2) {
                 updateLayerDrag(); return
             }
@@ -830,7 +830,7 @@ final class TimelineCanvas: UIView, UIScrollViewDelegate, UIGestureRecognizerDel
         setNeedsDisplay()
     }
     private func updateLayerDrag() {
-        guard let moving = ghost?.clip, !moving.isAudio, !moving.isText, !tracks.isEmpty else { return }
+        guard let moving = ghost?.clip, !moving.isAudio, !moving.isDrawnOverlay, !tracks.isEmpty else { return }
         let y = dragPoint.y+scroll.contentOffset.y-32
         let visual = tracks.indices.filter { tracks[$0].kind == .mainVideo || tracks[$0].kind == .videoOverlay }
         guard !visual.isEmpty else { return }

@@ -1,7 +1,14 @@
 import Foundation
 
 struct TimelineTrack: Codable, Equatable, Identifiable, Sendable {
-    enum Kind: String, Codable, Sendable { case mainVideo, videoOverlay, text, audio }
+    enum Kind: String, Codable, Sendable {
+        case mainVideo, videoOverlay, text, shape, audio
+
+        /// Rows whose picture the app draws rather than reads from media. They
+        /// have no filmstrip and no waveform, so the timeline gives them a
+        /// short row and sizes itself accordingly.
+        var isDrawnOverlay: Bool { self == .text || self == .shape }
+    }
     let id: UUID
     var name: String
     var kind: Kind
@@ -25,6 +32,7 @@ struct TimelineTrack: Codable, Equatable, Identifiable, Sendable {
         case .mainVideo: "Main Video"
         case .videoOverlay: "Overlay"
         case .text: "Text"
+        case .shape: "Shape"
         case .audio: "Audio"
         }
     }
@@ -34,6 +42,14 @@ struct TimelineTrack: Codable, Equatable, Identifiable, Sendable {
     /// Text tracks normally contain one clip; after a split, the earliest clip
     /// provides the stable row label.
     var layerDisplayName: String {
+        if kind == .shape, name == Self.defaultName(for: .shape) {
+            let firstShape = items.compactMap { item -> ShapeClip? in
+                guard case .shape(let clip) = item else { return nil }
+                return clip
+            }.min { $0.placement.timelineStart < $1.placement.timelineStart }
+            guard let firstShape else { return name }
+            return Self.sanitizedName(firstShape.kind.title, kind: .shape)
+        }
         guard kind == .text, name == Self.defaultName(for: .text) else { return name }
         let firstText = items.compactMap { item -> TextClip? in
             guard case .text(let clip) = item else { return nil }
@@ -45,7 +61,8 @@ struct TimelineTrack: Codable, Equatable, Identifiable, Sendable {
 
     func accepts(_ item: TimelineItem) -> Bool {
         switch (kind, item) {
-        case (.mainVideo, .video), (.videoOverlay, .video), (.text, .text), (.audio, .audio): true
+        case (.mainVideo, .video), (.videoOverlay, .video), (.text, .text),
+             (.shape, .shape), (.audio, .audio): true
         default: false
         }
     }

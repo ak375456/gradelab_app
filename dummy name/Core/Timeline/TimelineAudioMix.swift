@@ -24,7 +24,7 @@ struct TimelineAudioMix {
                     fade = clip.embeddedAudio.map {
                         AudioFade.resolved(duration: duration, fadeIn: $0.fadeIn, fadeOut: $0.fadeOut)
                     } ?? (0, 0)
-                case .text: break
+                case .text, .shape: break
                 }
                 placement = item.placement
             }

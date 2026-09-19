@@ -1,0 +1,6 @@
+Prise en charge d'Apple Log 2 et un navigateur de looks bien plus rapide.
+
+• Apple Log 2 — étalonnez les rushes de l'iPhone 17 Pro. Apple Log 2 est décodé via sa propre transformation Apple Wide Gamut au lieu d'être traité comme de l'Apple Log : la couleur est juste dès la première image, pendant l'étalonnage et jusqu'à l'export.
+• Les looks se chargent bien plus vite — le navigateur de looks se remplissait lentement sur les grandes collections de LUTs, et appliquer un LUT haute résolution pouvait prendre plusieurs secondes. Les aperçus apparaissent désormais presque instantanément et un look s'applique dès que vous le touchez.
+• Correction : le timecode au-dessus de la timeline pouvait passer sur deux lignes sur les petits iPhone et couper une valeur au passage.
+• Correction : l'import d'une photo affichait « Analyse de la vidéo ».

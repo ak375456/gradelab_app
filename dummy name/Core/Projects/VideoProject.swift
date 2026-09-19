@@ -224,8 +224,35 @@ struct VideoProject: Codable, Identifiable, Equatable, Sendable {
                           (0.05...1.5).contains(clip.style.layoutWidth), (-20...100).contains(clip.style.characterSpacing), (0...300).contains(clip.style.lineSpacing),
                           [clip.backgroundOpacity, clip.shadowOpacity, clip.glowOpacity].allSatisfy({ $0.isFinite && (0...1).contains($0) }) else { throw TimelineError.invalid("Invalid text geometry or appearance.") }
                 }
+                if case .shape(let clip) = item {
+                    let sizes = [clip.width, clip.height, clip.strokeWidth, clip.cornerRadius,
+                                 clip.shadowRadius, clip.glowRadius]
+                    let offsets = [clip.shadowOffsetX, clip.shadowOffsetY]
+                    let geometry = [clip.transform.positionX, clip.transform.positionY, clip.transform.scale,
+                                    clip.transform.widthScale, clip.transform.heightScale,
+                                    clip.transform.rotationDegrees, clip.transform.anchorX, clip.transform.anchorY]
+                    var colors = [clip.fillColor, clip.strokeColor, clip.shadowColor, clip.glowColor]
+                    if let gradient = clip.gradient { colors.append(contentsOf: [gradient.start, gradient.end]) }
+                    guard sizes.allSatisfy({ $0.isFinite && (0...8192).contains($0) }),
+                          clip.width > 0, clip.height > 0,
+                          offsets.allSatisfy({ $0.isFinite && (-8192...8192).contains($0) }),
+                          geometry.allSatisfy(\.isFinite),
+                          clip.transform.scale > 0, clip.transform.widthScale > 0, clip.transform.heightScale > 0,
+                          ShapeKind.pointCountRange.contains(clip.pointCount),
+                          clip.innerRadius.isFinite, (0.01...1).contains(clip.innerRadius),
+                          [clip.opacity, clip.shadowOpacity, clip.glowOpacity]
+                              .allSatisfy({ $0.isFinite && (0...1).contains($0) }),
+                          clip.gradient.map({ $0.angleDegrees.isFinite && (-360...360).contains($0.angleDegrees) }) ?? true,
+                          colors.allSatisfy({ color in
+                              [color.red, color.green, color.blue, color.alpha]
+                                  .allSatisfy { $0.isFinite && (0...1).contains($0) }
+                          }) else {
+                        throw TimelineError.invalid("Invalid shape geometry or appearance.")
+                    }
+                }
                 switch item {
                 case .text(let clip): try Self.validateAnimation(clip)
+                case .shape(let clip): try Self.validateAnimation(clip)
                 case .video(let clip):
                     try Self.validateAnimation(clip)
                     try Self.validateMaskedGrades(clip)
@@ -235,7 +262,7 @@ struct VideoProject: Codable, Identifiable, Equatable, Sendable {
                 switch item {
                 case .video(let clip): sourceRange = clip.sourceRange
                 case .audio(let clip): sourceRange = clip.sourceRange
-                case .text: sourceRange = nil
+                case .text, .shape: sourceRange = nil
                 }
                 if let sourceRange {
                     // A clip occupies `sourceRange.duration / speed` of timeline.

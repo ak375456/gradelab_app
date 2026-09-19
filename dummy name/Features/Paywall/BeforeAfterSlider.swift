@@ -18,6 +18,10 @@ struct BeforeAfterSlider: View {
     /// What the crop is centred on, in unit coordinates of the source image.
     /// Set for a face a little above centre.
     var focus: UnitPoint = UnitPoint(x: 0.54, y: 0.38)
+    /// The shape of the card. Wider than it is tall: a portrait card the width
+    /// of the paywall's column is taller than an iPad sheet, which left the
+    /// plans below it with nowhere to appear.
+    var aspect: CGFloat = 3.0 / 2.0
 
     @State private var split: CGFloat = 0.5
     @State private var isDragging = false
@@ -25,9 +29,12 @@ struct BeforeAfterSlider: View {
 
     private let corner: CGFloat = 18
 
-    init(zoom: CGFloat = 1.25, focus: UnitPoint = UnitPoint(x: 0.54, y: 0.38)) {
+    init(zoom: CGFloat = 1.25,
+         focus: UnitPoint = UnitPoint(x: 0.54, y: 0.38),
+         aspect: CGFloat = 3.0 / 2.0) {
         self.zoom = zoom
         self.focus = focus
+        self.aspect = aspect
     }
 
     private var before: Image? { UIImage(named: "PaywallBefore").map(Image.init(uiImage:)) }
@@ -63,17 +70,14 @@ struct BeforeAfterSlider: View {
                 RoundedRectangle(cornerRadius: corner)
                     .stroke(.white.opacity(0.12), lineWidth: 1)
             )
-            .contentShape(Rectangle())
-            .gesture(
-                DragGesture(minimumDistance: 0)
-                    .onChanged { value in
-                        isDragging = true
-                        split = min(max(value.location.x / width, 0), 1)
-                    }
-                    .onEnded { _ in isDragging = false }
+            .overlay(
+                WipeGestures(
+                    onMove: { x in moveHandle(to: x, width: width) },
+                    onDragging: { isDragging = $0 }
+                )
             )
         }
-        .aspectRatio(4.0 / 5.0, contentMode: .fit)
+        .aspectRatio(aspect, contentMode: .fit)
         .accessibilityElement()
         .accessibilityLabel("Before and after grading comparison")
         .accessibilityValue("\(Int(split * 100))% showing the ungraded image")
@@ -84,6 +88,10 @@ struct BeforeAfterSlider: View {
             @unknown default: break
             }
         }
+    }
+
+    private func moveHandle(to x: CGFloat, width: CGFloat) {
+        split = min(max(x / width, 0), 1)
     }
 
     @ViewBuilder
@@ -141,3 +149,84 @@ struct BeforeAfterSlider: View {
         .allowsHitTesting(false)
     }
 }
+
+/// The wipe's touch handling, in UIKit.
+///
+/// SwiftUI's `DragGesture` cannot do the one thing this control needs. Inside a
+/// scroll view it claims the touch the moment a finger lands, whether that
+/// finger turns out to be wiping or scrolling, and `simultaneousGesture` does
+/// not change that — it only stops the wipe from also moving. That is what got
+/// the paywall rejected: on iPad the card filled the sheet, so every touch that
+/// could have scrolled to the plans landed on a control that swallowed it.
+///
+/// A gesture recognizer can refuse. `gestureRecognizerShouldBegin` is asked the
+/// question at exactly the right moment — the finger has moved, its direction is
+/// known, and nothing has been claimed yet — so a pan heading up or down fails
+/// itself and the touch goes on to the scroll view, untouched.
+private struct WipeGestures: UIViewRepresentable {
+    /// Where the finger is, in the card's own coordinates.
+    var onMove: (CGFloat) -> Void
+    /// Whether a wipe is in progress, for the handle's grow-on-touch.
+    var onDragging: (Bool) -> Void
+
+    func makeUIView(context: Context) -> UIView {
+        let view = UIView()
+        view.backgroundColor = .clear
+        // The card speaks for itself through SwiftUI's accessibility element;
+        // this layer is only here to carry recognizers.
+        view.isAccessibilityElement = false
+        view.accessibilityElementsHidden = true
+
+        let pan = UIPanGestureRecognizer(target: context.coordinator,
+                                         action: #selector(Coordinator.pan(_:)))
+        pan.delegate = context.coordinator
+        view.addGestureRecognizer(pan)
+
+        let tap = UITapGestureRecognizer(target: context.coordinator,
+                                         action: #selector(Coordinator.tap(_:)))
+        view.addGestureRecognizer(tap)
+        return view
+    }
+
+    func updateUIView(_ view: UIView, context: Context) {
+        context.coordinator.onMove = onMove
+        context.coordinator.onDragging = onDragging
+    }
+
+    func makeCoordinator() -> Coordinator {
+        Coordinator(onMove: onMove, onDragging: onDragging)
+    }
+
+    final class Coordinator: NSObject, UIGestureRecognizerDelegate {
+        var onMove: (CGFloat) -> Void
+        var onDragging: (Bool) -> Void
+
+        init(onMove: @escaping (CGFloat) -> Void, onDragging: @escaping (Bool) -> Void) {
+            self.onMove = onMove
+            self.onDragging = onDragging
+        }
+
+        @objc func pan(_ recognizer: UIPanGestureRecognizer) {
+            switch recognizer.state {
+            case .began, .changed:
+                onDragging(true)
+                onMove(recognizer.location(in: recognizer.view).x)
+            default:
+                onDragging(false)
+            }
+        }
+
+        /// A tap moves the handle to where it landed.
+        @objc func tap(_ recognizer: UITapGestureRecognizer) {
+            onMove(recognizer.location(in: recognizer.view).x)
+        }
+
+        /// Sideways only. A finger heading up or down belongs to the scroll view.
+        func gestureRecognizerShouldBegin(_ recognizer: UIGestureRecognizer) -> Bool {
+            guard let pan = recognizer as? UIPanGestureRecognizer else { return true }
+            let velocity = pan.velocity(in: pan.view)
+            return abs(velocity.x) > abs(velocity.y)
+        }
+    }
+}
+

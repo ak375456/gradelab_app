@@ -362,7 +362,7 @@ struct ValidateSequence {
 
         // Splitting through an eased span must not change any retained frame.
         var split = project
-        let rightID = try TextEditing.split(clipID, at: try .seconds(1.5), in: &split)
+        let rightID = try OverlayEditing.split(clipID, at: try .seconds(1.5), in: &split)
         precondition(rightID != clipID)
         let splitSequence = try await SequenceComposition.build(project: split, context: context)
         let splitPreview = AVAssetImageGenerator(asset: splitSequence.source.asset)

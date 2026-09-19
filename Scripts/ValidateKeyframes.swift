@@ -319,14 +319,14 @@ import CoreMedia
         let original = text(project, id)
         var moved = original
         moved.placement.timelineStart = seconds(6)
-        try TextEditing.replace(id, with: moved, in: &project)
+        try OverlayEditing.replace(id, with: moved, in: &project)
         near(text(project, id).evaluated(at: seconds(8)).opacity,
              original.evaluated(at: seconds(4)).opacity, "moving a clip moved its animation with it")
 
         // Split: both halves must reproduce the original at every retained time.
         (project, id) = textProject()
         let source = text(project, id)
-        let rightID = try TextEditing.split(id, at: seconds(4), in: &project)
+        let rightID = try OverlayEditing.split(id, at: seconds(4), in: &project)
         let left = text(project, id), right = text(project, rightID)
         check(left.animation?.track(.opacity)?.keyframes == source.animation?.track(.opacity)?.keyframes,
               "the split rewrote the left keyframes")
@@ -341,13 +341,13 @@ import CoreMedia
 
         // Trim the head: hidden keyframes are preserved and restored by extending again.
         (project, id) = textProject()
-        try TextEditing.edit(id, operation: .trimStart, to: seconds(3), in: &project)
+        try OverlayEditing.edit(id, operation: .trimStart, to: seconds(3), in: &project)
         let trimmed = text(project, id)
         near(trimmed.animation?.startOffset.seconds, 1, "a head trim advances the animation offset")
         check(trimmed.animation?.track(.opacity)?.keyframes.count == 2, "a head trim discarded keyframes")
         near(trimmed.evaluated(at: seconds(3)).opacity, source.evaluated(at: seconds(3)).opacity,
              "a head trim shifted the animation in time")
-        try TextEditing.edit(id, operation: .trimStart, to: seconds(2), in: &project)
+        try OverlayEditing.edit(id, operation: .trimStart, to: seconds(2), in: &project)
         let restored = text(project, id)
         near(restored.animation?.startOffset.seconds, 0, "extending the head restored the hidden animation")
         near(restored.evaluated(at: seconds(2)).opacity, source.evaluated(at: seconds(2)).opacity,
@@ -355,7 +355,7 @@ import CoreMedia
 
         // Trim the tail: the animation clock is untouched.
         (project, id) = textProject()
-        try TextEditing.edit(id, operation: .trimEnd, to: seconds(4), in: &project)
+        try OverlayEditing.edit(id, operation: .trimEnd, to: seconds(4), in: &project)
         let shortened = text(project, id)
         near(shortened.animation?.startOffset.seconds, 0, "a tail trim must not move the animation")
         near(shortened.evaluated(at: seconds(3)).opacity, source.evaluated(at: seconds(3)).opacity,
@@ -363,10 +363,10 @@ import CoreMedia
 
         // Duplicate: independent animation data.
         (project, id) = textProject()
-        let copyID = try TextEditing.paste(text(project, id), at: seconds(20), in: &project)
+        let copyID = try OverlayEditing.paste(text(project, id), at: seconds(20), in: &project)
         var copy = text(project, copyID)
         copy.animation?.update(.opacity) { $0.set(.number(0.25), at: .zero) }
-        try TextEditing.replace(copyID, with: copy, in: &project)
+        try OverlayEditing.replace(copyID, with: copy, in: &project)
         near(text(project, id).animation?.track(.opacity)?.keyframes.first?.value.number, 0,
              "editing a pasted copy changed the original")
         near(text(project, copyID).animation?.track(.opacity)?.keyframes.first?.value.number, 0.25,
@@ -374,10 +374,10 @@ import CoreMedia
         check(copyID != id, "paste must produce a new identity")
 
         // Delete: the clip and its animation go together.
-        try TextEditing.delete(copyID, in: &project)
+        try OverlayEditing.delete(copyID, in: &project)
         check(project.timeline.item(id: copyID) == nil, "deleting a clip left it behind")
         check(project.timeline.hasAnimation, "deleting a copy removed the original's animation")
-        try TextEditing.delete(id, in: &project)
+        try OverlayEditing.delete(id, in: &project)
         check(!project.timeline.hasAnimation, "deleting the last animated clip left animation behind")
     }
 
@@ -394,7 +394,7 @@ import CoreMedia
         var wide = clip
         wide.placement.duration = seconds(5)
         var widened = project
-        try TextEditing.replace(id, with: wide, in: &widened)
+        try OverlayEditing.replace(id, with: wide, in: &widened)
         let display = widened.timeline.items.compactMap(TimelineDisplayClip.init)
         let both = text(widened, id).visibleKeyframeSeconds
         check(both == [2, 6], "expected keyframes at 2s and 6s, got \(both)")
@@ -469,7 +469,7 @@ import CoreMedia
         }
         withColor.animation?.startOffset = seconds(0.5)
         var document = animated
-        try TextEditing.replace(id, with: withColor, in: &document)
+        try OverlayEditing.replace(id, with: withColor, in: &document)
         let restored = try JSONDecoder().decode(VideoProject.self, from: try JSONEncoder().encode(document))
         check(text(restored, id).animation == withColor.animation, "animation did not survive a save and reopen exactly")
         check(text(restored, id).animation?.track(.opacity)?.keyframes[0].interpolation == .easeInOut,
@@ -482,7 +482,7 @@ import CoreMedia
         bad.animation = ClipAnimation(tracks: [
             AnimationTrack(property: .scale, keyframes: [Keyframe(time: .zero, value: .color(.white))])
         ])
-        try TextEditing.replace(id, with: bad, in: &broken)
+        try OverlayEditing.replace(id, with: bad, in: &broken)
         throwsError("a colour value on a numeric property") { try broken.validate() }
 
         var outOfRange = document
@@ -490,7 +490,7 @@ import CoreMedia
         big.animation = ClipAnimation(tracks: [
             AnimationTrack(property: .fontSize, keyframes: [Keyframe(time: .zero, value: .number(999_999))])
         ])
-        try TextEditing.replace(id, with: big, in: &outOfRange)
+        try OverlayEditing.replace(id, with: big, in: &outOfRange)
         throwsError("an out-of-range keyframe") { try outOfRange.validate() }
 
         var wrongClip = project

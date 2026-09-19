@@ -374,7 +374,10 @@ enum ProAccessPolicy {
                 switch item {
                 case .video(let clip): found.append(contentsOf: clipRequirements(clip))
                 case .text(let clip): found.append(contentsOf: textRequirements(clip))
-                case .audio: continue
+                // Shapes are free, exactly as text is: what GradeLab charges
+                // for is the delivery, not the ability to put a layer on the
+                // timeline. See `configurationRequirements`.
+                case .shape, .audio: continue
                 }
             }
         }

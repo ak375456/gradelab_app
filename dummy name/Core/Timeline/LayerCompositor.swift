@@ -331,25 +331,34 @@ class LayerCompositor: NSObject, AVVideoCompositing, @unchecked Sendable {
         // reduced size and everything here is normalised to the canvas it is
         // given, so both paths scale without a second set of geometry.
         let bounds = CGRect(origin: .zero, size: request.renderContext.size)
+        // The coordinate system drawn overlays are authored in. Constant for the
+        // whole frame, so it is read once rather than per track.
+        let authoredCanvas = SequenceComposition.previewRenderSize(
+            width: project.canvas.width, height: project.canvas.height)
         var result = CIImage(color: .black).cropped(to: bounds)
         var retained: [CVPixelBuffer] = []
         for track in project.timeline.tracks.reversed() where track.isEnabled {
-            for case .text(let authored) in track.items where authored.placement.isEnabled {
-                let relative = CMTimeSubtract(request.compositionTime, authored.placement.timelineStart.cmTime)
-                guard relative >= .zero, relative < authored.placement.duration.cmTime else { continue }
+            for item in track.items where item.placement.isEnabled && item.isDrawnOverlay {
+                let relative = CMTimeSubtract(request.compositionTime, item.placement.timelineStart.cmTime)
+                guard relative >= .zero, relative < item.placement.duration.cmTime else { continue }
                 // Single conversion from composition time to clip-local animation time.
                 // Preview and export reach this same line, so they cannot disagree.
-                let clip = (try? TimelineTime(request.compositionTime)).map { authored.evaluated(at: $0) } ?? authored
-                if let text = TextRenderer.image(
-                    clip,
-                    canvas: bounds.size,
-                    authoredCanvas: SequenceComposition.previewRenderSize(
-                        width: project.canvas.width,
-                        height: project.canvas.height
-                    )
-                ) {
+                let time = try? TimelineTime(request.compositionTime)
+                let drawn: (image: CIImage, blend: VisualBlendMode)?
+                switch item {
+                case .text(let authored):
+                    let clip = time.map { authored.evaluated(at: $0) } ?? authored
+                    drawn = TextRenderer.image(clip, canvas: bounds.size, authoredCanvas: authoredCanvas)
+                        .map { ($0, clip.blendMode) }
+                case .shape(let authored):
+                    let clip = time.map { authored.evaluated(at: $0) } ?? authored
+                    drawn = ShapeRenderer.image(clip, canvas: bounds.size, authoredCanvas: authoredCanvas)
+                        .map { ($0, clip.blendMode) }
+                default: drawn = nil
+                }
+                if let drawn {
                     let filters: [VisualBlendMode: String] = [.normal: "CISourceOverCompositing", .multiply: "CIMultiplyBlendMode", .screen: "CIScreenBlendMode", .overlay: "CIOverlayBlendMode", .softLight: "CISoftLightBlendMode", .hardLight: "CIHardLightBlendMode", .darken: "CIDarkenBlendMode", .lighten: "CILightenBlendMode"]
-                    result = text.applyingFilter(filters[clip.blendMode]!, parameters: [kCIInputBackgroundImageKey: result]).cropped(to: bounds)
+                    result = drawn.image.applyingFilter(filters[drawn.blend]!, parameters: [kCIInputBackgroundImageKey: result]).cropped(to: bounds)
                 }
             }
             let activeTransition = project.timeline.transitions.first { transition in
@@ -604,30 +613,38 @@ class LayerCompositor: NSObject, AVVideoCompositing, @unchecked Sendable {
             readsFirst.toggle()
         }
 
+        // The coordinate system drawn overlays are authored in. Constant for the
+        // whole frame, so it is read once rather than per track.
+        let authoredCanvas = SequenceComposition.previewRenderSize(
+            width: project.canvas.width, height: project.canvas.height)
         // The same traversal order the SDR path uses, so the two cannot disagree
         // about which layer sits on top.
         for track in project.timeline.tracks.reversed() where track.isEnabled {
-            for case .text(let authored) in track.items where authored.placement.isEnabled {
-                let relative = CMTimeSubtract(request.compositionTime, authored.placement.timelineStart.cmTime)
-                guard relative >= .zero, relative < authored.placement.duration.cmTime else { continue }
-                let clip = (try? TimelineTime(request.compositionTime)).map { authored.evaluated(at: $0) } ?? authored
-                try Self.requireNormalBlend(clip.blendMode)
-                guard let image = TextRenderer.image(
-                    clip,
-                    canvas: canvasSize,
-                    authoredCanvas: SequenceComposition.previewRenderSize(
-                        width: project.canvas.width,
-                        height: project.canvas.height
-                    )
-                ) else { continue }
+            for item in track.items where item.placement.isEnabled && item.isDrawnOverlay {
+                let relative = CMTimeSubtract(request.compositionTime, item.placement.timelineStart.cmTime)
+                guard relative >= .zero, relative < item.placement.duration.cmTime else { continue }
+                let time = try? TimelineTime(request.compositionTime)
+                let drawn: CIImage?
+                switch item {
+                case .text(let authored):
+                    let clip = time.map { authored.evaluated(at: $0) } ?? authored
+                    try Self.requireNormalBlend(clip.blendMode)
+                    drawn = TextRenderer.image(clip, canvas: canvasSize, authoredCanvas: authoredCanvas)
+                case .shape(let authored):
+                    let clip = time.map { authored.evaluated(at: $0) } ?? authored
+                    try Self.requireNormalBlend(clip.blendMode)
+                    drawn = ShapeRenderer.image(clip, canvas: canvasSize, authoredCanvas: authoredCanvas)
+                default: drawn = nil
+                }
+                guard let image = drawn else { continue }
                 let buffer = try renderedSDRLayer(image, size: canvasSize, ci: ci)
                 guard let texture = metal.packedTexture(from: buffer, pixelFormat: .bgra8Unorm) else {
                     throw GradeLabError.rendererInitializationFailed
                 }
                 retained.append(buffer); retained.append(texture)
-                // Text is authored into canvas coordinates already, so it needs
-                // no placement of its own — only the SDR→working conversion and
-                // its own alpha.
+                // A drawn overlay is authored into canvas coordinates already, so
+                // it needs no placement of its own — only the SDR→working
+                // conversion and its own alpha.
                 var layer = HDRLayerUniforms(
                     transform: .identity, sourceSize: canvasSize, canvasSize: canvasSize,
                     opacity: 1, sourceIsSDR: true, premultiplied: true)
@@ -1117,23 +1134,31 @@ extension LayerCompositor {
             }
         }
 
+        // The coordinate system drawn overlays are authored in. Constant for the
+        // whole frame, so it is read once rather than per track.
+        let authoredCanvas = SequenceComposition.previewRenderSize(
+            width: project.canvas.width, height: project.canvas.height)
         for track in project.timeline.tracks.reversed() where track.isEnabled {
-            for case .text(let authored) in track.items where authored.placement.isEnabled {
-                let relative = CMTimeSubtract(request.compositionTime, authored.placement.timelineStart.cmTime)
-                guard relative >= .zero, relative < authored.placement.duration.cmTime else { continue }
-                let clip = authored.evaluated(at: time)
-                guard let text = TextRenderer.image(
-                    clip,
-                    canvas: size,
-                    authoredCanvas: SequenceComposition.previewRenderSize(
-                        width: project.canvas.width,
-                        height: project.canvas.height
-                    )
-                ) else { continue }
-                let buffer = try renderedSDRLayer(text, size: size, ci: ci)
+            for item in track.items where item.placement.isEnabled && item.isDrawnOverlay {
+                let relative = CMTimeSubtract(request.compositionTime, item.placement.timelineStart.cmTime)
+                guard relative >= .zero, relative < item.placement.duration.cmTime else { continue }
+                let drawn: (image: CIImage, blend: VisualBlendMode)?
+                switch item {
+                case .text(let authored):
+                    let clip = authored.evaluated(at: time)
+                    drawn = TextRenderer.image(clip, canvas: size, authoredCanvas: authoredCanvas)
+                        .map { ($0, clip.blendMode) }
+                case .shape(let authored):
+                    let clip = authored.evaluated(at: time)
+                    drawn = ShapeRenderer.image(clip, canvas: size, authoredCanvas: authoredCanvas)
+                        .map { ($0, clip.blendMode) }
+                default: drawn = nil
+                }
+                guard let drawn else { continue }
+                let buffer = try renderedSDRLayer(drawn.image, size: size, ci: ci)
                 try image(buffer, transform: .identity, opacity: 1, mask: nil,
                     program: GradeProgram(settings: .neutral, bypass: true, aspect: size.maskAspect), to: surfaces[2])
-                try blend(surfaces[2], mode: clip.blendMode)
+                try blend(surfaces[2], mode: drawn.blend)
             }
             var transitioned = Set<UUID>()
             if let transition = project.timeline.transitions.first(where: {

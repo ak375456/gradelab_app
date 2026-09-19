@@ -30,12 +30,17 @@ enum AnimatableProperty: String, Codable, CaseIterable, Sendable {
     case localMaskCornerRadius, localMaskStrength
     // Text typography and geometry.
     case fontSize, characterSpacing, lineSpacing, layoutWidth, curve
+    // Shape geometry. A shape's KIND is not here on purpose: there is no
+    // halfway point between a star and an arrow, so it stays a discrete choice
+    // while everything measurable about the figure animates.
+    case shapeWidth, shapeHeight, shapeInnerRadius
     // Text appearance.
     case strokeWidth, backgroundOpacity, cornerRadius, backgroundPadding
     case shadowOpacity, shadowRadius, shadowOffsetX, shadowOffsetY
     case glowOpacity, glowRadius
     // Colors.
     case textColor, strokeColor, backgroundColor, shadowColor, glowColor
+    case fillColor
 
     // ---------------------------------------------------------------------
     // Colour grading.
@@ -85,13 +90,23 @@ enum AnimatableProperty: String, Codable, CaseIterable, Sendable {
 
     var kind: Kind {
         switch self {
-        case .textColor, .strokeColor, .backgroundColor, .shadowColor, .glowColor: .color
+        case .textColor, .strokeColor, .backgroundColor, .shadowColor, .glowColor, .fillColor: .color
         default: gradeSlot?.kind ?? .number
         }
     }
 
     /// Properties every visual clip type supports.
     static let transform: [Self] = [.positionX, .positionY, .scale, .widthScale, .heightScale, .rotation, .opacity]
+
+    /// A shape's own geometry and appearance, in the order the inspector shows
+    /// them. Kept beside `transform` so the two lists that describe a drawn
+    /// layer sit together rather than one being buried in a clip extension.
+    static let shape: [Self] = [
+        .shapeWidth, .shapeHeight, .cornerRadius, .shapeInnerRadius,
+        .fillColor, .strokeColor, .strokeWidth,
+        .shadowColor, .shadowOpacity, .shadowRadius, .shadowOffsetX, .shadowOffsetY,
+        .glowColor, .glowOpacity, .glowRadius
+    ]
 
     var title: String {
         // Grading parameters name themselves through their slot.
@@ -118,6 +133,9 @@ enum AnimatableProperty: String, Codable, CaseIterable, Sendable {
         case .lineSpacing: "Line spacing"
         case .layoutWidth: "Wrap width"
         case .curve: "Curve"
+        case .shapeWidth: "Width"
+        case .shapeHeight: "Height"
+        case .shapeInnerRadius: "Star waist"
         case .strokeWidth: "Stroke width"
         case .backgroundOpacity: "Background opacity"
         case .cornerRadius: "Corner radius"
@@ -129,6 +147,7 @@ enum AnimatableProperty: String, Codable, CaseIterable, Sendable {
         case .glowOpacity: "Glow intensity"
         case .glowRadius: "Glow radius"
         case .textColor: "Text color"
+        case .fillColor: "Fill"
         case .strokeColor: "Stroke color"
         case .backgroundColor: "Background color"
         case .shadowColor: "Shadow color"
@@ -162,10 +181,14 @@ enum AnimatableProperty: String, Codable, CaseIterable, Sendable {
         case .lineSpacing: 0...300
         case .layoutWidth: 0.05...1.5
         case .curve: -1...1
+        // Canvas points, like a font size: the shape's own dimensions before
+        // `transform.scale` is applied on top of them.
+        case .shapeWidth, .shapeHeight: 1...8192
+        case .shapeInnerRadius: 0.05...0.95
         case .strokeWidth: 0...64
         case .cornerRadius, .backgroundPadding, .shadowRadius, .glowRadius: 0...2048
         case .shadowOffsetX, .shadowOffsetY: -2048...2048
-        case .textColor, .strokeColor, .backgroundColor, .shadowColor, .glowColor: 0...1
+        case .textColor, .strokeColor, .backgroundColor, .shadowColor, .glowColor, .fillColor: 0...1
         // Only a grading property reaches here, and it was bounded above.
         default: 0...1
         }
@@ -197,6 +220,8 @@ enum AnimatableProperty: String, Codable, CaseIterable, Sendable {
         case .characterSpacing, .lineSpacing: .number(0)
         case .layoutWidth: .number(0.8)
         case .curve: .number(0)
+        case .shapeWidth, .shapeHeight: .number(480)
+        case .shapeInnerRadius: .number(0.5)
         case .strokeWidth, .backgroundOpacity, .shadowOpacity, .glowOpacity, .cornerRadius: .number(0)
         case .backgroundPadding: .number(12)
         case .shadowRadius: .number(8)
@@ -204,6 +229,7 @@ enum AnimatableProperty: String, Codable, CaseIterable, Sendable {
         case .shadowOffsetY: .number(4)
         case .glowRadius: .number(12)
         case .textColor: .color(.white)
+        case .fillColor: .color(ShapeClip.defaultFill)
         case .strokeColor, .backgroundColor, .shadowColor: .color(.black)
         case .glowColor: .color(.white)
         // Only a grading property reaches here; its neutral came from its slot.

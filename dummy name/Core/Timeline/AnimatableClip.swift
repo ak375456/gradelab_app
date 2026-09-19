@@ -357,6 +357,51 @@ extension TextClip {
     }
 }
 
+// MARK: - Shapes
+
+/// A shape animates for exactly one reason: it is an `AnimatableClip`. There is
+/// no shape-specific animation code anywhere — the tracks, the interpolation,
+/// the diamond, the split and trim behaviour and the document format are the
+/// ones text and video already use.
+extension ShapeClip: AnimatableClip {
+    static let animatableProperties: [AnimatableProperty] =
+        AnimatableProperty.transform + AnimatableProperty.shape
+
+    static func numberKeyPath(_ property: AnimatableProperty) -> WritableKeyPath<ShapeClip, Double>? {
+        switch property {
+        case .positionX: \.transform.positionX
+        case .positionY: \.transform.positionY
+        case .scale: \.transform.scale
+        case .widthScale: \.transform.widthScale
+        case .heightScale: \.transform.heightScale
+        case .rotation: \.transform.rotationDegrees
+        case .opacity: \.opacity
+        case .shapeWidth: \.width
+        case .shapeHeight: \.height
+        case .shapeInnerRadius: \.innerRadius
+        case .cornerRadius: \.cornerRadius
+        case .strokeWidth: \.strokeWidth
+        case .shadowOpacity: \.shadowOpacity
+        case .shadowRadius: \.shadowRadius
+        case .shadowOffsetX: \.shadowOffsetX
+        case .shadowOffsetY: \.shadowOffsetY
+        case .glowOpacity: \.glowOpacity
+        case .glowRadius: \.glowRadius
+        default: nil
+        }
+    }
+
+    static func colorKeyPath(_ property: AnimatableProperty) -> WritableKeyPath<ShapeClip, RGBAColor>? {
+        switch property {
+        case .fillColor: \.fillColor
+        case .strokeColor: \.strokeColor
+        case .shadowColor: \.shadowColor
+        case .glowColor: \.glowColor
+        default: nil
+        }
+    }
+}
+
 // MARK: - Video and image
 
 extension VideoClip: AnimatableClip {
@@ -569,6 +614,7 @@ extension Timeline {
             track.items.contains { item in
                 switch item {
                 case .text(let clip): clip.isAnimated
+                case .shape(let clip): clip.isAnimated
                 case .video(let clip): clip.isAnimated
                 case .audio: false
                 }

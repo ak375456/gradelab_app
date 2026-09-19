@@ -1,3 +1,4 @@
+import CoreGraphics
 import CoreMedia
 import Foundation
 
@@ -21,6 +22,24 @@ struct VisualTransform: Codable, Equatable, Sendable {
     var heightScale: Double = 1
     var rotationDegrees: Double = 0
     var locksAspectRatio = true
+
+    /// Where a drawn layer's own bounds land on the canvas.
+    ///
+    /// The single definition of what anchor, scale, rotation and position mean
+    /// for a layer the app draws. Both renderers and the canvas handles call
+    /// this rather than each spelling the matrix out, so a title and a shape
+    /// dragged to the same place cannot end up in different places.
+    ///
+    /// Canvas coordinates are Y-up, as CoreGraphics has them, while
+    /// `positionY` is measured from the top — which is the inversion in the
+    /// last line.
+    func placement(bounds: CGRect, canvas: CGSize) -> CGAffineTransform {
+        CGAffineTransform(translationX: -(bounds.minX+bounds.width*anchorX),
+                          y: -(bounds.maxY-bounds.height*anchorY))
+            .concatenating(.init(scaleX: scale*widthScale, y: scale*heightScale))
+            .concatenating(.init(rotationAngle: -rotationDegrees * .pi/180))
+            .concatenating(.init(translationX: positionX*canvas.width, y: (1-positionY)*canvas.height))
+    }
 }
 
 // Only implemented modes are representable/exposed at this checkpoint.
@@ -246,13 +265,13 @@ struct TextClip: TimelineClip {
     var curve: Double = 0 // normalized arc amount (-1...1)
     var decoration: TextDecoration? = nil
     /// Optional: replaces the flat fill. Nil keeps `color` and old documents decodable.
-    var gradient: TextGradient? = nil
+    var gradient: GradientFill? = nil
     /// Optional so projects saved before keyframes existed still decode unchanged.
     var animation: ClipAnimation? = nil
 }
 
 /// Fill gradient across the glyph ink box. Angle 0 sweeps left to right; 90 sweeps bottom to top.
-struct TextGradient: Codable, Equatable, Sendable {
+struct GradientFill: Codable, Equatable, Sendable {
     var start = RGBAColor.white
     var end = RGBAColor(red: 1, green: 0.42, blue: 0.1)
     var angleDegrees: Double = 90
@@ -293,7 +312,7 @@ struct TextStylePreset: Codable, Equatable, Identifiable, Sendable {
     var strokeWidth: Double
     var backgroundColor: RGBAColor
     var backgroundOpacity: Double
-    var gradient: TextGradient? = nil
+    var gradient: GradientFill? = nil
     static let builtIn: [TextStylePreset] = [
         .init(id: "clean", name: "Clean", style: .init(), color: .white, strokeColor: .black, strokeWidth: 0, backgroundColor: .black, backgroundOpacity: 0),
         .init(id: "label", name: "Label", style: .init(fontSize: 48, isBold: true), color: .white, strokeColor: .black, strokeWidth: 2, backgroundColor: .black, backgroundOpacity: 0.65),
@@ -327,12 +346,29 @@ enum TimelineItem: Codable, Equatable, Identifiable, Sendable {
     case video(VideoClip)
     case audio(AudioClip)
     case text(TextClip)
+    case shape(ShapeClip)
 
     var placement: ItemPlacement {
-        switch self { case .video(let c): c.placement; case .audio(let c): c.placement; case .text(let c): c.placement }
+        switch self {
+        case .video(let c): c.placement
+        case .audio(let c): c.placement
+        case .text(let c): c.placement
+        case .shape(let c): c.placement
+        }
     }
     var id: UUID { placement.id }
     var assetID: UUID? {
-        switch self { case .video(let c): c.assetID; case .audio(let c): c.assetID; case .text: nil }
+        switch self {
+        case .video(let c): c.assetID
+        case .audio(let c): c.assetID
+        case .text, .shape: nil
+        }
+    }
+    /// A drawn layer: one whose picture the app generates rather than reads from
+    /// an asset. Text and shapes behave identically everywhere this matters —
+    /// they have no source range, they live on their own track, and they can sit
+    /// anywhere on the timeline without a media edit underneath them.
+    var isDrawnOverlay: Bool {
+        switch self { case .text, .shape: true; case .video, .audio: false }
     }
 }

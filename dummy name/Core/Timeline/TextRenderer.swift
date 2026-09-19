@@ -115,11 +115,7 @@ enum TextRenderer {
         return .init(path: path, bounds: bounds, ink: ink, fittedBounds: fitted)
     }
     static func placement(_ clip: TextClip, bounds: CGRect, canvas: CGSize) -> CGAffineTransform {
-        CGAffineTransform(translationX: -(bounds.minX+bounds.width*clip.transform.anchorX),
-            y: -(bounds.maxY-bounds.height*clip.transform.anchorY))
-            .concatenating(.init(scaleX: clip.transform.scale*clip.transform.widthScale, y: clip.transform.scale*clip.transform.heightScale))
-            .concatenating(.init(rotationAngle: -clip.transform.rotationDegrees * .pi/180))
-            .concatenating(.init(translationX: clip.transform.positionX*canvas.width, y: (1-clip.transform.positionY)*canvas.height))
+        clip.transform.placement(bounds: bounds, canvas: canvas)
     }
     /// Renders authored text into a composition surface.
     ///
@@ -226,7 +222,7 @@ enum TextRenderer {
         return raster.transformed(by: placement(clip, bounds: geometry.fittedBounds, canvas: canvas))
             .applyingFilter("CIColorMatrix", parameters: ["inputAVector": CIVector(x: 0, y: 0, z: 0, w: clip.opacity)])
     }
-    private static func ramp(_ gradient: TextGradient) -> CGGradient? {
+    private static func ramp(_ gradient: GradientFill) -> CGGradient? {
         CGGradient(colorsSpace: CGColorSpace(name: CGColorSpace.sRGB),
             colors: [cgColor(gradient.start), cgColor(gradient.end)] as CFArray, locations: [0, 1])
     }

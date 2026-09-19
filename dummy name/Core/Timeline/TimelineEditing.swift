@@ -171,9 +171,9 @@ enum TimelineEditing {
         var result: [VideoClip] = []
         for track in project.timeline.tracks {
             if track.kind == .audio { try AudioEditing.validate(track); continue }
-            if track.kind == .text { continue }
+            if track.kind == .text || track.kind == .shape { continue }
             guard track.kind == .mainVideo || track.kind == .videoOverlay else {
-                throw TimelineError.invalid("Text tracks are not supported yet.")
+                throw TimelineError.invalid("Only video, audio and drawn overlay tracks are supported.")
             }
             let clips = try track.items.map { item -> VideoClip in
                 guard case .video(let clip) = item,
