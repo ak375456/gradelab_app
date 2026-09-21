@@ -41,28 +41,35 @@ final class ProStore: ObservableObject {
     deinit { updatesTask?.cancel(); expiryTask?.cancel() }
 
     func product(for plan: ProPlan) -> Product? { products.first { $0.id == plan.id } }
-    /// The lifetime plan while the founding campaign is on, in any currency.
-    func isFounding(_ product: Product) -> Bool {
-        product.id == ProPlan.lifetime.id && ProConfiguration.isFoundingCampaignRunning
+    /// The lifetime plan while the ladder is below its settled price, in any
+    /// currency.
+    func isPromotional(_ product: Product) -> Bool {
+        product.id == ProPlan.lifetime.id && ProConfiguration.isPromotionalPricing
     }
 
     /// The same plan, but only where the percentage saving can honestly be named.
-    func showsFoundingDiscount(_ product: Product) -> Bool {
-        isFounding(product) && ProConfiguration.canStateFoundingDiscount(
+    func showsDiscount(_ product: Product) -> Bool {
+        isPromotional(product) && ProConfiguration.canStateDiscount(
             price: product.price, currency: product.priceFormatStyle.currencyCode)
     }
 
-    /// The standard lifetime price, struck through beside the founding one.
+    /// The standard lifetime price, struck through beside the current one.
     ///
-    /// Nil unless the customer is being charged in the currency the standard
-    /// price is actually known in — which is dollars. A struck-through price is
-    /// read as "this is what you would otherwise pay", so putting one next to a
-    /// rupee or euro figure would be claiming a local price this app has never
-    /// charged and cannot look up. Outside the US storefront the standard price
-    /// is named in words instead, as the US price it is.
+    /// Shown in every storefront, and always as the dollar figure it is —
+    /// never converted into the customer's own currency. That distinction is
+    /// the whole safety of it: `US$34.99` struck through above `Rs 500` says
+    /// "the standard price is thirty-five dollars", which is true everywhere,
+    /// while `Rs 34.99` would be claiming a rupee price this app has never
+    /// charged and cannot look up. The caption underneath names the same
+    /// figure in words, so the two always agree.
+    ///
+    /// The *percentage* is a separate question and stays US-only — see
+    /// `showsDiscount` — because a saving is a comparison between two prices
+    /// and only one of them is known outside the US storefront.
     func standardPriceLabel(_ product: Product) -> String? {
-        guard showsFoundingDiscount(product) else { return nil }
-        return ProConfiguration.standardLifetimeUSD.formatted(product.priceFormatStyle)
+        guard isPromotional(product) else { return nil }
+        return ProConfiguration.standardLifetimeUSD.formatted(
+            .currency(code: "USD").precision(.fractionLength(2)))
     }
     // MARK: - Comparing plans
 

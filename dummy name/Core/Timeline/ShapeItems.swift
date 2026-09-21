@@ -100,6 +100,9 @@ struct ShapeClip: TimelineClip {
     var glowColor = RGBAColor.white
     var glowOpacity: Double = 0
     var glowRadius: Double = 12
+    /// Another layer supplies this shape's coverage. Optional, like everything
+    /// else added after the first shape shipped.
+    var trackMatte: TrackMatteConfiguration? = nil
     /// Optional for the same reason a text clip's is: an unanimated shape stores
     /// no animation at all rather than an empty one.
     var animation: ClipAnimation? = nil

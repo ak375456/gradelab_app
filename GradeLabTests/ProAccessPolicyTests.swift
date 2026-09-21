@@ -624,10 +624,48 @@ final class ProAccessPolicyTests: XCTestCase {
 
     /// The badge derives its percentage from the two prices, so this fails if
     /// either one is changed without the other being considered.
-    func testTheFoundingDiscountMatchesThePrices() {
-        XCTAssertEqual(ProConfiguration.foundingUSD, 1.99)
+    ///
+    /// The rung asserted here is also the half of a price change that lives in
+    /// the build. If App Store Connect says one thing and this says another,
+    /// the paywall quietly drops its percentage and strikethrough — correct,
+    /// but silent — so the rung is pinned in a test instead.
+    func testTheLadderRungMatchesThePrices() {
+        XCTAssertEqual(ProConfiguration.currentPhase, .earlyAdopter)
+        XCTAssertEqual(ProConfiguration.currentPhase.lifetimeUSD, 4.99)
         XCTAssertEqual(ProConfiguration.standardLifetimeUSD, 34.99)
-        XCTAssertEqual(ProConfiguration.foundingDiscountPercent, 94)
+        XCTAssertEqual(ProConfiguration.lifetimeDiscountPercent, 86)
+    }
+
+    /// The ladder only ever goes up, and it ends where the standard price is.
+    ///
+    /// A rung that priced below the one before it would turn a "price rises
+    /// next" promise into a lie the next time the campaign moved.
+    func testTheLadderClimbsAndSettlesAtTheStandardPrice() {
+        var rung = ProConfiguration.LaunchPhase.founding
+        var seen: [Decimal] = [rung.lifetimeUSD]
+        while let next = rung.next {
+            XCTAssertGreaterThan(next.lifetimeUSD, rung.lifetimeUSD,
+                                 "\(next) must cost more than \(rung)")
+            seen.append(next.lifetimeUSD)
+            rung = next
+        }
+        XCTAssertEqual(rung, .standard, "every rung must lead to the settled price")
+        XCTAssertEqual(rung.lifetimeUSD, ProConfiguration.standardLifetimeUSD)
+        XCTAssertEqual(seen, [1.99, 4.99, 9.99, 14.99, 34.99])
+    }
+
+    /// Every rung that shows a pill must have something to write on it, in both
+    /// the form that names a percentage and the form that cannot.
+    func testEveryPromotionalRungHasABadgeAndTheStandardOneDoesNot() {
+        for rung in ProConfiguration.LaunchPhase.allCases where rung.isPromotional {
+            XCTAssertFalse(rung.badge(discountPercent: nil)?.isEmpty ?? true,
+                           "\(rung) has no badge without a percentage")
+            XCTAssertFalse(rung.badge(discountPercent: 86)?.isEmpty ?? true,
+                           "\(rung) has no badge with a percentage")
+        }
+        XCTAssertNil(ProConfiguration.LaunchPhase.standard.badge(discountPercent: nil),
+                     "the settled price is not an offer and carries no pill")
+        XCTAssertNil(ProConfiguration.LaunchPhase.standard.badge(discountPercent: 0))
     }
 
     // MARK: - Plan comparison
@@ -697,27 +735,35 @@ final class ProAccessPolicyTests: XCTestCase {
     }
 
     /// The percentage claim must not follow the price into another currency, or
-    /// survive App Store Connect raising it.
-    func testTheFoundingPercentageIsUSDAndExactPriceOnly() {
-        XCTAssertTrue(ProConfiguration.canStateFoundingDiscount(price: 1.99, currency: "USD"))
-        XCTAssertFalse(ProConfiguration.canStateFoundingDiscount(price: 1.99, currency: "EUR"),
+    /// outlive the rung it was calculated for.
+    ///
+    /// The stale-price case is the one that matters in practice: App Store
+    /// Connect applies a price in hours and review takes a day, and an older
+    /// build stays installed indefinitely. Whenever the two disagree the claim
+    /// has to disappear rather than be printed against the wrong number — which
+    /// is what kept "94% OFF" off the paywall when Lifetime went to $4.99.
+    func testThePercentageIsUSDAndCurrentRungOnly() {
+        XCTAssertTrue(ProConfiguration.canStateDiscount(price: 4.99, currency: "USD"))
+        XCTAssertFalse(ProConfiguration.canStateDiscount(price: 4.99, currency: "EUR"),
                        "the standard price is only known in dollars")
-        XCTAssertFalse(ProConfiguration.canStateFoundingDiscount(price: 4.99, currency: "USD"),
-                       "the claim must stop when App Store Connect raises the price")
+        XCTAssertFalse(ProConfiguration.canStateDiscount(price: 1.99, currency: "USD"),
+                       "a price from the previous rung must not carry this rung's percentage")
+        XCTAssertFalse(ProConfiguration.canStateDiscount(price: 9.99, currency: "USD"),
+                       "the claim must stop the moment App Store Connect raises the price")
     }
 
-    /// The campaign itself is a date, not a currency. Someone buying in Karachi
-    /// during launch week is as much a founding user as someone in California,
-    /// and the badge went missing for them because the two questions had been
-    /// collapsed into one.
-    func testTheFoundingCampaignRunsInEveryStorefront() {
+    /// The rung itself is a date, not a currency. Someone buying in Karachi
+    /// this week is on the same rung as someone in California, and the badge
+    /// went missing for them because the two questions had been collapsed into
+    /// one.
+    func testThePromotionalRungAppliesInEveryStorefront() {
         XCTAssertEqual(
-            ProConfiguration.isFoundingCampaignRunning,
-            ProConfiguration.foundingCampaignEnabled,
-            "campaign visibility must not depend on the customer's currency")
+            ProConfiguration.isPromotionalPricing,
+            ProConfiguration.currentPhase.isPromotional,
+            "badge visibility must not depend on the customer's currency")
         // The badge is shown on this, so it has to stay true where the
         // percentage cannot be stated.
-        XCTAssertTrue(ProConfiguration.isFoundingCampaignRunning)
-        XCTAssertFalse(ProConfiguration.canStateFoundingDiscount(price: 500, currency: "PKR"))
+        XCTAssertTrue(ProConfiguration.isPromotionalPricing)
+        XCTAssertFalse(ProConfiguration.canStateDiscount(price: 500, currency: "PKR"))
     }
 }

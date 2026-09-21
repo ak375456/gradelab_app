@@ -45,6 +45,9 @@ final class ImageExportViewModel: ObservableObject {
     /// runs so there is no doubt about what is being written.
     var outputSizeLabel: String { project.metadata.resolutionLabel }
 
+    var hasCutout: Bool { project.backgroundRemoval?.isEnabled == true }
+    var flattensCutout: Bool { hasCutout && configuration.format != .png }
+
     /// What writing this still would need from Pro. Full-resolution JPEG of a
     /// free grade is free; HEIC, PNG and the Pro grading tools are not.
     var proRequirements: [ProFeature] {

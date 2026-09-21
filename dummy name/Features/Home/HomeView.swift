@@ -95,16 +95,20 @@ struct HomeView: View {
                             Text("Unlock GradeLab Pro")
                                 .font(AppTypography.bodyEmphasized)
                                 .foregroundStyle(AppColors.textPrimary)
-                            if ProConfiguration.foundingCampaignEnabled {
-                                Text("SAVE \(ProConfiguration.foundingDiscountPercent)%")
+                            if ProConfiguration.isPromotionalPricing {
+                                Text("SAVE \(ProConfiguration.lifetimeDiscountPercent)%")
                                     .font(.system(size: 10, weight: .bold)).tracking(0.6)
                                     .foregroundStyle(.black)
                                     .padding(.horizontal, 6).padding(.vertical, 2)
                                     .background(ProStyle.gold, in: Capsule())
                             }
                         }
-                        Text(ProConfiguration.foundingCampaignEnabled
-                             ? "Founding price for launch week. One purchase, yours forever."
+                        // Deliberately not naming the rung here. The pill
+                        // already carries the number, and a card that names a
+                        // week goes stale the moment the price moves — which is
+                        // exactly how "launch week" survived into week two.
+                        Text(ProConfiguration.isPromotionalPricing
+                             ? "Introductory price. One purchase, yours forever."
                              : "4K export, custom LUTs, scopes, curves and more.")
                             .font(AppTypography.caption)
                             .foregroundStyle(AppColors.textSecondary)
@@ -253,9 +257,9 @@ struct HomeView: View {
         var deletionMessage: String {
             switch self {
             case .video:
-                "The grade and GradeLab’s imported copy of the footage are removed. The clip in your photo library is untouched."
+                String(localized: "The grade and GradeLab’s imported copy of the footage are removed. The clip in your photo library is untouched.")
             case .image:
-                "The grade and GradeLab’s imported copy of the picture are removed. The photograph in your photo library is untouched."
+                String(localized: "The grade and GradeLab’s imported copy of the picture are removed. The photograph in your photo library is untouched.")
             }
         }
     }

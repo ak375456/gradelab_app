@@ -42,13 +42,15 @@ enum CompositorResources {
     /// build reports itself ready for those before the rest finish.
     static let requiredNames = [
         "gradeExportBGRA", "gradeStillBGRA", "gradeBlendedBGRA",
-        "applyLayerMaskBGRA", "transitionBGRA"
+        "applyLayerMaskBGRA", "transitionBGRA",
+        "buildBackgroundMaskYUV", "buildBackgroundMaskBGRA", "applyBackgroundRemovalBGRA"
     ]
 
     /// Needed only by the HDR and Apple Log paths. A device without them refuses
     /// that colour mode with a reason, exactly as it did before.
     static let optionalNames = [
         "compositeVideoHDR", "compositeImageHDR", "resolveHDRCanvas", "compositeTransitionHDR",
+        "fillEditorCheckerboard",
         "compositeVideoAppleLog", "compositeImageAppleLog", "blendAppleLogLayer",
         "compositeTransitionAppleLog", "resolveAppleLogCanvas", "resolveAppleLogCanvas422"
     ]

@@ -103,7 +103,7 @@ enum TimelineEditing {
         guard let sourceIndex = project.timeline.tracks.firstIndex(where: { $0.id == original.placement.trackID }),
               project.timeline.tracks[sourceIndex].kind == .mainVideo ||
                 project.timeline.tracks[sourceIndex].kind == .videoOverlay else {
-            throw TimelineError.invalid("Only video and image clips can move between visual layers.")
+            throw TimelineError.invalid(String(localized: "Only video and image clips can move between visual layers."))
         }
 
         if destinationTrackID == original.placement.trackID {
@@ -113,7 +113,7 @@ enum TimelineEditing {
 
         var candidate = project
         guard let sourceItemIndex = candidate.timeline.tracks[sourceIndex].items.firstIndex(where: { $0.id == id }) else {
-            throw TimelineError.invalid("Clip not found on its layer.")
+            throw TimelineError.invalid(String(localized: "Clip not found on its layer."))
         }
         candidate.timeline.tracks[sourceIndex].items.remove(at: sourceItemIndex)
         if candidate.timeline.tracks[sourceIndex].kind == .mainVideo {
@@ -132,7 +132,7 @@ enum TimelineEditing {
         let destinationIndex: Int
         if let destinationTrackID {
             guard let index = candidate.timeline.tracks.firstIndex(where: { $0.id == destinationTrackID }) else {
-                throw TimelineError.invalid("That destination layer is no longer available.")
+                throw TimelineError.invalid(String(localized: "That destination layer is no longer available."))
             }
             destinationIndex = index
         } else {
@@ -148,11 +148,11 @@ enum TimelineEditing {
         }
 
         guard !candidate.timeline.tracks[destinationIndex].isLocked else {
-            throw TimelineError.invalid("Unlock the destination layer before moving this clip.")
+            throw TimelineError.invalid(String(localized: "Unlock the destination layer before moving this clip."))
         }
         let destinationKind = candidate.timeline.tracks[destinationIndex].kind
         guard destinationKind == .mainVideo || destinationKind == .videoOverlay else {
-            throw TimelineError.invalid("Video clips can only be dropped on video layers.")
+            throw TimelineError.invalid(String(localized: "Video clips can only be dropped on video layers."))
         }
 
         var moving = original
@@ -173,7 +173,7 @@ enum TimelineEditing {
             if track.kind == .audio { try AudioEditing.validate(track); continue }
             if track.kind == .text || track.kind == .shape { continue }
             guard track.kind == .mainVideo || track.kind == .videoOverlay else {
-                throw TimelineError.invalid("Only video, audio and drawn overlay tracks are supported.")
+                throw TimelineError.invalid(String(localized: "Only video, audio and drawn overlay tracks are supported."))
             }
             let clips = try track.items.map { item -> VideoClip in
                 guard case .video(let clip) = item,
@@ -182,13 +182,13 @@ enum TimelineEditing {
                        clip.transform.rotationDegrees, clip.transform.widthScale, clip.transform.heightScale,
                        clip.transform.anchorX, clip.transform.anchorY].allSatisfy(\.isFinite),
                       clip.transform.scale > 0, clip.transform.widthScale > 0, clip.transform.heightScale > 0 else {
-                    throw TimelineError.invalid("Invalid visual clip or transform.")
+                    throw TimelineError.invalid(String(localized: "Invalid visual clip or transform."))
                 }
                 return clip
             }.sorted { $0.placement.timelineStart < $1.placement.timelineStart }
             for pair in zip(clips, clips.dropFirst()) {
                 guard try pair.0.placement.range.end <= pair.1.placement.timelineStart else {
-                    throw TimelineError.invalid("Clips on the same track cannot overlap. Use an overlay track.")
+                    throw TimelineError.invalid(String(localized: "Clips on the same track cannot overlap. Use an overlay track."))
                 }
             }
             result += clips
@@ -209,14 +209,14 @@ enum TimelineEditing {
         // Time from gestures is a UI boundary. Frame-count conversion happens once;
         // the resulting edit coordinate is an exact rational frame multiple.
         let count = (time.seconds / frame.seconds).rounded()
-        guard count.isFinite, abs(count) < Double(Int32.max) else { throw TimelineError.invalid("Timeline is too long to snap safely.") }
+        guard count.isFinite, abs(count) < Double(Int32.max) else { throw TimelineError.invalid(String(localized: "Timeline is too long to snap safely.")) }
         return try TimelineTime(CMTimeMultiply(frame.cmTime, multiplier: Int32(count)))
     }
 
     static func editable(_ id: UUID, in project: VideoProject) throws -> VideoClip {
         guard let clip = project.timeline.videoClip(id: id), !clip.placement.isLocked,
               project.timeline.tracks.first(where: { $0.id == clip.placement.trackID })?.isLocked == false else {
-            throw TimelineError.invalid("Unlock the clip and its track before editing.")
+            throw TimelineError.invalid(String(localized: "Unlock the clip and its track before editing."))
         }
         return clip
     }
@@ -226,6 +226,10 @@ enum TimelineEditing {
         guard let track = project.timeline.tracks.firstIndex(where: { $0.id == original.placement.trackID }),
               let index = project.timeline.tracks[track].items.firstIndex(where: { $0.id == id }) else { return }
         project.timeline.tracks[track].items.replaceSubrange(index...index, with: clips.map(TimelineItem.video))
+        // Removing a clip that another layer used as its track matte clears that
+        // relationship here, in the same mutation, so nothing downstream ever
+        // sees — or refuses — a reference to a clip that is gone.
+        project.timeline.reconcileTrackMattes()
     }
 
     static func split(_ id: UUID, at time: TimelineTime, in project: inout VideoProject) throws -> UUID {
@@ -235,7 +239,7 @@ enum TimelineEditing {
         let rightDuration = try original.placement.duration.subtracting(leftDuration)
         let minimum = try project.canvas.frameDuration ?? TimelineTime.seconds(0.01)
         guard leftDuration >= minimum, rightDuration >= minimum else {
-            throw TimelineError.invalid("Place the playhead inside the clip, at least one frame from either edge.")
+            throw TimelineError.invalid(String(localized: "Place the playhead inside the clip, at least one frame from either edge."))
         }
         // Timeline distance is not source distance on a retimed clip: at 2x, the
         // left half covers twice as much source as it does timeline. Splitting
@@ -247,7 +251,7 @@ enum TimelineEditing {
         // or duplicated at the seam.
         let rightSource = try original.sourceRange.duration.subtracting(leftSource)
         guard leftSource > .zero, rightSource > .zero else {
-            throw TimelineError.invalid("Place the playhead inside the clip, at least one frame from either edge.")
+            throw TimelineError.invalid(String(localized: "Place the playhead inside the clip, at least one frame from either edge."))
         }
 
         var left = original, right = original
@@ -328,7 +332,7 @@ enum TimelineEditing {
         let minimum = try project.canvas.frameDuration ?? TimelineTime.seconds(0.01)
         if clamping {
             let others = try clips(in: project).filter { $0.id != id && $0.placement.trackID == clip.placement.trackID }
-            guard let asset = project.assets.first(where: { $0.id == clip.assetID }) else { throw TimelineError.invalid("Missing source.") }
+            guard let asset = project.assets.first(where: { $0.id == clip.assetID }) else { throw TimelineError.invalid(String(localized: "Missing source.")) }
             let source = asset.sourceRange
             // The main video track is repacked from zero after every timing
             // edit, so a neighbour there is not a wall: it is something that
@@ -383,7 +387,7 @@ enum TimelineEditing {
         clip.placement.duration = try ClipSpeed.timelineDuration(
             sourceDuration: clip.sourceRange.duration, speed: clip.speed
         )
-        guard clip.placement.duration >= minimum else { throw TimelineError.invalid("Keep at least one frame in the clip.") }
+        guard clip.placement.duration >= minimum else { throw TimelineError.invalid(String(localized: "Keep at least one frame in the clip.")) }
         try replace(id, with: [clip], in: &project)
     }
 
@@ -405,7 +409,7 @@ enum TimelineEditing {
             sourceDuration: clip.sourceRange.duration, speed: resolved
         )
         guard newDuration > .zero else {
-            throw TimelineError.invalid("That speed would leave the clip with no duration.")
+            throw TimelineError.invalid(String(localized: "That speed would leave the clip with no duration."))
         }
         let previousDuration = clip.placement.duration
         let shift = try newDuration.subtracting(previousDuration)
@@ -464,7 +468,7 @@ enum TimelineEditing {
 
     static func paste(_ copied: VideoClip, at time: TimelineTime, in project: inout VideoProject) throws -> UUID {
         guard let index = project.timeline.tracks.firstIndex(where: { $0.kind == .mainVideo }),
-              !project.timeline.tracks[index].isLocked else { throw TimelineError.invalid("Unlock the main track before pasting.") }
+              !project.timeline.tracks[index].isLocked else { throw TimelineError.invalid(String(localized: "Unlock the main track before pasting.")) }
         var clip = copied
         clip.placement = .init(id: UUID(), trackID: project.timeline.tracks[index].id,
             timelineStart: try snapped(max(.zero, time), frame: project.canvas.frameDuration), duration: copied.placement.duration)

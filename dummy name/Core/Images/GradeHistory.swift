@@ -32,3 +32,26 @@ struct GradeHistory {
         return entry.after
     }
 }
+
+/// Whole-document history for the photo editor now that a photo can carry
+/// authored alpha as well as a grade.
+struct ImageProjectHistory {
+    struct Entry { let name: String; let before: ImageProject; let after: ImageProject }
+    private(set) var undoEntries: [Entry] = []
+    private(set) var redoEntries: [Entry] = []
+
+    mutating func record(_ name: String, before: ImageProject, after: ImageProject) {
+        guard before != after else { return }
+        undoEntries.append(.init(name: name, before: before, after: after))
+        if undoEntries.count > 100 { undoEntries.removeFirst() }
+        redoEntries.removeAll()
+    }
+    mutating func undo() -> ImageProject? {
+        guard let entry = undoEntries.popLast() else { return nil }
+        redoEntries.append(entry); return entry.before
+    }
+    mutating func redo() -> ImageProject? {
+        guard let entry = redoEntries.popLast() else { return nil }
+        undoEntries.append(entry); return entry.after
+    }
+}

@@ -9,6 +9,34 @@ enum TimelineLayerDropTarget: Equatable {
     case newOverlay(index: Int)
 }
 
+enum TimelineTrackHeightChoice: String, CaseIterable {
+    case compact = "Compact"
+    case regular = "Regular"
+    case tall = "Tall"
+
+    /// Regular media rows are sized to hold a 16:9 filmstrip above a readable
+    /// waveform lane; below that the row drops to a name strip.
+    ///
+    /// Deliberately tighter than the drawing would like. The timeline shares a
+    /// phone screen with a picture, a transport, a tool panel and the mode bar,
+    /// and a row that reads beautifully on its own is not worth pushing one of
+    /// those off the bottom for.
+    func points(for kind: TimelineTrack.Kind) -> CGFloat {
+        switch self {
+        case .compact: kind.isDrawnOverlay ? 24 : 26
+        case .regular: kind.isDrawnOverlay ? 30 : 66
+        case .tall: kind.isDrawnOverlay ? 44 : 96
+        }
+    }
+}
+
+enum TimelineWaveformSize: String, CaseIterable {
+    case small = "Small"
+    case medium = "Medium"
+    case large = "Large"
+    var scale: CGFloat { self == .small ? 0.55 : self == .large ? 1.35 : 1 }
+}
+
 struct TimelineView: UIViewRepresentable {
     let clips: [TimelineDisplayClip]
     let tracks: [TimelineTrack]
@@ -28,12 +56,32 @@ struct TimelineView: UIViewRepresentable {
     let selectedIDs: Set<UUID>
     let selectedTransitionID: UUID?
     let thumbnails: [UIImage]
+    let trackHeights: [UUID: TimelineTrackHeightChoice]
+    let waveformSizes: [UUID: TimelineWaveformSize]
+    /// Points per second, owned by the view that hosts the timeline so the zoom
+    /// control and the canvas's pinch stay in step.
+    let pixelsPerSecond: Double
+    /// Magnetic alignment for the playhead, trim handles and clip moves. The
+    /// main video track still ripples when it is off: packing is how that track
+    /// works, not a snap.
+    let isSnappingEnabled: Bool
+    /// Whether clips carry their file name and their length. Both are settings
+    /// rather than state, so someone who would rather see the picture and the
+    /// waveform can uncover them.
+    let showsClipNames: Bool
+    let showsClipDurations: Bool
+    let onZoomChange: (Double) -> Void
     let onSelect: (UUID?) -> Void
     let onSelectMany: (Set<UUID>) -> Void
     let onSelectTransition: (UUID) -> Void
     let onDragSelect: (UUID) -> Void
     let onOptions: (UUID) -> Void
     let onMoveClipToLayer: (UUID, TimelineLayerDropTarget, Double) -> Void
+    let onToggleTrackVisibility: (UUID) -> Void
+    let onToggleTrackLock: (UUID) -> Void
+    let onToggleTrackMute: (UUID) -> Void
+    let onSetTrackHeight: (UUID, TimelineTrackHeightChoice) -> Void
+    let onSetWaveformSize: (UUID, TimelineWaveformSize) -> Void
     let onEdit: (UUID, TimelineGestureEdit, Double) -> Void
     let onBeginEdit: () -> Void
     let onBeginSeek: () -> Void
@@ -49,15 +97,28 @@ struct TimelineView: UIViewRepresentable {
         view.waveforms = waveforms
         view.minimumDuration = minimumDuration
         view.selectedID = selectedID; view.selectedIDs = selectedIDs; view.thumbnails = thumbnails
+        view.trackHeights = trackHeights
+        view.waveformSizes = waveformSizes
         view.selectedTransitionID = selectedTransitionID
+        view.isSnappingEnabled = isSnappingEnabled
+        view.showsClipNames = showsClipNames
+        view.showsClipDurations = showsClipDurations
+        view.onZoomChange = onZoomChange
         view.onDragSelect = onDragSelect
         view.onOptions = onOptions
         view.onMoveClipToLayer = onMoveClipToLayer
+        view.onToggleTrackVisibility = onToggleTrackVisibility
+        view.onToggleTrackLock = onToggleTrackLock
+        view.onToggleTrackMute = onToggleTrackMute
+        view.onSetTrackHeight = onSetTrackHeight
+        view.onSetWaveformSize = onSetWaveformSize
         view.onEdit = onEdit; view.onBeginEdit = onBeginEdit
         view.onSelect = onSelect; view.onBeginSeek = onBeginSeek
         view.onSelectMany = onSelectMany
         view.onSelectTransition = onSelectTransition
         view.onSeek = onSeek; view.onEndSeek = onEndSeek
+        view.applyExternalZoom(pixelsPerSecond)
+        view.updateTrackControls()
         view.update(time: currentTime)
     }
     static func dismantleUIView(_ view: TimelineCanvas, coordinator: ()) { view.cancelInteraction() }
@@ -65,6 +126,12 @@ struct TimelineView: UIViewRepresentable {
 
 /// Only the viewport is drawn. UIScrollView supplies touch/inertia, not a giant
 /// filmstrip view or thousands of ruler/thumbnail subviews.
+///
+/// The canvas owns interaction and the composition's geometry; everything it
+/// puts on screen is drawn by `TimelineClipRenderer` and
+/// `TimelineChromeRenderer`, and the track headers are real UIKit views. New
+/// row types, overlays and badges are therefore added by describing them to a
+/// renderer rather than by growing `draw(_:)`.
 final class TimelineCanvas: UIView, UIScrollViewDelegate, UIGestureRecognizerDelegate {
     var clips: [TimelineDisplayClip] = []
     var tracks: [TimelineTrack] = []
@@ -73,21 +140,35 @@ final class TimelineCanvas: UIView, UIScrollViewDelegate, UIGestureRecognizerDel
     var keyframeTimes: [Double] = []
     var assets: [ProjectMediaAsset] = []
     var assetFrames: [UUID: [UIImage]] = [:]
-    var waveforms: [UUID: [Float]] = [:]
-    // Text rows are short: a title needs a label, not a filmstrip-sized band.
-    private static let overlayClipHeight: CGFloat = 30
-    private static let mediaClipHeight: CGFloat = 68
-    private static let rowGap: CGFloat = 8
+    var waveforms: [UUID: [Float]] = [:] {
+        // Envelopes for assets that have left the timeline are released here
+        // rather than during drawing: membership changes with the document,
+        // not sixty times a second while someone scrolls.
+        didSet {
+            guard waveforms.count != oldValue.count else { return }
+            waveformCache.retain(assetIDs: Set(waveforms.keys))
+        }
+    }
     private func clipHeight(_ track: TimelineTrack?) -> CGFloat {
-        track?.kind.isDrawnOverlay == true ? Self.overlayClipHeight : Self.mediaClipHeight
+        let kind = track?.kind ?? .mainVideo
+        let preferred = track.map { (trackHeights[$0.id] ?? .regular).points(for: $0.kind) }
+            ?? TimelineTrackHeightChoice.regular.points(for: kind)
+        // A row taller than the canvas is a row with its bottom cut off. When
+        // the workspace hands the timeline less height than one row wants — a
+        // short phone, or a picture someone dragged large — shrink the row
+        // instead, down to the compact size. More rows than fit still scroll,
+        // which is what scrolling is for; a single clipped row is just wrong.
+        let available = bounds.height - TimelineMetrics.rowsTop - 4
+        guard bounds.height > 0, available < preferred else { return preferred }
+        return max(TimelineTrackHeightChoice.compact.points(for: kind), available)
     }
     private func clipHeight(trackID: UUID) -> CGFloat { clipHeight(tracks.first { $0.id == trackID }) }
     /// Cumulative top of a row within the scrolled content, so rows may differ in height.
     private func rowTop(_ index: Int, in rows: [TimelineTrack]? = nil) -> CGFloat {
         let rows = rows ?? displayTracks
-        return rows.prefix(max(0, index)).reduce(0) { $0 + clipHeight($1) + Self.rowGap }
+        return rows.prefix(max(0, index)).reduce(0) { $0 + clipHeight($1) + TimelineMetrics.rowGap }
     }
-    private var contentHeight: CGFloat { rowTop(displayTracks.count) + 36 }
+    private var contentHeight: CGFloat { rowTop(displayTracks.count) + TimelineMetrics.rowsTop }
     private func rowOffset(_ clip: TimelineDisplayClip) -> CGFloat {
         if clip.id == ghost?.clip.id, let layerDropTarget {
             let destinationID: UUID
@@ -111,18 +192,29 @@ final class TimelineCanvas: UIView, UIScrollViewDelegate, UIGestureRecognizerDel
     var selectedIDs: Set<UUID> = []
     var selectedTransitionID: UUID?
     var thumbnails: [UIImage] = []
+    var trackHeights: [UUID: TimelineTrackHeightChoice] = [:]
+    var waveformSizes: [UUID: TimelineWaveformSize] = [:]
+    var isSnappingEnabled = true
+    var showsClipNames = true
+    var showsClipDurations = true
+    var onZoomChange: ((Double) -> Void)?
     var onSelect: ((UUID?) -> Void)?
     var onSelectMany: ((Set<UUID>) -> Void)?
     var onSelectTransition: ((UUID) -> Void)?
     var onDragSelect: ((UUID) -> Void)?
     var onOptions: ((UUID) -> Void)?
     var onMoveClipToLayer: ((UUID, TimelineLayerDropTarget, Double) -> Void)?
+    var onToggleTrackVisibility: ((UUID) -> Void)?
+    var onToggleTrackLock: ((UUID) -> Void)?
+    var onToggleTrackMute: ((UUID) -> Void)?
+    var onSetTrackHeight: ((UUID, TimelineTrackHeightChoice) -> Void)?
+    var onSetWaveformSize: ((UUID, TimelineWaveformSize) -> Void)?
     private var layerDropTarget: TimelineLayerDropTarget?
     private let newOverlayPreviewID = UUID()
     private var displayTracks: [TimelineTrack] {
         guard case .newOverlay(let index) = layerDropTarget else { return tracks }
         var result = tracks
-        result.insert(.init(id: newOverlayPreviewID, name: "+ New overlay", kind: .videoOverlay),
+        result.insert(.init(id: newOverlayPreviewID, name: String(localized: "New overlay"), kind: .videoOverlay),
                       at: min(max(0, index), result.count))
         return result
     }
@@ -160,6 +252,11 @@ final class TimelineCanvas: UIView, UIScrollViewDelegate, UIGestureRecognizerDel
     var onSeek: ((Double) -> Void)?
     var onEndSeek: ((Double) -> Void)?
     private let scroll = UIScrollView()
+    /// Opaque backing for the header column, so clips scrolling past never show
+    /// through the gaps between one header and the next.
+    private let headerBackdrop = TimelinePassthroughView()
+    private var trackHeaders: [UUID: TimelineTrackHeaderView] = [:]
+    private let waveformCache = TimelineWaveformCache()
     private var zoom = 48.0
     private var pinchZoom = 48.0
     private var currentTime = 0.0
@@ -169,6 +266,9 @@ final class TimelineCanvas: UIView, UIScrollViewDelegate, UIGestureRecognizerDel
     private var playheadSnap: Double?
     private var revealedSelection: UUID?
     private var duration: Double { clips.compactMap { try? $0.placement.range.end.seconds }.max() ?? 0 }
+    /// Left edge of the scrolling content: everything left of it belongs to the
+    /// track headers.
+    private var contentLeft: CGFloat { TimelineMetrics.headerWidth(for: bounds.width) }
     private var viewport: TimelineViewport {
         .init(pixelsPerSecond: zoom, width: bounds.width,
               offset: interacting && !pinching ? currentTime * zoom : scroll.contentOffset.x)
@@ -176,7 +276,7 @@ final class TimelineCanvas: UIView, UIScrollViewDelegate, UIGestureRecognizerDel
 
     override init(frame: CGRect) {
         super.init(frame: frame)
-        backgroundColor = UIColor(white: 0.075, alpha: 1)
+        backgroundColor = TimelineTheme.background
         scroll.backgroundColor = .clear
         scroll.isOpaque = false
         scroll.delegate = self
@@ -188,6 +288,9 @@ final class TimelineCanvas: UIView, UIScrollViewDelegate, UIGestureRecognizerDel
         scroll.decelerationRate = .fast
         scroll.contentInsetAdjustmentBehavior = .never
         addSubview(scroll)
+        headerBackdrop.backgroundColor = TimelineTheme.background
+        headerBackdrop.isOpaque = true
+        addSubview(headerBackdrop)
         editPan = UIPanGestureRecognizer(target: self, action: #selector(edited(_:)))
         editPan.delegate = self
         scroll.addGestureRecognizer(editPan)
@@ -202,14 +305,14 @@ final class TimelineCanvas: UIView, UIScrollViewDelegate, UIGestureRecognizerDel
         pinch.delegate = self
         scroll.addGestureRecognizer(pinch)
         isAccessibilityElement = true
-        accessibilityLabel = "Video and audio timeline"
+        accessibilityLabel = String(localized: "Video and audio timeline")
         accessibilityTraits = .adjustable
-        accessibilityHint = "Swipe up or down to seek one second. Hold a clip and drag sideways to move it or vertically to move it to another layer."
+        accessibilityHint = String(localized: "Swipe up or down to seek one second. Pinch to zoom. Hold a clip and drag sideways to move it or vertically to move it to another layer.")
         accessibilityCustomActions = [
-            UIAccessibilityCustomAction(name: "Select clip", target: self, selector: #selector(selectClip)),
-            UIAccessibilityCustomAction(name: "Deselect clip", target: self, selector: #selector(deselectClip)),
-            UIAccessibilityCustomAction(name: "Zoom in", target: self, selector: #selector(zoomIn)),
-            UIAccessibilityCustomAction(name: "Zoom out", target: self, selector: #selector(zoomOut))
+            UIAccessibilityCustomAction(name: String(localized: "Select clip"), target: self, selector: #selector(selectClip)),
+            UIAccessibilityCustomAction(name: String(localized: "Deselect clip"), target: self, selector: #selector(deselectClip)),
+            UIAccessibilityCustomAction(name: String(localized: "Zoom in"), target: self, selector: #selector(zoomIn)),
+            UIAccessibilityCustomAction(name: String(localized: "Zoom out"), target: self, selector: #selector(zoomOut))
         ]
     }
     required init?(coder: NSCoder) { fatalError("init(coder:) is not supported") }
@@ -218,9 +321,12 @@ final class TimelineCanvas: UIView, UIScrollViewDelegate, UIGestureRecognizerDel
         super.layoutSubviews()
         updating = true
         scroll.frame = bounds
+        headerBackdrop.frame = CGRect(x: 0, y: TimelineMetrics.rulerHeight, width: contentLeft,
+                                      height: max(0, bounds.height - TimelineMetrics.rulerHeight))
         scroll.contentSize = CGSize(width: duration * zoom + bounds.width, height: max(bounds.height, contentHeight))
         if ghost == nil && !interacting { scroll.contentOffset.x = currentTime * zoom }
         updating = false
+        layoutTrackControls()
         setNeedsDisplay()
     }
 
@@ -246,8 +352,17 @@ final class TimelineCanvas: UIView, UIScrollViewDelegate, UIGestureRecognizerDel
         setNeedsDisplay()
     }
 
+    /// Adopts a zoom chosen outside the canvas — the slider, or its own pinch
+    /// having been reported back through SwiftUI state. Ignored mid-pinch so a
+    /// live gesture is never fought by a stale value.
+    func applyExternalZoom(_ value: Double) {
+        guard !pinching, value.isFinite, abs(value - zoom) > 0.0001 else { return }
+        setZoom(value, notifying: false)
+    }
+
     func scrollViewWillBeginDragging(_ scrollView: UIScrollView) { beginInteraction() }
     func scrollViewDidScroll(_ scrollView: UIScrollView) {
+        layoutTrackControls()
         guard !updating, interacting, !pinching else { return }
         let rawTime = min(duration, max(0, scroll.contentOffset.x / zoom))
         // Keep raw touch travel independent from the displayed snapped position,
@@ -255,7 +370,7 @@ final class TimelineCanvas: UIView, UIScrollViewDelegate, UIGestureRecognizerDel
         if let playheadSnap, abs(rawTime-playheadSnap) * zoom <= 22 {
             currentTime = playheadSnap
         } else {
-            let snapped = TimelineEditing.snapPlayhead(rawTime, clips: clips, markers: markers, keyframes: keyframeTimes, tolerance: 12/zoom)
+            let snapped = TimelineEditing.snapPlayhead(rawTime, clips: clips, markers: markers, keyframes: keyframeTimes, tolerance: snapTolerance(12))
             let boundary = snapped != rawTime ? snapped : nil
             if boundary != nil && boundary != playheadSnap { UISelectionFeedbackGenerator().selectionChanged() }
             playheadSnap = boundary
@@ -274,9 +389,16 @@ final class TimelineCanvas: UIView, UIScrollViewDelegate, UIGestureRecognizerDel
         if let playheadSnap, abs(scrollView.contentOffset.x/zoom-playheadSnap) * zoom <= 22 {
             targetContentOffset.pointee.x = playheadSnap * zoom
         } else {
-            targetContentOffset.pointee.x = TimelineEditing.snapPlayhead(seconds, clips: clips, markers: markers, keyframes: keyframeTimes, tolerance: 12/zoom) * zoom
+            targetContentOffset.pointee.x = TimelineEditing.snapPlayhead(seconds, clips: clips, markers: markers, keyframes: keyframeTimes, tolerance: snapTolerance(12)) * zoom
         }
     }
+
+    /// Magnet strength in seconds for a given touch slack in points, or zero
+    /// when the magnet button is off.
+    private func snapTolerance(_ points: Double) -> Double {
+        isSnappingEnabled ? points / zoom : 0
+    }
+
     private func beginInteraction() {
         guard !interacting else { return }
         playheadSnap = nil
@@ -284,7 +406,7 @@ final class TimelineCanvas: UIView, UIScrollViewDelegate, UIGestureRecognizerDel
     }
     private func endInteraction() {
         guard interacting else { return }
-        let snapped = TimelineEditing.snapPlayhead(currentTime, clips: clips, markers: markers, keyframes: keyframeTimes, tolerance: 10/zoom)
+        let snapped = TimelineEditing.snapPlayhead(currentTime, clips: clips, markers: markers, keyframes: keyframeTimes, tolerance: snapTolerance(10))
         if snapped != currentTime { UISelectionFeedbackGenerator().selectionChanged() }
         currentTime = snapped
         updating = true; scroll.contentOffset.x = currentTime * zoom; updating = false
@@ -302,7 +424,9 @@ final class TimelineCanvas: UIView, UIScrollViewDelegate, UIGestureRecognizerDel
 
     @objc private func tapped(_ recognizer: UITapGestureRecognizer) {
         let point = recognizer.location(in: self)
-        if point.y < 30 {
+        // The header column is a control panel, not timeline content.
+        guard point.x >= contentLeft else { return }
+        if point.y < TimelineMetrics.rulerHeight {
             seek(to: viewport.seconds(at: point.x, duration: duration))
         } else if let transition = hitTransition(at: point) {
             onSelectTransition?(transition.id)
@@ -316,10 +440,14 @@ final class TimelineCanvas: UIView, UIScrollViewDelegate, UIGestureRecognizerDel
             pinching = true; beginInteraction(); pinchZoom = zoom
             scroll.panGestureRecognizer.isEnabled = false
             scroll.setContentOffset(scroll.contentOffset, animated: false)
-        case .changed: setZoom(pinchZoom * recognizer.scale)
+        // Not reported while the fingers are down: the zoom lives in SwiftUI
+        // state, and publishing it sixty times a second would re-evaluate the
+        // whole editor on every frame of the gesture.
+        case .changed: setZoom(pinchZoom * recognizer.scale, notifying: false)
         case .ended, .cancelled, .failed:
             scroll.panGestureRecognizer.isEnabled = true
             pinching = false; endInteraction()
+            onZoomChange?(zoom)
         default: break
         }
     }
@@ -327,12 +455,15 @@ final class TimelineCanvas: UIView, UIScrollViewDelegate, UIGestureRecognizerDel
                            shouldRecognizeSimultaneouslyWith otherGestureRecognizer: UIGestureRecognizer) -> Bool {
         gestureRecognizer is UIPinchGestureRecognizer || otherGestureRecognizer is UIPinchGestureRecognizer
     }
-    private func setZoom(_ value: Double) {
-        zoom = min(TimelineViewport.zoomRange.upperBound, max(TimelineViewport.zoomRange.lowerBound, value))
+    private func setZoom(_ value: Double, notifying: Bool = true) {
+        let clamped = min(TimelineViewport.zoomRange.upperBound, max(TimelineViewport.zoomRange.lowerBound, value))
+        guard clamped != zoom else { return }
+        zoom = clamped
         updating = true
         scroll.contentSize.width = duration * zoom + bounds.width
         scroll.contentOffset.x = currentTime * zoom
         updating = false
+        if notifying { onZoomChange?(zoom) }
         setNeedsDisplay()
     }
     private func seek(to time: Double) {
@@ -349,242 +480,147 @@ final class TimelineCanvas: UIView, UIScrollViewDelegate, UIGestureRecognizerDel
     @objc private func zoomIn() -> Bool { setZoom(zoom * 2); return true }
     @objc private func zoomOut() -> Bool { setZoom(zoom / 2); return true }
 
+    // MARK: - Drawing
+
     override func draw(_ rect: CGRect) {
         guard let context = UIGraphicsGetCurrentContext() else { return }
         let geometry = viewport
-        let interval = geometry.rulerInterval
-        let minor = minimumDuration * zoom >= 8 ? minimumDuration : interval/5
-        var minorTick = max(0, floor(geometry.seconds(at: 0, duration: duration)/minor)*minor)
-        let minorEnd = min(duration, geometry.seconds(at: bounds.width, duration: duration)+minor)
-        context.setStrokeColor(UIColor(white: 0.25, alpha: 1).cgColor)
-        while minorTick <= minorEnd {
-            let x = geometry.x(for: minorTick)
-            context.move(to: CGPoint(x: x, y: 26)); context.addLine(to: CGPoint(x: x, y: 30)); context.strokePath()
-            minorTick += minor
-        }
-        let first = max(0, floor(geometry.seconds(at: 0, duration: duration) / interval) * interval)
-        let last = min(duration, geometry.seconds(at: bounds.width, duration: duration) + interval)
-        var tick = first
-        while tick <= last {
-            let x = geometry.x(for: tick)
-            context.setStrokeColor(UIColor(white: 0.4, alpha: 1).cgColor)
-            context.move(to: CGPoint(x: x, y: 23)); context.addLine(to: CGPoint(x: x, y: 29)); context.strokePath()
-            let label = interval < 0.1 ? String(format: "%.2fs", locale: .current, tick) : interval < 1 ? String(format: "%.1fs", locale: .current, tick) : String(format: "%02d:%02d", Int(tick)/60, Int(tick)%60)
-            (label as NSString).draw(at: CGPoint(x: x + 4, y: 6), withAttributes: [.font: UIFont.monospacedDigitSystemFont(ofSize: 10, weight: .regular), .foregroundColor: UIColor.lightGray])
-            tick += interval
-        }
-        let insertion = insertionPreview
+        let rows = displayTracks
+        let chrome = TimelineChromeRenderer(context: context, canvas: bounds,
+                                            geometry: geometry, contentLeft: contentLeft)
+        // Clips are culled and their chips pinned against the content area, so
+        // nothing is drawn under the header column and a name chip stops at
+        // the timeline's own left edge.
+        let content = CGRect(x: contentLeft, y: 0, width: max(0, bounds.width - contentLeft),
+                             height: bounds.height)
+        let clipRenderer = TimelineClipRenderer(context: context, canvas: content, geometry: geometry,
+                                                pixelsPerSecond: zoom, waveformCache: waveformCache)
+
         context.saveGState()
-        context.clip(to: CGRect(x: 0, y: 32, width: bounds.width, height: bounds.height-32))
-        for clip in clips {
-            context.saveGState(); context.translateBy(x: 0, y: rowOffset(clip))
-            if tracks.first(where: { $0.id == clip.placement.trackID })?.isEnabled == false { context.setAlpha(0.35) }
-            drawClip(clip, context: context, geometry: geometry, insertion: insertion)
-            context.restoreGState()
-        }
-        for (index, track) in displayTracks.enumerated() where track.kind != .text {
-            let y = rowTop(index) + 32 - scroll.contentOffset.y
-            guard y >= 30, y < bounds.height else { continue }
-            let title = (track.isLocked ? "🔒 " : "") + (track.kind == .audio && !track.isEnabled ? "Muted · " : "") + track.name
-            let isNewOverlay = track.id == newOverlayPreviewID
-            let attributes: [NSAttributedString.Key: Any] = [
-                .font: UIFont.systemFont(ofSize: 9, weight: isNewOverlay ? .semibold : .medium),
-                .foregroundColor: isNewOverlay ? UIColor.systemMint : UIColor.lightGray
-            ]
-            let size = (title as NSString).size(withAttributes: attributes)
-            context.setFillColor((isNewOverlay ? UIColor.systemMint.withAlphaComponent(0.14) : UIColor.black.withAlphaComponent(0.8)).cgColor)
-            context.fill(CGRect(x: 3, y: y, width: size.width+8, height: 13))
-            (title as NSString).draw(at: CGPoint(x: 7, y: y), withAttributes: attributes)
-            if isNewOverlay {
-                context.setStrokeColor(UIColor.systemMint.withAlphaComponent(0.8).cgColor)
-                context.setLineWidth(1)
-                context.stroke(CGRect(x: 1, y: y+2, width: bounds.width-2,
-                                      height: clipHeight(track)-2))
+        context.clip(to: CGRect(x: 0, y: TimelineMetrics.rulerHeight, width: bounds.width,
+                                height: max(0, bounds.height - TimelineMetrics.rulerHeight)))
+
+        // Lanes first: a track reads as a channel that continues past its last
+        // clip rather than as rectangles floating in space.
+        let laneWidth = max(0, bounds.width - contentLeft)
+        for (index, track) in rows.enumerated() {
+            let top = TimelineMetrics.rowsTop + rowTop(index, in: rows) - scroll.contentOffset.y
+            let height = clipHeight(track)
+            guard top + height >= TimelineMetrics.rulerHeight, top <= bounds.height else { continue }
+            let isPreview = track.id == newOverlayPreviewID
+            chrome.drawLane(CGRect(x: contentLeft, y: top, width: laneWidth, height: height),
+                            isDropTarget: isPreview)
+            if isPreview {
+                let attributes: [NSAttributedString.Key: Any] = [
+                    .font: UIFont.systemFont(ofSize: 10, weight: .semibold),
+                    .foregroundColor: TimelineTheme.accent
+                ]
+                (String(localized: "New overlay") as NSString).draw(
+                    at: CGPoint(x: contentLeft + 10, y: top + height / 2 - 7), withAttributes: attributes)
             }
         }
-        context.restoreGState()
+
+        let insertion = insertionPreview
+        for clip in clips {
+            clipRenderer.draw(presentation(for: clip, insertion: insertion))
+        }
+
         for transition in transitions where transition.enabled {
             guard let outgoing = clips.first(where: { $0.id == transition.outgoingClipID }),
-                  let row = displayTracks.firstIndex(where: { $0.id == outgoing.placement.trackID }) else { continue }
-            let x = geometry.x(for: transition.editTime.seconds)
-            let y = rowTop(row) + 36 + clipHeight(trackID: outgoing.placement.trackID) / 2 - scroll.contentOffset.y
-            guard x >= -14, x <= bounds.width + 14, y >= 28, y <= bounds.height else { continue }
-            let radius: CGFloat = selectedTransitionID == transition.id ? 10 : 8
-            context.saveGState()
-            context.setShadow(offset: .zero, blur: 4, color: UIColor.black.withAlphaComponent(0.8).cgColor)
-            context.setFillColor((selectedTransitionID == transition.id ? UIColor.systemMint : UIColor(white: 0.92, alpha: 1)).cgColor)
-            context.move(to: CGPoint(x: x, y: y-radius))
-            context.addLine(to: CGPoint(x: x+radius, y: y))
-            context.addLine(to: CGPoint(x: x, y: y+radius))
-            context.addLine(to: CGPoint(x: x-radius, y: y))
-            context.closePath(); context.fillPath()
-            context.setStrokeColor(UIColor.black.withAlphaComponent(0.8).cgColor)
-            context.setLineWidth(1.5); context.strokePath()
-            context.restoreGState()
+                  let row = rows.firstIndex(where: { $0.id == outgoing.placement.trackID }) else { continue }
+            let point = transitionPoint(row: row, trackID: outgoing.placement.trackID,
+                                        time: transition.editTime.seconds, in: rows)
+            guard point.x >= -14, point.x <= bounds.width + 14,
+                  point.y >= TimelineMetrics.rulerHeight, point.y <= bounds.height else { continue }
+            chrome.drawTransition(at: point, isSelected: selectedTransitionID == transition.id)
         }
-        for marker in markers {
-            let x = geometry.x(for: marker.time.seconds)
-            context.setFillColor(UIColor.systemYellow.cgColor)
-            context.move(to: CGPoint(x: x, y: 18)); context.addLine(to: CGPoint(x: x+5, y: 23))
-            context.addLine(to: CGPoint(x: x, y: 28)); context.addLine(to: CGPoint(x: x-5, y: 23)); context.closePath(); context.fillPath()
-        }
-        if let selectionRect = marqueeRect {
-            context.saveGState()
-            context.setFillColor(UIColor.systemMint.withAlphaComponent(0.12).cgColor)
-            context.fill(selectionRect)
-            context.setStrokeColor(UIColor.systemMint.withAlphaComponent(0.95).cgColor)
-            context.setLineWidth(1.5)
-            context.setLineDash(phase: 0, lengths: [5, 3])
-            context.stroke(selectionRect.insetBy(dx: 0.75, dy: 0.75))
-            context.restoreGState()
-        }
+
         if let ghost, ghost.operation == .move, let start = insertion[ghost.clip.id] {
-            context.setStrokeColor(UIColor.systemMint.cgColor); context.setLineWidth(3)
-            let x = geometry.x(for: start)
-            let span = clipHeight(trackID: ghost.clip.placement.trackID)
-            context.move(to: CGPoint(x: x, y: 30+rowOffset(ghost.clip))); context.addLine(to: CGPoint(x: x, y: 42+span+rowOffset(ghost.clip))); context.strokePath()
+            let top = TimelineMetrics.rowsTop + rowOffset(ghost.clip) - 4
+            chrome.drawInsertionLine(x: geometry.x(for: start), top: top,
+                                     height: clipHeight(trackID: ghost.clip.placement.trackID) + 8)
         }
-        context.setStrokeColor(UIColor.white.cgColor); context.setLineWidth(1.5)
-        context.move(to: CGPoint(x: bounds.midX, y: 0)); context.addLine(to: CGPoint(x: bounds.midX, y: bounds.height)); context.strokePath()
-        context.setFillColor(UIColor.white.cgColor)
-        context.fill(CGRect(x: bounds.midX-3, y: 0, width: 6, height: 8))
+        if let selectionRect = marqueeRect { chrome.drawMarquee(selectionRect) }
+        context.restoreGState()
+
+        // Chrome above the rows: the ruler repaints its own band, so a clip
+        // scrolled up can never bleed into it.
+        chrome.drawRuler(scale: TimelineRulerScale(pixelsPerSecond: zoom, frameDuration: minimumDuration),
+                         duration: duration)
+        for marker in markers { chrome.drawMarker(at: geometry.x(for: marker.time.seconds)) }
+        if let boundary = snappedBoundary ?? playheadSnap {
+            chrome.drawSnapIndicator(at: geometry.x(for: boundary))
+        }
+        chrome.drawPlayhead(at: bounds.midX, time: currentTime, isScrubbing: interacting)
     }
 
-    private func drawClip(_ clip: TimelineDisplayClip, context: CGContext, geometry: TimelineViewport, insertion: [UUID: Double]) {
+    /// Resolves one clip's appearance, including any live trim or move ghost.
+    /// The renderer sees only the result, never the timeline.
+    private func presentation(for clip: TimelineDisplayClip, insertion: [UUID: Double]) -> TimelineClipPresentation {
         let asset = assets.first { $0.id == clip.assetID }
-        let thumbnails = assetFrames[clip.assetID] ?? []
-        let sourceRange = asset?.sourceRange
-        let name = clip.title ?? (asset?.audioName ?? (asset?.stillImage != nil ? "Image overlay" : (asset?.videoMetadata?.fileName ?? self.name)))
+        let assetRange = asset?.sourceRange
         var start = clip.placement.timelineStart.seconds
         var end = (try? clip.placement.range.end.seconds) ?? start
+        var trimOffset = 0.0
         if let ghost, ghost.clip.id == clip.id {
             switch ghost.operation {
             case .move: break
-            case .trimStart: start = ghost.time
+            case .trimStart: start = ghost.time; trimOffset = ghost.time - clip.placement.timelineStart.seconds
             case .trimEnd: end = ghost.time
             }
         }
         if let position = insertion[clip.id] { start = position; end = start + clip.placement.duration.seconds }
+
+        let geometry = viewport
         let left = geometry.x(for: start), right = geometry.x(for: end)
-        guard right >= 0, left <= bounds.width else { return }
-        let selected = selectedIDs.contains(clip.id) || marqueeSelection.contains(clip.id)
-        let independentlyEditable = selectedID == clip.id && selectedIDs.count == 1 && marqueeOrigin == nil
-        let height = clipHeight(trackID: clip.placement.trackID)
-        let clipRect = CGRect(x: left, y: 36, width: max(1, right-left), height: height)
-        context.saveGState()
-        context.clip(to: clipRect.intersection(bounds))
-        context.setFillColor((clip.isAudio ? UIColor.systemBlue.withAlphaComponent(0.25) : clip.isText ? UIColor.systemPurple.withAlphaComponent(0.3) : clip.isShape ? UIColor.systemTeal.withAlphaComponent(0.3) : UIColor(white: 0.18, alpha: 1)).cgColor)
-        context.fill(clipRect.intersection(bounds))
-        let cellWidth = 72.0
-        var cell = max(0, Int(floor(-left / cellWidth)))
-        while left + Double(cell) * cellWidth < min(right, bounds.width) {
-            let x = left + Double(cell) * cellWidth
-            if !clip.isAudio && !thumbnails.isEmpty {
-                let sourceTime = clip.sourceRange.start.seconds + (Double(cell) * cellWidth + cellWidth / 2) / zoom
-                let fraction = min(0.999999, max(0, (sourceTime - (sourceRange?.start.seconds ?? 0)) / max(0.001, sourceRange?.duration.seconds ?? 1)))
-                let image = thumbnails[min(thumbnails.count-1, Int(fraction * Double(thumbnails.count)))]
-                let box = CGRect(x: x, y: 36, width: cellWidth, height: height)
-                context.saveGState(); context.clip(to: box)
-                let scale = max(box.width/image.size.width, box.height/image.size.height)
-                image.draw(in: CGRect(x: box.midX-image.size.width*scale/2, y: box.midY-image.size.height*scale/2, width: image.size.width*scale, height: image.size.height*scale))
-                context.restoreGState()
-            }
-            cell += 1
+        let track = tracks.first { $0.id == clip.placement.trackID }
+        let title = clip.title
+            ?? asset?.audioName
+            ?? (asset?.stillImage != nil ? String(localized: "Image overlay") : nil)
+            ?? asset?.videoMetadata?.fileName
+            ?? name
+
+        var presentation = TimelineClipPresentation(
+            clip: clip,
+            rect: CGRect(x: left, y: TimelineMetrics.rowsTop + rowOffset(clip),
+                         width: max(1, right - left), height: clipHeight(trackID: clip.placement.trackID)),
+            title: title,
+            duration: max(0, end - start))
+        presentation.isSelected = selectedIDs.contains(clip.id) || marqueeSelection.contains(clip.id)
+        presentation.isFocused = selectedID == clip.id && selectedIDs.count == 1 && marqueeOrigin == nil
+        presentation.isLocked = isLocked(clip)
+        presentation.isDimmed = track?.isEnabled == false
+        presentation.isStillImage = asset?.stillImage != nil
+        presentation.showsName = showsClipNames
+        presentation.showsDuration = showsClipDurations
+        presentation.mapping = TimelineSourceMapping(
+            sourceStart: clip.sourceRange.start.seconds + trimOffset * clip.speed,
+            speed: clip.speed,
+            assetStart: assetRange?.start.seconds ?? 0,
+            assetDuration: assetRange?.duration.seconds ?? max(0.001, clip.sourceRange.duration.seconds))
+        presentation.thumbnails = clip.isAudio ? [] : (assetFrames[clip.assetID] ?? [])
+        if clip.isAudio || clip.embeddedAudio != nil {
+            presentation.waveform = waveformCache.waveform(for: clip.assetID, peaks: waveforms[clip.assetID] ?? [])
+            presentation.waveformScale = waveformSizes[clip.placement.trackID]?.scale ?? 1
         }
-        if clip.isAudio {
-            context.setStrokeColor(UIColor.systemCyan.withAlphaComponent(clip.isMuted ? 0.3 : 0.9).cgColor)
-            context.setLineWidth(1.5)
-            let peaks = waveforms[clip.assetID] ?? []
-            var x = max(0, left)
-            while x < min(right, bounds.width) {
-                let trimOffset = ghost?.clip.id == clip.id && ghost?.operation == .trimStart ? start-clip.placement.timelineStart.seconds : 0
-                let sourceTime = clip.sourceRange.start.seconds + (x-left)/zoom + trimOffset
-                let fraction = (sourceTime-(sourceRange?.start.seconds ?? 0))/max(0.001, sourceRange?.duration.seconds ?? 1)
-                let peak: Float = peaks.isEmpty ? 0 : peaks[min(peaks.count-1, max(0, Int(fraction * Double(peaks.count))))]
-                let peakHeight = max(1, CGFloat(sqrt(peak))*18)
-                context.move(to: CGPoint(x: x, y: 62-peakHeight)); context.addLine(to: CGPoint(x: x, y: 62+peakHeight))
-                x += 3
-            }
-            context.strokePath()
-        }
-        // The fade shape, drawn over the waveform the way an editor expects to
-        // see it: a wedge where the level is on its way up or down. These are the
-        // resolved lengths, so what is drawn is what the mix applies.
-        if clip.fade.rise > 0 || clip.fade.fall > 0 {
-            let top: CGFloat = 36
-            let bottom = top + height
-            context.setFillColor(UIColor.black.withAlphaComponent(0.45).cgColor)
-            context.setStrokeColor(UIColor.systemCyan.withAlphaComponent(0.9).cgColor)
-            context.setLineWidth(1.5)
-            if clip.fade.rise > 0 {
-                let width = CGFloat(clip.fade.rise * zoom)
-                let path = CGMutablePath()
-                path.move(to: CGPoint(x: left, y: top))
-                path.addLine(to: CGPoint(x: left + width, y: top))
-                path.addLine(to: CGPoint(x: left, y: bottom))
-                path.closeSubpath()
-                context.addPath(path); context.fillPath()
-                context.move(to: CGPoint(x: left, y: bottom))
-                context.addLine(to: CGPoint(x: left + width, y: top))
-                context.strokePath()
-            }
-            if clip.fade.fall > 0 {
-                let width = CGFloat(clip.fade.fall * zoom)
-                let path = CGMutablePath()
-                path.move(to: CGPoint(x: right, y: top))
-                path.addLine(to: CGPoint(x: right - width, y: top))
-                path.addLine(to: CGPoint(x: right, y: bottom))
-                path.closeSubpath()
-                context.addPath(path); context.fillPath()
-                context.move(to: CGPoint(x: right - width, y: top))
-                context.addLine(to: CGPoint(x: right, y: bottom))
-                context.strokePath()
-            }
-        }
-        let labelHeight: CGFloat = min(22, height)
-        let labelTop = 36+height-labelHeight
-        if !clip.isDrawnOverlay {
-            context.setFillColor(UIColor.black.withAlphaComponent(0.65).cgColor)
-            context.fill(CGRect(x: max(left, 0), y: labelTop, width: min(right, bounds.width)-max(left, 0), height: labelHeight))
-        }
-        let label = (isLocked(clip) && clip.isDrawnOverlay ? "🔒 " : "")
-            + (clip.isMuted ? "Muted · " : clip.isAudio || clip.embeddedAudio != nil ? "♫  " : "") + name
-        // Media keeps its original baseline inside the dark strip; a drawn overlay centres in its short row.
-        let labelY = clip.isDrawnOverlay ? 36+(height-13)/2 : labelTop+3
-        (label as NSString).draw(at: CGPoint(x: max(left, 0)+8, y: labelY),
-            withAttributes: [.font: UIFont.systemFont(ofSize: 11, weight: .medium), .foregroundColor: UIColor.white])
-        context.restoreGState()
-        context.setStrokeColor((selected ? UIColor.systemMint : UIColor.darkGray).cgColor)
-        context.setLineWidth(selected ? 2 : 1)
-        context.stroke(clipRect.insetBy(dx: 1, dy: 1))
-        if independentlyEditable && !isLocked(clip) {
-            context.setFillColor(UIColor.systemMint.cgColor)
-            context.fill(CGRect(x: left, y: 36, width: 8, height: height))
-            context.fill(CGRect(x: right-8, y: 36, width: 8, height: height))
-        }
-        if independentlyEditable && !keyframeTimes.isEmpty {
-            let y = 36 + height - 6
-            context.saveGState()
-            context.clip(to: clipRect.intersection(bounds))
-            for time in keyframeTimes {
-                let x = geometry.x(for: time)
-                guard x >= -6, x <= bounds.width + 6 else { continue }
-                context.setFillColor(UIColor.white.cgColor)
-                context.move(to: CGPoint(x: x, y: y-4)); context.addLine(to: CGPoint(x: x+4, y: y))
-                context.addLine(to: CGPoint(x: x, y: y+4)); context.addLine(to: CGPoint(x: x-4, y: y))
-                context.closePath(); context.fillPath()
-                context.setStrokeColor(UIColor.black.withAlphaComponent(0.7).cgColor); context.setLineWidth(0.5)
-                context.move(to: CGPoint(x: x, y: y-4)); context.addLine(to: CGPoint(x: x+4, y: y))
-                context.addLine(to: CGPoint(x: x, y: y+4)); context.addLine(to: CGPoint(x: x-4, y: y))
-                context.closePath(); context.strokePath()
-            }
-            context.restoreGState()
-        }
+        presentation.fade = clip.fade
+        if presentation.isFocused { presentation.keyframeTimes = keyframeTimes }
+        return presentation
     }
 
+    private func transitionPoint(row: Int, trackID: UUID, time: Double, in rows: [TimelineTrack]) -> CGPoint {
+        CGPoint(x: viewport.x(for: time),
+                y: TimelineMetrics.rowsTop + rowTop(row, in: rows) + clipHeight(trackID: trackID) / 2
+                    - scroll.contentOffset.y)
+    }
+
+    // MARK: - Hit testing
+
     private func hitClip(at point: CGPoint) -> TimelineDisplayClip? {
+        guard point.x >= contentLeft else { return nil }
         return clips.first {
-            guard (36...(36+clipHeight(trackID: $0.placement.trackID))).contains(point.y-rowOffset($0)) else { return false }
+            let top = TimelineMetrics.rowsTop + rowOffset($0)
+            guard (top...(top + clipHeight(trackID: $0.placement.trackID))).contains(point.y) else { return false }
             let left = viewport.x(for: $0.placement.timelineStart.seconds)
             let right = viewport.x(for: (try? $0.placement.range.end.seconds) ?? 0)
             return point.x >= left && point.x <= right
@@ -594,7 +630,7 @@ final class TimelineCanvas: UIView, UIScrollViewDelegate, UIGestureRecognizerDel
     private func visibleRect(for clip: TimelineDisplayClip) -> CGRect {
         let left = viewport.x(for: clip.placement.timelineStart.seconds)
         let right = viewport.x(for: (try? clip.placement.range.end.seconds) ?? 0)
-        return CGRect(x: left, y: 36 + rowOffset(clip), width: max(1, right-left),
+        return CGRect(x: left, y: TimelineMetrics.rowsTop + rowOffset(clip), width: max(1, right-left),
                       height: clipHeight(trackID: clip.placement.trackID))
     }
 
@@ -624,31 +660,38 @@ final class TimelineCanvas: UIView, UIScrollViewDelegate, UIGestureRecognizerDel
     }
 
     private func hitTransition(at point: CGPoint) -> TimelineTransition? {
-        transitions.first { transition in
+        let rows = displayTracks
+        return transitions.first { transition in
             guard transition.enabled,
                   let outgoing = clips.first(where: { $0.id == transition.outgoingClipID }),
-                  let row = displayTracks.firstIndex(where: { $0.id == outgoing.placement.trackID }) else { return false }
-            let x = viewport.x(for: transition.editTime.seconds)
-            let y = rowTop(row) + 36 + clipHeight(trackID: outgoing.placement.trackID) / 2 - scroll.contentOffset.y
-            return abs(point.x - x) <= 18 && abs(point.y - y) <= 22
+                  let row = rows.firstIndex(where: { $0.id == outgoing.placement.trackID }) else { return false }
+            let centre = transitionPoint(row: row, trackID: outgoing.placement.trackID,
+                                         time: transition.editTime.seconds, in: rows)
+            return abs(point.x - centre.x) <= 18 && abs(point.y - centre.y) <= 22
         }
     }
 
+    /// Which edge a touch is reaching for. The handles are 13pt wide but
+    /// answer within 22pt either side of the edge, so the grab region is the
+    /// 44pt a finger needs.
     private func operation(at point: CGPoint, clip: TimelineDisplayClip) -> TimelineGestureEdit? {
-        guard selectedIDs.count == 1,
-              (30...(42+clipHeight(trackID: clip.placement.trackID))).contains(point.y-rowOffset(clip)),
+        let top = TimelineMetrics.rowsTop + rowOffset(clip)
+        let height = clipHeight(trackID: clip.placement.trackID)
+        guard selectedIDs.count == 1, point.x >= contentLeft,
+              ((top - 6)...(top + height + 6)).contains(point.y),
               !isLocked(clip) else { return nil }
         let left = viewport.x(for: clip.placement.timelineStart.seconds)
         let right = viewport.x(for: (try? clip.placement.range.end.seconds) ?? 0)
-        if abs(point.x-left) < 18 { return .trimStart }
-        if abs(point.x-right) < 18 { return .trimEnd }
+        if abs(point.x-left) < TimelineMetrics.trimHitSlop { return .trimStart }
+        if abs(point.x-right) < TimelineMetrics.trimHitSlop { return .trimEnd }
         return nil
     }
     override func gestureRecognizerShouldBegin(_ gestureRecognizer: UIGestureRecognizer) -> Bool {
         if gestureRecognizer === hold {
             // Holding a clip moves it; holding open timeline space starts a
             // desktop-style marquee across as many rows as the drag crosses.
-            return gestureRecognizer.location(in: self).y >= 30
+            let location = gestureRecognizer.location(in: self)
+            return location.y >= TimelineMetrics.rulerHeight && location.x >= contentLeft
         }
         guard gestureRecognizer === editPan else { return true }
         guard let clip = clips.first(where: { $0.id == selectedID }) else { return false }
@@ -672,7 +715,7 @@ final class TimelineCanvas: UIView, UIScrollViewDelegate, UIGestureRecognizerDel
             let trackFilter = ghost.clip.isDrawnOverlay ? nil : ghost.clip.placement.trackID
             let proposed = TimelineEditing.snapClipEdge(
                 rawTarget, clips: clips, markers: markers, excluding: ghost.clip.id,
-                trackID: trackFilter, playhead: currentTime, tolerance: 14/zoom)
+                trackID: trackFilter, playhead: currentTime, tolerance: snapTolerance(14))
             let targetIsSticky = snappedBoundary.map { abs($0-rawTarget) <= 22/zoom } == true
             var target = targetIsSticky ? snappedBoundary! : proposed
             let newSnap = target == rawTarget ? nil : target
@@ -707,8 +750,8 @@ final class TimelineCanvas: UIView, UIScrollViewDelegate, UIGestureRecognizerDel
             ghost.time = target; self.ghost = ghost; setNeedsDisplay()
         case .ended:
             if let ghost { onEdit?(ghost.clip.id, ghost.operation, ghost.time) }
-            ghost = nil; setNeedsDisplay()
-        case .cancelled, .failed: ghost = nil; setNeedsDisplay()
+            ghost = nil; snappedBoundary = nil; setNeedsDisplay()
+        case .cancelled, .failed: ghost = nil; snappedBoundary = nil; setNeedsDisplay()
         default: break
         }
     }
@@ -814,12 +857,14 @@ final class TimelineCanvas: UIView, UIScrollViewDelegate, UIGestureRecognizerDel
             let destination = sticky ?? TimelineEditing.snapMovingClipStart(
                 target, duration: ghost.clip.placement.duration.seconds,
                 clips: clips, markers: markers, excluding: ghost.clip.id,
-                playhead: currentTime, tolerance: 14/zoom)
+                playhead: currentTime, tolerance: snapTolerance(14))
             if destination != target && destination != snappedBoundary { UISelectionFeedbackGenerator().selectionChanged() }
             ghost.time = destination; self.ghost = ghost
             snappedBoundary = destination == target ? nil : destination
             setNeedsDisplay(); return
         }
+        // The main video track packs from zero whatever the magnet button says:
+        // a gap in it is not representable, so the slot is the edit, not a snap.
         let others = clips.filter { $0.id != ghost.clip.id && $0.placement.trackID == ghost.clip.placement.trackID }
         let next = others.first { target < $0.placement.timelineStart.seconds + $0.placement.duration.seconds/2 }
         let slot = next?.placement.timelineStart.seconds ?? ((try? others.last?.placement.range.end.seconds) ?? 0)
@@ -831,7 +876,7 @@ final class TimelineCanvas: UIView, UIScrollViewDelegate, UIGestureRecognizerDel
     }
     private func updateLayerDrag() {
         guard let moving = ghost?.clip, !moving.isAudio, !moving.isDrawnOverlay, !tracks.isEmpty else { return }
-        let y = dragPoint.y+scroll.contentOffset.y-32
+        let y = dragPoint.y + scroll.contentOffset.y - TimelineMetrics.rowsTop
         let visual = tracks.indices.filter { tracks[$0].kind == .mainVideo || tracks[$0].kind == .videoOverlay }
         guard !visual.isEmpty else { return }
 
@@ -866,7 +911,7 @@ final class TimelineCanvas: UIView, UIScrollViewDelegate, UIGestureRecognizerDel
         let snapped = sticky ?? TimelineEditing.snapMovingClipStart(
             raw, duration: moving.placement.duration.seconds,
             clips: clips, markers: markers, excluding: moving.id,
-            playhead: currentTime, tolerance: 14/zoom)
+            playhead: currentTime, tolerance: snapTolerance(14))
         if snapped != raw && snapped != snappedBoundary { UISelectionFeedbackGenerator().selectionChanged() }
         snappedBoundary = snapped == raw ? nil : snapped
         movingGhost.time = snapped
@@ -876,4 +921,97 @@ final class TimelineCanvas: UIView, UIScrollViewDelegate, UIGestureRecognizerDel
         updating = false
         setNeedsDisplay()
     }
+
+    // MARK: - Track headers
+
+    /// Track headers are UIKit subviews of the canvas, not children of its
+    /// horizontal scroll view. Their names and buttons therefore stay put while
+    /// clips, waveforms and thumbnails travel underneath the playhead.
+    func updateTrackControls() {
+        let liveIDs = Set(tracks.map(\.id))
+        for id in trackHeaders.keys.filter({ !liveIDs.contains($0) }) {
+            trackHeaders[id]?.removeFromSuperview()
+            trackHeaders[id] = nil
+        }
+        let selectedTrackID = clips.first { $0.id == selectedID }?.placement.trackID
+        for track in tracks {
+            let model = headerModel(for: track, isSelected: track.id == selectedTrackID)
+            let header: TimelineTrackHeaderView
+            if let existing = trackHeaders[track.id] {
+                header = existing
+                if existing.model != model { existing.apply(model) }
+            } else {
+                header = TimelineTrackHeaderView(trackID: track.id, model: model)
+                let id = track.id
+                header.onToggleLock = { [weak self] in self?.onToggleTrackLock?(id) }
+                header.onToggleVisibility = { [weak self] in self?.onToggleTrackVisibility?(id) }
+                header.onToggleMute = { [weak self] in self?.onToggleTrackMute?(id) }
+                addSubview(header)
+                trackHeaders[track.id] = header
+            }
+            header.menu = trackMenu(track)
+        }
+        layoutTrackControls()
+        setNeedsLayout(); setNeedsDisplay()
+    }
+
+    /// "3 clips · 00:12" — what the row holds and how far it runs, which is the
+    /// question a header actually answers.
+    private func headerModel(for track: TimelineTrack, isSelected: Bool) -> TimelineTrackHeaderView.Model {
+        let count = track.items.count
+        let end = track.items.compactMap { try? $0.placement.range.end.seconds }.max() ?? 0
+        let clipCount = count == 1
+            ? String(localized: "1 clip")
+            : String(format: String(localized: "%lld clips"), count)
+        return .init(title: track.layerDisplayName,
+                     subtitle: "\(clipCount) · \(TimecodeFormatter.string(from: end))",
+                     kind: track.kind,
+                     isLocked: track.isLocked,
+                     isEnabled: track.isEnabled,
+                     isAudioMuted: track.isAudioMuted,
+                     hasAudioContent: track.hasAudioContent,
+                     isSelected: isSelected)
+    }
+
+    private func layoutTrackControls() {
+        let width = contentLeft
+        headerBackdrop.frame = CGRect(x: 0, y: TimelineMetrics.rulerHeight, width: width,
+                                      height: max(0, bounds.height - TimelineMetrics.rulerHeight))
+        bringSubviewToFront(headerBackdrop)
+        for (index, track) in tracks.enumerated() {
+            guard let header = trackHeaders[track.id] else { continue }
+            let height = clipHeight(track)
+            let y = TimelineMetrics.rowsTop + rowTop(index, in: tracks) - scroll.contentOffset.y
+            header.isHidden = y + height <= TimelineMetrics.rulerHeight || y >= bounds.height
+            header.frame = CGRect(x: 0, y: y, width: width, height: height)
+            bringSubviewToFront(header)
+        }
+    }
+
+    private func trackMenu(_ track: TimelineTrack) -> UIMenu {
+        let selectedHeight = trackHeights[track.id] ?? .regular
+        let heights = TimelineTrackHeightChoice.allCases.map { choice in
+            UIAction(title: choice.rawValue, state: choice == selectedHeight ? .on : .off) { [weak self] _ in
+                self?.onSetTrackHeight?(track.id, choice)
+            }
+        }
+        var children: [UIMenuElement] = [UIMenu(title: String(localized: "Track height"), children: heights)]
+        if track.hasAudioContent {
+            let selectedWaveform = waveformSizes[track.id] ?? .medium
+            let waveforms = TimelineWaveformSize.allCases.map { choice in
+                UIAction(title: choice.rawValue, state: choice == selectedWaveform ? .on : .off) { [weak self] _ in
+                    self?.onSetWaveformSize?(track.id, choice)
+                }
+            }
+            children.append(UIMenu(title: String(localized: "Audio waveform size"), children: waveforms))
+        }
+        return UIMenu(children: children)
+    }
+}
+
+/// A backdrop that paints but never intercepts. The header column has to be
+/// opaque so clips do not show through it, yet a drag that starts over it
+/// should still reach the timeline underneath.
+final class TimelinePassthroughView: UIView {
+    override func hitTest(_ point: CGPoint, with event: UIEvent?) -> UIView? { nil }
 }

@@ -198,9 +198,9 @@ struct SourceInfoView: View {
     private func decodedExplanation(for mode: ProjectColorMode) -> String {
         switch mode {
         case .appleLog2:
-            "Apple's transfer function decodes the footage to scene light, the primaries are converted from Apple Wide Gamut to BT.2020, and Apple's own display transform renders it to Rec.709. This is the picture the camera captured, and what export produces."
+            String(localized: "Apple's transfer function decodes the footage to scene light, the primaries are converted from Apple Wide Gamut to BT.2020, and Apple's own display transform renders it to Rec.709. This is the picture the camera captured, and what export produces.")
         default:
-            "Apple's transfer function decodes the footage to scene light, and Apple's own display transform renders it to Rec.709. This is the picture the camera captured, and what export produces."
+            String(localized: "Apple's transfer function decodes the footage to scene light, and Apple's own display transform renders it to Rec.709. This is the picture the camera captured, and what export produces.")
         }
     }
 

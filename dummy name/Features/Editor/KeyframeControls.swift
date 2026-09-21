@@ -33,9 +33,9 @@ struct KeyframeDiamond: View {
 
     private var accessibilityValue: String {
         switch state {
-        case .off: "Not animated"
-        case .animated: "Animated, no keyframe at the playhead"
-        case .onKeyframe: "Keyframe at the playhead"
+        case .off: String(localized: "Not animated")
+        case .animated: String(localized: "Animated, no keyframe at the playhead")
+        case .onKeyframe: String(localized: "Keyframe at the playhead")
         }
     }
 }

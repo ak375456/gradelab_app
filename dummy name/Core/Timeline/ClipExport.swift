@@ -44,6 +44,11 @@ enum SingleClipExport {
         // left alone — the document's primary asset has to stay present, and an
         // asset no clip references costs the export nothing.
         project.timeline = Timeline(tracks: [isolated])
+        // Every other layer is gone, including one this clip used as a track
+        // matte, so the relationship goes with it and the clip exports whole.
+        // A matte is a relationship BETWEEN layers; there is no second layer in
+        // a single-clip export for it to be a relationship with.
+        project.timeline.reconcileTrackMattes()
         project.displayName = name(for: clipID, in: source)
         guard (try? project.validate()) != nil else { return nil }
         return project
@@ -62,6 +67,6 @@ enum SingleClipExport {
             .filter { if case .video = $0 { true } else { false } }
             .sorted { $0.placement.timelineStart < $1.placement.timelineStart }
         let index = (ordered.firstIndex { $0.id == clipID } ?? 0) + 1
-        return "\(source.displayName) · Clip \(index)"
+        return String(localized: "\(source.displayName) · Clip \(index)")
     }
 }

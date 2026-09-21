@@ -39,7 +39,7 @@ enum OverlayEditing {
               let i = project.timeline.tracks[t].items.firstIndex(where: { $0.id == id }),
               !project.timeline.tracks[t].isLocked,
               !project.timeline.tracks[t].items[i].placement.isLocked else {
-            throw TimelineError.invalid("Unlock the \(Clip.noun) track before editing.")
+            throw TimelineError.invalid(String(localized: "Unlock the \(Clip.noun) track before editing."))
         }
         project.timeline.tracks[t].items[i] = clip.timelineItem
     }
@@ -59,6 +59,8 @@ enum OverlayEditing {
         let index = project.timeline.tracks.firstIndex { $0.id == clip.placement.trackID }!
         project.timeline.tracks[index].items.removeAll { $0.id == clip.id }
         if project.timeline.tracks[index].items.isEmpty { project.timeline.tracks.remove(at: index) }
+        // A title used as somebody's track matte takes the relationship with it.
+        project.timeline.reconcileTrackMattes()
     }
 
     /// Pasting a drawn layer gives it a track of its own rather than hunting for
@@ -94,14 +96,14 @@ enum OverlayEditing {
         switch project.timeline.item(id: id) {
         case .text(let clip): return try split(clip, at: time, in: &project)
         case .shape(let clip): return try split(clip, at: time, in: &project)
-        default: throw TimelineError.invalid("Select a text or shape layer to split.")
+        default: throw TimelineError.invalid(String(localized: "Select a text or shape layer to split."))
         }
     }
 
     static func split<Clip: DrawnOverlayClip>(_ clip: Clip, at time: TimelineTime, in project: inout VideoProject) throws -> UUID {
         var left = clip
         guard splitTarget(in: project, at: time, trackID: left.placement.trackID) == left.id else {
-            throw TimelineError.invalid("Place the playhead inside the \(Clip.noun) clip.")
+            throw TimelineError.invalid(String(localized: "Place the playhead inside the \(Clip.noun) clip."))
         }
         let boundary = try TimelineEditing.snapped(time, frame: project.canvas.frameDuration)
         var right = left
@@ -122,7 +124,7 @@ enum OverlayEditing {
         switch project.timeline.item(id: id) {
         case .text(let clip): try edit(clip, operation: operation, to: time, in: &project)
         case .shape(let clip): try edit(clip, operation: operation, to: time, in: &project)
-        default: throw TimelineError.invalid("Overlay clip not found.")
+        default: throw TimelineError.invalid(String(localized: "Overlay clip not found."))
         }
     }
 
@@ -143,7 +145,7 @@ enum OverlayEditing {
                                           try target.subtracting(clip.placement.timelineStart))
         }
         guard clip.placement.duration >= (project.canvas.frameDuration ?? .zero) else {
-            throw TimelineError.invalid("Keep at least one frame of \(Clip.noun).")
+            throw TimelineError.invalid(String(localized: "Keep at least one frame of \(Clip.noun)."))
         }
         try replace(clip.id, with: clip, in: &project)
     }

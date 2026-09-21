@@ -11,6 +11,7 @@ struct EditorView: View {
     let onShowSource: () -> Void
     let onSettingsChanged: (VideoProject, Bool) -> Void
     @Environment(\.scenePhase) private var scenePhase
+    @Environment(\.verticalSizeClass) private var verticalSizeClass
     @State private var colorMode = false
     @State private var textMode = false
     @State private var textSection = "Style"
@@ -37,6 +38,8 @@ struct EditorView: View {
     @State private var transforms = false
     @ObservedObject private var warmup = CompositorWarmup.shared
     @State private var maskMode = false
+    @State private var matteMode = false
+    @State private var backgroundMode = false
     @State private var canvasTool = false
     /// The legacy single grading window, edited from Color → Local.
     private var localMaskMode: Bool { colorMode && model.selectedPanel == .mask }
@@ -45,6 +48,33 @@ struct EditorView: View {
     /// user most needs to see which area a slider is about to change.
     private var maskedGradeMode: Bool {
         colorMode && (model.selectedMaskID != nil || model.selectedPanel == .masks)
+    }
+    /// The overlay also stays up for a finished lasso with no tool armed: the
+    /// outline is the selection, so hiding it would leave the user guessing
+    /// what is about to be cut — and, once tracked, unable to watch it hold on
+    /// the object while scrubbing.
+    private var backgroundInteractionActive: Bool {
+        backgroundMode && (backgroundToolArmed
+                           || model.selectedBackgroundRemoval?.lasso?.isDrawn == true)
+    }
+    /// A cutout tool currently owns the one-finger drag over the picture: the
+    /// lasso is being traced, a refinement brush is down, or a colour is being
+    /// picked off the frame.
+    private var backgroundToolArmed: Bool {
+        backgroundMode && (model.backgroundBrush != nil || model.isDrawingBackgroundLasso
+                           || model.isPickingBackgroundColor)
+    }
+    /// What the preview lets the user do with the picture.
+    ///
+    /// A cutout tool keeps the pinch, because tracing an edge is exactly when
+    /// magnification is worth the most; everything else that draws on the
+    /// picture — text and shape handles, mask windows, the eyedropper — still
+    /// holds the viewport at 1x so a drag cannot mean two things at once.
+    private var previewInteraction: PreviewInteraction {
+        if backgroundToolArmed { return .pinchOnly }
+        let drawsOnPicture = model.selectedText != nil || model.selectedShape != nil
+            || model.isPickingCurveHue || maskMode || localMaskMode || maskedGradeMode
+        return drawsOnPicture ? .off : .full
     }
     @State private var speedTool = false
     @State private var transitionMode = false
@@ -61,6 +91,24 @@ struct EditorView: View {
     @State private var markers = false
     @State private var help = false
     @State private var comparePinned = false
+    @State private var timelineTrackHeights: [UUID: TimelineTrackHeightChoice] = [:]
+    @State private var timelineWaveformSizes: [UUID: TimelineWaveformSize] = [:]
+    /// Timeline zoom in points per second, and whether the magnet is on. Both
+    /// are how someone has set their workspace up rather than part of the
+    /// document, so they persist across sessions and across projects.
+    @AppStorage("editor.timelineZoom") private var timelineZoom: Double = 48
+    @AppStorage("editor.timelineSnapping") private var timelineSnapping = true
+    /// Clip name and length chips. Set in Settings, because they are a reading
+    /// preference rather than something to toggle mid-edit.
+    @AppStorage("timeline.showsClipNames") private var showsClipNames = true
+    @AppStorage("timeline.showsClipDurations") private var showsClipDurations = true
+    /// The canvas outline over the preview. A reading preference rather than
+    /// part of the document, so it is set in Settings and kept across projects.
+    @AppStorage("preview.showsCanvasEdge") private var showsCanvasEdge = true
+    /// True while the preview is being pinched, so the cutout tools can tell a
+    /// zoom from a stroke.
+    @State private var previewPinching = false
+    @State private var gradeScrollPosition = ScrollPosition(y: 0)
     @State private var colorInfo = false
     @State private var confirmsResetAll = false
     @State private var savingPreset = false
@@ -98,7 +146,7 @@ struct EditorView: View {
                             // NLE. Phone landscape keeps the compact behaviour
                             // so its preview is not squeezed by two panels.
                             let showsTimeline = UIDevice.current.userInterfaceIdiom == .pad
-                                || (!colorMode && !transforms && !canvasTool && !speedTool)
+                                || (!colorMode && !transforms && !canvasTool && !speedTool && !backgroundMode)
                             if showsTimeline {
                                 WorkspaceDivider(
                                     orientation: .horizontal,
@@ -159,7 +207,7 @@ struct EditorView: View {
                                    traceHeight: scopeHeight(geometry.size, regular: false))
                     }
                     transport
-                    if !colorMode && !transforms && !canvasTool && !speedTool {
+                    if showsTimelineInTallLayout {
                         timeline(height: compactTimelineHeight(geometry.size))
                         // The handle sits UNDER the timeline here, where the
                         // wide layout puts it above: dragging down gives the
@@ -228,22 +276,25 @@ struct EditorView: View {
     /// The timeline's height in the TALL layout, where it shares the window with
     /// the picture above it and the tool panel below rather than sitting beside
     /// a panel of its own.
+    ///
+    /// Clamped whether or not anyone has dragged it. The automatic height is a
+    /// wish — enough room for the rows that exist — and on a phone it is a wish
+    /// the window cannot always grant. Granting it anyway pushes the mode bar,
+    /// and the first-run notice under it, off the bottom of the screen.
     private func compactTimelineHeight(_ size: CGSize) -> CGFloat {
-        // An untouched workspace keeps exactly the height this layout has always
-        // used. Only a size someone dragged is clamped — adding a handle must
-        // not quietly resize a timeline nobody asked to resize.
-        guard storedTimelineHeight > 0 else { return automaticTimelineHeight }
-        return clampedCompactTimelineHeight(CGFloat(storedTimelineHeight), in: size)
+        let wanted = storedTimelineHeight > 0 ? CGFloat(storedTimelineHeight) : automaticTimelineHeight
+        return clampedCompactTimelineHeight(wanted, in: size)
     }
 
-    /// The floor keeps one row readable. The ceiling is half of what the picture
-    /// has left over, so a drag can never squeeze the tool panel — and with it
-    /// the handle that would undo the drag — off the bottom of the screen; but
-    /// never below the automatic height either, so the handle can always be
-    /// dragged back to where it started.
+    /// The floor keeps a toolbar, a ruler and one row readable. The ceiling is
+    /// whatever the window has left once the picture and the fixed chrome below
+    /// have taken theirs, so the timeline gives up height — and scrolls — rather
+    /// than displacing the controls that would shrink it again.
     private func clampedCompactTimelineHeight(_ value: CGFloat, in size: CGSize) -> CGFloat {
-        let lower: CGFloat = 76
-        let ceiling = max(automaticTimelineHeight, (size.height - previewHeight(size)) * 0.5)
+        let lower = EditorWorkspaceBudget.minimumTimeline
+        let ceiling = EditorWorkspaceBudget.timelineCeiling(
+            height: size.height, previewHeight: previewHeight(size),
+            showsWarmupNotice: !warmup.isReady)
         return min(max(value, lower), max(lower, ceiling))
     }
 
@@ -252,19 +303,34 @@ struct EditorView: View {
     }
 
     private func previewHeight(_ size: CGSize) -> CGFloat {
+        // The shares below the timeline's own are deliberately modest. The
+        // timeline now carries its own toolbar, and a picture taking half the
+        // window leaves it too little to show a ruler and a whole row.
         let automatic = size.height * (colorMode
             ? (scopesVisible ? 0.30 : 0.43)
-            : model.project.timeline.tracks.count > 1 ? 0.38 : 0.48)
+            : model.project.timeline.tracks.count > 1 ? 0.36 : 0.40)
         return clampedPreviewHeight(
             storedPreviewHeight > 0 ? CGFloat(storedPreviewHeight) : automatic, in: size)
     }
 
     private func clampedPreviewHeight(_ value: CGFloat, in size: CGSize) -> CGFloat {
-        // The floor keeps the picture recognisable; the ceiling keeps at least
-        // a usable strip of tools on screen, so a drag can never hide the
-        // controls that would undo it.
+        // The floor keeps the picture recognisable; the ceiling keeps a usable
+        // timeline and the whole mode bar on screen, so a drag can never hide
+        // the controls that would undo it. A height stored before this ceiling
+        // existed is corrected on the way out rather than on the way in, which
+        // is what repairs a workspace someone had already dragged too far.
         let lower: CGFloat = 140
-        return min(max(value, lower), max(lower, size.height * 0.72))
+        let ceiling = EditorWorkspaceBudget.previewCeiling(
+            height: size.height, floor: lower, showsTimeline: showsTimelineInTallLayout,
+            showsWarmupNotice: !warmup.isReady)
+        return min(max(value, lower), max(lower, ceiling))
+    }
+
+    /// Whether the tall layout is currently showing a timeline under the
+    /// picture. The tools that take the whole panel hide it, and the picture is
+    /// welcome to that room when they do.
+    private var showsTimelineInTallLayout: Bool {
+        !colorMode && !transforms && !canvasTool && !speedTool && !backgroundMode
     }
 
     private func setPreviewHeight(_ value: CGFloat, in size: CGSize) {
@@ -302,10 +368,6 @@ struct EditorView: View {
 
     private var editorInputs: some View {
         editorLayout
-        // Keep the editing workspace at its authored size while the software
-        // keyboard floats over it. Only the text dock moves above the keyboard;
-        // the canvas and its framing do not jump or shrink.
-        .ignoresSafeArea(.keyboard, edges: .bottom)
         .overlay(alignment: .bottom) {
             if typingText {
                 textInputDock
@@ -313,10 +375,21 @@ struct EditorView: View {
                     .transition(.move(edge: .bottom).combined(with: .opacity))
             }
         }
+        // Keep the editing workspace at its authored size while the software
+        // keyboard floats over it. Only the text dock moves above the keyboard;
+        // the canvas and its framing do not jump or shrink.
+        //
+        // Applied AFTER the overlay, which is the whole point: with it applied
+        // first, the dock was still inside the keyboard's safe area, so SwiftUI
+        // lifted it by the keyboard height and `keyboardOverlap` lifted it
+        // again. That double lift put the dock a full keyboard above the
+        // keyboard in portrait and clean off the top of the screen in
+        // landscape, where the keyboard is most of the window.
+        .ignoresSafeArea(.keyboard, edges: .bottom)
         .numericEntryHost()
         .onReceive(NotificationCenter.default.publisher(for: UIResponder.keyboardWillChangeFrameNotification)) { note in
             guard let frame = note.userInfo?[UIResponder.keyboardFrameEndUserInfoKey] as? CGRect else { return }
-            keyboardOverlap = max(0, UIScreen.main.bounds.maxY-frame.minY)
+            keyboardOverlap = Self.keyboardOverlap(ofScreenFrame: frame)
         }
         .onReceive(NotificationCenter.default.publisher(for: UIResponder.keyboardWillHideNotification)) { _ in keyboardOverlap = 0 }
         .toolbar { ToolbarItemGroup(placement: .keyboard) {
@@ -515,12 +588,19 @@ struct EditorView: View {
 
     private var preview: some View {
         ZStack(alignment: .topLeading) {
-            PreviewViewport(inspectionEnabled: model.selectedText == nil && model.selectedShape == nil && !model.isPickingCurveHue && !maskMode && !localMaskMode && !maskedGradeMode) {
+            PreviewViewport(interaction: previewInteraction,
+                            onPinchChanged: { previewPinching = $0 }) {
                 ZStack {
                 MetalPreviewView(renderer: model.renderer, settings: model.settings,
                              showsOriginal: model.showsOriginal, isPlaying: model.playback.isPlaying,
                              redrawTime: model.playback.currentTime, frameUpdateID: model.playback.frameUpdateID,
                              isActive: scenePhase == .active && !model.showsExport)
+                    // Inside the viewport, so the edge zooms with the picture it
+                    // belongs to. Hidden while the original is held, which is a
+                    // look at the untouched frame and wants nothing over it.
+                    if showsCanvasEdge && model.hasMedia && !model.showsOriginal {
+                        CanvasEdgeOverlay(canvas: model.project.canvas)
+                    }
                     if !typingText { OverlayCanvasControls(model: model, editContent: { typingText = true }) }
                     if localMaskMode && !model.showsOriginal {
                         GradeMaskOverlay(model: model, displayedRect: model.renderer.displayedVideoRect)
@@ -534,6 +614,11 @@ struct EditorView: View {
                     }
                     if maskMode {
                         LayerMaskOverlay(model: model, displayedRect: model.renderer.displayedVideoRect)
+                    }
+                    if backgroundInteractionActive {
+                        BackgroundRemovalOverlay(model: model,
+                                                 displayedRect: model.renderer.displayedVideoRect,
+                                                 isZooming: previewPinching)
                     }
                 }
             }
@@ -786,10 +871,41 @@ struct EditorView: View {
     }
 
     /// The height the timeline takes when nobody has resized it: enough for the
-    /// tracks that exist, capped so it never crowds out the picture.
+    /// tracks that exist plus its own controls, capped so it never crowds out
+    /// the picture.
     private var automaticTimelineHeight: CGFloat {
-        min(audioMode || textMode || shapeMode ? 156 : 230,
-            model.project.timeline.tracks.reduce(CGFloat(36)) { $0 + ($1.kind.isDrawnOverlay ? 38 : 76) })
+        TimelineToolbar<EmptyView>.height
+            + min(audioMode || textMode || shapeMode ? 156 : 230,
+                  model.project.timeline.tracks.reduce(TimelineMetrics.rowsTop) {
+                      $0 + (timelineTrackHeights[$1.id] ?? .regular).points(for: $1.kind) + TimelineMetrics.rowGap
+                  })
+    }
+
+    /// Track types the timeline can gain. Grouped by what the new row holds, so
+    /// another kind later — an adjustment layer, a nested sequence — is a new
+    /// section here rather than a new menu.
+    @ViewBuilder private var addTrackActions: some View {
+        Section("Video") {
+            Button("Video clip", systemImage: "film") {
+                importImage = false; importOverlay = false; mediaPicker = true
+            }
+            Button("Video overlay", systemImage: "square.3.layers.3d") {
+                importImage = false; importOverlay = true; mediaPicker = true
+            }
+            Button("Image overlay", systemImage: "photo") {
+                importImage = true; importOverlay = true; mediaPicker = true
+            }
+        }
+        Section("Audio") {
+            Button("Sound effects", systemImage: "waveform.badge.plus") {
+                model.playback.pause(); soundEffects = true
+            }
+            Button("Audio from Files", systemImage: "waveform") { audioPicker = true }
+        }
+        Section("Overlays") {
+            Button("Text", systemImage: "textformat") { openTextTool(); model.addText() }
+            Button("Shape", systemImage: "square.on.circle") { openShapeTool(); model.addShape() }
+        }
     }
 
     private func timeline(height: CGFloat) -> some View {
@@ -803,6 +919,13 @@ struct EditorView: View {
                     selectedIDs: model.selectedClipIDs,
                     selectedTransitionID: model.selectedTransitionID,
                     thumbnails: filmstrip.frames,
+                    trackHeights: timelineTrackHeights,
+                    waveformSizes: timelineWaveformSizes,
+                    pixelsPerSecond: timelineZoom,
+                    isSnappingEnabled: timelineSnapping,
+                    showsClipNames: showsClipNames,
+                    showsClipDurations: showsClipDurations,
+                    onZoomChange: { timelineZoom = $0 },
                     onSelect: { id in
                         model.selectClip(id: id)
                         if id == nil { colorMode = false; maskMode = false }
@@ -817,13 +940,25 @@ struct EditorView: View {
                     onDragSelect: { model.selectClip(id: $0, seek: false) },
                     onOptions: { model.selectClip(id: $0, seek: false); clipOptions = true },
                     onMoveClipToLayer: model.moveClipToLayer,
+                    onToggleTrackVisibility: { model.toggleTrack($0, lock: false) },
+                    onToggleTrackLock: { model.toggleTrack($0, lock: true) },
+                    onToggleTrackMute: model.toggleTrackMute,
+                    onSetTrackHeight: { timelineTrackHeights[$0] = $1 },
+                    onSetWaveformSize: { timelineWaveformSizes[$0] = $1 },
                     onEdit: model.editTiming,
                     onBeginEdit: model.playback.pause,
                     onBeginSeek: model.playback.beginSeeking,
                     onSeek: { model.seekTimeline(to: $0, finishing: false) },
                     onEndSeek: { model.seekTimeline(to: $0, finishing: true) })
-                    .frame(height: height)
+                    .frame(height: max(60, height - TimelineToolbar<EmptyView>.height))
                     .allowsHitTesting(!model.isPreparingTimeline)
+            TimelineToolbar(
+                pixelsPerSecond: $timelineZoom,
+                isSnappingEnabled: $timelineSnapping,
+                canSplit: model.canSplit,
+                onSplit: model.split,
+                addTrackMenu: { addTrackActions })
+                .disabled(model.isPreparingTimeline)
             if filmstrip.unavailable {
                 Text("Filmstrip unavailable · seeking still works").font(.caption2).foregroundStyle(.secondary)
             }
@@ -865,7 +1000,7 @@ struct EditorView: View {
     /// single place to switch, instead of nine buttons each clearing seven
     /// flags by hand — which is how a tool used to end up half switched.
     private enum EditorMode: String, CaseIterable, Identifiable {
-        case timeline, text, shape, audio, color, transform, mask, speed, transition, canvas
+        case timeline, text, shape, audio, color, transform, mask, matte, background, speed, transition, canvas
 
         var id: String { rawValue }
 
@@ -878,6 +1013,8 @@ struct EditorView: View {
             case .color: return String(localized: "Color")
             case .transform: return String(localized: "Transform")
             case .mask: return String(localized: "Mask")
+            case .matte: return String(localized: "Matte")
+            case .background: return String(localized: "Remove BG")
             case .speed: return String(localized: "Speed")
             case .transition: return String(localized: "Transition")
             case .canvas: return String(localized: "Canvas")
@@ -893,6 +1030,8 @@ struct EditorView: View {
             case .color: return "camera.filters"
             case .transform: return "crop.rotate"
             case .mask: return "circle.dashed"
+            case .matte: return "square.on.square.dashed"
+            case .background: return "person.crop.rectangle"
             case .speed: return "speedometer"
             case .transition: return "rectangle.2.swap"
             case .canvas: return "aspectratio"
@@ -902,7 +1041,7 @@ struct EditorView: View {
         /// Tools that cannot run until the compositing shaders have been built.
         var needsCompositor: Bool {
             switch self {
-            case .text, .shape, .audio, .transform, .mask, .transition: return true
+            case .text, .shape, .audio, .transform, .mask, .matte, .background, .transition: return true
             case .timeline, .color, .speed, .canvas: return false
             }
         }
@@ -915,6 +1054,8 @@ struct EditorView: View {
         if colorMode { return .color }
         if transforms { return .transform }
         if maskMode { return .mask }
+        if matteMode { return .matte }
+        if backgroundMode { return .background }
         if speedTool { return .speed }
         if transitionMode { return .transition }
         if canvasTool { return .canvas }
@@ -929,6 +1070,17 @@ struct EditorView: View {
         colorMode = mode == .color
         transforms = mode == .transform
         maskMode = mode == .mask
+        matteMode = mode == .matte
+        backgroundMode = mode == .background
+        // The matte view is a debug view, so leaving the tool takes it with it
+        // rather than leaving the preview showing coverage during a colour edit.
+        if mode != .matte { model.endTrackMatteEditing() }
+        if mode != .background {
+            model.showsBackgroundMatte = false
+            model.backgroundBrush = nil
+            model.isDrawingBackgroundLasso = false
+            model.isPickingBackgroundColor = false
+        }
         canvasTool = mode == .canvas
         speedTool = mode == .speed
         transitionMode = mode == .transition
@@ -942,21 +1094,33 @@ struct EditorView: View {
     private func unavailableReason(for mode: EditorMode) -> String? {
         // Checked first: it is temporary, and it covers most of the list at once.
         if mode.needsCompositor && !warmup.isReady {
-            return "Still preparing effects — first run only."
+            return String(localized: "Still preparing effects — first run only.")
         }
         switch mode {
         case .timeline, .canvas, .text, .shape, .audio:
             return nil
         case .color, .transform:
-            if model.selectedClip == nil { return "Select a clip in the timeline first." }
-            return model.canGrade ? nil : "This clip can’t be graded."
+            if model.selectedClip == nil { return String(localized: "Select a clip in the timeline first.") }
+            return model.canGrade ? nil : String(localized: "This clip can’t be graded.")
         case .mask:
-            if model.selectedClip == nil { return "Select a clip in the timeline first." }
-            return model.canEditSelection ? nil : "This clip is locked."
+            if model.selectedClip == nil { return String(localized: "Select a clip in the timeline first.") }
+            return model.canEditSelection ? nil : String(localized: "This clip is locked.")
+        case .matte:
+            // Wrapped at the call site: the return type is `String`, and a bare
+            // literal in a `String`-typed expression is never extracted for
+            // translation.
+            if model.selectedItem == nil { return String(localized: "Select a layer in the timeline first.") }
+            if model.selectedItem?.isCompositable != true {
+                return String(localized: "An audio clip has no picture to cut.")
+            }
+            return model.canEditSelection ? nil : String(localized: "This layer is locked.")
+        case .background:
+            if model.selectedClip == nil { return String(localized: "Select a video or image clip first.") }
+            return model.canEditSelection ? nil : String(localized: "This clip is locked.")
         case .speed:
-            return model.canChangeSpeed ? nil : "Select a video clip to change its speed."
+            return model.canChangeSpeed ? nil : String(localized: "Select a video clip to change its speed.")
         case .transition:
-            return model.canUseTransitions ? nil : "Transitions need two clips meeting at the playhead."
+            return model.canUseTransitions ? nil : String(localized: "Transitions need two clips meeting at the playhead.")
         }
     }
 
@@ -977,6 +1141,10 @@ struct EditorView: View {
             activate(mode); model.beginTransformEditing()
         case .mask:
             activate(mode); model.beginLayerMaskEditing()
+        case .matte:
+            activate(mode); model.beginTrackMatteEditing()
+        case .background:
+            activate(mode); model.beginBackgroundRemovalEditing()
         }
     }
 
@@ -1121,6 +1289,8 @@ struct EditorView: View {
         }
         else if speedTool { SpeedPanel(model: model) }
         else if maskMode { LayerMaskPanel(model: model) }
+        else if matteMode { TrackMattePanel(model: model) }
+        else if backgroundMode { BackgroundRemovalPanel(model: model) }
         else if transforms { LiveTransformPanel(model: model) }
         else if canvasTool { CanvasTools(model: model) }
         else if colorMode && model.canGrade { controls }
@@ -1130,6 +1300,9 @@ struct EditorView: View {
                     HStack(spacing: 12) {
                         Button(action: model.pasteClip) { Image(systemName: "doc.on.clipboard").frame(width: 44, height: 44) }
                             .accessibilityLabel("Paste").disabled(model.clipboard == nil)
+                        // Split lives in the timeline's own toolbar, beside
+                        // Snap and the zoom. A second scissors a few points
+                        // below it was the same command twice.
                         Button(role: .destructive) { model.deleteClip() } label: { Image(systemName: "trash").frame(width: 44, height: 44) }
                             .accessibilityLabel(model.selectedAudio == nil ? "Delete clip and close gaps" : "Delete audio clip").disabled(!model.canEditSelection)
                         Button { model.toggleMarker() } label: { Image(systemName: "bookmark").frame(width: 44, height: 44) }
@@ -1157,7 +1330,8 @@ struct EditorView: View {
     }
 
     private var controls: some View {
-        GradingControls(model: model, onSaveGrade: { savingPreset = true })
+        GradingControls(model: model, onSaveGrade: { savingPreset = true },
+                        scrollPosition: $gradeScrollPosition)
     }
 
     private func openTextTool() {
@@ -1182,6 +1356,24 @@ struct EditorView: View {
         model.selectTransition(id)
     }
 
+    /// How far the keyboard reaches into this app's own window, in points.
+    ///
+    /// Measured against the window rather than the screen. In Split View or
+    /// Stage Manager the window is not the screen, and a screen-relative
+    /// measurement lifts the dock by the distance to the bottom of the display
+    /// instead of the distance to the bottom of the app.
+    private static func keyboardOverlap(ofScreenFrame frame: CGRect) -> CGFloat {
+        guard let window = UIApplication.shared.connectedScenes
+            .compactMap({ $0 as? UIWindowScene })
+            .flatMap(\.windows)
+            .first(where: \.isKeyWindow) else { return 0 }
+        let local = window.convert(frame, from: window.screen.coordinateSpace)
+        // A floating or undocked keyboard does not sit on the bottom edge, so
+        // there is nothing to lift the dock out from under.
+        guard local.maxY >= window.bounds.maxY - 1 else { return 0 }
+        return max(0, window.bounds.maxY - local.minY)
+    }
+
     private var textInputDock: some View {
         VStack(spacing: 6) {
             HStack {
@@ -1191,10 +1383,14 @@ struct EditorView: View {
             }
             TextEditor(text: Binding(get: { model.selectedText?.text ?? "" }, set: { text in model.editText { $0.text = text } }))
                 .focused($textFocused).font(.body).scrollContentBackground(.hidden)
-                .frame(height: 84).padding(.horizontal, 6)
+                // Short in a compact-height window: on a phone in landscape the
+                // keyboard leaves barely a third of the screen, and a dock
+                // authored for portrait would take the rest of it.
+                .frame(height: verticalSizeClass == .compact ? 52 : 84).padding(.horizontal, 6)
                 .background(.white.opacity(0.07), in: RoundedRectangle(cornerRadius: 10))
                 .accessibilityLabel("Text content")
         }.padding(.horizontal, 16).padding(.bottom, 8)
+            .frame(maxWidth: .infinity)
             .background(AppColors.background)
     }
 
@@ -1205,7 +1401,7 @@ struct EditorView: View {
                 comparePinned = false
                 clipExport = SingleClipExport.isolate(clipID: id, in: model.project)
                 if clipExport == nil {
-                    model.editError = "This clip could not be prepared for export on its own."
+                    model.editError = String(localized: "This clip could not be prepared for export on its own.")
                 }
             }
         }

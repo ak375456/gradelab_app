@@ -32,7 +32,7 @@ extension SequenceComposition {
             }
         }
         let clips = try TimelineEditing.clips(in: project)
-        guard project.timeline.duration > .zero, let cadence = project.canvas.frameDuration else { throw TimelineError.invalid("Add media before playback.") }
+        guard project.timeline.duration > .zero, let cadence = project.canvas.frameDuration else { throw TimelineError.invalid(String(localized: "Add media before playback.")) }
         // The layer compositor has its own Metal context during preview, while
         // export supplies the exporter's context. Load every referenced look
         // into the context that will actually execute the grade before the
@@ -44,7 +44,7 @@ extension SequenceComposition {
         var sources: [UUID: ExportSourceInfo] = [:]
         for asset in project.assets where clips.contains(where: { $0.assetID == asset.id }) {
             if asset.stillImage != nil { continue }
-            guard let metadata = asset.videoMetadata else { throw TimelineError.invalid("Missing video metadata.") }
+            guard let metadata = asset.videoMetadata else { throw TimelineError.invalid(String(localized: "Missing video metadata.")) }
             sources[asset.id] = try await ExportSourceInspector.inspect(.init(url: asset.url, metadata: metadata), requireExportColorTags: forExport || (project.colorMode.isAppleLog && metadata.logProfileIdentifier != nil))
             try Task.checkCancellation()
         }
@@ -58,7 +58,7 @@ extension SequenceComposition {
             if media?.stillImage != nil { continue }
             guard let source = sources[clip.assetID],
                   let video = composition.addMutableTrack(withMediaType: .video, preferredTrackID: kCMPersistentTrackID_Invalid) else {
-                throw TimelineError.invalid("Could not create video layer.")
+                throw TimelineError.invalid(String(localized: "Could not create video layer."))
             }
             // Transition handles are scheduled on the clip's own composition
             // track. The authored clip placement remains non-overlapping; only
@@ -140,7 +140,7 @@ extension SequenceComposition {
                 for original in source.audioTracks {
                     let range = CMTimeRangeGetIntersection(clip.sourceRange.cmTimeRange, otherRange: original.timeRange)
                     guard range.duration > .zero else { continue }
-                    guard let track = composition.addMutableTrack(withMediaType: .audio, preferredTrackID: kCMPersistentTrackID_Invalid) else { throw TimelineError.invalid("Could not create linked audio.") }
+                    guard let track = composition.addMutableTrack(withMediaType: .audio, preferredTrackID: kCMPersistentTrackID_Invalid) else { throw TimelineError.invalid(String(localized: "Could not create linked audio.")) }
                     let offset = CMTimeSubtract(range.start, clip.sourceRange.start.cmTime)
                     let insertedAt = CMTimeAdd(clip.placement.timelineStart.cmTime, offset)
                     try track.insertTimeRange(range, of: original.track, at: insertedAt)
@@ -172,10 +172,10 @@ extension SequenceComposition {
             if independentSources[clip.assetID] == nil {
                 if let existing = sources[clip.assetID] { independentSources[clip.assetID] = existing.audioTracks }
                 else {
-                    guard let media = project.assets.first(where: { $0.id == clip.assetID }) else { throw TimelineError.invalid("Audio source is missing.") }
+                    guard let media = project.assets.first(where: { $0.id == clip.assetID }) else { throw TimelineError.invalid(String(localized: "Audio source is missing.")) }
                     let asset = AVURLAsset(url: media.url)
                     audioAssets.append(asset)
-                    guard try await !asset.load(.hasProtectedContent) else { throw TimelineError.invalid("Protected audio cannot be edited.") }
+                    guard try await !asset.load(.hasProtectedContent) else { throw TimelineError.invalid(String(localized: "Protected audio cannot be edited.")) }
                     var inspected: [ExportAudioTrackInfo] = []
                     let embeddedTracks = try await asset.loadTracks(withMediaType: .audio)
                     let enabledTracks = try await AudioTrackSelection.enabledTracks(from: embeddedTracks)
@@ -187,12 +187,12 @@ extension SequenceComposition {
             }
             let originals = independentSources[clip.assetID] ?? []
             guard !originals.isEmpty, clip.sourceTrackIndex.map({ originals.indices.contains($0) }) ?? true else {
-                throw TimelineError.invalid("The selected source audio track is unavailable.")
+                throw TimelineError.invalid(String(localized: "The selected source audio track is unavailable."))
             }
             for (index, original) in originals.enumerated() where clip.sourceTrackIndex == nil || clip.sourceTrackIndex == index {
                 let range = CMTimeRangeGetIntersection(clip.sourceRange.cmTimeRange, otherRange: original.timeRange)
                 guard range.duration > .zero else { continue }
-                guard let track = composition.addMutableTrack(withMediaType: .audio, preferredTrackID: kCMPersistentTrackID_Invalid) else { throw TimelineError.invalid("Could not create audio track.") }
+                guard let track = composition.addMutableTrack(withMediaType: .audio, preferredTrackID: kCMPersistentTrackID_Invalid) else { throw TimelineError.invalid(String(localized: "Could not create audio track.")) }
                 let offset = CMTimeSubtract(range.start, clip.sourceRange.start.cmTime)
                 try track.insertTimeRange(range, of: original.track, at: CMTimeAdd(clip.placement.timelineStart.cmTime, offset))
                 audio.append(.init(track: track, formatID: original.formatID,
@@ -204,7 +204,7 @@ extension SequenceComposition {
         }
         let state = LayerRenderState(project, context: context)
         if videos.isEmpty {
-            guard let clock = composition.addMutableTrack(withMediaType: .video, preferredTrackID: kCMPersistentTrackID_Invalid) else { throw TimelineError.invalid("Could not create image timeline.") }
+            guard let clock = composition.addMutableTrack(withMediaType: .video, preferredTrackID: kCMPersistentTrackID_Invalid) else { throw TimelineError.invalid(String(localized: "Could not create image timeline.")) }
             clock.insertEmptyTimeRange(CMTimeRange(start: .zero, duration: project.timeline.duration.cmTime))
             videos.append(clock)
         }

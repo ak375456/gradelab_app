@@ -4,6 +4,12 @@ import Foundation
 import SwiftUI
 @preconcurrency import Metal
 
+enum ImageEditorTool: String, CaseIterable, Identifiable {
+    case color
+    case background
+    var id: String { rawValue }
+}
+
 /// The still-image grading workspace.
 ///
 /// It is the second `GradingModel` in the app, not a second grading engine. It
@@ -24,14 +30,17 @@ final class ImageEditorViewModel: ObservableObject, GradingModel {
 
     private let frames = StillFrameProvider()
     private let context: MetalContext
+    private var sourcePreviewBuffer: CVPixelBuffer?
 
     /// True until the full preview-resolution decode has landed.
     @Published private(set) var isPreparing = true
     @Published var editError: String?
-    @Published private(set) var history = GradeHistory()
+    @Published private(set) var history = ImageProjectHistory()
     /// The grade as it was before the current coalesced edit began.
-    private var gradeBaseline: GradeSettings?
+    private var gradeBaseline: ImageProject?
     private var gradeTask: Task<Void, Never>?
+    private var backgroundTask: Task<Void, Never>?
+    private var backgroundAnalysisTask: Task<Void, Never>?
     private var historyLabel = "Color"
     private var decodeTask: Task<Void, Never>?
 
@@ -44,7 +53,7 @@ final class ImageEditorViewModel: ObservableObject, GradingModel {
         get { project.gradeSettings }
         set {
             guard canGrade, project.gradeSettings != newValue else { return }
-            if gradeBaseline == nil { gradeBaseline = project.gradeSettings }
+            if gradeBaseline == nil { gradeBaseline = project }
             project.gradeSettings = newValue
             project.updatedAt = .now
             synchronizeRenderer()
@@ -67,6 +76,15 @@ final class ImageEditorViewModel: ObservableObject, GradingModel {
     @Published var isPickingCurveHue = false
     @Published var showsOriginal = false { didSet { synchronizeRenderer() } }
     @Published var showsExport = false
+    @Published var imageTool: ImageEditorTool = .color
+    @Published var backgroundAnalysisProgress: BackgroundRemovalAnalysisProgress?
+    @Published var backgroundAnalysisMessage: String?
+    @Published var isDrawingBackgroundLasso = false
+    @Published var isPickingBackgroundColor = false
+    @Published var backgroundBrush: BackgroundRemovalBrush?
+    @Published var backgroundBrushSize = 0.04
+    @Published var backgroundBrushSoftness = 0.65
+    @Published var showsBackgroundMatte = false { didSet { refreshBackgroundPreview() } }
 
     var visibleParameters: [GradeParameter] {
         selectedPanel == .light ? GradeParameter.light : GradeParameter.color
@@ -148,6 +166,8 @@ final class ImageEditorViewModel: ObservableObject, GradingModel {
 
     deinit {
         gradeTask?.cancel()
+        backgroundTask?.cancel()
+        backgroundAnalysisTask?.cancel()
         decodeTask?.cancel()
         previewTask?.cancel()
     }
@@ -166,12 +186,14 @@ final class ImageEditorViewModel: ObservableObject, GradingModel {
             do {
                 let quick = try await ImageDecoder.decodeDetached(url: url, maximumLongEdge: 640)
                 guard !Task.isCancelled, let model = self else { return }
-                model.frames.replace(quick.buffer)
+                model.sourcePreviewBuffer = quick.buffer
+                model.refreshBackgroundPreview()
                 model.renderer.invalidate()
 
                 let full = try await ImageDecoder.decodeDetached(url: url, maximumLongEdge: longEdge)
                 guard !Task.isCancelled else { return }
-                model.frames.replace(full.buffer)
+                model.sourcePreviewBuffer = full.buffer
+                model.refreshBackgroundPreview()
                 model.renderer.invalidate()
                 model.isPreparing = false
                 model.refreshLookPreviews(force: true)
@@ -189,17 +211,215 @@ final class ImageEditorViewModel: ObservableObject, GradingModel {
         renderer.update(settings: settings, bypass: showsOriginal || !canGrade)
     }
 
-    func setOriginalVisible(_ visible: Bool) { showsOriginal = visible }
+    var selectedBackgroundRemoval: BackgroundRemovalSettings? {
+        guard let settings = project.backgroundRemoval?.clamped, settings.isEnabled else { return nil }
+        return settings
+    }
+
+    func backgroundRemovalBinding<T>(_ keyPath: WritableKeyPath<BackgroundRemovalSettings, T>) -> Binding<T> {
+        Binding(get: { [weak self] in
+            (self?.selectedBackgroundRemoval ?? .automatic)[keyPath: keyPath]
+        }, set: { [weak self] value in
+            self?.changeBackground { settings in
+                settings[keyPath: keyPath] = value; settings.isEnabled = true
+            }
+        })
+    }
+
+    func startAutomaticBackgroundRemoval() {
+        changeBackground("Auto Background Removal", immediate: true) {
+            $0.beginAnalysis(mode: .automatic)
+        }
+        runBackgroundAnalysis()
+    }
+
+    func armBackgroundLasso() {
+        backgroundAnalysisTask?.cancel(); backgroundAnalysisTask = nil
+        backgroundAnalysisProgress = nil
+        backgroundBrush = nil; isPickingBackgroundColor = false; isDrawingBackgroundLasso = true
+        backgroundAnalysisMessage = String(localized: "Draw a closed outline around the object you want to keep.")
+    }
+
+    /// Adopts a freshly drawn outline. A still needs no analysis pass at all:
+    /// the cutout is on screen as soon as the preview redraws.
+    func commitBackgroundLasso(_ points: [MaskPoint]) {
+        guard isDrawingBackgroundLasso else { return }
+        isDrawingBackgroundLasso = false
+        let authored = BackgroundLassoSelection.authored(points)
+        guard authored.count >= 3 else {
+            backgroundAnalysisMessage = String(localized: "That outline was too small. Draw all the way around the object.")
+            return
+        }
+        changeBackground("Lasso Selection", immediate: true) { $0.adopt(.init(points: authored)) }
+        backgroundAnalysisMessage = String(localized: "Everything outside the outline is removed. Turn on Invert to cut out the object instead.")
+    }
+
+    func clearBackgroundLasso() {
+        changeBackground("Clear Lasso", immediate: true) { $0.lasso = nil }
+        armBackgroundLasso()
+    }
+
+    func useColorBackgroundRemoval() {
+        backgroundAnalysisTask?.cancel(); backgroundAnalysisProgress = nil
+        changeBackground("Color Background Removal", immediate: true) {
+            $0.mode = .colorKey; $0.isEnabled = true
+        }
+    }
+
+    func armBackgroundColorPicker() {
+        useColorBackgroundRemoval(); backgroundBrush = nil; isDrawingBackgroundLasso = false
+        isPickingBackgroundColor = true
+        backgroundAnalysisMessage = String(localized: "Tap the background color to remove.")
+    }
+
+    func pickBackgroundColor(at point: CGPoint) {
+        guard isPickingBackgroundColor, let sourcePreviewBuffer,
+              let color = Self.sample(sourcePreviewBuffer, at: point) else { return }
+        isPickingBackgroundColor = false
+        changeBackground("Pick Background Color", immediate: true) {
+            $0.mode = .colorKey; $0.isEnabled = true
+            $0.colorKey.color = .init(red: color.x, green: color.y, blue: color.z)
+        }
+        backgroundAnalysisMessage = nil
+    }
+
+    func addBackgroundStroke(_ points: [MaskPoint]) {
+        guard let kind = backgroundBrush, !points.isEmpty else { return }
+        changeBackground(kind == .add ? "Add Cutout Detail" : "Remove Cutout Detail", immediate: true) {
+            $0.strokes.append(.init(kind: kind, points: points,
+                radius: self.backgroundBrushSize, softness: self.backgroundBrushSoftness))
+        }
+    }
+
+    func resetBackgroundRefinement() {
+        changeBackground("Reset Background Refinement", immediate: true) { $0.resetRefinement() }
+    }
+
+    func removeBackgroundRemoval() {
+        flushBackgroundHistory(); backgroundAnalysisTask?.cancel()
+        let before = project
+        project.backgroundRemoval = nil; project.updatedAt = .now
+        history.record("Remove Background Removal", before: before, after: project)
+        backgroundAnalysisProgress = nil; backgroundAnalysisMessage = nil
+        backgroundBrush = nil; isDrawingBackgroundLasso = false; isPickingBackgroundColor = false
+        refreshBackgroundPreview()
+    }
+
+    func cancelBackgroundAnalysis() {
+        backgroundAnalysisTask?.cancel(); backgroundAnalysisTask = nil
+        backgroundAnalysisProgress = nil
+        backgroundAnalysisMessage = String(localized: "Analysis canceled.")
+    }
+
+    func refreshBackgroundPreview() {
+        guard let source = sourcePreviewBuffer else { return }
+        if showsOriginal {
+            frames.replace(source); renderer.invalidate(); return
+        }
+        guard let settings = selectedBackgroundRemoval else {
+            frames.replace(source); renderer.invalidate(); return
+        }
+        let matte = ImageBackgroundMatteBuilder.make(projectID: project.id, itemID: project.id,
+                                                      source: source, settings: settings)
+        let displayed: CVPixelBuffer?
+        if showsBackgroundMatte {
+            displayed = ImageBackgroundMatteBuilder.mattePreview(matte,
+                width: CVPixelBufferGetWidth(source), height: CVPixelBufferGetHeight(source))
+        } else {
+            displayed = ImageBackgroundMatteBuilder.applying(matte, to: source, settings: settings)
+        }
+        frames.replace(displayed ?? source); renderer.invalidate()
+    }
+
+    private func changeBackground(_ label: String = "Remove Background", immediate: Bool = false,
+                                  _ edit: (inout BackgroundRemovalSettings) -> Void) {
+        flushGradeHistory()
+        let before = project
+        var settings = project.backgroundRemoval ?? .automatic
+        edit(&settings)
+        settings = settings.clamped
+        guard settings != project.backgroundRemoval else { return }
+        if _backgroundBaseline == nil { _backgroundBaseline = before; backgroundHistoryLabel = label }
+        project.backgroundRemoval = settings; project.updatedAt = .now
+        refreshBackgroundPreview()
+        backgroundTask?.cancel()
+        if immediate { flushBackgroundHistory(); return }
+        backgroundTask = Task { [weak self] in
+            do { try await Task.sleep(for: .milliseconds(650)) } catch { return }
+            self?.flushBackgroundHistory()
+        }
+    }
+
+    private var _backgroundBaseline: ImageProject?
+    private var backgroundHistoryLabel = "Remove Background"
+
+    private func flushBackgroundHistory() {
+        backgroundTask?.cancel(); backgroundTask = nil
+        if let before = _backgroundBaseline {
+            history.record(backgroundHistoryLabel, before: before, after: project)
+        }
+        _backgroundBaseline = nil; backgroundHistoryLabel = "Remove Background"
+    }
+
+    private func runBackgroundAnalysis() {
+        backgroundAnalysisTask?.cancel()
+        guard let settings = selectedBackgroundRemoval else { return }
+        let duration = (try? TimelineTime.seconds(1)) ?? .zero
+        let trackID = UUID()
+        let clip = VideoClip(placement: .init(id: project.id, trackID: trackID,
+            timelineStart: .zero, duration: duration), assetID: project.asset.id,
+            sourceRange: .init(start: .zero, duration: duration), backgroundRemoval: settings)
+        let asset = ProjectMediaAsset(id: project.asset.id, url: project.sourceURL,
+            sourceRange: .init(start: .zero, duration: duration),
+            stillImage: .init(width: project.metadata.pixelWidth, height: project.metadata.pixelHeight))
+        let request = BackgroundRemovalAnalysisRequest(projectID: project.id, clip: clip,
+                                                       asset: asset, settings: settings)
+        backgroundAnalysisProgress = .init(fraction: 0, frames: 0, preparing: true)
+        backgroundAnalysisMessage = nil
+        backgroundAnalysisTask = Task { [weak self] in
+            do {
+                let summary = try await BackgroundRemovalAnalyzer.analyze(request) { update in
+                    Task { @MainActor [weak self] in self?.backgroundAnalysisProgress = update }
+                }
+                guard !Task.isCancelled else { return }
+                self?.backgroundAnalysisProgress = nil
+                self?.backgroundAnalysisMessage = summary.frames > 0
+                    ? String(localized: "Background ready")
+                    : String(localized: "No clear subject was found. Try the Lasso tool instead.")
+                self?.refreshBackgroundPreview()
+            } catch is CancellationError { return }
+            catch {
+                self?.backgroundAnalysisProgress = nil
+                self?.backgroundAnalysisMessage = error.localizedDescription
+            }
+        }
+    }
+
+    private nonisolated static func sample(_ buffer: CVPixelBuffer, at point: CGPoint) -> SIMD3<Double>? {
+        guard CVPixelBufferGetPixelFormatType(buffer) == kCVPixelFormatType_32BGRA else { return nil }
+        CVPixelBufferLockBaseAddress(buffer, .readOnly)
+        defer { CVPixelBufferUnlockBaseAddress(buffer, .readOnly) }
+        guard let pixels = CVPixelBufferGetBaseAddress(buffer)?.assumingMemoryBound(to: UInt8.self) else { return nil }
+        let x = min(max(Int(point.x * CGFloat(CVPixelBufferGetWidth(buffer))), 0), CVPixelBufferGetWidth(buffer)-1)
+        let y = min(max(Int(point.y * CGFloat(CVPixelBufferGetHeight(buffer))), 0), CVPixelBufferGetHeight(buffer)-1)
+        let offset = y * CVPixelBufferGetBytesPerRow(buffer) + x * 4
+        return SIMD3(Double(pixels[offset+2])/255, Double(pixels[offset+1])/255, Double(pixels[offset])/255)
+    }
+
+    func setOriginalVisible(_ visible: Bool) {
+        showsOriginal = visible
+        refreshBackgroundPreview()
+    }
 
     // MARK: - History
 
-    var canUndo: Bool { gradeBaseline != nil || !history.undoEntries.isEmpty }
-    var canRedo: Bool { gradeBaseline == nil && !history.redoEntries.isEmpty }
+    var canUndo: Bool { gradeBaseline != nil || _backgroundBaseline != nil || !history.undoEntries.isEmpty }
+    var canRedo: Bool { gradeBaseline == nil && _backgroundBaseline == nil && !history.redoEntries.isEmpty }
 
     func flushGradeHistory() {
         gradeTask?.cancel(); gradeTask = nil
         if let before = gradeBaseline {
-            history.record(historyLabel, before: before, after: project.gradeSettings)
+            history.record(historyLabel, before: before, after: project)
         }
         gradeBaseline = nil
         historyLabel = "Color"
@@ -207,19 +427,23 @@ final class ImageEditorViewModel: ObservableObject, GradingModel {
 
     func undo() {
         flushGradeHistory()
-        guard let grade = history.undo() else { return }
-        project.gradeSettings = grade
+        flushBackgroundHistory()
+        guard let restored = history.undo() else { return }
+        project = restored
         project.updatedAt = .now
-        prepareLook(in: grade)
+        prepareLook(in: project.gradeSettings)
+        refreshBackgroundPreview()
         synchronizeRenderer()
     }
 
     func redo() {
         flushGradeHistory()
-        guard let grade = history.redo() else { return }
-        project.gradeSettings = grade
+        flushBackgroundHistory()
+        guard let restored = history.redo() else { return }
+        project = restored
         project.updatedAt = .now
-        prepareLook(in: grade)
+        prepareLook(in: project.gradeSettings)
+        refreshBackgroundPreview()
         synchronizeRenderer()
     }
 
@@ -310,7 +534,7 @@ final class ImageEditorViewModel: ObservableObject, GradingModel {
 
     func beginCurveEdit(_ label: String = "Curves") {
         gradeTask?.cancel(); gradeTask = nil
-        if gradeBaseline == nil { gradeBaseline = project.gradeSettings }
+        if gradeBaseline == nil { gradeBaseline = project }
         historyLabel = label
     }
 
@@ -511,21 +735,31 @@ final class ImageEditorViewModel: ObservableObject, GradingModel {
         guard canCopyGrade else { return }
         gradeClipboard.copy(settings, from: project.displayName)
         CurveHaptics.add()
-        showStatus("Grade copied")
+        showStatus(String(localized: "Grade copied"))
     }
 
-    func pasteGrade() {
+    /// `.replace` swaps the whole grading state for the copied one; `.addOnTop`
+    /// keeps what is on the picture and lays the copied grade over it. The user
+    /// chooses, through the same question the video editor asks.
+    func pasteGrade(_ mode: GradePasteMode) {
         guard canPasteGrade, let grade = gradeClipboard.grade else { return }
-        replaceGrade(with: grade, label: "Paste Grade", subject: "The copied grade")
+        switch mode {
+        case .replace:
+            replaceGrade(with: grade, label: "Paste Grade", subject: "The copied grade")
+            showStatus(String(localized: "Grade pasted"))
+        case .addOnTop:
+            replaceGrade(with: grade.stacked(onto: settings),
+                         label: "Add Grade", subject: "The copied grade")
+            showStatus(String(localized: "Grade added"))
+        }
         CurveHaptics.add()
-        showStatus("Grade pasted")
     }
 
     func resetGrade() {
         guard canResetGrade else { return }
         guard replaceGrade(with: .neutral, label: "Reset Grade", subject: "This grade") else { return }
         CurveHaptics.reset()
-        showStatus("Grade reset")
+        showStatus(String(localized: "Grade reset"))
     }
 
     /// The one path that swaps the whole grading state, matching the video
@@ -541,11 +775,11 @@ final class ImageEditorViewModel: ObservableObject, GradingModel {
                 renderer.prepareLook(identifier)
             } else {
                 applied = applied.withoutLook
-                editError = """
+                editError = String(localized: """
                     \(subject) uses a LUT that is no longer available.
 
                     Everything else has been applied. No other look was substituted.
-                    """
+                    """)
             }
         }
         guard applied != settings else { return false }

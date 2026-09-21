@@ -4,6 +4,8 @@ import Foundation
 import SwiftUI
 import PhotosUI
 import CoreMedia
+import CoreGraphics
+import ImageIO
 @preconcurrency import Metal
 
 @MainActor
@@ -31,6 +33,11 @@ final class EditorViewModel: ObservableObject, GradingModel {
     private var speedTask: Task<Void, Never>?
     private var transitionDurationBaseline: VideoProject?
     private var sequenceTask: Task<Void, Never>?
+    private var backgroundAnalysisTask: Task<Void, Never>?
+    private var backgroundTrackTask: Task<Void, Never>?
+    private var backgroundPreviewSeekInFlight = false
+    private var pendingBackgroundPreviewTime: TimelineTime?
+    private var backgroundPreviewAnalysisID: UUID?
     private var layerState: LayerRenderState?
     private var audioRouting = TimelineAudioMix()
     private var forceLayerPreview = false
@@ -93,11 +100,34 @@ final class EditorViewModel: ObservableObject, GradingModel {
     /// Show Mask. The preview draws this mask as a matte instead of a picture.
     /// Editor state only — the export paths cannot reach it.
     @Published var maskMatteID: UUID? { didSet { synchronizeRenderer() } }
+    /// The layer whose track matte the preview is showing as a picture, or nil
+    /// for the ordinary composition. Editor-only: it reaches the compositor
+    /// through `LayerRenderState`, which export builds for itself and never
+    /// sets.
+    ///
+    /// The TARGET, because the mode belongs to the target: the same source cuts
+    /// one layer and its inverse cuts another, and the view shows what actually
+    /// survives rather than the raw source alpha.
+    @Published var inspectedMatteTargetID: UUID? { didSet { synchronizeRenderer() } }
     /// Tints mask coverage over the picture while a window is being placed.
     /// A guide drawn by the editor; never composited into a frame.
     @Published var showsMaskOverlay = false
     /// True while a freehand mask is being tapped or drawn on the preview.
     @Published var isDrawingMask = false
+    @Published var backgroundAnalysisProgress: BackgroundRemovalAnalysisProgress?
+    @Published var backgroundAnalysisMessage: String?
+    /// Where lasso tracking lost the object, in clip-local time. Nil covers
+    /// both "never tracked" and "tracked the whole clip".
+    @Published private(set) var backgroundTrackLostTime: TimelineTime?
+    @Published var backgroundTrackProgress: MaskTrackingProgress?
+    @Published var backgroundTrackDirection: MaskTrackingDirection = .both
+    @Published var isDrawingBackgroundLasso = false
+    @Published var isPickingBackgroundColor = false
+    @Published var backgroundBrush: BackgroundRemovalBrush?
+    @Published var backgroundBrushSize = 0.04
+    @Published var backgroundBrushSoftness = 0.65
+    @Published var showsBackgroundMatte = false { didSet { synchronizeRenderer() } }
+    @Published var showsRemovedOverlay = false
     @Published var maskTrackingSession: MaskTrackingSession?
     @Published var pendingMaskTracking: MaskTrackingPlan?
     @Published var maskTrackingNotice: MaskTrackingNotice?
@@ -210,6 +240,8 @@ final class EditorViewModel: ObservableObject, GradingModel {
 
     deinit {
         maskTrackingWorker?.cancel()
+        backgroundAnalysisTask?.cancel()
+        backgroundTrackTask?.cancel()
         sequenceTask?.cancel()
         gradeTask?.cancel()
         previewTask?.cancel()
@@ -226,8 +258,31 @@ final class EditorViewModel: ObservableObject, GradingModel {
             guard let i = project.timeline.tracks.firstIndex(where: { $0.id == id }) else { return self.selectedClipID }
             if lock { project.timeline.tracks[i].isLocked.toggle() }
             else {
-                guard !project.timeline.tracks[i].isLocked else { throw TimelineError.invalid("Unlock this track before changing visibility.") }
+                guard !project.timeline.tracks[i].isLocked else { throw TimelineError.invalid(String(localized: "Unlock this track before changing visibility.")) }
                 project.timeline.tracks[i].isEnabled.toggle()
+            }
+            return self.selectedClipID
+        }
+    }
+    func toggleTrackMute(_ id: UUID) {
+        commit("Track mute") { project in
+            guard let index = project.timeline.tracks.firstIndex(where: { $0.id == id }) else {
+                return self.selectedClipID
+            }
+            guard !project.timeline.tracks[index].isLocked else {
+                throw TimelineError.invalid(String(localized: "Unlock this track before changing its sound."))
+            }
+            let mute = !project.timeline.tracks[index].isAudioMuted
+            for itemIndex in project.timeline.tracks[index].items.indices {
+                switch project.timeline.tracks[index].items[itemIndex] {
+                case .audio(var clip):
+                    clip.isMuted = mute
+                    project.timeline.tracks[index].items[itemIndex] = .audio(clip)
+                case .video(var clip):
+                    clip.embeddedAudio?.isMuted = mute
+                    project.timeline.tracks[index].items[itemIndex] = .video(clip)
+                case .text, .shape: break
+                }
             }
             return self.selectedClipID
         }
@@ -235,7 +290,7 @@ final class EditorViewModel: ObservableObject, GradingModel {
     func reorderTrack(_ id: UUID, direction: Int) {
         commit("Layer order") { project in
             guard let i = project.timeline.tracks.firstIndex(where: { $0.id == id }), project.timeline.tracks.indices.contains(i+direction) else { return self.selectedClipID }
-            guard !project.timeline.tracks[i].isLocked, !project.timeline.tracks[i+direction].isLocked else { throw TimelineError.invalid("Unlock both tracks before reordering.") }
+            guard !project.timeline.tracks[i].isLocked, !project.timeline.tracks[i+direction].isLocked else { throw TimelineError.invalid(String(localized: "Unlock both tracks before reordering.")) }
             project.timeline.tracks.swapAt(i, i+direction)
             return self.selectedClipID
         }
@@ -244,7 +299,7 @@ final class EditorViewModel: ObservableObject, GradingModel {
         commit("Layer order") { project in
             guard let origin = project.timeline.tracks.firstIndex(where: { $0.id == id }),
                   project.timeline.tracks.indices.contains(target) else { return self.selectedClipID }
-            guard project.timeline.tracks[min(origin, target)...max(origin, target)].allSatisfy({ !$0.isLocked }) else { throw TimelineError.invalid("Unlock the affected layers before reordering.") }
+            guard project.timeline.tracks[min(origin, target)...max(origin, target)].allSatisfy({ !$0.isLocked }) else { throw TimelineError.invalid(String(localized: "Unlock the affected layers before reordering.")) }
             let track = project.timeline.tracks.remove(at: origin)
             project.timeline.tracks.insert(track, at: target)
             return self.selectedClipID
@@ -277,7 +332,7 @@ final class EditorViewModel: ObservableObject, GradingModel {
             try Task.checkCancellation()
             commit(overlay ? "Add overlay" : "Add video") { project in
                 let main = project.timeline.tracks.firstIndex { $0.kind == .mainVideo }
-                guard overlay || main.map({ !project.timeline.tracks[$0].isLocked }) == true else { throw TimelineError.invalid("Unlock the main track before adding media.") }
+                guard overlay || main.map({ !project.timeline.tracks[$0].isLocked }) == true else { throw TimelineError.invalid(String(localized: "Unlock the main track before adding media.")) }
                 let range = try asset.sourceRange ?? .init(start: .zero, duration: .seconds(asset.metadata.durationSeconds))
                 let media = ProjectMediaAsset(id: UUID(), url: asset.url, sourceRange: range, videoMetadata: asset.metadata, frameDuration: asset.frameDuration)
                 project.addAsset(media)
@@ -354,6 +409,359 @@ final class EditorViewModel: ObservableObject, GradingModel {
         if layerState == nil { rebuildSequence() }
     }
 
+    /// Track matte only exists in the compositor, so opening the tool forces the
+    /// composited preview exactly as the Transform and Mask tools do.
+    func beginTrackMatteEditing() {
+        flushGradeHistory(); forceLayerPreview = true
+        if layerState == nil { rebuildSequence() }
+    }
+
+    func beginBackgroundRemovalEditing() {
+        flushGradeHistory(); forceLayerPreview = true
+        if layerState == nil { rebuildSequence() }
+    }
+
+    var selectedBackgroundRemoval: BackgroundRemovalSettings? {
+        selectedClip?.backgroundRemoval?.clamped
+    }
+
+    func backgroundRemovalBinding<T>(_ keyPath: WritableKeyPath<BackgroundRemovalSettings, T>) -> Binding<T> {
+        Binding(
+            get: { [weak self] in
+                (self?.selectedBackgroundRemoval ?? .automatic)[keyPath: keyPath]
+            },
+            set: { [weak self] value in
+                self?.changeVisual("Remove Background") { clip in
+                    var settings = clip.backgroundRemoval ?? .automatic
+                    settings[keyPath: keyPath] = value
+                    settings.isEnabled = true
+                    clip.backgroundRemoval = settings.clamped
+                }
+            })
+    }
+
+    func startAutomaticBackgroundRemoval() {
+        changeVisual("Auto Background Removal", immediate: true) { clip in
+            var settings = clip.backgroundRemoval ?? .automatic
+            settings.beginAnalysis(mode: .automatic)
+            clip.backgroundRemoval = settings
+        }
+        runBackgroundAnalysis()
+    }
+
+    func armBackgroundLasso() {
+        backgroundAnalysisTask?.cancel(); backgroundAnalysisTask = nil
+        backgroundAnalysisProgress = nil
+        backgroundBrush = nil
+        isPickingBackgroundColor = false
+        isDrawingBackgroundLasso = true
+        backgroundAnalysisMessage = String(localized: "Draw a closed outline around the object you want to keep.")
+    }
+
+    /// Adopts a freshly drawn outline. There is no analysis pass behind this:
+    /// the cutout is on screen by the next rendered frame, and Track Object is
+    /// then a separate, explicit step.
+    func commitBackgroundLasso(_ points: [MaskPoint]) {
+        guard isDrawingBackgroundLasso else { return }
+        isDrawingBackgroundLasso = false
+        let authored = BackgroundLassoSelection.authored(points)
+        guard authored.count >= 3 else {
+            backgroundAnalysisMessage = String(localized: "That outline was too small. Draw all the way around the object.")
+            return
+        }
+        let clip = selectedClip
+        let sourceTime = clip.flatMap { try? $0.sourceTime(at: playheadTime) }
+        let localTime = clip?.localTime(for: playheadTime)
+        backgroundTrackLostTime = nil
+        changeVisual("Lasso Selection", immediate: true) { clip in
+            var settings = clip.backgroundRemoval ?? .automatic
+            settings.adopt(.init(points: authored, sourceTime: sourceTime, localTime: localTime))
+            clip.backgroundRemoval = settings
+        }
+        backgroundAnalysisMessage = String(localized: "Outline applied to this frame. Use Track Object to follow it through the clip.")
+    }
+
+    func clearBackgroundLasso() {
+        backgroundTrackTask?.cancel(); backgroundTrackTask = nil
+        backgroundTrackProgress = nil
+        backgroundTrackLostTime = nil
+        changeVisual("Clear Lasso", immediate: true) { $0.backgroundRemoval?.lasso = nil }
+        armBackgroundLasso()
+    }
+
+    // MARK: - Lasso tracking
+
+    var canTrackBackgroundLasso: Bool {
+        guard let clip = selectedClip, let settings = clip.resolvedBackgroundRemoval,
+              settings.mode == .lasso, settings.lasso?.isDrawn == true,
+              let asset = project.assets.first(where: { $0.id == clip.assetID }) else { return false }
+        return asset.stillImage == nil
+    }
+
+    /// Follows the outlined object through the clip and stores where it sits
+    /// on each frame. Only the motion is written to the document; the outline
+    /// the user drew is never rewritten by the tracker.
+    func trackBackgroundLasso() {
+        guard let clip = selectedClip, let settings = clip.resolvedBackgroundRemoval,
+              settings.mode == .lasso, let lasso = settings.lasso, lasso.isDrawn,
+              let asset = project.assets.first(where: { $0.id == clip.assetID }),
+              asset.stillImage == nil else {
+            backgroundAnalysisMessage = String(localized: "Draw a lasso around the object before tracking it.")
+            return
+        }
+        backgroundTrackTask?.cancel()
+        isDrawingBackgroundLasso = false
+        backgroundBrush = nil
+        let request = BackgroundLassoTrackRequest(url: asset.url, clip: clip, selection: lasso,
+                                                  direction: backgroundTrackDirection)
+        backgroundAnalysisMessage = nil
+        backgroundTrackLostTime = nil
+        backgroundTrackProgress = .init(fraction: 0, frames: 0,
+                                        direction: backgroundTrackDirection, preparing: true)
+        playback.pause()
+        backgroundTrackTask = Task { [weak self] in
+            let result = await BackgroundLassoTracker.track(request) { update in
+                Task { @MainActor [weak self] in
+                    guard let self, self.selectedClipID == request.clip.id else { return }
+                    self.backgroundTrackProgress = update
+                }
+            }
+            guard let self, !Task.isCancelled, self.selectedClipID == request.clip.id else { return }
+            self.backgroundTrackProgress = nil
+            if let message = result.message, result.samples.count < 2 {
+                self.backgroundAnalysisMessage = message
+                return
+            }
+            guard result.samples.count > 1 else {
+                self.backgroundAnalysisMessage = String(localized: "Tracking did not measure any movement. The outline still applies to the whole clip.")
+                return
+            }
+            self.changeVisual("Track Lasso", immediate: true) { clip in
+                clip.backgroundRemoval?.lasso?.motion = result.samples
+            }
+            self.backgroundTrackLostTime = result.lostLocalTime
+            if let lost = result.lostLocalTime {
+                self.backgroundAnalysisMessage = String(
+                    localized: "Tracked \(result.frames) frames. The object was lost at \(TimecodeFormatter.string(from: lost.seconds, alwaysShowHours: true)); the outline holds its last position after that.")
+            } else if let message = result.message {
+                self.backgroundAnalysisMessage = message
+            } else {
+                self.backgroundAnalysisMessage = String(localized: "Tracked \(result.frames) frames. The cutout now follows the object.")
+            }
+        }
+    }
+
+    func cancelBackgroundLassoTracking() {
+        backgroundTrackTask?.cancel(); backgroundTrackTask = nil
+        backgroundTrackProgress = nil
+        backgroundAnalysisMessage = String(localized: "Tracking canceled. The outline still applies to this frame.")
+    }
+
+    func clearBackgroundLassoTracking() {
+        backgroundTrackTask?.cancel(); backgroundTrackTask = nil
+        backgroundTrackProgress = nil
+        backgroundTrackLostTime = nil
+        guard selectedBackgroundRemoval?.lasso?.isTracked == true else {
+            backgroundAnalysisMessage = String(localized: "This outline has not been tracked.")
+            return
+        }
+        changeVisual("Clear Lasso Tracking", immediate: true) {
+            $0.backgroundRemoval?.lasso?.motion = []
+        }
+        backgroundAnalysisMessage = String(localized: "Tracking cleared. The outline stays where you drew it.")
+    }
+
+    func useColorBackgroundRemoval() {
+        backgroundAnalysisTask?.cancel()
+        backgroundAnalysisProgress = nil
+        changeVisual("Color Background Removal", immediate: true) { clip in
+            var settings = clip.backgroundRemoval ?? .automatic
+            settings.mode = .colorKey; settings.isEnabled = true
+            clip.backgroundRemoval = settings
+        }
+    }
+
+    func armBackgroundColorPicker() {
+        useColorBackgroundRemoval()
+        backgroundBrush = nil
+        isDrawingBackgroundLasso = false
+        isPickingBackgroundColor = true
+        backgroundAnalysisMessage = String(localized: "Tap the background color to remove.")
+    }
+
+    func pickBackgroundColor(atSourcePoint point: CGPoint) {
+        guard isPickingBackgroundColor, let clip = selectedClip,
+              let asset = project.assets.first(where: { $0.id == clip.assetID }) else { return }
+        isPickingBackgroundColor = false
+        let sourceTime = (try? clip.sourceTime(at: playheadTime)) ?? clip.sourceRange.start
+        Task { [weak self] in
+            do {
+                let color = try await Self.sourceColor(asset: asset, time: sourceTime, point: point)
+                guard let self else { return }
+                self.changeVisual("Pick Background Color", immediate: true) { edited in
+                    var settings = edited.backgroundRemoval ?? .automatic
+                    settings.mode = .colorKey; settings.isEnabled = true
+                    settings.colorKey.color = .init(red: color.x, green: color.y, blue: color.z)
+                    edited.backgroundRemoval = settings
+                }
+                self.backgroundAnalysisMessage = nil
+            } catch {
+                self?.editError = String(localized: "That color could not be sampled. Try another point.")
+            }
+        }
+    }
+
+    func addBackgroundStroke(_ points: [MaskPoint]) {
+        guard let kind = backgroundBrush, !points.isEmpty else { return }
+        let local = selectedClip?.localTime(for: playheadTime)
+        changeVisual(kind == .add ? "Add Cutout Detail" : "Remove Cutout Detail", immediate: true) { clip in
+            var settings = clip.backgroundRemoval ?? .automatic
+            settings.isEnabled = true
+            settings.strokes.append(.init(kind: kind, points: points,
+                radius: self.backgroundBrushSize, softness: self.backgroundBrushSoftness,
+                localTime: local))
+            clip.backgroundRemoval = settings.clamped
+        }
+    }
+
+    func resetBackgroundRefinement() {
+        guard selectedBackgroundRemoval?.strokes.isEmpty == false else {
+            backgroundAnalysisMessage = String(localized: "There are no refinement strokes to reset.")
+            return
+        }
+        changeVisual("Reset Background Refinement", immediate: true) { clip in
+            clip.backgroundRemoval?.resetRefinement()
+        }
+        backgroundAnalysisMessage = String(localized: "All Add and Remove strokes were reset.")
+    }
+
+    func removeBackgroundRemoval() {
+        backgroundAnalysisTask?.cancel()
+        backgroundTrackTask?.cancel(); backgroundTrackProgress = nil; backgroundTrackLostTime = nil
+        backgroundAnalysisProgress = nil; backgroundAnalysisMessage = nil
+        isDrawingBackgroundLasso = false; isPickingBackgroundColor = false; backgroundBrush = nil
+        changeVisual("Remove Background Removal", immediate: true) { $0.backgroundRemoval = nil }
+    }
+
+    func cancelBackgroundAnalysis() {
+        backgroundAnalysisTask?.cancel(); backgroundAnalysisTask = nil
+        backgroundPreviewAnalysisID = nil; pendingBackgroundPreviewTime = nil
+        backgroundAnalysisProgress = nil
+        backgroundAnalysisMessage = String(localized: "Analysis canceled. Already analyzed frames remain available.")
+    }
+
+    private func runBackgroundAnalysis() {
+        backgroundAnalysisTask?.cancel()
+        guard let clip = selectedClip, let settings = clip.resolvedBackgroundRemoval,
+              let asset = project.assets.first(where: { $0.id == clip.assetID }) else { return }
+        let request = BackgroundRemovalAnalysisRequest(projectID: project.id, clip: clip,
+                                                       asset: asset, settings: settings)
+        backgroundAnalysisMessage = nil
+        backgroundAnalysisProgress = .init(fraction: 0, frames: 0, preparing: true)
+        backgroundPreviewAnalysisID = settings.analysisID
+        pendingBackgroundPreviewTime = nil
+        backgroundPreviewSeekInFlight = false
+        playback.pause()
+        backgroundAnalysisTask = Task { [weak self] in
+            do {
+                let summary = try await BackgroundRemovalAnalyzer.analyze(request) { update in
+                    Task { @MainActor [weak self] in
+                        guard let self, self.selectedClipID == request.clip.id else { return }
+                        self.backgroundAnalysisProgress = update
+                        if let sourceTime = update.currentSourceTime {
+                            self.queueBackgroundAnalysisPreview(sourceTime, clip: request.clip,
+                                                                analysisID: request.settings.analysisID)
+                        }
+                    }
+                }
+                guard !Task.isCancelled else { return }
+                self?.backgroundAnalysisProgress = nil
+                self?.backgroundAnalysisMessage = String(localized: "Background ready across \(summary.frames) frames.")
+            } catch is CancellationError {
+                return
+            } catch {
+                self?.backgroundAnalysisProgress = nil
+                self?.backgroundAnalysisMessage = error.localizedDescription
+            }
+        }
+    }
+
+    private func queueBackgroundAnalysisPreview(_ sourceTime: TimelineTime, clip: VideoClip,
+                                                analysisID: UUID) {
+        guard backgroundPreviewAnalysisID == analysisID else { return }
+        pendingBackgroundPreviewTime = sourceTime
+        guard !backgroundPreviewSeekInFlight else { return }
+        presentNextBackgroundAnalysisPreview(clip: clip, analysisID: analysisID)
+    }
+
+    private func presentNextBackgroundAnalysisPreview(clip: VideoClip, analysisID: UUID) {
+        guard backgroundPreviewAnalysisID == analysisID,
+              let sourceTime = pendingBackgroundPreviewTime else {
+            backgroundPreviewSeekInFlight = false
+            return
+        }
+        pendingBackgroundPreviewTime = nil
+        do {
+            let sourceOffset = try sourceTime.subtracting(clip.sourceRange.start)
+            let timelineOffset = try TimelineTime(CMTimeMultiplyByFloat64(
+                sourceOffset.cmTime, multiplier: 1 / clip.speed))
+            let unclamped = try clip.placement.timelineStart.adding(timelineOffset)
+            let target = min(unclamped, try clip.placement.range.end)
+            backgroundPreviewSeekInFlight = true
+            playback.seekPrecisely(to: target.cmTime) { [weak self] in
+                guard let self, self.backgroundPreviewAnalysisID == analysisID else { return }
+                self.backgroundPreviewSeekInFlight = false
+                self.presentNextBackgroundAnalysisPreview(clip: clip, analysisID: analysisID)
+            }
+        } catch {
+            backgroundPreviewSeekInFlight = false
+        }
+    }
+
+    /// Parks the playhead on the frame where tracking lost the object, so the
+    /// fix is to redraw there rather than to start the whole clip again.
+    func goToBackgroundTrackLostFrame() {
+        guard let local = backgroundTrackLostTime, let clip = selectedClip else { return }
+        do {
+            let visibleStart = clip.animation?.startOffset ?? .zero
+            let offset = try local.subtracting(visibleStart)
+            let target = min(try clip.placement.range.end,
+                             try clip.placement.timelineStart.adding(offset))
+            playback.pause()
+            playback.seekPrecisely(to: target.cmTime)
+            armBackgroundLasso()
+        } catch { editError = error.localizedDescription }
+    }
+
+    private nonisolated static func sourceColor(asset: ProjectMediaAsset, time: TimelineTime,
+                                                point: CGPoint) async throws -> SIMD3<Double> {
+        let image: CGImage
+        if asset.stillImage != nil {
+            guard let source = CGImageSourceCreateWithURL(asset.url as CFURL, nil),
+                  let decoded = CGImageSourceCreateImageAtIndex(source, 0, [kCGImageSourceShouldCache: true] as CFDictionary) else {
+                throw BackgroundRemovalAnalysisError.message("The image could not be decoded.")
+            }
+            image = decoded
+        } else {
+            let generator = AVAssetImageGenerator(asset: AVURLAsset(url: asset.url))
+            generator.appliesPreferredTrackTransform = false
+            generator.requestedTimeToleranceBefore = .zero
+            generator.requestedTimeToleranceAfter = .zero
+            image = try await generator.image(at: time.cmTime).image
+        }
+        var bytes = [UInt8](repeating: 0, count: 4)
+        guard let context = CGContext(data: &bytes, width: 1, height: 1, bitsPerComponent: 8,
+                                      bytesPerRow: 4, space: CGColorSpaceCreateDeviceRGB(),
+                                      bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue) else {
+            throw BackgroundRemovalAnalysisError.message("The color sampler could not start.")
+        }
+        let x = min(max(point.x, 0), 1), y = min(max(point.y, 0), 1)
+        context.interpolationQuality = .none
+        context.translateBy(x: -x * CGFloat(image.width), y: -(1 - y) * CGFloat(image.height))
+        context.draw(image, in: CGRect(x: 0, y: 0, width: image.width, height: image.height))
+        return SIMD3(Double(bytes[0]) / 255, Double(bytes[1]) / 255, Double(bytes[2]) / 255)
+    }
+
     var maskOverlayUsesCanvas: Bool { layerState != nil }
 
     var evaluatedSelectedClip: VideoClip? {
@@ -418,9 +826,29 @@ final class EditorViewModel: ObservableObject, GradingModel {
     }
     func setCanvas(width: Int, height: Int) {
         guard (64...4096).contains(width), (64...4096).contains(height), width % 2 == 0, height % 2 == 0 else {
-            editError = "Use even canvas dimensions between 64 and 4096 pixels."; return
+            editError = String(localized: "Use even canvas dimensions between 64 and 4096 pixels."); return
         }
         commit("Canvas") { project in project.canvas.width = width; project.canvas.height = height; return self.selectedClipID }
+    }
+
+    /// The colour the canvas is filled with wherever no clip covers it.
+    ///
+    /// Part of the document, not a viewing preference: it is what the exported
+    /// frame contains behind a scaled-down or repositioned clip, which is
+    /// exactly why it is worth being able to change.
+    func setCanvasBackground(_ color: RGBAColor) {
+        guard project.canvas.background != color else { return }
+        var probe = project
+        probe.canvas.background = color
+        // Only the first step away from black — or back to it — changes which
+        // compositor the sequence needs. Every other change is a value the live
+        // one already reads each frame, so the composition is left alone rather
+        // than rebuilt under a colour picker the user is still dragging.
+        let switchesCompositor = probe.needsLayerCompositor != project.needsLayerCompositor
+        commit("Canvas Background", rebuildsSequence: switchesCompositor) { project in
+            project.canvas.background = color
+            return self.selectedClipID
+        }
     }
     func stepFrames(_ count: Int) {
         guard !isPreparingTimeline, let cadence = project.canvas.frameDuration else { return }
@@ -913,7 +1341,7 @@ final class EditorViewModel: ObservableObject, GradingModel {
         guard let selection = animationSelection else { return }
         let animated = selection.animation?.track(property) != nil
         if animated && animationTime == nil {
-            editError = "Move the playhead inside the clip to change an animated value."
+            editError = String(localized: "Move the playhead inside the clip to change an animated value.")
             return
         }
         if animated { playback.pause() }
@@ -1079,14 +1507,18 @@ final class EditorViewModel: ObservableObject, GradingModel {
         }
     }
 
-    private func commit(_ name: String, seekToSelection: Bool = false, rebuildsSequence: Bool = true,
-                        edit: (inout VideoProject) throws -> UUID?) {
+    func commit(_ name: String, seekToSelection: Bool = false, rebuildsSequence: Bool = true,
+                edit: (inout VideoProject) throws -> UUID?) {
         flushGradeHistory()
         do {
             let before = project
             var after = before
             let selection = try edit(&after)
             try TimelineTransitionEditing.reconcile(in: &after)
+            // Track matte relationships are repaired on every mutation, not only
+            // when one is edited: deleting the layer a matte points at has to
+            // clear the relationship in the SAME undo step that removed it.
+            after.timeline.reconcileTrackMattes()
             _ = try TimelineEditing.clips(in: after)
             guard before.timeline != after.timeline || before.canvas != after.canvas else {
                 selectedClipID = selection
@@ -1118,7 +1550,7 @@ final class EditorViewModel: ObservableObject, GradingModel {
             var clip = try TimelineEditing.editable(plan.request.clip.id, in: project)
             var masks = clip.resolvedMaskedGrades
             guard let index = masks.firstIndex(where: { $0.id == plan.original.id }) else {
-                throw MaskTrackingError.message("The tracked mask was removed.")
+                throw MaskTrackingError.message(String(localized: "The tracked mask was removed."))
             }
             var combined = masks[index].animation ?? ClipAnimation()
             combined.tracks.removeAll { MaskTrackingMotion.properties.contains($0.property) }
@@ -1275,7 +1707,7 @@ final class EditorViewModel: ObservableObject, GradingModel {
     var smoothingUnavailableReason: String? {
         guard canChangeSpeed else { return nil }
         if selectedClip?.isRetimed == false {
-            return "Change the speed first. At normal speed every frame already lands on a source frame, so there is nothing to blend."
+            return String(localized: "Change the speed first. At normal speed every frame already lands on a source frame, so there is nothing to blend.")
         }
         return nil
     }
@@ -1361,7 +1793,11 @@ final class EditorViewModel: ObservableObject, GradingModel {
                 guard !Task.isCancelled, let self else { return }
                 self.layerState = sequence.layerState
                 self.audioRouting = sequence.audioRouting
-                self.layerState?.update(self.project, bypass: self.showsOriginal)
+                self.layerState?.update(self.project, bypass: self.showsOriginal,
+                                        inspectingMatteOn: self.inspectedMatteTargetID,
+                                        inspectingBackgroundOn: self.showsBackgroundMatte ? self.selectedClipID : nil,
+                                        showsTransparencyGrid: !self.showsOriginal && !self.showsBackgroundMatte
+                                            && self.selectedBackgroundRemoval?.isEnabled == true)
                 // The composited frame's real size, which is smaller than the
                 // canvas when preview is downscaled for performance.
                 self.renderer.setComposited(
@@ -1427,6 +1863,8 @@ final class EditorViewModel: ObservableObject, GradingModel {
         // Masks belong to a clip, so the context cannot outlive the selection.
         selectedMaskID = nil
         maskMatteID = nil
+        // The matte view belongs to the layer it was opened on.
+        inspectedMatteTargetID = nil
         isDrawingMask = false
         if !availablePanels.contains(selectedPanel) { selectedPanel = .light }
         selectedClipID = id
@@ -1783,19 +2221,20 @@ final class EditorViewModel: ObservableObject, GradingModel {
 
         var detail: String? {
             if projectMode == .appleLog {
-                return "Apple Log is decoded with Apple's published transfer function into scene light, graded there, and rendered to Rec.709 with Apple's own display transform. The preview is that rendered result — the same picture the export produces — which is why it does not look flat."
+                return String(localized: "Apple Log is decoded with Apple's published transfer function into scene light, graded there, and rendered to Rec.709 with Apple's own display transform. The preview is that rendered result — the same picture the export produces — which is why it does not look flat.")
             }
             if projectMode == .appleLog2 {
-                return "Apple Log 2 uses the same transfer function as Apple Log on wider primaries, so it is decoded to scene light, converted from Apple Wide Gamut to BT.2020, and rendered to Rec.709 with Apple's own display transform. The preview is that rendered result — the same picture the export produces — which is why it does not look flat."
+                return String(localized: "Apple Log 2 uses the same transfer function as Apple Log on wider primaries, so it is decoded to scene light, converted from Apple Wide Gamut to BT.2020, and rendered to Rec.709 with Apple's own display transform. The preview is that rendered result — the same picture the export produces — which is why it does not look flat.")
             }
             guard projectMode.isHDR else { return nil }
             if showingHDR {
                 return String(
-                    format: "HDR preview · %.1f× display headroom. The system applies HLG display tone mapping, the same as Photos.",
+                    format: String(localized: "HDR preview · %.1f× display headroom. The system applies HLG display tone mapping, the same as Photos."),
+                    locale: .current,
                     headroom
                 )
             }
-            return "This display has little HDR headroom, so the system is tone-mapping the HDR preview down to what the screen can show. It does not represent HDR highlight brightness. HDR export is unaffected."
+            return String(localized: "This display has little HDR headroom, so the system is tone-mapping the HDR preview down to what the screen can show. It does not represent HDR highlight brightness. HDR export is unaffected.")
         }
     }
 
@@ -1907,7 +2346,7 @@ final class EditorViewModel: ObservableObject, GradingModel {
     /// per property, in each parameter's Animation menu.
     func resetPanel() {
         let stillAnimated = panelHasAnimation(selectedPanel)
-        defer { if stillAnimated { showStatus("Base values reset. Animation kept.") } }
+        defer { if stillAnimated { showStatus(String(localized: "Base values reset. Animation kept.")) } }
         var advanced = settings.advanced ?? .neutral
         switch selectedPanel {
         case .light: GradeParameter.light.forEach { settings.reset($0) }
@@ -2110,6 +2549,14 @@ final class EditorViewModel: ObservableObject, GradingModel {
     /// masks exist would promise something it does not do.
     var canResetGrade: Bool { canGrade && (globalSettings != .neutral || selectionHasGradeAnimation) }
 
+    /// Against the clip's own grade, never the selected mask's — a paste
+    /// replaces `globalSettings`, so that is the work it would throw away.
+    /// `settings` points at the mask while one is being edited, which is why
+    /// the shared default is not the right test here.
+    var pasteWouldOverwriteGrade: Bool {
+        canPasteGrade && globalSettings.hasCreativeChangeIgnoringMask
+    }
+
     /// Copies the selected clip's complete grading state.
     ///
     /// Reads the model only — no textures, no cached GPU state, nothing the
@@ -2121,18 +2568,32 @@ final class EditorViewModel: ObservableObject, GradingModel {
         // spatial structure that belongs to this picture.
         gradeClipboard.copy(globalSettings, from: project.displayName)
         CurveHaptics.add()
-        showStatus("Grade copied")
+        showStatus(String(localized: "Grade copied"))
     }
 
-    /// Replaces the selected clip's complete grading state with the copied one.
-    func pasteGrade() {
+    /// Puts the copied grade on the selected clip.
+    ///
+    /// `.replace` is what pasting has always meant: the clip's grading state
+    /// becomes the copied one outright. `.addOnTop` keeps the grade the clip
+    /// already carries and lays the copied one over it — see
+    /// `GradeSettings.stacked(onto:)` for what that means control by control.
+    /// Which of the two happens is the user's answer to a question the UI asks,
+    /// never a guess made here.
+    func pasteGrade(_ mode: GradePasteMode) {
         guard canPasteGrade, let grade = gradeClipboard.grade else { return }
         // Confirmed even when nothing changed -- pasting onto a clip that
         // already carries that grade succeeded, and silence would read as a
         // broken button.
-        replaceGrade(with: grade, label: "Paste Grade", subject: "The copied grade")
+        switch mode {
+        case .replace:
+            replaceGrade(with: grade, label: "Paste Grade", subject: "The copied grade")
+            showStatus(String(localized: "Grade pasted"))
+        case .addOnTop:
+            replaceGrade(with: grade.stacked(onto: globalSettings),
+                         label: "Add Grade", subject: "The copied grade")
+            showStatus(String(localized: "Grade added"))
+        }
         CurveHaptics.add()
-        showStatus("Grade pasted")
     }
 
     /// Returns the selected clip to the neutral grade, in one undoable step.
@@ -2150,7 +2611,7 @@ final class EditorViewModel: ObservableObject, GradingModel {
         guard replaceGrade(with: .neutral, label: "Reset Grade", subject: "This grade",
                            clearsGradeAnimation: true) else { return }
         CurveHaptics.reset()
-        showStatus("Grade reset")
+        showStatus(String(localized: "Grade reset"))
     }
 
     /// Strips every grading track from the clip and its masks, leaving geometry
@@ -2197,11 +2658,11 @@ final class EditorViewModel: ObservableObject, GradingModel {
                 // it has to be said plainly, and no other look is put in its
                 // place.
                 applied = applied.withoutLook
-                editError = """
+                editError = String(localized: """
                     \(subject) uses a LUT that is no longer available.
 
                     Everything else has been applied. No other look was substituted.
-                    """
+                    """)
             }
         }
         guard applied != globalSettings || (clearsGradeAnimation && selectionHasGradeAnimation) else { return false }
@@ -2220,7 +2681,7 @@ final class EditorViewModel: ObservableObject, GradingModel {
             // animation, which is the only reading that lets the two stay
             // separate ideas. Said out loud, because the picture may not change
             // where the playhead happens to be.
-            showStatus("Base grade replaced. Animation kept.")
+            showStatus(String(localized: "Base grade replaced. Animation kept."))
         }
         flushGradeHistory()
         return true
@@ -2237,7 +2698,10 @@ final class EditorViewModel: ObservableObject, GradingModel {
     /// Not private: the masked-grade editing extension pushes mask changes
     /// through the same one path everything else uses.
     func synchronizeRenderer() {
-        layerState?.update(project, bypass: showsOriginal)
+        layerState?.update(project, bypass: showsOriginal, inspectingMatteOn: inspectedMatteTargetID,
+                           inspectingBackgroundOn: showsBackgroundMatte ? selectedClipID : nil,
+                           showsTransparencyGrid: !showsOriginal && !showsBackgroundMatte
+                               && selectedBackgroundRemoval?.isEnabled == true)
         if layerState != nil { playback.refreshCompositionFrame() }
         renderer.updateSequence(clips)
         renderer.update(

@@ -54,7 +54,7 @@ extension EditorViewModel {
     func addMask(_ shape: MaskShape) {
         guard canAddMask else {
             if canGrade {
-                editError = "A clip can carry \(MaskedGradeLayer.maximumPerClip) masks. Delete one to add another."
+                editError = String(localized: "A clip can carry \(MaskedGradeLayer.maximumPerClip) masks. Delete one to add another.")
             }
             return
         }
@@ -222,7 +222,7 @@ extension EditorViewModel {
             return
         }
         guard let local = maskAnimationTime else {
-            editError = "Move the playhead inside the clip to change an animated mask value."
+            editError = String(localized: "Move the playhead inside the clip to change an animated mask value.")
             return
         }
         playback.pause()
@@ -311,7 +311,7 @@ extension EditorViewModel {
         guard let layer = maskedGrades.first(where: { $0.id == id }),
               layer.geometry.shape == .freehand else { return }
         guard layer.geometry.points.count < MaskGeometry.maximumPoints else {
-            editError = "A freehand mask can hold \(MaskGeometry.maximumPoints) points."
+            editError = String(localized: "A freehand mask can hold \(MaskGeometry.maximumPoints) points.")
             return
         }
         updateMask(id, label: "Draw Mask", immediate: true) { mask in
@@ -384,6 +384,6 @@ extension EditorViewModel {
         guard let layer = maskedGrades.first(where: { $0.id == id }),
               layer.geometry.shape == .freehand,
               layer.geometry.points.count < 3 else { return }
-        editError = "A freehand mask needs at least three points. Tap around the subject to draw one."
+        editError = String(localized: "A freehand mask needs at least three points. Tap around the subject to draw one.")
     }
 }

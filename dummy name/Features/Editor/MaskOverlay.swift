@@ -68,8 +68,8 @@ struct MaskOverlay: View {
     }
 
     private var accessibilityLabel: String {
-        guard let mask = model.displayedSelectedMask else { return "Mask editing" }
-        return "\(mask.name), \(mask.geometry.shape.title) mask"
+        guard let mask = model.displayedSelectedMask else { return String(localized: "Mask editing") }
+        return String(localized: "\(mask.name), \(mask.geometry.shape.title) mask")
     }
 
     // MARK: - Geometry

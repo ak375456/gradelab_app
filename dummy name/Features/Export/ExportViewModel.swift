@@ -121,7 +121,7 @@ final class ExportViewModel: ObservableObject {
             do {
                 try self.project.validate()
                 _ = try TimelineEditing.clips(in: self.project)
-                guard self.project.timeline.duration > .zero else { throw TimelineError.invalid("There are no clips to export.") }
+                guard self.project.timeline.duration > .zero else { throw TimelineError.invalid(String(localized: "There are no clips to export.")) }
                 let context = try MetalContext()
                 let exporter = try VideoExporter(context: context)
                 self.exporter = exporter

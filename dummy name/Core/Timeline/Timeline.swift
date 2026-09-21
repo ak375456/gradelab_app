@@ -27,6 +27,13 @@ struct TimelineTrack: Codable, Equatable, Identifiable, Sendable {
         return collapsed.isEmpty ? defaultName(for: kind) : String(collapsed.prefix(60))
     }
 
+    /// The stored name a new track is given. **English, deliberately, in every
+    /// language.** It is the document value, and it is also compared — a track
+    /// still carrying its default name is treated as unnamed by
+    /// `layerDisplayName` and by the rename field. Localising it would mean a
+    /// project made in one language stopped matching when opened in another,
+    /// and a renamed track would be indistinguishable from a default one.
+    /// `localizedName(_:)` is what the user actually reads.
     static func defaultName(for kind: Kind) -> String {
         switch kind {
         case .mainVideo: "Main Video"
@@ -34,6 +41,19 @@ struct TimelineTrack: Codable, Equatable, Identifiable, Sendable {
         case .text: "Text"
         case .shape: "Shape"
         case .audio: "Audio"
+        }
+    }
+
+    /// A track name as it should be shown. A name the user chose is their own
+    /// words and is returned untouched; one the app supplied is translated.
+    static func localizedName(_ name: String) -> String {
+        switch name {
+        case "Main Video": String(localized: "Main Video")
+        case "Overlay": String(localized: "Overlay")
+        case "Text": String(localized: "Text")
+        case "Shape": String(localized: "Shape")
+        case "Audio": String(localized: "Audio")
+        default: name
         }
     }
 
@@ -47,16 +67,37 @@ struct TimelineTrack: Codable, Equatable, Identifiable, Sendable {
                 guard case .shape(let clip) = item else { return nil }
                 return clip
             }.min { $0.placement.timelineStart < $1.placement.timelineStart }
-            guard let firstShape else { return name }
+            guard let firstShape else { return Self.localizedName(name) }
             return Self.sanitizedName(firstShape.kind.title, kind: .shape)
         }
-        guard kind == .text, name == Self.defaultName(for: .text) else { return name }
+        guard kind == .text, name == Self.defaultName(for: .text) else { return Self.localizedName(name) }
         let firstText = items.compactMap { item -> TextClip? in
             guard case .text(let clip) = item else { return nil }
             return clip
         }.min { $0.placement.timelineStart < $1.placement.timelineStart }
-        guard let firstText else { return name }
+        guard let firstText else { return Self.localizedName(name) }
         return Self.sanitizedName(firstText.text, kind: .text)
+    }
+
+    var hasAudioContent: Bool {
+        items.contains { item in
+            switch item {
+            case .audio: true
+            case .video(let clip): clip.embeddedAudio != nil
+            case .text, .shape: false
+            }
+        }
+    }
+
+    var isAudioMuted: Bool {
+        let states = items.compactMap { item -> Bool? in
+            switch item {
+            case .audio(let clip): clip.isMuted
+            case .video(let clip): clip.embeddedAudio?.isMuted
+            case .text, .shape: nil
+            }
+        }
+        return !states.isEmpty && states.allSatisfy { $0 }
     }
 
     func accepts(_ item: TimelineItem) -> Bool {

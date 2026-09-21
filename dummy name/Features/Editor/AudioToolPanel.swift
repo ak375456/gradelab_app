@@ -71,10 +71,10 @@ private struct AudioFadeControls: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 6) {
             Divider().padding(.vertical, 2)
-            row(title: "Fade in",
+            row(title: String(localized: "Fade in"),
                 icon: "speaker.wave.1",
                 value: model.audioSettings?.fadeIn ?? 0) { model.changeAudio(fadeIn: $0) }
-            row(title: "Fade out",
+            row(title: String(localized: "Fade out"),
                 icon: "speaker.wave.1.fill",
                 value: model.audioSettings?.fadeOut ?? 0) { model.changeAudio(fadeOut: $0) }
         }

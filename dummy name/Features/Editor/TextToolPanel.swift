@@ -284,7 +284,7 @@ private struct FontMenu: View {
             .background(.black.opacity(0.28), in: RoundedRectangle(cornerRadius: 9))
             ScrollView {
                 LazyVStack(spacing: 4) {
-                    fontRow(name: "System", fontName: nil, needsPro: false, isSelected: selected == nil)
+                    fontRow(name: String(localized: "System"), fontName: nil, needsPro: false, isSelected: selected == nil)
                     ForEach(entries.filter { query.isEmpty || $0.name.localizedCaseInsensitiveContains(query) || $0.family.localizedCaseInsensitiveContains(query) }) { font in
                     // Every face stays choosable: the point is to see the title
                     // set in it. The badge says which ones need Pro to export.

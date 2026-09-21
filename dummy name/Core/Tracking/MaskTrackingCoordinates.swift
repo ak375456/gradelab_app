@@ -15,7 +15,7 @@ struct MaskTrackingCoordinates: Sendable {
         guard encodedSize.width > 0, encodedSize.height > 0,
               [t.a, t.b, t.c, t.d, t.tx, t.ty].allSatisfy(\.isFinite),
               abs(t.a * t.d - t.b * t.c) > 0.0001 else {
-            throw MaskTrackingError.message("This video has an invalid source transform.")
+            throw MaskTrackingError.message(String(localized: "This video has an invalid source transform."))
         }
         // Vision's EXIF orientation covers all eight camera rotations/reflections.
         // Reject skew instead of silently using the wrong tracking coordinates.
@@ -29,7 +29,7 @@ struct MaskTrackingCoordinates: Sendable {
         guard let match = candidates.first(where: {
             abs(t.a / sx - $0.1) < 0.001 && abs(t.b / sx - $0.2) < 0.001 &&
             abs(t.c / sy - $0.3) < 0.001 && abs(t.d / sy - $0.4) < 0.001
-        }) else { throw MaskTrackingError.message("Tracking cannot interpret this video's source orientation.") }
+        }) else { throw MaskTrackingError.message(String(localized: "Tracking cannot interpret this video's source orientation.")) }
         self.encodedSize = encodedSize
         self.preferredTransform = t
         displayBounds = CGRect(origin: .zero, size: encodedSize).applying(t).standardized
@@ -81,7 +81,7 @@ struct MaskTrackingCoordinates: Sendable {
     func region(for geometry: MaskGeometry) throws -> CGRect {
         let g = geometry.clamped
         guard g.shape != .linear, g.isRenderable else {
-            throw MaskTrackingError.message("Tracking needs an Ellipse, Rectangle or completed Freehand window.")
+            throw MaskTrackingError.message(String(localized: "Tracking needs an Ellipse, Rectangle or completed Freehand window."))
         }
         let points: [CGPoint]
         if g.shape == .freehand {
@@ -98,7 +98,7 @@ struct MaskTrackingCoordinates: Sendable {
         let box = Self.bounds(points).intersection(CGRect(x: 0, y: 0, width: 1, height: 1))
         guard Self.isValid(box), box.width * encodedSize.width >= 8,
               box.height * encodedSize.height >= 8 else {
-            throw MaskTrackingError.message("Place a larger part of the mask inside the picture before tracking.")
+            throw MaskTrackingError.message(String(localized: "Place a larger part of the mask inside the picture before tracking."))
         }
         return box
     }

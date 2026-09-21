@@ -88,7 +88,7 @@ struct TransitionPanel: View {
         ScrollView(.horizontal) {
             HStack(spacing: 9) {
                 if title == nil {
-                    transitionTile(title: "None", systemImage: "nosign",
+                    transitionTile(title: String(localized: "None"), systemImage: "nosign",
                                    selected: model.selectedTransition == nil) {
                         model.removeSelectedTransition()
                     }

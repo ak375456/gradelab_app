@@ -24,43 +24,43 @@ enum GradeLabError: LocalizedError, Equatable, Sendable {
     var errorDescription: String? {
         switch self {
         case .unsupportedVideo:
-            "This video format is not supported."
+            String(localized: "This video format is not supported.")
         case .protectedVideo:
-            "Protected videos can’t be graded."
+            String(localized: "Protected videos can’t be graded.")
         case .unableToReadMetadata:
-            "GradeLab couldn’t read this video’s technical information."
+            String(localized: "GradeLab couldn’t read this video’s technical information.")
         case .missingVideoTrack:
-            "The selected file does not contain a video track."
+            String(localized: "The selected file does not contain a video track.")
         case .unsupportedCodec(let codec):
-            "The \(codec) codec is not supported on this device."
+            String(localized: "The \(codec) codec is not supported on this device.")
         case .rendererInitializationFailed:
-            "The video renderer could not be started."
+            String(localized: "The video renderer could not be started.")
         case .metalUnavailable:
-            "Metal is unavailable on this device."
+            String(localized: "Metal is unavailable on this device.")
         case .exportFailed(let detail):
-            detail.isEmpty ? "The graded video could not be exported." : detail
+            detail.isEmpty ? String(localized: "The graded video could not be exported.") : detail
         case .insufficientStorage:
-            "There isn’t enough free storage to export this video."
+            String(localized: "There isn’t enough free storage to export this video.")
         case .photoLibrarySaveFailed:
-            "The exported video could not be saved to Photos."
+            String(localized: "The exported video could not be saved to Photos.")
         case .invalidLUT(let detail):
-            "This LUT is invalid. \(detail)"
+            String(localized: "This LUT is invalid. \(detail)")
         case .assetUnavailable:
-            "The source video is no longer available."
+            String(localized: "The source video is no longer available.")
         case .exportCancelled:
-            "Export was cancelled."
+            String(localized: "Export was cancelled.")
         case .unsupportedExport(let detail):
             detail
         case .presetThumbnailFailed:
-            "The preview image for this preset could not be created."
+            String(localized: "The preview image for this preset could not be created.")
         case .invalidPresetName:
-            "Give the preset a name before saving it."
+            String(localized: "Give the preset a name before saving it.")
         case .unableToReadImage:
-            "GradeLab couldn’t read this image."
+            String(localized: "GradeLab couldn’t read this image.")
         case .imageTooLarge:
-            "This image is too large to process on this device."
+            String(localized: "This image is too large to process on this device.")
         case .imageExportFailed(let detail):
-            detail.isEmpty ? "The graded image could not be exported." : detail
+            detail.isEmpty ? String(localized: "The graded image could not be exported.") : detail
         }
     }
 }

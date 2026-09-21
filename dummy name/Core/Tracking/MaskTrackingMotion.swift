@@ -122,7 +122,7 @@ enum MaskTrackingMotion {
             }
             // Bounded relaxation, never unbounded compression or silent truncation.
             guard tolerance < 0.002 else {
-                throw MaskTrackingError.message("This range needs more than 2,000 motion keyframes per track. Track a shorter section using Stop, or clear existing geometry animation first. No existing animation was replaced.")
+                throw MaskTrackingError.message(String(localized: "This range needs more than 2,000 motion keyframes per track. Track a shorter section using Stop, or clear existing geometry animation first. No existing animation was replaced."))
             }
             tolerance *= 2
         }
@@ -168,7 +168,7 @@ enum MaskTrackingMotion {
                 let middle = Keyframe(time: time, value: value, interpolation: .linear)
                 frames.append(middle)
                 guard frames.count <= AnimationTrack.keyframeLimit else {
-                    throw MaskTrackingError.message("Preserving the existing motion would exceed 2,000 keyframes. Choose an existing keyframe as the tracking anchor or clear geometry animation first. No animation was replaced.")
+                    throw MaskTrackingError.message(String(localized: "Preserving the existing motion would exceed 2,000 keyframes. Choose an existing keyframe as the tracking anchor or clear geometry animation first. No animation was replaced."))
                 }
                 segments.append((left, middle)); segments.append((middle, right))
             }

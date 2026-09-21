@@ -10,13 +10,13 @@ enum PhotoLibrarySaveError: LocalizedError, Equatable, Sendable {
     var errorDescription: String? {
         switch self {
         case .sourceUnavailable:
-            "The exported file is no longer available."
+            String(localized: "The exported file is no longer available.")
         case .accessDenied:
-            "Allow GradeLab to add to Photos in Settings, then try again."
+            String(localized: "Allow GradeLab to add to Photos in Settings, then try again.")
         case .accessRestricted:
-            "This device does not allow GradeLab to add to Photos."
+            String(localized: "This device does not allow GradeLab to add to Photos.")
         case .saveFailed:
-            "The export could not be saved to Photos."
+            String(localized: "The export could not be saved to Photos.")
         }
     }
 }

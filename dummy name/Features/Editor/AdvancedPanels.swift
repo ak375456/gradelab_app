@@ -139,6 +139,10 @@ struct LUTPanel<Model: GradingModel>: View {
     @State private var isImporting = false
     @State private var confirmsRemoval = false
     @State private var section: LookSection = .looks
+    /// Two lines of `.caption2`, reserved whether a name needs both of them or
+    /// not, so every thumbnail in the strip sits on the same line and the strip
+    /// keeps its height as looks are imported and removed.
+    @ScaledMetric(relativeTo: .caption2) private var labelHeight: CGFloat = 27
 
     private enum LookSection: String, CaseIterable, Identifiable {
         case looks = "Looks"
@@ -172,9 +176,12 @@ struct LUTPanel<Model: GradingModel>: View {
     private var sdrBody: some View {
         VStack(spacing: 14) {
             ScrollView(.horizontal) {
-                HStack(spacing: 10) {
+                HStack(alignment: .top, spacing: 10) {
                     lookTile(
-                        title: "None",
+                        // Wrapped, because `lookTile` takes a `String` and a
+                        // `String` is invisible to the string extractor. The
+                        // look names it carries stay English; this word does not.
+                        title: String(localized: "None"),
                         preview: model.lookPreviews[LookPreviewKey.original],
                         isSelected: selected == nil
                     ) { model.selectLook(nil) }
@@ -195,20 +202,25 @@ struct LUTPanel<Model: GradingModel>: View {
                                 .overlay(alignment: .topTrailing) {
                                     if !ProStore.shared.hasPro { ProBadge(compact: true).padding(4) }
                                 }
-                            if ProStore.shared.hasPro {
-                                Text("Import").font(.caption2).lineLimit(1)
-                            } else {
-                                Text("Import").font(.caption2).lineLimit(1)
-                                    .foregroundStyle(ProStyle.gold)
-                            }
+                            tileLabel(String(localized: "Import"))
+                                .foregroundStyle(ProStore.shared.hasPro
+                                                 ? AppColors.textSecondary : ProStyle.gold)
                         }
                     }
                     .buttonStyle(.plain).foregroundStyle(AppColors.textSecondary)
                     .accessibilityLabel("Import a look from Files")
                 }.padding(.horizontal, 2)
-            }.frame(height: tileHeight + 22).scrollIndicators(.hidden)
+            }.frame(height: tileHeight + 6 + labelHeight).scrollIndicators(.hidden)
 
             if let selected {
+                // A tile's caption has two short lines to work with, which is
+                // enough for every look that ships and for most imported ones.
+                // This is where a name of any length is readable in full — and
+                // it names what the strength slider under it is acting on.
+                Text(selected.name)
+                    .font(.subheadline.weight(.semibold))
+                    .foregroundStyle(AppColors.textPrimary)
+                    .frame(maxWidth: .infinity, alignment: .leading)
                 // The look itself stays a discrete choice; its strength is an
                 // ordinary animatable value, which is what a look fade-in is.
                 GradeSlider(
@@ -296,13 +308,31 @@ struct LUTPanel<Model: GradingModel>: View {
                 .overlay(alignment: .topTrailing) {
                     if marked { ProBadge(compact: true).padding(4) }
                 }
-                Text(title).font(.caption2).lineLimit(1).frame(width: tileWidth + 12)
+                tileLabel(title)
             }
         }
         .buttonStyle(.plain)
         .foregroundStyle(isSelected ? AppColors.textPrimary : AppColors.textSecondary)
         .accessibilityLabel(marked ? "\(title). Pro feature" : title)
         .accessibilityAddTraits(isSelected ? .isSelected : [])
+    }
+
+    /// The caption under a tile.
+    ///
+    /// The name is the only thing separating two looks that thumbnail alike —
+    /// a strip reading "Apple LOG…" four times over says nothing about which
+    /// is which — so it is given more width than the thumbnail, two lines to
+    /// wrap into, and room to shrink a little before it truncates. Between
+    /// them that fits every look that ships and every sensibly named import;
+    /// anything longer is still readable in full under the strip once it is
+    /// selected.
+    private func tileLabel(_ title: String) -> some View {
+        Text(title)
+            .font(.caption2)
+            .lineLimit(2)
+            .multilineTextAlignment(.center)
+            .minimumScaleFactor(0.75)
+            .frame(width: LookTileMetrics.labelWidth, height: labelHeight, alignment: .top)
     }
 }
 
@@ -312,4 +342,10 @@ struct LUTPanel<Model: GradingModel>: View {
 private enum LookTileMetrics {
     static let width: CGFloat = 56
     static let height: CGFloat = 56
+    /// Wider than the thumbnail on purpose. Look names are not short — "Apple
+    /// Log To Rec 709", "Presetpro Kodacrome 64" — and a caption the width of
+    /// the thumbnail truncated nearly all of them to their shared prefix. The
+    /// overhang is small enough that a caption still reads as belonging to the
+    /// tile above it: captions stay 10pt apart, the strip's own spacing.
+    static let labelWidth: CGFloat = 78
 }

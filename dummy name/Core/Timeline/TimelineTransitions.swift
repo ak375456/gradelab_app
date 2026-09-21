@@ -52,51 +52,51 @@ enum TimelineTransitionType: Int, Codable, CaseIterable, Identifiable, Sendable 
     var id: Int { rawValue }
     var title: String {
         switch self {
-        case .crossDissolve: "Dissolve"
-        case .dipToBlack: "Dip to Black"
-        case .dipToWhite: "Dip to White"
-        case .slideLeft: "Slide Left"
-        case .slideRight: "Slide Right"
-        case .slideUp: "Slide Up"
-        case .slideDown: "Slide Down"
-        case .push: "Push"
-        case .zoomIn: "Zoom In"
-        case .zoomOut: "Zoom Out"
-        case .blurDissolve: "Blur Dissolve"
-        case .whipPanLeft: "Whip Left"
-        case .whipPanRight: "Whip Right"
-        case .spin: "Spin"
-        case .flash: "Flash"
-        case .wipeLeft: "Wipe Left"
-        case .wipeRight: "Wipe Right"
-        case .wipeUp: "Wipe Up"
-        case .wipeDown: "Wipe Down"
-        case .iris: "Iris"
-        case .clockWipe: "Clock Wipe"
-        case .splitHorizontal: "Split H"
-        case .splitVertical: "Split V"
-        case .filmBurn: "Film Burn"
-        case .rgbSplit: "RGB Split"
-        case .softLight: "Soft Light"
-        case .glitch: "Glitch"
-        case .diagonalWipe: "Diagonal"
-        case .diamond: "Diamond"
-        case .horizontalBlinds: "Blinds H"
-        case .verticalBlinds: "Blinds V"
-        case .checkerboard: "Checker"
-        case .pixelate: "Pixelate"
-        case .ripple: "Ripple"
-        case .wave: "Wave"
-        case .squeeze: "Squeeze"
-        case .crossZoom: "Cross Zoom"
-        case .bounce: "Bounce"
-        case .noiseDissolve: "Noise"
-        case .prism: "Prism"
-        case .lensWarp: "Lens Warp"
-        case .kaleidoscope: "Kaleido"
-        case .liquid: "Liquid"
-        case .vortex: "Vortex"
-        case .pageTurn: "Page Turn"
+        case .crossDissolve: String(localized: "Dissolve")
+        case .dipToBlack: String(localized: "Dip to Black")
+        case .dipToWhite: String(localized: "Dip to White")
+        case .slideLeft: String(localized: "Slide Left")
+        case .slideRight: String(localized: "Slide Right")
+        case .slideUp: String(localized: "Slide Up")
+        case .slideDown: String(localized: "Slide Down")
+        case .push: String(localized: "Push")
+        case .zoomIn: String(localized: "Zoom In")
+        case .zoomOut: String(localized: "Zoom Out")
+        case .blurDissolve: String(localized: "Blur Dissolve")
+        case .whipPanLeft: String(localized: "Whip Left")
+        case .whipPanRight: String(localized: "Whip Right")
+        case .spin: String(localized: "Spin")
+        case .flash: String(localized: "Flash")
+        case .wipeLeft: String(localized: "Wipe Left")
+        case .wipeRight: String(localized: "Wipe Right")
+        case .wipeUp: String(localized: "Wipe Up")
+        case .wipeDown: String(localized: "Wipe Down")
+        case .iris: String(localized: "Iris")
+        case .clockWipe: String(localized: "Clock Wipe")
+        case .splitHorizontal: String(localized: "Split H")
+        case .splitVertical: String(localized: "Split V")
+        case .filmBurn: String(localized: "Film Burn")
+        case .rgbSplit: String(localized: "RGB Split")
+        case .softLight: String(localized: "Soft Light")
+        case .glitch: String(localized: "Glitch")
+        case .diagonalWipe: String(localized: "Diagonal")
+        case .diamond: String(localized: "Diamond")
+        case .horizontalBlinds: String(localized: "Blinds H")
+        case .verticalBlinds: String(localized: "Blinds V")
+        case .checkerboard: String(localized: "Checker")
+        case .pixelate: String(localized: "Pixelate")
+        case .ripple: String(localized: "Ripple")
+        case .wave: String(localized: "Wave")
+        case .squeeze: String(localized: "Squeeze")
+        case .crossZoom: String(localized: "Cross Zoom")
+        case .bounce: String(localized: "Bounce")
+        case .noiseDissolve: String(localized: "Noise")
+        case .prism: String(localized: "Prism")
+        case .lensWarp: String(localized: "Lens Warp")
+        case .kaleidoscope: String(localized: "Kaleido")
+        case .liquid: String(localized: "Liquid")
+        case .vortex: String(localized: "Vortex")
+        case .pageTurn: String(localized: "Page Turn")
         }
     }
     var systemImage: String {
@@ -263,18 +263,18 @@ enum TimelineTransitionEditing {
             }, at: time.cmTime) ?? TimelineEditing.activeClip(in: clips.filter {
                 clip in project.timeline.tracks.first(where: { $0.id == clip.placement.trackID })?.kind == .mainVideo
             }, at: time.cmTime)
-            guard let target else { throw TimelineError.invalid("Place the playhead on or inside a video clip.") }
+            guard let target else { throw TimelineError.invalid(String(localized: "Place the playhead on or inside a video clip.")) }
             let rightID = try TimelineEditing.split(target.id, at: time, in: &project)
             guard let left = project.timeline.videoClip(id: target.id),
                   let right = project.timeline.videoClip(id: rightID) else {
-                throw TimelineError.invalid("The clip could not be split at the playhead.")
+                throw TimelineError.invalid(String(localized: "The clip could not be split at the playhead."))
             }
             point = .init(outgoing: left, incoming: right, time: right.placement.timelineStart)
         }
-        guard let point else { throw TimelineError.invalid("A transition needs video on both sides.") }
+        guard let point else { throw TimelineError.invalid(String(localized: "A transition needs video on both sides.")) }
         let maximum = try maximumDuration(for: point.outgoing, incoming: point.incoming, in: project)
         let minimum = try minimumDuration(in: project)
-        guard maximum >= minimum else { throw TimelineError.invalid("The clips do not have enough source frames for a transition.") }
+        guard maximum >= minimum else { throw TimelineError.invalid(String(localized: "The clips do not have enough source frames for a transition.")) }
         let requestedDuration = try TimelineTime.seconds(defaultSeconds)
         let duration = try snappedDuration(min(requestedDuration, maximum), in: project)
         let transition = TimelineTransition(id: UUID(), type: type, editTime: point.time,
@@ -355,7 +355,7 @@ enum TimelineTransitionEditing {
 
     static func validate(project: VideoProject) throws {
         guard Set(project.timeline.transitions.map(\.id)).count == project.timeline.transitions.count else {
-            throw TimelineError.invalid("Duplicate transition identifiers.")
+            throw TimelineError.invalid(String(localized: "Duplicate transition identifiers."))
         }
         let clips = project.timeline.tracks.flatMap(\.items).compactMap { item -> VideoClip? in
             if case .video(let clip) = item { return clip }
@@ -369,7 +369,7 @@ enum TimelineTransitionEditing {
                   outgoing.placement.trackID == incoming.placement.trackID,
                   try outgoing.placement.range.end == incoming.placement.timelineStart,
                   cuts.insert("\(outgoing.id):\(incoming.id)").inserted else {
-                throw TimelineError.invalid("A transition must connect one adjacent pair of video clips.")
+                throw TimelineError.invalid(String(localized: "A transition must connect one adjacent pair of video clips."))
             }
         }
     }

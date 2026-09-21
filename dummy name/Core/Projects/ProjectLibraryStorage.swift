@@ -20,9 +20,9 @@ enum LibraryLoadError: LocalizedError, Equatable {
         switch self {
         case .unreadable(let recoveredURL, _):
             if let recoveredURL {
-                return "GradeLab couldn’t read its saved projects. The unreadable file has been kept as “\(recoveredURL.lastPathComponent)” in the app’s Recovered folder, and the library has started again empty."
+                return String(localized: "GradeLab couldn’t read its saved projects. The unreadable file has been kept as “\(recoveredURL.lastPathComponent)” in the app’s Recovered folder, and the library has started again empty.")
             }
-            return "GradeLab couldn’t read its saved projects, and couldn’t set the unreadable file aside. Reinstalling the app will clear it."
+            return String(localized: "GradeLab couldn’t read its saved projects, and couldn’t set the unreadable file aside. Reinstalling the app will clear it.")
         case .newerVersion(let reason):
             return reason
         }

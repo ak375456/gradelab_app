@@ -149,27 +149,28 @@ struct PaywallView: View {
         }
         return String(localized: "Subscribe · \(product.displayPrice) / \(period)")
     }
-    /// The founding offer's small print.
+    /// The current rung's small print.
     ///
-    /// It anchors to the standard $34.99 lifetime price and stops there. It
-    /// deliberately does not say the price becomes $34.99 when launch week
-    /// ends, because it does not — it becomes $4.99 and climbs from there over
-    /// the following weeks. Claiming the larger jump would be the kind of
-    /// invented reference price that App Review rejects, and the launch plan
-    /// warns against it in the same breath as fake countdowns.
-    private func foundingDetail(statingDiscount: Bool) -> String {
+    /// One claim only: the saving against the settled $34.99 lifetime price,
+    /// which is the only standard this app knows. It stops there. It does not
+    /// say what the price becomes next, because a future price printed on a
+    /// paywall is a promise the app cannot keep on its own — and an invented
+    /// one is exactly the reference price App Review rejects, which the launch
+    /// plan warns about in the same breath as fake countdowns.
+    private func ladderDetail(statingDiscount: Bool) -> String {
         let promise = String(localized: "Buy now and it stays yours forever, whatever the price becomes.")
         let standard = ProConfiguration.standardLifetimeUSD
             .formatted(.currency(code: "USD").precision(.fractionLength(2)))
         guard statingDiscount else {
-            // No percentage and no struck-through figure outside the US
-            // storefront: a saving quoted against a local price this app cannot
-            // see would be a number made up for effect. The standard price is
-            // still named — it is the whole point of the offer — but named as
-            // what it is, the US one.
-            return String(localized: "The standard lifetime price is US\(standard). This price is for launch week only, as a thank-you to our founding users. \(promise)")
+            // No percentage outside the US storefront: a saving quoted against
+            // a local price this app cannot see would be a number made up for
+            // effect. The standard price is still named — it is the whole point
+            // of the offer — but named as what it is, the US one, matching the
+            // struck-through figure above it.
+            return String(localized: "The standard lifetime price is US\(standard). \(promise)")
         }
-        return String(localized: "This price is for launch week only — \(ProConfiguration.foundingDiscountPercent)% off the \(standard) standard lifetime price, as a thank-you to our founding users. \(promise)")
+        let percent = ProConfiguration.lifetimeDiscountPercent
+        return String(localized: "\(percent)% off the \(standard) standard lifetime price. \(promise)")
     }
 
     private func benefit(_ title: String, _ detail: String, _ icon: String) -> some View {
@@ -183,19 +184,18 @@ struct PaywallView: View {
     }
     private func planRow(_ plan: ProPlan) -> some View {
         let product = store.product(for: plan)
-        let founding = product.map(store.isFounding) ?? false
-        let statesDiscount = product.map(store.showsFoundingDiscount) ?? false
+        let promotional = product.map(store.isPromotional) ?? false
+        let statesDiscount = product.map(store.showsDiscount) ?? false
         let selected = selection == plan
         let savings = product.flatMap(store.savingsVersusWeekly)
         let weekly = product.flatMap(store.weeklyPriceLabel)
         let standard = product.flatMap(store.standardPriceLabel)
-        // Naming the saving on the pill, where it can be named: "FOUNDING
-        // PRICE" says an offer exists, "94% OFF" says how big it is, and the
+        // Naming the saving on the pill, where it can be named: "EARLY ADOPTER
+        // PRICE" says an offer exists, "86% OFF" says how big it is, and the
         // second is the one that makes someone stop scrolling.
-        let badge = founding
-            ? (statesDiscount
-                ? String(localized: "FOUNDING — \(ProConfiguration.foundingDiscountPercent)% OFF")
-                : String(localized: "FOUNDING PRICE"))
+        let badge = promotional
+            ? ProConfiguration.currentPhase.badge(
+                discountPercent: statesDiscount ? ProConfiguration.lifetimeDiscountPercent : nil)
             : savings.map { String(localized: "SAVE \($0)%") }
         return Button { selection = plan } label: {
             VStack(alignment: .leading, spacing: 10) {
@@ -203,17 +203,17 @@ struct PaywallView: View {
                     Image(systemName: selected ? "largecircle.fill.circle" : "circle")
                         .font(.title3).foregroundStyle(selected ? accent : .white.opacity(0.4))
                     VStack(alignment: .leading, spacing: 4) {
-                        Text(founding ? String(localized: "Lifetime Pro") : plan.title).font(.headline)
+                        Text(promotional ? String(localized: "Lifetime Pro") : plan.title).font(.headline)
                         Text(plan.billingLabel).font(.caption).foregroundStyle(.white.opacity(0.65))
                     }
                     Spacer(minLength: 4)
                     VStack(alignment: .trailing, spacing: 2) {
                         // The price this replaces, struck through directly above
-                        // it. Without it the founding price is simply the price,
+                        // it. Without it the current price is simply the price,
                         // and the offer is a sentence of small print nobody
                         // reads; with it the discount is the first thing the eye
-                        // lands on. Only ever shown in the currency the standard
-                        // price is genuinely known in — see `standardPriceLabel`.
+                        // lands on. Always the dollar figure, in every
+                        // storefront — see `standardPriceLabel`.
                         if let standard {
                             Text(standard)
                                 .font(.subheadline)
@@ -231,8 +231,8 @@ struct PaywallView: View {
                     }
                     .multilineTextAlignment(.trailing)
                 }
-                if founding {
-                    Text(foundingDetail(statingDiscount: statesDiscount))
+                if promotional {
+                    Text(ladderDetail(statingDiscount: statesDiscount))
                         .font(.caption).foregroundStyle(.white.opacity(0.65)).fixedSize(horizontal: false, vertical: true)
                 }
             }
@@ -242,39 +242,39 @@ struct PaywallView: View {
             .background(selected ? accent.opacity(0.09) : .white.opacity(0.035), in: RoundedRectangle(cornerRadius: 18))
             .overlay(RoundedRectangle(cornerRadius: 18).stroke(selected ? accent : .white.opacity(0.1), lineWidth: selected ? 1.5 : 1))
             .overlay(alignment: .topTrailing) {
-                if let badge { planBadge(badge, isFounding: founding) }
+                if let badge { planBadge(badge, isPromotional: promotional) }
             }
         }
         .buttonStyle(.plain).disabled(busy || product == nil)
         .accessibilityElement(children: .combine)
-        .accessibilityLabel(planAccessibilityLabel(plan, product: product, founding: founding,
+        .accessibilityLabel(planAccessibilityLabel(plan, product: product, promotional: promotional,
                                                    savings: savings, weekly: weekly))
         .accessibilityAddTraits(selected ? .isSelected : [])
     }
 
     /// The pill that straddles a plan's top edge.
-    private func planBadge(_ text: String, isFounding: Bool) -> some View {
+    private func planBadge(_ text: String, isPromotional: Bool) -> some View {
         Text(text)
             .font(.system(size: 10, weight: .bold)).tracking(0.6)
             .foregroundStyle(.black)
             .padding(.horizontal, 9).padding(.vertical, 3)
-            .background(isFounding ? ProStyle.gold : accent, in: Capsule())
+            .background(isPromotional ? ProStyle.gold : accent, in: Capsule())
             .padding(.trailing, 14)
             .offset(y: -8)
             .accessibilityHidden(true)
     }
 
     private func planAccessibilityLabel(
-        _ plan: ProPlan, product: Product?, founding: Bool, savings: Int?, weekly: String?
+        _ plan: ProPlan, product: Product?, promotional: Bool, savings: Int?, weekly: String?
     ) -> String {
-        var parts = [founding ? String(localized: "Lifetime Pro") : plan.title]
+        var parts = [promotional ? String(localized: "Lifetime Pro") : plan.title]
         if let standard = product.flatMap(store.standardPriceLabel) {
             parts.append(String(localized: "Was \(standard)"))
         }
         if let price = product?.displayPrice { parts.append(price) }
         parts.append(plan.billingLabel)
         if let weekly { parts.append(String(localized: "\(weekly) per week")) }
-        if founding { parts.append(String(localized: "Founding price, launch week only")) }
+        if promotional { parts.append(String(localized: "Introductory price")) }
         if let savings { parts.append(String(localized: "Saves \(savings) percent against the weekly plan")) }
         return parts.joined(separator: ". ")
     }

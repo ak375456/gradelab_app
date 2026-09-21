@@ -23,12 +23,12 @@ enum ImageImportService {
             kCGImageSourceThumbnailMaxPixelSize: 192, kCGImageSourceCreateThumbnailWithTransform: true] as CFDictionary)
     }
     static func load(_ item: PhotosPickerItem) async throws -> ProjectMediaAsset {
-        guard let file = try await item.loadTransferable(type: TransferredStill.self) else { throw TimelineError.invalid("The image could not be imported.") }
+        guard let file = try await item.loadTransferable(type: TransferredStill.self) else { throw TimelineError.invalid(String(localized: "The image could not be imported.")) }
         defer { try? FileManager.default.removeItem(at: file.url) }
         guard let source = CGImageSourceCreateWithURL(file.url as CFURL, nil),
               let props = CGImageSourceCopyPropertiesAtIndex(source, 0, nil) as? [CFString: Any],
               let width = props[kCGImagePropertyPixelWidth] as? Int, let height = props[kCGImagePropertyPixelHeight] as? Int,
-              width > 0, height > 0 else { throw TimelineError.invalid("Choose a supported still image.") }
+              width > 0, height > 0 else { throw TimelineError.invalid(String(localized: "Choose a supported still image.")) }
         let destination = try await ProjectStore().sourceImportURL(fileExtension: file.url.pathExtension)
         try FileManager.default.copyItem(at: file.url, to: destination)
         let orientation = props[kCGImagePropertyOrientation] as? Int ?? 1

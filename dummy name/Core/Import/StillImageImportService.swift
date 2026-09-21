@@ -21,7 +21,7 @@ enum StillImageImportService {
 
     static func load(_ item: PhotosPickerItem, store: ImageProjectStore = ImageProjectStore()) async throws -> Imported {
         guard let file = try await item.loadTransferable(type: TransferredStill.self) else {
-            throw TimelineError.invalid("The image could not be imported.")
+            throw TimelineError.invalid(String(localized: "The image could not be imported."))
         }
         defer { try? FileManager.default.removeItem(at: file.url) }
         return try await load(url: file.url, store: store,
@@ -82,6 +82,6 @@ enum StillImageImportService {
 
     private static func defaultName(for metadata: ImageMetadata) -> String {
         let date = metadata.creationDate ?? .now
-        return "Photo \(date.formatted(.dateTime.year().month(.twoDigits).day(.twoDigits)))"
+        return String(localized: "Photo \(date.formatted(.dateTime.year().month(.twoDigits).day(.twoDigits)))")
     }
 }

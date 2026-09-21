@@ -102,14 +102,14 @@ struct ExportTimeRemaining: Sendable {
     /// on a number this approximate would be a false precision.
     static func label(_ seconds: TimeInterval) -> String {
         guard seconds.isFinite, seconds >= 0 else { return "" }
-        if seconds < 10 { return "Almost done" }
-        if seconds < 60 { return "About \(Int((seconds / 5).rounded()) * 5) sec remaining" }
+        if seconds < 10 { return String(localized: "Almost done") }
+        if seconds < 60 { return String(localized: "About \(Int((seconds / 5).rounded()) * 5) sec remaining") }
         let minutes = Int((seconds / 60).rounded(.up))
-        if minutes < 60 { return "About \(minutes) min remaining" }
+        if minutes < 60 { return String(localized: "About \(minutes) min remaining") }
         let hours = minutes / 60
         let rest = minutes % 60
         return rest == 0
-            ? "About \(hours) hr remaining"
-            : "About \(hours) hr \(rest) min remaining"
+            ? String(localized: "About \(hours) hr remaining")
+            : String(localized: "About \(hours) hr \(rest) min remaining")
     }
 }

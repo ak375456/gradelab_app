@@ -33,46 +33,101 @@ enum ProConfiguration {
     /// the way a missing privacy policy does.
     static let communityURL = URL(string: "https://www.reddit.com/r/GradeLabApp/")
     static var legalLinksReady: Bool { privacyPolicyURL != nil && termsURL != nil }
-    // No timer. Change this in the update ending the founding campaign AND
-    // change the existing lifetime product's price in App Store Connect.
-    static let foundingCampaignEnabled = true
-    static let foundingUSD: Decimal = 1.99
-    /// What Lifetime is worth at its settled price, and the only number the
-    /// founding saving is ever measured against.
+    /// A rung on the launch price ladder.
+    ///
+    /// Lifetime does not go on sale and come off it again — it climbs, one
+    /// announced step at a time, and the credibility of each increase rests
+    /// entirely on the last one having happened exactly when it was promised.
+    /// So this is a sequence rather than a discount flag: the rung names itself
+    /// on the badge and sets the saving the paywall prints, both read from the
+    /// same value. It deliberately does *not* tell anyone what the next price
+    /// will be — the app states what it charges today and anchors it to the
+    /// settled price, and nothing else.
+    ///
+    /// There is no timer and no date arithmetic. Moving a rung is two changes
+    /// made together — `currentPhase` below, and the lifetime product's price
+    /// in App Store Connect. **Ship the build first.** App Store Connect applies
+    /// a price within hours while review takes about a day, and in between the
+    /// app would be charging one price while describing another.
+    enum LaunchPhase: String, CaseIterable, Sendable {
+        case founding, earlyAdopter, launch, growth, standard
+
+        /// What Lifetime costs in the US storefront on this rung.
+        var lifetimeUSD: Decimal {
+            switch self {
+            case .founding: 1.99
+            case .earlyAdopter: 4.99
+            case .launch: 9.99
+            case .growth: 14.99
+            case .standard: ProConfiguration.standardLifetimeUSD
+            }
+        }
+
+        /// The rung after this one, or nil at the top of the ladder.
+        var next: LaunchPhase? {
+            switch self {
+            case .founding: .earlyAdopter
+            case .earlyAdopter: .launch
+            case .launch: .growth
+            case .growth: .standard
+            case .standard: nil
+            }
+        }
+
+        /// Whether Lifetime sits below its settled price here, and so carries a
+        /// badge and an explanation rather than just a number.
+        var isPromotional: Bool { self != .standard }
+
+        /// The gold pill's text, naming the saving where it can be named.
+        ///
+        /// Written out per rung rather than composed from a name and a
+        /// template, because "FOUNDING PRICE" is a single word in German
+        /// (GRÜNDERPREIS) and a template would have produced "GRÜNDER PREIS".
+        func badge(discountPercent: Int?) -> String? {
+            switch (self, discountPercent) {
+            case (.founding, let percent?): String(localized: "FOUNDING — \(percent)% OFF")
+            case (.founding, nil): String(localized: "FOUNDING PRICE")
+            case (.earlyAdopter, let percent?): String(localized: "EARLY ADOPTER — \(percent)% OFF")
+            case (.earlyAdopter, nil): String(localized: "EARLY ADOPTER PRICE")
+            case (.launch, let percent?): String(localized: "LAUNCH — \(percent)% OFF")
+            case (.launch, nil): String(localized: "LAUNCH PRICE")
+            case (.growth, let percent?): String(localized: "GROWTH — \(percent)% OFF")
+            case (.growth, nil): String(localized: "GROWTH PRICE")
+            case (.standard, _): nil
+            }
+        }
+    }
+
+    /// Where the ladder stands today. See `LaunchPhase` before changing it.
+    static let currentPhase: LaunchPhase = .earlyAdopter
+    /// What Lifetime is worth at its settled price, and the only number any
+    /// saving is ever measured against.
     static let standardLifetimeUSD: Decimal = 34.99
-    /// What Lifetime actually costs the week after the founding campaign ends.
+    /// Whether Lifetime is currently below its settled price.
     ///
-    /// Kept separate from `standardLifetimeUSD` because the two are different
-    /// claims, and only one of them is imminent. The launch plan steps Lifetime
-    /// up over weeks — $4.99, then $9.99, then $14.99 — before it settles at
-    /// the $34.99 standard. Paywall copy may anchor the saving to $34.99, but
-    /// it must not tell anyone the price becomes $34.99 next week, because it
-    /// does not.
-    static let nextLifetimeUSD: Decimal = 4.99
-    /// Whether the founding campaign is running.
-    ///
-    /// True in every storefront. The campaign is a date, not a currency: someone
-    /// buying in Karachi during launch week is as much a founding user as
-    /// someone buying in California, and hiding the badge from them was a bug.
-    static var isFoundingCampaignRunning: Bool { foundingCampaignEnabled }
+    /// True in every storefront. A rung is a date, not a currency: someone
+    /// buying in Karachi this week is on the same rung as someone buying in
+    /// California, and hiding the badge from them was a bug.
+    static var isPromotionalPricing: Bool { currentPhase.isPromotional }
 
     /// Whether the exact saving can be stated as a percentage.
     ///
     /// Only where the standard price is known in the same currency the customer
     /// is being charged in — which is USD, because `standardLifetimeUSD` is the
-    /// only standard price this app knows. Everywhere else the campaign is
-    /// announced without a number rather than with an invented one. The price
-    /// check also suppresses the claim after App Store Connect raises the price,
-    /// including for customers who have not installed the newest build.
-    static func canStateFoundingDiscount(price: Decimal, currency: String) -> Bool {
-        foundingCampaignEnabled && currency == "USD" && price == foundingUSD
+    /// only standard price this app knows. Everywhere else the rung is announced
+    /// without a number rather than with an invented one. The price check also
+    /// suppresses the claim whenever App Store Connect and this build disagree:
+    /// during the hours between a price change and an approved update, and on
+    /// every older build still installed after one.
+    static func canStateDiscount(price: Decimal, currency: String) -> Bool {
+        currentPhase.isPromotional && currency == "USD" && price == currentPhase.lifetimeUSD
     }
     /// Whole-percent saving against the standard lifetime price, derived rather
-    /// than written down so the badge cannot drift away from the two numbers
-    /// above when either of them changes.
-    static var foundingDiscountPercent: Int {
+    /// than written down so the badge cannot drift away from the two numbers it
+    /// is made of when either of them changes.
+    static var lifetimeDiscountPercent: Int {
         guard standardLifetimeUSD > 0 else { return 0 }
-        let ratio = (standardLifetimeUSD - foundingUSD) / standardLifetimeUSD
+        let ratio = (standardLifetimeUSD - currentPhase.lifetimeUSD) / standardLifetimeUSD
         return Int((NSDecimalNumber(decimal: ratio).doubleValue * 100).rounded())
     }
 }

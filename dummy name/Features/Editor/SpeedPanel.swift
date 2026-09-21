@@ -119,7 +119,7 @@ struct SpeedPanel: View {
     }
 
     private var durationSummary: String {
-        guard model.selectedClip != nil else { return "No clip selected" }
+        guard model.selectedClip != nil else { return String(localized: "No clip selected") }
         return String(format: String(localized: "%.2fs source · %.2fs on the timeline"), locale: .current, sourceSeconds, timelineSeconds)
     }
 }

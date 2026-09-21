@@ -38,6 +38,9 @@ struct ImageProject: Codable, Identifiable, Equatable, Sendable {
     /// The grade. Non-destructive: the source file is never rewritten, and this
     /// is the only thing an edit changes.
     var gradeSettings: GradeSettings
+    /// Optional for backwards compatibility with every photo document written
+    /// before non-destructive cutouts existed.
+    var backgroundRemoval: BackgroundRemovalSettings?
     var thumbnailFileName: String?
     let createdAt: Date
     var updatedAt: Date
@@ -47,6 +50,7 @@ struct ImageProject: Codable, Identifiable, Equatable, Sendable {
         displayName: String,
         asset: ImageAsset,
         gradeSettings: GradeSettings = .neutral,
+        backgroundRemoval: BackgroundRemovalSettings? = nil,
         thumbnailFileName: String? = nil,
         createdAt: Date = .now,
         updatedAt: Date = .now
@@ -56,6 +60,7 @@ struct ImageProject: Codable, Identifiable, Equatable, Sendable {
         self.displayName = displayName
         self.asset = asset
         self.gradeSettings = gradeSettings
+        self.backgroundRemoval = backgroundRemoval
         self.thumbnailFileName = thumbnailFileName
         self.createdAt = createdAt
         self.updatedAt = updatedAt
@@ -70,15 +75,15 @@ struct ImageProject: Codable, Identifiable, Equatable, Sendable {
             throw TimelineError.unsupportedVersion("This photo project was made by a newer version of GradeLab. Update the app to open it.")
         }
         guard asset.url.isFileURL else {
-            throw TimelineError.invalid("The image project references a source that is not a file.")
+            throw TimelineError.invalid(String(localized: "The image project references a source that is not a file."))
         }
         guard asset.metadata.pixelWidth > 0, asset.metadata.pixelHeight > 0 else {
-            throw TimelineError.invalid("The image project has no pixel dimensions.")
+            throw TimelineError.invalid(String(localized: "The image project has no pixel dimensions."))
         }
     }
 
     private enum CodingKeys: String, CodingKey {
-        case documentVersion, id, displayName, asset, gradeSettings
+        case documentVersion, id, displayName, asset, gradeSettings, backgroundRemoval
         case thumbnailFileName, createdAt, updatedAt
     }
 
@@ -100,6 +105,7 @@ struct ImageProject: Codable, Identifiable, Equatable, Sendable {
         // Absent means neutral, which is what a project saved before a grading
         // control existed meant.
         gradeSettings = try c.decodeIfPresent(GradeSettings.self, forKey: .gradeSettings) ?? .neutral
+        backgroundRemoval = try c.decodeIfPresent(BackgroundRemovalSettings.self, forKey: .backgroundRemoval)
         thumbnailFileName = try c.decodeIfPresent(String.self, forKey: .thumbnailFileName)
         createdAt = try c.decode(Date.self, forKey: .createdAt)
         updatedAt = try c.decode(Date.self, forKey: .updatedAt)
@@ -114,6 +120,7 @@ struct ImageProject: Codable, Identifiable, Equatable, Sendable {
         try c.encode(displayName, forKey: .displayName)
         try c.encode(asset, forKey: .asset)
         try c.encode(gradeSettings, forKey: .gradeSettings)
+        try c.encodeIfPresent(backgroundRemoval, forKey: .backgroundRemoval)
         try c.encodeIfPresent(thumbnailFileName, forKey: .thumbnailFileName)
         try c.encode(createdAt, forKey: .createdAt)
         try c.encode(updatedAt, forKey: .updatedAt)

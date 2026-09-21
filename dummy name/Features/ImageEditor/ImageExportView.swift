@@ -103,6 +103,10 @@ struct ImageExportView: View {
                     }
                 }
 
+                if model.hasCutout {
+                    transparencyOptions
+                }
+
                 proNotice
                 AppButton(model.isLocked ? "Unlock Pro to Export" : "Export Image",
                           systemImage: model.isLocked ? "lock.fill" : "arrow.up.circle.fill",
@@ -117,6 +121,58 @@ struct ImageExportView: View {
             .padding(AppSpacing.standard)
         }
         .scrollIndicators(.hidden)
+    }
+
+    private var transparencyOptions: some View {
+        VStack(alignment: .leading, spacing: AppSpacing.small) {
+            AppSectionHeader(model.flattensCutout ? "Background" : "Transparency")
+            if model.flattensCutout {
+                HStack(spacing: AppSpacing.small) {
+                    flattenPreset(String(localized: "White"), color: .white)
+                    flattenPreset(String(localized: "Black"), color: .black)
+                    ColorPicker("Custom", selection: flattenColorBinding, supportsOpacity: false)
+                        .font(AppTypography.callout)
+                        .frame(minHeight: 44)
+                }
+                Text("This format does not preserve transparency, so the cutout will be flattened onto this color.")
+                    .font(AppTypography.caption)
+                    .foregroundStyle(AppColors.textSecondary)
+            } else {
+                Label("PNG preserves the transparent background.", systemImage: "checkerboard.rectangle")
+                    .font(AppTypography.callout)
+                    .foregroundStyle(AppColors.textSecondary)
+                    .frame(minHeight: 44)
+            }
+        }
+    }
+
+    private func flattenPreset(_ title: String, color: RGBAColor) -> some View {
+        Button {
+            model.configuration.flattenColor = color
+        } label: {
+            HStack(spacing: 7) {
+                Circle()
+                    .fill(Color(.sRGB, red: color.red, green: color.green, blue: color.blue, opacity: 1))
+                    .frame(width: 18, height: 18)
+                    .overlay(Circle().stroke(.white.opacity(0.22), lineWidth: 1))
+                Text(title)
+            }
+            .font(AppTypography.callout)
+            .frame(minHeight: 44)
+        }
+        .buttonStyle(.plain)
+        .foregroundStyle(model.configuration.flattenColor == color ? AppColors.accent : AppColors.textSecondary)
+    }
+
+    private var flattenColorBinding: Binding<Color> {
+        Binding {
+            let color = model.configuration.flattenColor
+            return Color(.sRGB, red: color.red, green: color.green, blue: color.blue, opacity: 1)
+        } set: { color in
+            var red: CGFloat = 0, green: CGFloat = 0, blue: CGFloat = 0, alpha: CGFloat = 0
+            UIColor(color).getRed(&red, green: &green, blue: &blue, alpha: &alpha)
+            model.configuration.flattenColor = RGBAColor(red: red, green: green, blue: blue)
+        }
     }
 
     /// Every Pro feature this still would use.

@@ -112,46 +112,46 @@ enum AnimatableProperty: String, Codable, CaseIterable, Sendable {
         // Grading parameters name themselves through their slot.
         if let grade = gradeSlot { return grade.title }
         return switch self {
-        case .positionX: "Position X"
-        case .positionY: "Position Y"
-        case .scale: "Scale"
-        case .widthScale: "Width scale"
-        case .heightScale: "Height scale"
-        case .rotation: "Rotation"
-        case .opacity: "Opacity"
-        case .layerMaskPositionX, .localMaskPositionX: "Position X"
-        case .layerMaskPositionY, .localMaskPositionY: "Position Y"
-        case .layerMaskWidth, .localMaskWidth: "Width"
-        case .layerMaskHeight, .localMaskHeight: "Height"
-        case .layerMaskRotation, .localMaskRotation: "Rotation"
-        case .layerMaskFeather, .localMaskFeather: "Feather"
-        case .localMaskOpacity: "Mask opacity"
-        case .localMaskCornerRadius: "Corner radius"
-        case .localMaskStrength: "Strength"
-        case .fontSize: "Font size"
-        case .characterSpacing: "Character spacing"
-        case .lineSpacing: "Line spacing"
-        case .layoutWidth: "Wrap width"
-        case .curve: "Curve"
-        case .shapeWidth: "Width"
-        case .shapeHeight: "Height"
-        case .shapeInnerRadius: "Star waist"
-        case .strokeWidth: "Stroke width"
-        case .backgroundOpacity: "Background opacity"
-        case .cornerRadius: "Corner radius"
-        case .backgroundPadding: "Background padding"
-        case .shadowOpacity: "Shadow opacity"
-        case .shadowRadius: "Shadow blur"
-        case .shadowOffsetX: "Shadow offset X"
-        case .shadowOffsetY: "Shadow offset Y"
-        case .glowOpacity: "Glow intensity"
-        case .glowRadius: "Glow radius"
-        case .textColor: "Text color"
-        case .fillColor: "Fill"
-        case .strokeColor: "Stroke color"
-        case .backgroundColor: "Background color"
-        case .shadowColor: "Shadow color"
-        case .glowColor: "Glow color"
+        case .positionX: String(localized: "Position X")
+        case .positionY: String(localized: "Position Y")
+        case .scale: String(localized: "Scale")
+        case .widthScale: String(localized: "Width scale")
+        case .heightScale: String(localized: "Height scale")
+        case .rotation: String(localized: "Rotation")
+        case .opacity: String(localized: "Opacity")
+        case .layerMaskPositionX, .localMaskPositionX: String(localized: "Position X")
+        case .layerMaskPositionY, .localMaskPositionY: String(localized: "Position Y")
+        case .layerMaskWidth, .localMaskWidth: String(localized: "Width")
+        case .layerMaskHeight, .localMaskHeight: String(localized: "Height")
+        case .layerMaskRotation, .localMaskRotation: String(localized: "Rotation")
+        case .layerMaskFeather, .localMaskFeather: String(localized: "Feather")
+        case .localMaskOpacity: String(localized: "Mask opacity")
+        case .localMaskCornerRadius: String(localized: "Corner radius")
+        case .localMaskStrength: String(localized: "Strength")
+        case .fontSize: String(localized: "Font size")
+        case .characterSpacing: String(localized: "Character spacing")
+        case .lineSpacing: String(localized: "Line spacing")
+        case .layoutWidth: String(localized: "Wrap width")
+        case .curve: String(localized: "Curve")
+        case .shapeWidth: String(localized: "Width")
+        case .shapeHeight: String(localized: "Height")
+        case .shapeInnerRadius: String(localized: "Star waist")
+        case .strokeWidth: String(localized: "Stroke width")
+        case .backgroundOpacity: String(localized: "Background opacity")
+        case .cornerRadius: String(localized: "Corner radius")
+        case .backgroundPadding: String(localized: "Background padding")
+        case .shadowOpacity: String(localized: "Shadow opacity")
+        case .shadowRadius: String(localized: "Shadow blur")
+        case .shadowOffsetX: String(localized: "Shadow offset X")
+        case .shadowOffsetY: String(localized: "Shadow offset Y")
+        case .glowOpacity: String(localized: "Glow intensity")
+        case .glowRadius: String(localized: "Glow radius")
+        case .textColor: String(localized: "Text color")
+        case .fillColor: String(localized: "Fill")
+        case .strokeColor: String(localized: "Stroke color")
+        case .backgroundColor: String(localized: "Background color")
+        case .shadowColor: String(localized: "Shadow color")
+        case .glowColor: String(localized: "Glow color")
         // Only a grading property reaches here, and it was named above.
         default: rawValue
         }
@@ -333,11 +333,11 @@ enum KeyframeInterpolation: String, Codable, Sendable, CaseIterable {
 
     var title: String {
         switch self {
-        case .linear: "Linear"
-        case .hold: "Hold"
-        case .easeIn: "Ease In"
-        case .easeOut: "Ease Out"
-        case .easeInOut: "Ease In-Out"
+        case .linear: String(localized: "Linear")
+        case .hold: String(localized: "Hold")
+        case .easeIn: String(localized: "Ease In")
+        case .easeOut: String(localized: "Ease Out")
+        case .easeInOut: String(localized: "Ease In-Out")
         }
     }
     var symbol: String {

@@ -12,8 +12,16 @@ struct GradingControls<Model: GradingModel>: View {
     @ObservedObject var model: Model
     /// Opens the "Save Grade as Preset" sheet, which the host presents.
     var onSaveGrade: () -> Void = {}
+    @Binding private var scrollPosition: ScrollPosition
 
     @State private var selectedParameter: GradeParameter = .exposure
+
+    init(model: Model, onSaveGrade: @escaping () -> Void = {},
+         scrollPosition: Binding<ScrollPosition> = .constant(ScrollPosition(y: 0))) {
+        self.model = model
+        self.onSaveGrade = onSaveGrade
+        self._scrollPosition = scrollPosition
+    }
 
     var body: some View {
         VStack(spacing: 0) {
@@ -91,7 +99,9 @@ struct GradingControls<Model: GradingModel>: View {
                     case .effects: FilmEffectsPanel(model: model)
                     }
                 }.padding(.horizontal, 20).padding(.bottom, 24)
-            }.scrollIndicators(.visible)
+            }
+            .scrollPosition($scrollPosition)
+            .scrollIndicators(.visible)
         }
         .onChange(of: model.selectedPanel, initial: true) { _, panel in
             selectedParameter = panel == .color ? .temperature : .exposure
@@ -421,12 +431,18 @@ struct GradeActionsMenu<Model: GradingModel>: View {
     var onSaveGrade: () -> Void
     @ObservedObject private var store = ProStore.shared
     @State private var paywallFeature: ProFeature?
+    /// Raised when a paste would land on a clip that is already graded. Pasting
+    /// silently replaced that work, which is a lot to lose to one menu tap.
+    @State private var confirmsPaste = false
 
     var body: some View {
         Menu {
             Button("Copy Grade", systemImage: "doc.on.doc", action: model.copyGrade)
                 .disabled(!model.canCopyGrade)
-            Button("Paste Grade", systemImage: "doc.on.clipboard", action: model.pasteGrade)
+            Button("Paste Grade", systemImage: "doc.on.clipboard") {
+                if model.pasteWouldOverwriteGrade { confirmsPaste = true }
+                else { model.pasteGrade(.replace) }
+            }
                 .disabled(!model.canPasteGrade)
             Button("Reset Grade", systemImage: "arrow.counterclockwise", action: model.resetGrade)
                 .disabled(!model.canResetGrade)
@@ -441,5 +457,12 @@ struct GradeActionsMenu<Model: GradingModel>: View {
         } label: { Image(systemName: "ellipsis").frame(width: 44, height: 44) }
             .accessibilityLabel("Grade options")
             .paywallSheet($paywallFeature)
+            .confirmationDialog("Already graded", isPresented: $confirmsPaste, titleVisibility: .visible) {
+                Button("Add on Top") { model.pasteGrade(.addOnTop) }
+                Button("Replace", role: .destructive) { model.pasteGrade(.replace) }
+                Button("Cancel", role: .cancel) {}
+            } message: {
+                Text("Keep this grade and add the copied one, or replace it?")
+            }
     }
 }

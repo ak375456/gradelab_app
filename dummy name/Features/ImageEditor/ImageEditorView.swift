@@ -131,6 +131,24 @@ struct ImageEditorView: View {
     }
 
     private var scopesVisible: Bool { model.scopeSettings.isEnabled && !model.isPreparing }
+    /// True while the preview is being pinched, so the cutout tools can tell a
+    /// zoom from a stroke.
+    @State private var previewPinching = false
+    private var backgroundInteractionActive: Bool {
+        model.imageTool == .background &&
+        (backgroundToolArmed || model.selectedBackgroundRemoval?.lasso?.isDrawn == true)
+    }
+    /// A cutout tool currently owns the one-finger drag over the picture.
+    private var backgroundToolArmed: Bool {
+        model.imageTool == .background &&
+        (model.backgroundBrush != nil || model.isDrawingBackgroundLasso || model.isPickingBackgroundColor)
+    }
+    /// The cutout tools keep the pinch so an edge can be traced magnified; the
+    /// mask window and the eyedropper hold the picture at 1x, as before.
+    private var previewInteraction: PreviewInteraction {
+        if backgroundToolArmed { return .pinchOnly }
+        return model.isPickingCurveHue || model.selectedPanel == .mask ? .off : .full
+    }
 
     // MARK: - Header
 
@@ -170,7 +188,8 @@ struct ImageEditorView: View {
 
     private var preview: some View {
         ZStack(alignment: .topLeading) {
-            PreviewViewport(inspectionEnabled: !model.isPickingCurveHue && model.selectedPanel != .mask) {
+            PreviewViewport(interaction: previewInteraction,
+                            onPinchChanged: { previewPinching = $0 }) {
                 ZStack {
                     MetalPreviewView(
                         renderer: model.renderer, settings: model.settings,
@@ -179,6 +198,11 @@ struct ImageEditorView: View {
                         isActive: scenePhase == .active && !model.showsExport)
                     if model.selectedPanel == .mask && !model.showsOriginal {
                         GradeMaskOverlay(model: model, displayedRect: model.renderer.displayedVideoRect)
+                    }
+                    if backgroundInteractionActive && !model.showsOriginal {
+                        ImageBackgroundRemovalOverlay(model: model,
+                                                      displayedRect: model.renderer.displayedVideoRect,
+                                                      isZooming: previewPinching)
                     }
                 }
             }
@@ -267,25 +291,36 @@ struct ImageEditorView: View {
     // MARK: - Tools
 
     private var inspector: some View {
-        GradingControls(model: model, onSaveGrade: { savingPreset = true })
+        Group {
+            if model.imageTool == .background { ImageBackgroundRemovalPanel(model: model) }
+            else { GradingControls(model: model, onSaveGrade: { savingPreset = true }) }
+        }
     }
 
     private var toolBar: some View {
         HStack(spacing: 8) {
-            Text("Color").font(.caption.weight(.medium)).foregroundStyle(AppColors.accent)
-                .frame(minHeight: 44)
+            Button { model.imageTool = .color } label: {
+                Label("Color", systemImage: "camera.filters").font(.caption.weight(.medium)).frame(minHeight: 44)
+                    .foregroundStyle(model.imageTool == .color ? AppColors.accent : AppColors.textSecondary)
+            }
+            Button { model.imageTool = .background; model.isPickingCurveHue = false } label: {
+                Label("Remove BG", systemImage: "person.crop.rectangle").font(.caption.weight(.medium)).frame(minHeight: 44)
+                    .foregroundStyle(model.imageTool == .background ? AppColors.accent : AppColors.textSecondary)
+            }
             Spacer()
-            Button { help = true } label: {
+            if model.imageTool == .color { Button { help = true } label: {
                 Image(systemName: "questionmark.circle").frame(width: 44, height: 44)
-            }.accessibilityLabel("How to use \(model.selectedPanel.rawValue)")
-            GradeActionsMenu(model: model, onSaveGrade: { savingPreset = true })
+            }.accessibilityLabel("How to use \(model.selectedPanel.rawValue)") }
+            if model.imageTool == .color { GradeActionsMenu(model: model, onSaveGrade: { savingPreset = true }) }
             Button { comparePinned.toggle() } label: {
                 Image(systemName: "square.on.square").frame(width: 44, height: 44)
                     .foregroundStyle(comparePinned ? AppColors.accent : AppColors.textSecondary)
             }
             .accessibilityLabel(comparePinned ? "Show edited image" : "Compare with original")
             .accessibilityValue(comparePinned ? "Original" : "Edited")
-            Button("Reset", action: model.resetPanel).font(.caption).frame(minWidth: 44, minHeight: 44)
+            if model.imageTool == .color {
+                Button("Reset", action: model.resetPanel).font(.caption).frame(minWidth: 44, minHeight: 44)
+            }
         }
         .frame(height: 44).padding(.horizontal, 12)
     }

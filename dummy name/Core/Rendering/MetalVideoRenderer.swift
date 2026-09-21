@@ -2,6 +2,7 @@
 @preconcurrency import MetalKit
 import UIKit
 @preconcurrency import CoreVideo
+import CoreImage
 import QuartzCore
 import simd
 
@@ -12,6 +13,8 @@ final class MetalVideoRenderer: NSObject, MTKViewDelegate, @unchecked Sendable {
     }
 
     private let context: MetalContext
+    private lazy var interactionSnapshotContext = CIContext(
+        mtlDevice: context.device, options: [.cacheIntermediates: false])
     /// Shared with look-preview rendering so both use one device and LUT cache.
     var metalContext: MetalContext { context }
     private let frameProvider: any PreviewFrameSource
@@ -596,6 +599,24 @@ final class MetalVideoRenderer: NSObject, MTKViewDelegate, @unchecked Sendable {
         releaseEffectSurfacesIfIdle(active)
     }
 
+    /// The area of the preview around the canvas.
+    ///
+    /// Deliberately a lighter neutral than the canvas can be. The canvas itself
+    /// is allowed to be black, and against an equally black surround there was
+    /// no way to tell where the frame ended once a clip was scaled down inside
+    /// it - the picture just floated in undifferentiated darkness. This is
+    /// editor furniture: the drawable is the preview, and nothing rendered or
+    /// exported ever sees it.
+    ///
+    /// The two drawable formats need different numbers for the same grey. SDR
+    /// writes sRGB-encoded values straight into an 8-bit buffer, while the HDR
+    /// path presents through an extended *linear* colorspace, so the same
+    /// appearance is the linearised value there.
+    private static func surroundClearColor(extendedLinear: Bool) -> MTLClearColor {
+        let value = extendedLinear ? 0.0152 : 0.13
+        return MTLClearColorMake(value, value, value, 1)
+    }
+
     func configure(_ view: MTKView) {
         view.device = context.device
         view.delegate = self
@@ -603,8 +624,9 @@ final class MetalVideoRenderer: NSObject, MTKViewDelegate, @unchecked Sendable {
         // A non-extended colorspace clips to SDR no matter what the pixel format
         // is, which is the usual way this goes silently wrong.
         // (WWDC22 - Explore EDR on iOS.)
-        view.colorPixelFormat = colorMode.isHDR && hdrPipeline != nil ? Self.hdrDrawableFormat : .bgra8Unorm
-        view.clearColor = MTLClearColorMake(0.018, 0.02, 0.024, 1)
+        let extended = colorMode.isHDR && hdrPipeline != nil
+        view.colorPixelFormat = extended ? Self.hdrDrawableFormat : .bgra8Unorm
+        view.clearColor = Self.surroundClearColor(extendedLinear: extended)
         view.framebufferOnly = true
         view.enableSetNeedsDisplay = false
         view.isPaused = true
@@ -984,6 +1006,14 @@ final class MetalVideoRenderer: NSObject, MTKViewDelegate, @unchecked Sendable {
         }
         let sample = total / Float(side * side)
         return sample.x.isFinite && sample.y.isFinite && sample.z.isFinite ? sample : nil
+    }
+
+    /// A lightweight snapshot for editor interaction furniture such as the
+    /// refinement loupe. It is never used for rendering or export.
+    func currentInteractionImage() -> CGImage? {
+        guard let buffer = frameProvider.latestFrame else { return nil }
+        let image = CIImage(cvPixelBuffer: buffer)
+        return interactionSnapshotContext.createCGImage(image, from: image.extent)
     }
 
     /// Where the picture sits inside the preview view, as 0...1 from its

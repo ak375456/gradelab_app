@@ -267,7 +267,7 @@ struct ExportView: View {
     /// A menu row's text. Menu rows cannot carry a badge view, so Pro options
     /// say so in words.
     private func optionLabel(_ title: String, needsPro: Bool) -> String {
-        needsPro ? "\(title) · Pro" : title
+        needsPro ? String(localized: "\(title) · Pro") : title
     }
 
     /// Every Pro feature this export would use, listed above the button so the

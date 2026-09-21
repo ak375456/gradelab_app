@@ -172,6 +172,16 @@ final class ImageExporter: @unchecked Sendable {
             progress?(0.15 + 0.75 * Double(index + 1) / Double(max(tiles.count, 1)))
         }
 
+        let preservesAlpha = configuration.format == .png
+        if let removal = project.backgroundRemoval?.clamped, removal.isEnabled {
+            let matte = ImageBackgroundMatteBuilder.make(
+                projectID: project.id, itemID: project.id, source: source, settings: removal)
+            ImageBackgroundMatteBuilder.applyToExport(
+                matte, bytes: destination, width: width, height: height,
+                bytesPerRow: bytesPerRow, preserveAlpha: preservesAlpha,
+                background: configuration.flattenColor, settings: removal)
+        }
+
         // The provider takes ownership of the buffer the moment it is created,
         // and frees it when the image is released. Ownership therefore has to
         // transfer here, not after the file is written: if the encode failed
@@ -189,7 +199,8 @@ final class ImageExporter: @unchecked Sendable {
         let url = try write(
             provider: provider, width: width, height: height,
             bytesPerRow: bytesPerRow, configuration: configuration,
-            project: project, directory: destinationDirectory)
+            project: project, preservesAlpha: preservesAlpha && project.backgroundRemoval?.isEnabled == true,
+            directory: destinationDirectory)
         progress?(1)
         let size = (try? url.resourceValues(forKeys: [.fileSizeKey]).fileSize).map(Int64.init) ?? 0
         return Output(url: url, width: width, height: height,
@@ -510,13 +521,14 @@ final class ImageExporter: @unchecked Sendable {
     private func write(
         provider: CGDataProvider, width: Int, height: Int,
         bytesPerRow: Int, configuration: ImageExportConfiguration,
-        project: ImageProject, directory: URL
+        project: ImageProject, preservesAlpha: Bool, directory: URL
     ) throws -> URL {
+        let alphaInfo: CGImageAlphaInfo = preservesAlpha ? .premultipliedFirst : .noneSkipFirst
         guard let image = CGImage(
                 width: width, height: height,
                 bitsPerComponent: 8, bitsPerPixel: 32, bytesPerRow: bytesPerRow,
                 space: ImageDecoder.workingColorSpace,
-                bitmapInfo: CGBitmapInfo(rawValue: CGImageAlphaInfo.noneSkipFirst.rawValue
+                bitmapInfo: CGBitmapInfo(rawValue: alphaInfo.rawValue
                     | CGBitmapInfo.byteOrder32Little.rawValue),
                 provider: provider, decode: nil, shouldInterpolate: false, intent: .defaultIntent
               ) else {

@@ -9,14 +9,37 @@ final class LayerRenderState: @unchecked Sendable {
     private let lock = NSLock()
     private var project: VideoProject
     private var bypass = false
+    /// The layer whose matte the editor is inspecting, or nil for the ordinary
+    /// picture. Editor-only: export builds its own state and never sets it, so
+    /// a debug view cannot reach a written file.
+    ///
+    /// The TARGET, not the source: the same source cuts one layer and its
+    /// inverse cuts another, so only the target says which of the two the view
+    /// should be showing.
+    private var matteInspectionTargetID: UUID?
+    private var backgroundInspectionTargetID: UUID?
+    private var transparencyGrid = false
     let context: MetalContext?
     init(_ project: VideoProject, context: MetalContext? = nil) { self.project = project; self.context = context }
-    func update(_ project: VideoProject, bypass: Bool) {
+    func update(_ project: VideoProject, bypass: Bool, inspectingMatteOn target: UUID? = nil,
+                inspectingBackgroundOn background: UUID? = nil,
+                showsTransparencyGrid grid: Bool = false) {
         lock.lock(); defer { lock.unlock() }
-        self.project = project; self.bypass = bypass
+        self.project = project; self.bypass = bypass; self.matteInspectionTargetID = target
+        self.backgroundInspectionTargetID = background
+        self.transparencyGrid = grid
     }
     func snapshot() -> (VideoProject, Bool) {
         lock.lock(); defer { lock.unlock() }; return (project, bypass)
+    }
+    var inspectedMatteTargetID: UUID? {
+        lock.lock(); defer { lock.unlock() }; return matteInspectionTargetID
+    }
+    var inspectedBackgroundTargetID: UUID? {
+        lock.lock(); defer { lock.unlock() }; return backgroundInspectionTargetID
+    }
+    var showsTransparencyGrid: Bool {
+        lock.lock(); defer { lock.unlock() }; return transparencyGrid
     }
 }
 
@@ -68,6 +91,18 @@ class LayerCompositor: NSObject, AVVideoCompositing, @unchecked Sendable {
     /// compositor, never during frame playback.
     private var transitionPipeline: MTLComputePipelineState?
     private var stillFrames: [URL: CVPixelBuffer] = [:]
+    /// Fully opaque source-sized surfaces, one per distinct size. A video's
+    /// coverage is "everything inside its transformed rectangle", so a white
+    /// frame run through the layer mask kernel produces its matte alpha without
+    /// decoding or grading a single frame of the source.
+    private var opaqueFrames: [String: CVPixelBuffer] = [:]
+    /// A 1x1 opaque texture, bound wherever a layer has no track matte. Metal
+    /// kernels cannot have an unbound texture argument, and a constant white
+    /// sample costs nothing and needs no uniform flag.
+    private var neutralMatteTexture: MTLTexture?
+    /// The opposite constant: coverage zero, for a transition side whose matte
+    /// source is not present at this moment.
+    private var emptyMatteTexture: MTLTexture?
     private var ci: CIContext?
     private var pools: [String: CVPixelBufferPool] = [:]
     private let colorSpace = CGColorSpace(name: CGColorSpace.itur_709)!
@@ -77,11 +112,13 @@ class LayerCompositor: NSObject, AVVideoCompositing, @unchecked Sendable {
     private var hdrImagePipeline: MTLComputePipelineState?
     private var hdrResolvePipeline: MTLComputePipelineState?
     private var hdrTransitionPipeline: MTLComputePipelineState?
+    private var editorCheckerboardPipeline: MTLComputePipelineState?
     /// Two working-space canvases, ping-ponged as layers are composited.
     private var hdrCanvasPair: (MTLTexture, MTLTexture)?
     /// Spatial finishing effects, the same object preview and export use.
     private var effects: FilmEffectsStage?
     private var appleLogRenderer: AppleLogLayerRenderer?
+    private var backgroundRemovalGPU: BackgroundRemovalGPU?
     private var resources: CompositorResources.Bundle?
 
     func renderContextChanged(_ newRenderContext: AVVideoCompositionRenderContext) {
@@ -122,10 +159,12 @@ class LayerCompositor: NSObject, AVVideoCompositing, @unchecked Sendable {
         hdrImagePipeline = bundle.pipeline("compositeImageHDR")
         hdrResolvePipeline = bundle.pipeline("resolveHDRCanvas")
         hdrTransitionPipeline = bundle.pipeline("compositeTransitionHDR")
+        editorCheckerboardPipeline = bundle.pipeline("fillEditorCheckerboard")
         ci = bundle.ci
         effects = bundle.effects
         resources = bundle
         metal = bundle.context
+        backgroundRemovalGPU = try BackgroundRemovalGPU(context: bundle.context, resources: bundle)
     }
     /// Cross-dissolves two source frames and grades the result in one pass.
     ///
@@ -241,6 +280,67 @@ class LayerCompositor: NSObject, AVVideoCompositing, @unchecked Sendable {
         return output
     }
 
+    /// Applies source-local cutout coverage after the source has been processed
+    /// and before the existing structural mask. Vision reads `original`; alpha
+    /// is multiplied into `processed`, so creative grading never changes which
+    /// subject was found.
+    private func backgroundRemoved(
+        _ processed: CVPixelBuffer,
+        original: CVPixelBuffer,
+        clip: VideoClip,
+        asset: ProjectMediaAsset,
+        projectID: UUID,
+        compositionTime: CMTime
+    ) throws -> CVPixelBuffer {
+        guard let settings = clip.resolvedBackgroundRemoval,
+              let backgroundRemovalGPU else { return processed }
+        guard let matte = try backgroundMatteTexture(original: original, clip: clip, asset: asset,
+            projectID: projectID, compositionTime: compositionTime) else { return processed }
+        let output = try pooledBGRA(width: CVPixelBufferGetWidth(processed),
+                                    height: CVPixelBufferGetHeight(processed))
+        try backgroundRemovalGPU.apply(processed: processed, matte: matte,
+                                       settings: settings, output: output)
+        return output
+    }
+
+    private func backgroundMatteTexture(
+        original: CVPixelBuffer,
+        clip: VideoClip,
+        asset: ProjectMediaAsset,
+        projectID: UUID,
+        compositionTime: CMTime
+    ) throws -> MTLTexture? {
+        guard let settings = clip.resolvedBackgroundRemoval,
+              let backgroundRemovalGPU else { return nil }
+        let composition = try TimelineTime(compositionTime)
+        let sourceTime = asset.stillImage != nil ? .zero : try clip.sourceTime(at: composition)
+        let local = clip.localTime(for: composition)
+        let plane: BackgroundMaskPlane?
+        switch settings.mode {
+        case .colorKey:
+            plane = nil
+        case .lasso:
+            // Rasterized here rather than read from the cache: the outline is
+            // authored data, and evaluating it against this frame is what lets
+            // a tracked cutout follow the object without a generated matte per
+            // frame sitting on disk.
+            plane = settings.lasso.flatMap {
+                BackgroundLassoMatte.plane(for: $0, atLocal: local,
+                                           aspectWidth: CVPixelBufferGetWidth(original),
+                                           aspectHeight: CVPixelBufferGetHeight(original))
+            }
+        case .automatic:
+            let frame = BackgroundMaskFrameIndex.make(sourceTime: sourceTime,
+                assetStart: asset.sourceRange.start, frameDuration: asset.frameDuration)
+            plane = BackgroundRemovalMaskStore.shared.nearest(
+                projectID: projectID, clipID: clip.id,
+                analysisID: settings.analysisID, frame: frame)
+        }
+        return try backgroundRemovalGPU.makeMatte(
+            source: original, settings: settings, automatic: plane,
+            localTime: local, frameDuration: asset.frameDuration)
+    }
+
     private func graded(_ source: CVPixelBuffer, settings: GradeSettings,
                         masks: [MaskedGradeLayer] = [], bypass: Bool,
                         seconds: Double = 0) throws -> CVPixelBuffer {
@@ -302,6 +402,267 @@ class LayerCompositor: NSObject, AVVideoCompositing, @unchecked Sendable {
         guard command.status == .completed else { throw GradeLabError.rendererInitializationFailed }
         return finished
     }
+    // MARK: - Track matte
+
+    /// One frame's rendered mattes, keyed by matte-source item id.
+    ///
+    /// A source is drawn once per frame however many targets read it, and a
+    /// stored nil records "this source supplies no coverage here" so a second
+    /// target does not retry it. The buffers stay alive as long as the frame
+    /// does, which is also what keeps them checked out of the pool.
+    ///
+    /// A reference type so the per-frame helpers can share it without passing
+    /// `inout` through a nested function that also captures it.
+    final class MatteCache {
+        var buffers: [UUID: CVPixelBuffer?] = [:]
+    }
+
+    /// One layer's track matte, resolved for this frame, as the Metal paths
+    /// need it: the coverage texture plus which side of it keeps the layer.
+    ///
+    /// The flag rides alongside the texture rather than inside it, so two
+    /// targets reading the SAME source — one alpha, one inverted — share the
+    /// one rendered matte and differ by a single float in their uniforms.
+    struct LayerMatte {
+        let texture: MTLTexture
+        let inverted: Bool
+    }
+
+    /// The matte source's coverage, in FINAL CANVAS coordinates.
+    ///
+    /// Canvas space is the whole point. The target and the source have their own
+    /// resolutions, aspect ratios, rotations and positions, so there is no
+    /// meaningful shared source-local coordinate to compare — the only place the
+    /// two pictures agree is the frame they both land on.
+    ///
+    /// The source contributes ALPHA. Its colour never reaches the result, which
+    /// is why nothing here grades it: black text and white text with the same
+    /// coverage cut identically, and changing a matte layer's exposure or LUT
+    /// leaves the matte untouched. Its transform, its opacity and its own
+    /// structural layer mask DO change coverage, so those are all applied.
+    ///
+    /// Returns nil when the source contributes nothing at this moment — it is
+    /// disabled, its track is hidden, or the playhead is outside it. For an
+    /// alpha matte that is coverage zero, so the caller must drop the target
+    /// entirely rather than draw it unmatted.
+    private func matte(
+        source id: UUID,
+        project: VideoProject,
+        at compositionTime: CMTime,
+        canvas: CGSize,
+        authoredCanvas: CGSize,
+        cache: MatteCache,
+        request: AVAsynchronousVideoCompositionRequest,
+        instruction: LayerInstruction
+    ) throws -> CVPixelBuffer? {
+        if let cached = cache.buffers[id] { return cached }
+        let rendered = try renderMatte(source: id, project: project, at: compositionTime,
+                                       canvas: canvas, authoredCanvas: authoredCanvas,
+                                       request: request, instruction: instruction)
+        cache.buffers[id] = rendered
+        return rendered
+    }
+
+    private func renderMatte(
+        source id: UUID,
+        project: VideoProject,
+        at compositionTime: CMTime,
+        canvas: CGSize,
+        authoredCanvas: CGSize,
+        request: AVAsynchronousVideoCompositionRequest,
+        instruction: LayerInstruction
+    ) throws -> CVPixelBuffer? {
+        guard let ci, let item = project.timeline.item(id: id), item.placement.isEnabled,
+              let track = project.timeline.tracks.first(where: { $0.id == item.placement.trackID }),
+              track.isEnabled else { return nil }
+        let relative = CMTimeSubtract(compositionTime, item.placement.timelineStart.cmTime)
+        guard relative >= .zero, relative < item.placement.duration.cmTime else { return nil }
+        let time = try? TimelineTime(compositionTime)
+        let bounds = CGRect(origin: .zero, size: canvas)
+        let clear = CIImage(color: .clear).cropped(to: bounds)
+        let placed: CIImage
+        switch item {
+        case .text(let authored):
+            let clip = time.map { authored.evaluated(at: $0) } ?? authored
+            // The real rendered title: glyph anti-aliasing, stroke, background,
+            // shadow and glow all carry their own alpha, and all of it is
+            // coverage. Nothing is thresholded into a hard mask.
+            guard let image = TextRenderer.image(clip, canvas: canvas, authoredCanvas: authoredCanvas) else { return nil }
+            placed = image
+        case .shape(let authored):
+            let clip = time.map { authored.evaluated(at: $0) } ?? authored
+            guard let image = ShapeRenderer.image(clip, canvas: canvas, authoredCanvas: authoredCanvas) else { return nil }
+            placed = image
+        case .video(let authored):
+            let clip = time.map { authored.evaluated(at: $0) } ?? authored
+            guard let asset = project.assets.first(where: { $0.id == clip.assetID }) else { return nil }
+            let sourceSize: CGSize
+            let transform: CGAffineTransform
+            var coverage: CIImage
+            if asset.stillImage != nil {
+                // A still carries real transparency — a PNG logo cuts its own
+                // shape — so its own alpha is the coverage.
+                let still = try stillFrame(asset.url)
+                sourceSize = CGSize(width: CVPixelBufferGetWidth(still), height: CVPixelBufferGetHeight(still))
+                transform = Self.transform(clip.transform, encoded: sourceSize, preferred: .identity, canvas: canvas)
+                let cutout = try backgroundRemoved(still, original: still, clip: clip,
+                    asset: asset, projectID: project.id, compositionTime: compositionTime)
+                let masked = try self.masked(cutout, with: clip.resolvedLayerMask)
+                coverage = CIImage(cvPixelBuffer: masked, options: [.colorSpace: colorSpace])
+            } else {
+                guard let metadata = asset.videoMetadata else { return nil }
+                sourceSize = metadata.encodedSize
+                transform = Self.transform(clip.transform, metadata: metadata, canvas: canvas)
+                let rect = CGRect(origin: .zero, size: sourceSize)
+                if clip.resolvedBackgroundRemoval?.isEnabled == true {
+                    guard let trackID = instruction.trackIDs[clip.id],
+                          let original = request.sourceFrame(byTrackID: trackID) else { return nil }
+                    let opaque = try opaqueCoverage(width: Int(sourceSize.width), height: Int(sourceSize.height))
+                    let cutout = try backgroundRemoved(opaque, original: original, clip: clip,
+                        asset: asset, projectID: project.id, compositionTime: compositionTime)
+                    let masked = try self.masked(cutout, with: clip.resolvedLayerMask)
+                    coverage = CIImage(cvPixelBuffer: masked, options: [.colorSpace: colorSpace])
+                } else if clip.resolvedLayerMask.isEnabled {
+                    // Run the SAME kernel the picture uses, so a feathered edge
+                    // on the matte is the feather the mask draws, not a second
+                    // implementation of it that happens to look similar.
+                    let opaque = try opaqueCoverage(width: Int(sourceSize.width), height: Int(sourceSize.height))
+                    let masked = try self.masked(opaque, with: clip.resolvedLayerMask)
+                    coverage = CIImage(cvPixelBuffer: masked, options: [.colorSpace: colorSpace])
+                } else {
+                    // No mask: coverage is simply the clip's rectangle, and a
+                    // decoded frame would tell us nothing a flat one does not.
+                    coverage = CIImage(color: .white).cropped(to: rect)
+                }
+            }
+            coverage = coverage.transformed(by: transform)
+            placed = coverage.applyingFilter("CIColorMatrix", parameters: [
+                "inputAVector": CIVector(x: 0, y: 0, z: 0, w: clip.opacity)
+            ])
+        case .audio:
+            return nil
+        }
+        return try renderedSDRLayer(placed.composited(over: clear), size: canvas, ci: ci)
+    }
+
+    /// Multiplies a canvas-space layer's coverage by the matte.
+    ///
+    /// Both sides are premultiplied here — a `CVPixelBuffer` CIImage is, and
+    /// `applyLayerMaskBGRA` writes premultiplied — and blending toward a clear
+    /// background is exactly `rgb *= a, alpha *= a`. No unpremultiply/
+    /// repremultiply round trip, so anti-aliased glyph edges keep their
+    /// fractional coverage with no dark or bright fringe.
+    ///
+    /// Inverting is the SAME blend with its two sides exchanged, not a second
+    /// kind of blend and not a second pass: `mix(clear, image, m)` keeps the
+    /// layer where the source is opaque, `mix(image, clear, m)` keeps it where
+    /// the source is not. That is `1 - m` exactly, over the whole continuous
+    /// range, without an inversion filter that would round separately.
+    private func matted(
+        _ image: CIImage,
+        with buffer: CVPixelBuffer,
+        mode: TrackMatteMode,
+        bounds: CGRect
+    ) -> CIImage {
+        let mask = CIImage(cvPixelBuffer: buffer, options: [.colorSpace: colorSpace])
+        let clear = CIImage(color: .clear).cropped(to: bounds)
+        let foreground = mode.isInverted ? clear : image
+        let background = mode.isInverted ? image : clear
+        return foreground.applyingFilter("CIBlendWithAlphaMask", parameters: [
+            kCIInputBackgroundImageKey: background,
+            kCIInputMaskImageKey: mask
+        ]).cropped(to: bounds)
+    }
+
+    /// The matte shown as a picture: white where the target is kept, black
+    /// where it is cut, grey in between — in BOTH modes, so the view answers
+    /// "what survives" rather than "what the source happens to look like".
+    /// Editor-only; nothing calls this on the export path.
+    private func matteInspectionImage(_ buffer: CVPixelBuffer, mode: TrackMatteMode) -> CIImage {
+        // Alpha to an opaque grey, and the inverted mode simply negates that
+        // one channel: -a + 1 rather than a + 0.
+        let scale: CGFloat = mode.isInverted ? -1 : 1
+        let bias: CGFloat = mode.isInverted ? 1 : 0
+        return CIImage(cvPixelBuffer: buffer, options: [.colorSpace: colorSpace])
+            .applyingFilter("CIColorMatrix", parameters: [
+                "inputRVector": CIVector(x: 0, y: 0, z: 0, w: scale),
+                "inputGVector": CIVector(x: 0, y: 0, z: 0, w: scale),
+                "inputBVector": CIVector(x: 0, y: 0, z: 0, w: scale),
+                "inputAVector": CIVector(x: 0, y: 0, z: 0, w: 0),
+                "inputBiasVector": CIVector(x: bias, y: bias, z: bias, w: 1)
+            ])
+    }
+
+    /// What the matte view shows when the source supplies nothing at all at
+    /// this moment: black for an alpha matte (the target is cut everywhere),
+    /// white for an inverted one (the target is kept everywhere).
+    private func emptyMatteInspectionImage(mode: TrackMatteMode, bounds: CGRect) -> CIImage {
+        CIImage(color: mode.isInverted ? .white : .black).cropped(to: bounds)
+    }
+
+    /// A fully opaque source-sized surface, cached per size.
+    private func opaqueCoverage(width: Int, height: Int) throws -> CVPixelBuffer {
+        let key = "\(width)x\(height)"
+        if let existing = opaqueFrames[key] { return existing }
+        guard let ci else { throw GradeLabError.rendererInitializationFailed }
+        var buffer: CVPixelBuffer?
+        let attributes: [String: Any] = [
+            kCVPixelBufferMetalCompatibilityKey as String: true,
+            kCVPixelBufferIOSurfacePropertiesKey as String: [:]
+        ]
+        guard CVPixelBufferCreate(nil, max(1, width), max(1, height), kCVPixelFormatType_32BGRA,
+                                  attributes as CFDictionary, &buffer) == kCVReturnSuccess,
+              let buffer else { throw GradeLabError.rendererInitializationFailed }
+        let bounds = CGRect(x: 0, y: 0, width: max(1, width), height: max(1, height))
+        ci.render(CIImage(color: .white).cropped(to: bounds), to: buffer, bounds: bounds, colorSpace: colorSpace)
+        if opaqueFrames.count >= 4 { opaqueFrames.removeAll() }
+        opaqueFrames[key] = buffer
+        return buffer
+    }
+
+    /// The texture the Metal compositing kernels multiply their coverage by.
+    /// Without a matte this is the 1x1 opaque texture, which leaves alpha alone.
+    private func matteTexture(_ buffer: CVPixelBuffer?, retaining retained: inout [Any]) throws -> MTLTexture {
+        guard let metal else { throw GradeLabError.rendererInitializationFailed }
+        guard let buffer else { return try neutralMatte(device: metal.device) }
+        guard let texture = metal.packedTexture(from: buffer, pixelFormat: .bgra8Unorm) else {
+            throw GradeLabError.rendererInitializationFailed
+        }
+        retained.append(texture)
+        return texture.texture
+    }
+
+    private func neutralMatte(device: MTLDevice) throws -> MTLTexture {
+        if let neutralMatteTexture { return neutralMatteTexture }
+        neutralMatteTexture = try constantMatte(device: device, alpha: 255)
+        return neutralMatteTexture!
+    }
+
+    /// A 1x1 fully transparent texture: coverage zero everywhere. Used where a
+    /// layer HAS a matte but the source supplies nothing at this moment, in the
+    /// one place the layer cannot simply be skipped — a transition, which needs
+    /// both of its inputs.
+    private func transparentMatteTexture() throws -> MTLTexture {
+        guard let metal else { throw GradeLabError.rendererInitializationFailed }
+        if let emptyMatteTexture { return emptyMatteTexture }
+        emptyMatteTexture = try constantMatte(device: metal.device, alpha: 0)
+        return emptyMatteTexture!
+    }
+
+    private func constantMatte(device: MTLDevice, alpha: UInt8) throws -> MTLTexture {
+        let descriptor = MTLTextureDescriptor.texture2DDescriptor(
+            pixelFormat: .bgra8Unorm, width: 1, height: 1, mipmapped: false)
+        descriptor.usage = .shaderRead
+        guard let texture = device.makeTexture(descriptor: descriptor) else {
+            throw GradeLabError.rendererInitializationFailed
+        }
+        // Premultiplied, so the colour channels carry the same value the alpha
+        // does. Only the alpha is ever read.
+        var pixel: [UInt8] = [alpha, alpha, alpha, alpha]
+        texture.replace(region: MTLRegionMake2D(0, 0, 1, 1), mipmapLevel: 0, withBytes: &pixel, bytesPerRow: 4)
+        return texture
+    }
+
     private func render(_ request: AVAsynchronousVideoCompositionRequest) throws {
         guard let instruction = request.videoCompositionInstruction as? LayerInstruction else { throw GradeLabError.rendererInitializationFailed }
         let began = Date()
@@ -318,6 +679,11 @@ class LayerCompositor: NSObject, AVVideoCompositing, @unchecked Sendable {
         }
         try prepare(context: instruction.state.context)
         let (project, bypass) = instruction.state.snapshot()
+        if let inspected = instruction.state.inspectedBackgroundTargetID {
+            try renderBackgroundInspection(inspected, request: request,
+                                           instruction: instruction, project: project)
+            return
+        }
         if project.colorMode.isAppleLog {
             try renderAppleLog(request, instruction: instruction, project: project, bypass: bypass)
             return
@@ -335,10 +701,50 @@ class LayerCompositor: NSObject, AVVideoCompositing, @unchecked Sendable {
         // whole frame, so it is read once rather than per track.
         let authoredCanvas = SequenceComposition.previewRenderSize(
             width: project.canvas.width, height: project.canvas.height)
-        var result = CIImage(color: .black).cropped(to: bounds)
+        var result = instruction.state.showsTransparencyGrid
+            ? transparencyGridImage(bounds: bounds)
+            : CIImage(color: CIColor(cgColor: project.canvas.background.cgColor)).cropped(to: bounds)
         var retained: [CVPixelBuffer] = []
+        // Layers consumed as a matte are not ALSO drawn in their own right —
+        // a title used to cut a video is the hole, not a caption over it.
+        let consumed = project.timeline.trackMatteConsumedSourceIDs
+        // Rendered mattes for this frame. One entry per source however many
+        // targets read it, retained until the frame is finished.
+        let mattes = MatteCache()
+        if let inspected = instruction.state.inspectedMatteTargetID,
+           let configuration = project.timeline.item(id: inspected)?.trackMatte {
+            // Editor-only matte view. Everything else about the frame is
+            // skipped: what is being asked is what the coverage looks like.
+            let buffer = try matte(source: configuration.sourceItemID, project: project,
+                                   at: request.compositionTime,
+                                   canvas: bounds.size, authoredCanvas: authoredCanvas, cache: mattes,
+                                   request: request, instruction: instruction)
+            let view = buffer.map { matteInspectionImage($0, mode: configuration.mode) }
+                ?? emptyMatteInspectionImage(mode: configuration.mode, bounds: bounds)
+            ci.render(view.cropped(to: bounds), to: output, bounds: bounds, colorSpace: colorSpace)
+            withExtendedLifetime(mattes) {}
+            request.finish(withComposedVideoFrame: output)
+            return
+        }
+        /// The target's coverage after its track matte, or nil when the matte
+        /// supplies none here and the target must not be drawn at all.
+        func applyMatte(_ image: CIImage, of item: TimelineItem) throws -> CIImage? {
+            guard let configuration = item.trackMatte else { return image }
+            guard let buffer = try matte(source: configuration.sourceItemID, project: project,
+                                         at: request.compositionTime, canvas: bounds.size,
+                                         authoredCanvas: authoredCanvas, cache: mattes,
+                                         request: request, instruction: instruction) else {
+                // No source here means coverage zero, which an alpha matte cuts
+                // away entirely and an inverted one keeps entirely. Both fall
+                // out of `1 - 0 = 1`; neither is the matte quietly switching
+                // itself off.
+                return configuration.mode.isInverted ? image : nil
+            }
+            return matted(image, with: buffer, mode: configuration.mode, bounds: bounds)
+        }
         for track in project.timeline.tracks.reversed() where track.isEnabled {
             for item in track.items where item.placement.isEnabled && item.isDrawnOverlay {
+                guard !consumed.contains(item.id) else { continue }
                 let relative = CMTimeSubtract(request.compositionTime, item.placement.timelineStart.cmTime)
                 guard relative >= .zero, relative < item.placement.duration.cmTime else { continue }
                 // Single conversion from composition time to clip-local animation time.
@@ -356,9 +762,9 @@ class LayerCompositor: NSObject, AVVideoCompositing, @unchecked Sendable {
                         .map { ($0, clip.blendMode) }
                 default: drawn = nil
                 }
-                if let drawn {
+                if let drawn, let matted = try applyMatte(drawn.image, of: item) {
                     let filters: [VisualBlendMode: String] = [.normal: "CISourceOverCompositing", .multiply: "CIMultiplyBlendMode", .screen: "CIScreenBlendMode", .overlay: "CIOverlayBlendMode", .softLight: "CISoftLightBlendMode", .hardLight: "CIHardLightBlendMode", .darken: "CIDarkenBlendMode", .lighten: "CILightenBlendMode"]
-                    result = drawn.image.applyingFilter(filters[drawn.blend]!, parameters: [kCIInputBackgroundImageKey: result]).cropped(to: bounds)
+                    result = matted.applyingFilter(filters[drawn.blend]!, parameters: [kCIInputBackgroundImageKey: result]).cropped(to: bounds)
                 }
             }
             let activeTransition = project.timeline.transitions.first { transition in
@@ -371,11 +777,17 @@ class LayerCompositor: NSObject, AVVideoCompositing, @unchecked Sendable {
             if let transition = activeTransition,
                let progress = transition.progress(at: request.compositionTime),
                let outgoing = project.timeline.videoClip(id: transition.outgoingClipID),
-               let incoming = project.timeline.videoClip(id: transition.incomingClipID) {
+               let incoming = project.timeline.videoClip(id: transition.incomingClipID),
+               // A clip being consumed as somebody's matte is not in the
+               // picture, so there is nothing for it to transition into. The
+               // other side of the cut still draws normally below.
+               !consumed.contains(outgoing.id), !consumed.contains(incoming.id) {
                 let first = try renderedSDRClip(outgoing, request: request, instruction: instruction,
-                                                project: project, bypass: bypass, bounds: bounds)
+                                                project: project, bypass: bypass, bounds: bounds,
+                                                mattes: mattes, authoredCanvas: authoredCanvas)
                 let second = try renderedSDRClip(incoming, request: request, instruction: instruction,
-                                                 project: project, bypass: bypass, bounds: bounds)
+                                                 project: project, bypass: bypass, bounds: bounds,
+                                                 mattes: mattes, authoredCanvas: authoredCanvas)
                 retained.append(contentsOf: first.retained + second.retained)
                 let clear = CIImage(color: .clear).cropped(to: bounds)
                 let firstCanvas = try renderedSDRLayer(first.image.composited(over: clear), size: bounds.size, ci: ci)
@@ -389,11 +801,11 @@ class LayerCompositor: NSObject, AVVideoCompositing, @unchecked Sendable {
                 transitionedClipIDs = [outgoing.id, incoming.id]
             }
             for case .video(let authored) in track.items where authored.placement.isEnabled {
-                guard !transitionedClipIDs.contains(authored.id) else { continue }
+                guard !transitionedClipIDs.contains(authored.id), !consumed.contains(authored.id) else { continue }
                 guard TimelineEditing.activeClip(in: [authored], at: request.compositionTime) != nil else { continue }
                 let clip = (try? TimelineTime(request.compositionTime)).map { authored.evaluated(at: $0) } ?? authored
                 guard let asset = project.assets.first(where: { $0.id == clip.assetID }) else {
-                    throw TimelineError.invalid("A layer frame is unavailable.")
+                    throw TimelineError.invalid(String(localized: "A layer frame is unavailable."))
                 }
                 let source: CVPixelBuffer
                 let transform: CGAffineTransform
@@ -403,7 +815,7 @@ class LayerCompositor: NSObject, AVVideoCompositing, @unchecked Sendable {
                     source = try stillFrame(asset.url)
                     transform = Self.transform(clip.transform, encoded: CGSize(width: CVPixelBufferGetWidth(source), height: CVPixelBufferGetHeight(source)), preferred: .identity, canvas: bounds.size)
                 } else {
-                    guard let id = instruction.trackIDs[clip.id], let frame = request.sourceFrame(byTrackID: id), let metadata = asset.videoMetadata else { throw TimelineError.invalid("A video layer frame is unavailable.") }
+                    guard let id = instruction.trackIDs[clip.id], let frame = request.sourceFrame(byTrackID: id), let metadata = asset.videoMetadata else { throw TimelineError.invalid(String(localized: "A video layer frame is unavailable.")) }
                     // Smooth retiming: cross-dissolve toward the next source
                     // frame by however far between the two this moment falls.
                     // Without it each source frame is simply held, which is the
@@ -435,10 +847,19 @@ class LayerCompositor: NSObject, AVVideoCompositing, @unchecked Sendable {
                     gradedFrame = try graded(source, settings: clip.gradeSettings, masks: masks, bypass: bypass,
                                              seconds: request.compositionTime.seconds)
                 }
-                let frame = try masked(gradedFrame, with: clip.resolvedLayerMask)
+                let cutoutFrame = try backgroundRemoved(gradedFrame, original: source, clip: clip,
+                    asset: asset, projectID: project.id, compositionTime: request.compositionTime)
+                let frame = try masked(cutoutFrame, with: clip.resolvedLayerMask)
+                retained.append(cutoutFrame)
                 retained.append(frame)
                 var image = CIImage(cvPixelBuffer: frame, options: [.colorSpace: colorSpace]).transformed(by: transform)
                 image = image.applyingFilter("CIColorMatrix", parameters: ["inputAVector": CIVector(x: 0, y: 0, z: 0, w: clip.opacity)])
+                // Last thing before the blend: the clip is fully graded, its
+                // power windows are applied, it is placed, its own layer mask
+                // has cut it and its opacity is in. The matte then decides how
+                // much of that finished layer covers the canvas.
+                guard let matted = try applyMatte(image, of: .video(authored)) else { continue }
+                image = matted
                 let filter: String
                 switch clip.blendMode {
                 case .normal: filter = "CISourceOverCompositing"
@@ -455,6 +876,68 @@ class LayerCompositor: NSObject, AVVideoCompositing, @unchecked Sendable {
         }
         ci.render(result, to: output, bounds: bounds, colorSpace: colorSpace)
         withExtendedLifetime(retained) {}
+        withExtendedLifetime(mattes) {}
+        request.finish(withComposedVideoFrame: output)
+    }
+
+    /// Editor-only transparency indication. It lives at the bottom of the
+    /// composition, so a real lower timeline layer naturally covers it and the
+    /// grid is visible only where the stack remains transparent.
+    private func transparencyGridImage(bounds: CGRect) -> CIImage {
+        guard let filter = CIFilter(name: "CICheckerboardGenerator", parameters: [
+            kCIInputCenterKey: CIVector(x: 0, y: 0),
+            "inputColor0": CIColor(red: 0.13, green: 0.13, blue: 0.14),
+            "inputColor1": CIColor(red: 0.20, green: 0.20, blue: 0.21),
+            kCIInputWidthKey: 14,
+            kCIInputSharpnessKey: 1
+        ]), let image = filter.outputImage else {
+            return CIImage(color: CIColor(red: 0.16, green: 0.16, blue: 0.17)).cropped(to: bounds)
+        }
+        return image.cropped(to: bounds)
+    }
+
+    /// Editor-only white/black view of the final cutout matte. It uses the same
+    /// GPU stage ordinary composition uses and returns before any color mode's
+    /// picture renderer, so it can never leak into export state.
+    private func renderBackgroundInspection(
+        _ clipID: UUID,
+        request: AVAsynchronousVideoCompositionRequest,
+        instruction: LayerInstruction,
+        project: VideoProject
+    ) throws {
+        guard let output = request.renderContext.newPixelBuffer(), let ci,
+              let clip = project.timeline.videoClip(id: clipID),
+              let settings = clip.resolvedBackgroundRemoval,
+              let asset = project.assets.first(where: { $0.id == clip.assetID }) else {
+            throw GradeLabError.rendererInitializationFailed
+        }
+        let source: CVPixelBuffer
+        let transform: CGAffineTransform
+        if asset.stillImage != nil {
+            source = try stillFrame(asset.url)
+            transform = Self.transform(clip.transform,
+                encoded: CGSize(width: CVPixelBufferGetWidth(source), height: CVPixelBufferGetHeight(source)),
+                preferred: .identity, canvas: request.renderContext.size)
+        } else {
+            guard let id = instruction.trackIDs[clip.id],
+                  let frame = request.sourceFrame(byTrackID: id),
+                  let metadata = asset.videoMetadata else {
+                throw TimelineError.invalid(String(localized: "The source frame for matte preview is unavailable."))
+            }
+            source = frame
+            transform = Self.transform(clip.transform, metadata: metadata, canvas: request.renderContext.size)
+        }
+        let opaque = try opaqueCoverage(width: CVPixelBufferGetWidth(source),
+                                        height: CVPixelBufferGetHeight(source))
+        let matteFrame = try backgroundRemoved(opaque, original: source, clip: clip,
+            asset: asset, projectID: project.id, compositionTime: request.compositionTime)
+        let bounds = CGRect(origin: .zero, size: request.renderContext.size)
+        let black = CIImage(color: .black).cropped(to: bounds)
+        let white = CIImage(cvPixelBuffer: matteFrame, options: [.colorSpace: colorSpace])
+            .transformed(by: transform)
+        ci.render(white.composited(over: black).cropped(to: bounds), to: output,
+                  bounds: bounds, colorSpace: colorSpace)
+        withExtendedLifetime(settings) {}
         request.finish(withComposedVideoFrame: output)
     }
 
@@ -467,10 +950,12 @@ class LayerCompositor: NSObject, AVVideoCompositing, @unchecked Sendable {
         instruction: LayerInstruction,
         project: VideoProject,
         bypass: Bool,
-        bounds: CGRect
+        bounds: CGRect,
+        mattes: MatteCache,
+        authoredCanvas: CGSize
     ) throws -> (image: CIImage, retained: [CVPixelBuffer]) {
         guard let asset = project.assets.first(where: { $0.id == authored.assetID }) else {
-            throw TimelineError.invalid("A transition source is unavailable.")
+            throw TimelineError.invalid(String(localized: "A transition source is unavailable."))
         }
         let clip = (try? TimelineTime(request.compositionTime)).map { authored.evaluated(at: $0) } ?? authored
         let source: CVPixelBuffer
@@ -486,7 +971,7 @@ class LayerCompositor: NSObject, AVVideoCompositing, @unchecked Sendable {
             guard let id = instruction.trackIDs[clip.id],
                   let frame = request.sourceFrame(byTrackID: id),
                   let metadata = asset.videoMetadata else {
-                throw TimelineError.invalid("A transition source frame is unavailable.")
+                throw TimelineError.invalid(String(localized: "A transition source frame is unavailable."))
             }
             source = frame
             if clip.smoothsMotion,
@@ -508,11 +993,28 @@ class LayerCompositor: NSObject, AVVideoCompositing, @unchecked Sendable {
                             masks: masks, bypass: bypass)
         } ?? graded(source, settings: clip.gradeSettings, masks: masks, bypass: bypass,
                     seconds: request.compositionTime.seconds)
-        let frame = try masked(gradedFrame, with: clip.resolvedLayerMask)
+        let cutoutFrame = try backgroundRemoved(gradedFrame, original: source, clip: clip,
+            asset: asset, projectID: project.id, compositionTime: request.compositionTime)
+        let frame = try masked(cutoutFrame, with: clip.resolvedLayerMask)
         var image = CIImage(cvPixelBuffer: frame, options: [.colorSpace: colorSpace]).transformed(by: transform)
         image = image.applyingFilter("CIColorMatrix",
             parameters: ["inputAVector": CIVector(x: 0, y: 0, z: 0, w: clip.opacity)])
-        return (image, [gradedFrame, frame])
+        // The transition receives the MATTED layer, alpha and all. Cutting the
+        // coverage afterwards would mean the dissolve mixed picture the matte
+        // had already removed.
+        if let configuration = authored.trackMatte {
+            if let buffer = try matte(source: configuration.sourceItemID, project: project,
+                                      at: request.compositionTime, canvas: bounds.size,
+                                      authoredCanvas: authoredCanvas, cache: mattes,
+                                      request: request, instruction: instruction) {
+                image = matted(image, with: buffer, mode: configuration.mode, bounds: bounds)
+            } else if !configuration.mode.isInverted {
+                // Coverage zero. An inverted matte reads that as full coverage
+                // and leaves the transition input exactly as it was.
+                return (CIImage(color: .clear).cropped(to: bounds), [gradedFrame, cutoutFrame, frame])
+            }
+        }
+        return (image, [gradedFrame, cutoutFrame, frame])
     }
 
     private func transitionBGRA(_ outgoing: CVPixelBuffer, _ incoming: CVPixelBuffer,
@@ -577,14 +1079,21 @@ class LayerCompositor: NSObject, AVVideoCompositing, @unchecked Sendable {
         }
         command.label = "GradeLab HDR layers"
 
-        // Start from opaque black in working space. A clear render pass is the
-        // cheapest way to do that without a kernel that exists only to zero it.
-        let clear = MTLRenderPassDescriptor()
-        clear.colorAttachments[0].texture = canvases.0
-        clear.colorAttachments[0].loadAction = .clear
-        clear.colorAttachments[0].storeAction = .store
-        clear.colorAttachments[0].clearColor = MTLClearColor(red: 0, green: 0, blue: 0, alpha: 1)
-        command.makeRenderCommandEncoder(descriptor: clear)?.endEncoding()
+        if instruction.state.showsTransparencyGrid, let editorCheckerboardPipeline,
+           let encoder = command.makeComputeCommandEncoder() {
+            encoder.setComputePipelineState(editorCheckerboardPipeline)
+            encoder.setTexture(canvases.0, index: 0)
+            Self.dispatch(encoder, pipeline: editorCheckerboardPipeline,
+                          width: Int(canvasSize.width), height: Int(canvasSize.height))
+            encoder.endEncoding()
+        } else {
+            let clear = MTLRenderPassDescriptor()
+            clear.colorAttachments[0].texture = canvases.0
+            clear.colorAttachments[0].loadAction = .clear
+            clear.colorAttachments[0].storeAction = .store
+            clear.colorAttachments[0].clearColor = project.canvas.background.linearBT2020ClearColor
+            command.makeRenderCommandEncoder(descriptor: clear)?.endEncoding()
+        }
 
         var hdrUniforms = HDRDisplayUniforms()
         var readsFirst = true
@@ -617,10 +1126,33 @@ class LayerCompositor: NSObject, AVVideoCompositing, @unchecked Sendable {
         // whole frame, so it is read once rather than per track.
         let authoredCanvas = SequenceComposition.previewRenderSize(
             width: project.canvas.width, height: project.canvas.height)
+        // Track matte, exactly as the SDR path resolves it: a canvas-space
+        // coverage buffer per source, built once and read by every target.
+        let consumed = project.timeline.trackMatteConsumedSourceIDs
+        let mattes = MatteCache()
+        let inspectedMatte = instruction.state.inspectedMatteTargetID
+        func matteFor(_ item: TimelineItem, retaining store: inout [Any]) throws -> LayerMatte? {
+            guard let configuration = item.trackMatte else {
+                return LayerMatte(texture: try matteTexture(nil, retaining: &store), inverted: false)
+            }
+            guard let buffer = try matte(source: configuration.sourceItemID, project: project,
+                                         at: request.compositionTime, canvas: canvasSize,
+                                         authoredCanvas: authoredCanvas, cache: mattes,
+                                         request: request, instruction: instruction) else {
+                // Coverage zero. An alpha matte cuts the layer away entirely,
+                // so it is skipped; an inverted one keeps all of it, which is
+                // the neutral opaque texture read the ordinary way.
+                guard configuration.mode.isInverted else { return nil }
+                return LayerMatte(texture: try matteTexture(nil, retaining: &store), inverted: false)
+            }
+            return LayerMatte(texture: try matteTexture(buffer, retaining: &store),
+                              inverted: configuration.mode.isInverted)
+        }
         // The same traversal order the SDR path uses, so the two cannot disagree
         // about which layer sits on top.
-        for track in project.timeline.tracks.reversed() where track.isEnabled {
+        for track in project.timeline.tracks.reversed() where track.isEnabled && inspectedMatte == nil {
             for item in track.items where item.placement.isEnabled && item.isDrawnOverlay {
+                guard !consumed.contains(item.id) else { continue }
                 let relative = CMTimeSubtract(request.compositionTime, item.placement.timelineStart.cmTime)
                 guard relative >= .zero, relative < item.placement.duration.cmTime else { continue }
                 let time = try? TimelineTime(request.compositionTime)
@@ -645,14 +1177,19 @@ class LayerCompositor: NSObject, AVVideoCompositing, @unchecked Sendable {
                 // A drawn overlay is authored into canvas coordinates already, so
                 // it needs no placement of its own — only the SDR→working
                 // conversion and its own alpha.
+                guard let layerMatte = try matteFor(item, retaining: &retained) else { continue }
                 var layer = HDRLayerUniforms(
                     transform: .identity, sourceSize: canvasSize, canvasSize: canvasSize,
-                    opacity: 1, sourceIsSDR: true, premultiplied: true)
+                    opacity: 1, sourceIsSDR: true, premultiplied: true,
+                    matteInverted: layerMatte.inverted)
                 var mask = LayerMaskUniforms(nil)
+                var backgroundRemoval = BackgroundRemovalUniforms(.automatic)
                 try compose(imagePipeline) { encoder in
                     encoder.setTexture(texture.texture, index: 0)
+                    encoder.setTexture(layerMatte.texture, index: 8)
                     encoder.setBytes(&layer, length: MemoryLayout<HDRLayerUniforms>.stride, index: 2)
                     encoder.setBytes(&mask, length: MemoryLayout<LayerMaskUniforms>.stride, index: 3)
+                    encoder.setBytes(&backgroundRemoval, length: MemoryLayout<BackgroundRemovalUniforms>.stride, index: 4)
                 }
             }
             let activeTransition = project.timeline.transitions.first { transition in
@@ -667,6 +1204,7 @@ class LayerCompositor: NSObject, AVVideoCompositing, @unchecked Sendable {
                let progress = transition.progress(at: request.compositionTime),
                let outgoing = project.timeline.videoClip(id: transition.outgoingClipID),
                let incoming = project.timeline.videoClip(id: transition.incomingClipID),
+               !consumed.contains(outgoing.id), !consumed.contains(incoming.id),
                let outgoingAsset = project.assets.first(where: { $0.id == outgoing.assetID }),
                let incomingAsset = project.assets.first(where: { $0.id == incoming.assetID }),
                let outgoingMetadata = outgoingAsset.videoMetadata,
@@ -699,20 +1237,43 @@ class LayerCompositor: NSObject, AVVideoCompositing, @unchecked Sendable {
                 let outgoingLocals = outgoingProgram.locals
                 let incomingLocals = incomingProgram.locals
                 topmostVideoGrade = incomingGrade
+                let outgoingMatte = try matteFor(.video(outgoing), retaining: &retained)
+                let incomingMatte = try matteFor(.video(incoming), retaining: &retained)
+                let outgoingBackground = try backgroundMatteTexture(
+                    original: outgoingFrame, clip: outgoingClip, asset: outgoingAsset,
+                    projectID: project.id, compositionTime: request.compositionTime)
+                let incomingBackground = try backgroundMatteTexture(
+                    original: incomingFrame, clip: incomingClip, asset: incomingAsset,
+                    projectID: project.id, compositionTime: request.compositionTime)
+                if let outgoingBackground { retained.append(outgoingBackground) }
+                if let incomingBackground { retained.append(incomingBackground) }
                 var outgoingLayer = HDRLayerUniforms(
                     transform: Self.transform(outgoingClip.transform, metadata: outgoingMetadata, canvas: canvasSize),
                     sourceSize: outgoingMetadata.encodedSize, canvasSize: canvasSize,
-                    opacity: outgoingClip.opacity, sourceIsSDR: outgoingMetadata.transferFunction != "HLG")
+                    opacity: outgoingClip.opacity, sourceIsSDR: outgoingMetadata.transferFunction != "HLG",
+                    matteInverted: outgoingMatte?.inverted ?? false)
                 var incomingLayer = HDRLayerUniforms(
                     transform: Self.transform(incomingClip.transform, metadata: incomingMetadata, canvas: canvasSize),
                     sourceSize: incomingMetadata.encodedSize, canvasSize: canvasSize,
-                    opacity: incomingClip.opacity, sourceIsSDR: incomingMetadata.transferFunction != "HLG")
+                    opacity: incomingClip.opacity, sourceIsSDR: incomingMetadata.transferFunction != "HLG",
+                    matteInverted: incomingMatte?.inverted ?? false)
                 var outgoingMask = LayerMaskUniforms(outgoingClip.layerMask)
                 var incomingMask = LayerMaskUniforms(incomingClip.layerMask)
+                var outgoingBackgroundRemoval = BackgroundRemovalUniforms(outgoingClip.resolvedBackgroundRemoval ?? .automatic)
+                var incomingBackgroundRemoval = BackgroundRemovalUniforms(incomingClip.resolvedBackgroundRemoval ?? .automatic)
                 var uniforms = TransitionUniforms(transition, progress: progress, size: canvasSize)
+                // A side whose alpha matte supplies no coverage here contributes
+                // nothing, which is a fully transparent input rather than a
+                // skipped transition. An inverted matte never lands here: no
+                // coverage means it keeps everything.
+                let blankMatte = try transparentMatteTexture()
                 try compose(transitionPipeline) { encoder in
                     encoder.setTexture(outgoingTexture.texture, index: 0)
                     encoder.setTexture(incomingTexture.texture, index: 1)
+                    encoder.setTexture(outgoingMatte?.texture ?? blankMatte, index: 8)
+                    encoder.setTexture(incomingMatte?.texture ?? blankMatte, index: 9)
+                    encoder.setTexture(outgoingBackground, index: 10)
+                    encoder.setTexture(incomingBackground, index: 11)
                     encoder.setTexture(metal.luts.texture(for: outgoingProgram.lookIdentifier), index: 4)
                     encoder.setTexture(metal.luts.texture(for: incomingProgram.lookIdentifier), index: 5)
                     encoder.setTexture(metal.curves.texture(for: outgoingProgram.curveRows), index: 6)
@@ -725,18 +1286,21 @@ class LayerCompositor: NSObject, AVVideoCompositing, @unchecked Sendable {
                     encoder.setBytes(&incomingLayer, length: MemoryLayout<HDRLayerUniforms>.stride, index: 5)
                     encoder.setBytes(&incomingMask, length: MemoryLayout<LayerMaskUniforms>.stride, index: 6)
                     encoder.setBytes(&uniforms, length: MemoryLayout<TransitionUniforms>.stride, index: 7)
+                    encoder.setBytes(&outgoingBackgroundRemoval, length: MemoryLayout<BackgroundRemovalUniforms>.stride, index: 10)
+                    encoder.setBytes(&incomingBackgroundRemoval, length: MemoryLayout<BackgroundRemovalUniforms>.stride, index: 11)
                     outgoingLocals.bind(encoder, index: LocalGradeStack.bufferIndex)
                     incomingLocals.bind(encoder, index: LocalGradeStack.incomingBufferIndex)
                 }
                 transitionedClipIDs = [outgoing.id, incoming.id]
             }
             for case .video(let authored) in track.items where authored.placement.isEnabled {
-                guard !transitionedClipIDs.contains(authored.id) else { continue }
+                guard !transitionedClipIDs.contains(authored.id), !consumed.contains(authored.id) else { continue }
                 guard TimelineEditing.activeClip(in: [authored], at: request.compositionTime) != nil else { continue }
                 let clip = (try? TimelineTime(request.compositionTime)).map { authored.evaluated(at: $0) } ?? authored
                 try Self.requireNormalBlend(clip.blendMode)
+                guard let layerMatte = try matteFor(.video(authored), retaining: &retained) else { continue }
                 guard let asset = project.assets.first(where: { $0.id == clip.assetID }) else {
-                    throw TimelineError.invalid("A layer frame is unavailable.")
+                    throw TimelineError.invalid(String(localized: "A layer frame is unavailable."))
                 }
                 if asset.stillImage != nil {
                     let still = try stillFrame(asset.url)
@@ -745,27 +1309,40 @@ class LayerCompositor: NSObject, AVVideoCompositing, @unchecked Sendable {
                         throw GradeLabError.rendererInitializationFailed
                     }
                     retained.append(texture)
+                    let background = try backgroundMatteTexture(
+                        original: still, clip: clip, asset: asset,
+                        projectID: project.id, compositionTime: request.compositionTime)
+                    if let background { retained.append(background) }
                     var layer = HDRLayerUniforms(
                         transform: Self.transform(clip.transform, encoded: size, preferred: .identity, canvas: canvasSize),
                         sourceSize: size, canvasSize: canvasSize,
-                        opacity: clip.opacity, sourceIsSDR: true, premultiplied: false)
+                        opacity: clip.opacity, sourceIsSDR: true, premultiplied: false,
+                        matteInverted: layerMatte.inverted)
                     var mask = LayerMaskUniforms(clip.layerMask)
+                    var backgroundRemoval = BackgroundRemovalUniforms(clip.resolvedBackgroundRemoval ?? .automatic)
                     try compose(imagePipeline) { encoder in
                         encoder.setTexture(texture.texture, index: 0)
+                        encoder.setTexture(layerMatte.texture, index: 8)
+                        encoder.setTexture(background, index: 9)
                         encoder.setBytes(&layer, length: MemoryLayout<HDRLayerUniforms>.stride, index: 2)
                         encoder.setBytes(&mask, length: MemoryLayout<LayerMaskUniforms>.stride, index: 3)
+                        encoder.setBytes(&backgroundRemoval, length: MemoryLayout<BackgroundRemovalUniforms>.stride, index: 4)
                     }
                     continue
                 }
                 guard let id = instruction.trackIDs[clip.id],
                       let frame = request.sourceFrame(byTrackID: id),
                       let metadata = asset.videoMetadata else {
-                    throw TimelineError.invalid("A video layer frame is unavailable.")
+                    throw TimelineError.invalid(String(localized: "A video layer frame is unavailable."))
                 }
                 guard let texture = metal.packedTexture(from: frame, pixelFormat: .rgba16Float) else {
                     throw GradeLabError.unsupportedExport(String(localized: "An HDR source frame did not arrive as half-float."))
                 }
                 retained.append(texture)
+                let background = try backgroundMatteTexture(
+                    original: frame, clip: clip, asset: asset,
+                    projectID: project.id, compositionTime: request.compositionTime)
+                if let background { retained.append(background) }
                 // Measured: a custom compositor is handed each source in its OWN
                 // encoding, relabelled but not converted — an HLG file arrives as
                 // the HLG signal, a Rec.709 file as Rec.709. The direct preview
@@ -800,8 +1377,10 @@ class LayerCompositor: NSObject, AVVideoCompositing, @unchecked Sendable {
                 var layer = HDRLayerUniforms(
                     transform: Self.transform(clip.transform, metadata: metadata, canvas: canvasSize),
                     sourceSize: metadata.encodedSize, canvasSize: canvasSize,
-                    opacity: clip.opacity, blendAmount: blendAmount, sourceIsSDR: sourceIsSDR)
+                    opacity: clip.opacity, blendAmount: blendAmount, sourceIsSDR: sourceIsSDR,
+                    matteInverted: layerMatte.inverted)
                 var mask = LayerMaskUniforms(clip.layerMask)
+                var backgroundRemoval = BackgroundRemovalUniforms(clip.resolvedBackgroundRemoval ?? .automatic)
                 let lut = metal.luts.texture(for: program.lookIdentifier)
                 let curveLUT = metal.curves.texture(for: program.curveRows)
                 let locals = program.locals
@@ -810,11 +1389,44 @@ class LayerCompositor: NSObject, AVVideoCompositing, @unchecked Sendable {
                     encoder.setTexture(partnerTexture.texture, index: 1)
                     encoder.setTexture(lut, index: 4)
                     encoder.setTexture(curveLUT, index: 6)
+                    encoder.setTexture(layerMatte.texture, index: 8)
+                    encoder.setTexture(background, index: 9)
                     encoder.setBytes(&grade, length: MemoryLayout<GradeUniforms>.stride, index: 0)
                     encoder.setBytes(&hdrUniforms, length: MemoryLayout<HDRDisplayUniforms>.stride, index: 1)
                     encoder.setBytes(&layer, length: MemoryLayout<HDRLayerUniforms>.stride, index: 2)
                     encoder.setBytes(&mask, length: MemoryLayout<LayerMaskUniforms>.stride, index: 3)
+                    encoder.setBytes(&backgroundRemoval, length: MemoryLayout<BackgroundRemovalUniforms>.stride, index: 4)
                     locals.bind(encoder)
+                }
+            }
+        }
+
+        // Editor-only matte view: the coverage itself, as a picture, instead of
+        // the composition. Nothing on the export path can reach this.
+        if let inspected = inspectedMatte,
+           let configuration = project.timeline.item(id: inspected)?.trackMatte {
+            let buffer = try matte(source: configuration.sourceItemID, project: project,
+                                   at: request.compositionTime,
+                                   canvas: canvasSize, authoredCanvas: authoredCanvas, cache: mattes,
+                                   request: request, instruction: instruction)
+            let bounds = CGRect(origin: .zero, size: canvasSize)
+            let view = buffer.map { matteInspectionImage($0, mode: configuration.mode) }
+                ?? emptyMatteInspectionImage(mode: configuration.mode, bounds: bounds)
+            let rendered = try renderedSDRLayer(view, size: canvasSize, ci: ci)
+            if let texture = metal.packedTexture(from: rendered, pixelFormat: .bgra8Unorm) {
+                retained.append(rendered); retained.append(texture)
+                var layer = HDRLayerUniforms(
+                    transform: .identity, sourceSize: canvasSize, canvasSize: canvasSize,
+                    opacity: 1, sourceIsSDR: true, premultiplied: true)
+                var mask = LayerMaskUniforms(nil)
+                var backgroundRemoval = BackgroundRemovalUniforms(.automatic)
+                let neutral = try matteTexture(nil, retaining: &retained)
+                try compose(imagePipeline) { encoder in
+                    encoder.setTexture(texture.texture, index: 0)
+                    encoder.setTexture(neutral, index: 8)
+                    encoder.setBytes(&layer, length: MemoryLayout<HDRLayerUniforms>.stride, index: 2)
+                    encoder.setBytes(&mask, length: MemoryLayout<LayerMaskUniforms>.stride, index: 3)
+                    encoder.setBytes(&backgroundRemoval, length: MemoryLayout<BackgroundRemovalUniforms>.stride, index: 4)
                 }
             }
         }
@@ -822,7 +1434,7 @@ class LayerCompositor: NSObject, AVVideoCompositing, @unchecked Sendable {
         // Finishing effects, in working space, before the signal conversion: a
         // glow is light adding to light, and adding it after the transfer curve
         // would weight it by a non-linear function of brightness.
-        if let effects, let effectGrade = topmostVideoGrade,
+        if let effects, let effectGrade = topmostVideoGrade, inspectedMatte == nil,
            FilmEffectsStage.isActive(effectGrade) {
             let source = readsFirst ? canvases.0 : canvases.1
             let destination = readsFirst ? canvases.1 : canvases.0
@@ -844,6 +1456,7 @@ class LayerCompositor: NSObject, AVVideoCompositing, @unchecked Sendable {
         command.commit()
         command.waitUntilCompleted()
         withExtendedLifetime(retained) {}
+        withExtendedLifetime(mattes) {}
         guard command.status == .completed else {
             throw GradeLabError.exportFailed(
                 command.error.map { "HDR compositing failed: \($0.localizedDescription)" } ?? "HDR compositing failed."
@@ -918,7 +1531,7 @@ class LayerCompositor: NSObject, AVVideoCompositing, @unchecked Sendable {
     private func stillFrame(_ url: URL) throws -> CVPixelBuffer {
         if let cached = stillFrames[url] { return cached }
         guard let ci, var image = CIImage(contentsOf: url, options: [.applyOrientationProperty: true, .colorSpace: colorSpace]) else {
-            throw TimelineError.invalid("The image could not be decoded.")
+            throw TimelineError.invalid(String(localized: "The image could not be decoded."))
         }
         let factor = min(1, 4096/max(image.extent.width, image.extent.height))
         image = image.transformed(by: .init(scaleX: factor, y: factor))
@@ -1008,15 +1621,23 @@ extension LayerCompositor {
         let width = Int(size.width), height = Int(size.height)
         let surfaces = try renderer.canvases(width: width, height: height)
         var readIndex = 0
-        let clear = MTLRenderPassDescriptor()
-        clear.colorAttachments[0].texture = surfaces[0]
-        clear.colorAttachments[0].loadAction = .clear
-        clear.colorAttachments[0].storeAction = .store
-        clear.colorAttachments[0].clearColor = MTLClearColor(red: 0, green: 0, blue: 0, alpha: 1)
-        guard let clearEncoder = command.makeRenderCommandEncoder(descriptor: clear) else {
-            throw GradeLabError.rendererInitializationFailed
+        if instruction.state.showsTransparencyGrid, let editorCheckerboardPipeline,
+           let encoder = command.makeComputeCommandEncoder() {
+            encoder.setComputePipelineState(editorCheckerboardPipeline)
+            encoder.setTexture(surfaces[0], index: 0)
+            Self.dispatch(encoder, pipeline: editorCheckerboardPipeline, width: width, height: height)
+            encoder.endEncoding()
+        } else {
+            let clear = MTLRenderPassDescriptor()
+            clear.colorAttachments[0].texture = surfaces[0]
+            clear.colorAttachments[0].loadAction = .clear
+            clear.colorAttachments[0].storeAction = .store
+            clear.colorAttachments[0].clearColor = project.canvas.background.linearBT2020ClearColor
+            guard let clearEncoder = command.makeRenderCommandEncoder(descriptor: clear) else {
+                throw GradeLabError.rendererInitializationFailed
+            }
+            clearEncoder.endEncoding()
         }
-        clearEncoder.endEncoding()
         let time = try TimelineTime(request.compositionTime)
         var retained: [Any] = [output]
         var topmostGrade: GradeUniforms?
@@ -1033,32 +1654,39 @@ extension LayerCompositor {
         }
 
         func image(_ buffer: CVPixelBuffer, transform: CGAffineTransform, opacity: Double,
-                   mask authoredMask: LayerMask?, program: GradeProgram, to destination: MTLTexture) throws {
+                   mask authoredMask: LayerMask?, program: GradeProgram, to destination: MTLTexture,
+                   matte layerMatte: LayerMatte, background: MTLTexture? = nil,
+                   removal: BackgroundRemovalSettings? = nil) throws {
             guard let texture = metal.packedTexture(from: buffer, pixelFormat: .bgra8Unorm) else {
                 throw GradeLabError.rendererInitializationFailed
             }
             retained.append(buffer); retained.append(texture)
             var layer = HDRLayerUniforms(transform: transform,
                 sourceSize: CGSize(width: CVPixelBufferGetWidth(buffer), height: CVPixelBufferGetHeight(buffer)),
-                canvasSize: size, opacity: opacity, sourceIsSDR: true, premultiplied: true)
+                canvasSize: size, opacity: opacity, sourceIsSDR: true, premultiplied: true,
+                matteInverted: layerMatte.inverted)
             var mask = LayerMaskUniforms(authoredMask)
             var grade = program.uniforms
+            var backgroundRemoval = BackgroundRemovalUniforms(removal ?? .automatic)
             try renderer.encode("compositeImageAppleLog", into: command, width: width, height: height) { encoder in
                 encoder.setTexture(texture.texture, index: 0)
                 encoder.setTexture(destination, index: 2)
                 encoder.setTexture(metal.luts.texture(for: program.lookIdentifier), index: 3)
                 encoder.setTexture(metal.curves.texture(for: program.curveRows), index: 6)
+                encoder.setTexture(layerMatte.texture, index: 8)
+                encoder.setTexture(background, index: 9)
                 encoder.setBytes(&grade, length: MemoryLayout<GradeUniforms>.stride, index: 0)
                 encoder.setBytes(&layer, length: MemoryLayout<HDRLayerUniforms>.stride, index: 2)
                 encoder.setBytes(&mask, length: MemoryLayout<LayerMaskUniforms>.stride, index: 3)
+                encoder.setBytes(&backgroundRemoval, length: MemoryLayout<BackgroundRemovalUniforms>.stride, index: 4)
                 program.locals.bind(encoder)
             }
         }
 
-        func video(_ authored: VideoClip, to destination: MTLTexture) throws {
+        func video(_ authored: VideoClip, to destination: MTLTexture, matte layerMatte: LayerMatte) throws {
             let clip = authored.evaluated(at: time)
             guard let asset = project.assets.first(where: { $0.id == clip.assetID }) else {
-                throw TimelineError.invalid("A layer source is unavailable.")
+                throw TimelineError.invalid(String(localized: "A layer source is unavailable."))
             }
             let sourceSize: CGSize
             let still: CVPixelBuffer?
@@ -1068,7 +1696,7 @@ extension LayerCompositor {
                 sourceSize = CGSize(width: CVPixelBufferGetWidth(frame), height: CVPixelBufferGetHeight(frame))
             } else {
                 still = nil
-                guard let metadata = asset.videoMetadata else { throw TimelineError.invalid("Missing video metadata.") }
+                guard let metadata = asset.videoMetadata else { throw TimelineError.invalid(String(localized: "Missing video metadata.")) }
                 sourceSize = metadata.encodedSize
             }
             var program = GradeProgram(settings: clip.gradeSettings, masks: clip.evaluatedMaskedGrades(at: time),
@@ -1076,9 +1704,15 @@ extension LayerCompositor {
             program.setGrainSeed(request.compositionTime.seconds)
             topmostGrade = program.uniforms
             if let still {
+                let background = try backgroundMatteTexture(
+                    original: still, clip: clip, asset: asset,
+                    projectID: project.id, compositionTime: request.compositionTime)
+                if let background { retained.append(background) }
                 try image(still, transform: Self.transform(clip.transform, encoded: sourceSize,
                           preferred: .identity, canvas: size), opacity: clip.opacity,
-                          mask: clip.layerMask, program: program, to: destination)
+                          mask: clip.layerMask, program: program, to: destination,
+                          matte: layerMatte, background: background,
+                          removal: clip.resolvedBackgroundRemoval)
                 return
             }
             guard let metadata = asset.videoMetadata, let id = instruction.trackIDs[clip.id],
@@ -1089,6 +1723,10 @@ extension LayerCompositor {
                 throw GradeLabError.unsupportedExport(String(localized: "Apple Log layers require untouched full-range 10-bit 4:2:2 source frames."))
             }
             retained.append(textures)
+            let background = try backgroundMatteTexture(
+                original: frame, clip: clip, asset: asset,
+                projectID: project.id, compositionTime: request.compositionTime)
+            if let background { retained.append(background) }
             let profile = metadata.logProfileIdentifier.map(SourceColorProfile.fromLogIdentifier)
             if let profile, profile != expectedProfile {
                 // Including the *other* Apple Log. The compositing kernel is
@@ -1115,9 +1753,11 @@ extension LayerCompositor {
             }
             var layer = HDRLayerUniforms(transform: Self.transform(clip.transform, metadata: metadata, canvas: size),
                 sourceSize: sourceSize, canvasSize: size, opacity: clip.opacity,
-                blendAmount: amount, sourceIsSDR: profile != expectedProfile)
+                blendAmount: amount, sourceIsSDR: profile != expectedProfile,
+                matteInverted: layerMatte.inverted)
             var mask = LayerMaskUniforms(clip.layerMask)
             var grade = program.uniforms
+            var backgroundRemoval = BackgroundRemovalUniforms(clip.resolvedBackgroundRemoval ?? .automatic)
             var yuv = YUVUniforms.make(for: frame, fallbackMatrix: metadata.yCbCrMatrix)
             try renderer.encode(AppleLogSpecialization.key("compositeVideoAppleLog", isLog2: isLog2),
                                 into: command, width: width, height: height) { encoder in
@@ -1126,10 +1766,13 @@ extension LayerCompositor {
                 encoder.setTexture(metal.luts.texture(for: program.lookIdentifier), index: 3)
                 encoder.setTexture(partnerLuma, index: 4); encoder.setTexture(partnerChroma, index: 5)
                 encoder.setTexture(metal.curves.texture(for: program.curveRows), index: 6)
+                encoder.setTexture(layerMatte.texture, index: 8)
+                encoder.setTexture(background, index: 9)
                 encoder.setBytes(&grade, length: MemoryLayout<GradeUniforms>.stride, index: 0)
                 encoder.setBytes(&yuv, length: MemoryLayout<YUVUniforms>.stride, index: 1)
                 encoder.setBytes(&layer, length: MemoryLayout<HDRLayerUniforms>.stride, index: 2)
                 encoder.setBytes(&mask, length: MemoryLayout<LayerMaskUniforms>.stride, index: 3)
+                encoder.setBytes(&backgroundRemoval, length: MemoryLayout<BackgroundRemovalUniforms>.stride, index: 4)
                 program.locals.bind(encoder)
             }
         }
@@ -1138,8 +1781,27 @@ extension LayerCompositor {
         // whole frame, so it is read once rather than per track.
         let authoredCanvas = SequenceComposition.previewRenderSize(
             width: project.canvas.width, height: project.canvas.height)
-        for track in project.timeline.tracks.reversed() where track.isEnabled {
+        // Track matte, resolved exactly as the other two paths resolve it.
+        let consumed = project.timeline.trackMatteConsumedSourceIDs
+        let mattes = MatteCache()
+        let inspectedMatte = instruction.state.inspectedMatteTargetID
+        func matteFor(_ item: TimelineItem, retaining store: inout [Any]) throws -> LayerMatte? {
+            guard let configuration = item.trackMatte else {
+                return LayerMatte(texture: try matteTexture(nil, retaining: &store), inverted: false)
+            }
+            guard let buffer = try matte(source: configuration.sourceItemID, project: project,
+                                         at: request.compositionTime, canvas: size,
+                                         authoredCanvas: authoredCanvas, cache: mattes,
+                                         request: request, instruction: instruction) else {
+                guard configuration.mode.isInverted else { return nil }
+                return LayerMatte(texture: try matteTexture(nil, retaining: &store), inverted: false)
+            }
+            return LayerMatte(texture: try matteTexture(buffer, retaining: &store),
+                              inverted: configuration.mode.isInverted)
+        }
+        for track in project.timeline.tracks.reversed() where track.isEnabled && inspectedMatte == nil {
             for item in track.items where item.placement.isEnabled && item.isDrawnOverlay {
+                guard !consumed.contains(item.id) else { continue }
                 let relative = CMTimeSubtract(request.compositionTime, item.placement.timelineStart.cmTime)
                 guard relative >= .zero, relative < item.placement.duration.cmTime else { continue }
                 let drawn: (image: CIImage, blend: VisualBlendMode)?
@@ -1155,9 +1817,11 @@ extension LayerCompositor {
                 default: drawn = nil
                 }
                 guard let drawn else { continue }
+                guard let overlayMatte = try matteFor(item, retaining: &retained) else { continue }
                 let buffer = try renderedSDRLayer(drawn.image, size: size, ci: ci)
                 try image(buffer, transform: .identity, opacity: 1, mask: nil,
-                    program: GradeProgram(settings: .neutral, bypass: true, aspect: size.maskAspect), to: surfaces[2])
+                    program: GradeProgram(settings: .neutral, bypass: true, aspect: size.maskAspect),
+                    to: surfaces[2], matte: overlayMatte)
                 try blend(surfaces[2], mode: drawn.blend)
             }
             var transitioned = Set<UUID>()
@@ -1166,9 +1830,16 @@ extension LayerCompositor {
                 project.timeline.videoClip(id: $0.outgoingClipID)?.placement.trackID == track.id
             }), let outgoing = project.timeline.videoClip(id: transition.outgoingClipID),
                let incoming = project.timeline.videoClip(id: transition.incomingClipID),
+               !consumed.contains(outgoing.id), !consumed.contains(incoming.id),
                let progress = transition.progress(at: request.compositionTime) {
-                try video(outgoing, to: surfaces[2])
-                try video(incoming, to: surfaces[3])
+                // An alpha matte with no coverage here makes its side of the
+                // transition empty; an inverted one never reaches this fallback
+                // because no coverage means it keeps everything.
+                let blank = LayerMatte(texture: try transparentMatteTexture(), inverted: false)
+                let outgoingMatte = try matteFor(.video(outgoing), retaining: &retained) ?? blank
+                let incomingMatte = try matteFor(.video(incoming), retaining: &retained) ?? blank
+                try video(outgoing, to: surfaces[2], matte: outgoingMatte)
+                try video(incoming, to: surfaces[3], matte: incomingMatte)
                 var u = TransitionUniforms(transition, progress: progress, size: size)
                 try renderer.encode("compositeTransitionAppleLog", into: command, width: width, height: height) { encoder in
                     encoder.setTexture(surfaces[2], index: 0); encoder.setTexture(surfaces[3], index: 1)
@@ -1179,13 +1850,32 @@ extension LayerCompositor {
                 transitioned = [outgoing.id, incoming.id]
             }
             for case .video(let clip) in track.items where clip.placement.isEnabled {
-                guard !transitioned.contains(clip.id),
+                guard !transitioned.contains(clip.id), !consumed.contains(clip.id),
                       TimelineEditing.activeClip(in: [clip], at: request.compositionTime) != nil else { continue }
-                try video(clip, to: surfaces[2])
+                guard let layerMatte = try matteFor(.video(clip), retaining: &retained) else { continue }
+                try video(clip, to: surfaces[2], matte: layerMatte)
                 try blend(surfaces[2], mode: clip.blendMode)
             }
         }
-        if let grade = topmostGrade, FilmEffectsStage.isActive(grade) {
+        // Editor-only matte view. Replaces the picture with the coverage; never
+        // reachable from export, which never sets an inspection id.
+        if let inspected = inspectedMatte,
+           let configuration = project.timeline.item(id: inspected)?.trackMatte {
+            let buffer = try matte(source: configuration.sourceItemID, project: project,
+                                   at: request.compositionTime,
+                                   canvas: size, authoredCanvas: authoredCanvas, cache: mattes,
+                                   request: request, instruction: instruction)
+            let bounds = CGRect(origin: .zero, size: size)
+            let view = buffer.map { matteInspectionImage($0, mode: configuration.mode) }
+                ?? emptyMatteInspectionImage(mode: configuration.mode, bounds: bounds)
+            let rendered = try renderedSDRLayer(view, size: size, ci: ci)
+            let neutral = LayerMatte(texture: try matteTexture(nil, retaining: &retained), inverted: false)
+            try image(rendered, transform: .identity, opacity: 1, mask: nil,
+                      program: GradeProgram(settings: .neutral, bypass: true, aspect: size.maskAspect),
+                      to: surfaces[2], matte: neutral)
+            try blend(surfaces[2], mode: .normal)
+        }
+        if let grade = topmostGrade, inspectedMatte == nil, FilmEffectsStage.isActive(grade) {
             guard let effects, effects.encode(source: surfaces[readIndex], destination: surfaces[1 - readIndex],
                                               grade: grade, workingSpace: true, into: command) else {
                 throw GradeLabError.rendererInitializationFailed
@@ -1219,6 +1909,7 @@ extension LayerCompositor {
         CVBufferRemoveAttachment(output, kCVImageBufferLogTransferFunctionKey)
         command.commit(); command.waitUntilCompleted()
         withExtendedLifetime(retained) {}
+        withExtendedLifetime(mattes) {}
         guard command.status == .completed else {
             throw GradeLabError.exportFailed(command.error?.localizedDescription ?? "Apple Log compositing failed.")
         }

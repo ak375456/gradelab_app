@@ -33,7 +33,9 @@ struct WorkspaceDivider: View {
     /// would spend a whole SwiftUI layout pass - and on the preview side a
     /// Metal drawable resize - to move nothing anyone can see.
     private static let quantum: CGFloat = 2
-    private static let thickness: CGFloat = 20
+    /// Read by the editor's vertical budget, which has to know how much of the
+    /// window the handles themselves take.
+    static let thickness: CGFloat = 20
 
     @State private var delivered: CGFloat = 0
     @State private var isDragging = false

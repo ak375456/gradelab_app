@@ -23,17 +23,17 @@ enum VideoImportError: LocalizedError, Equatable, Sendable {
     var errorDescription: String? {
         switch self {
         case .unsupportedSelection:
-            "Please choose a video from your photo library."
+            String(localized: "Please choose a video from your photo library.")
         case .itemUnavailable:
-            "The selected video is no longer available."
+            String(localized: "The selected video is no longer available.")
         case .unableToStoreVideo:
-            "GradeLab couldn’t copy the selected video into its project storage."
+            String(localized: "GradeLab couldn’t copy the selected video into its project storage.")
         case .insufficientStorage(let needed, let available):
-            """
-            This video needs \(ByteCountFormatter.string(fromByteCount: needed, countStyle: .file)) of free space,             but only \(ByteCountFormatter.string(fromByteCount: available, countStyle: .file)) is available.
+            String(localized: """
+            This video needs \(ByteCountFormatter.string(fromByteCount: needed, countStyle: .file)) of free space, but only \(ByteCountFormatter.string(fromByteCount: available, countStyle: .file)) is available.
 
             Free up space and try again.
-            """
+            """)
         }
     }
 
@@ -163,12 +163,12 @@ actor VideoImportService {
     }
 
     private static func displayName(from originalFilename: String?) -> String {
-        guard let originalFilename else { return "Imported Video" }
+        guard let originalFilename else { return String(localized: "Imported Video") }
         let name = URL(fileURLWithPath: originalFilename)
             .deletingPathExtension()
             .lastPathComponent
             .trimmingCharacters(in: .whitespacesAndNewlines)
-        return name.isEmpty ? "Imported Video" : name
+        return name.isEmpty ? String(localized: "Imported Video") : name
     }
 }
 

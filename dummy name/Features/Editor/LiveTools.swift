@@ -284,13 +284,14 @@ struct LayerMaskOverlay: View {
     /// Kept for VoiceOver only; the preview itself stays visually clean.
     private var accessibilityStatus: String {
         let mask = model.selectedLayerMask
-        guard mask.isEnabled else { return "Off" }
+        guard mask.isEnabled else { return String(localized: "Off") }
         if mask.shape == .linear {
-            return mask.isInverted ? "Lower layer visible on left" : "Lower layer visible on right"
+            return mask.isInverted ? String(localized: "Lower layer visible on left")
+                                   : String(localized: "Lower layer visible on right")
         }
         return mask.isInverted
-            ? "Lower layer visible inside \(mask.shape.title)"
-            : "Lower layer visible outside \(mask.shape.title)"
+            ? String(localized: "Lower layer visible inside \(mask.shape.title)")
+            : String(localized: "Lower layer visible outside \(mask.shape.title)")
     }
 
     private struct Geometry {
@@ -433,6 +434,10 @@ struct CanvasTools: View {
     @ObservedObject var model: EditorViewModel
     @State private var width = "1080"
     @State private var height = "1920"
+    /// What the colour wheel is showing while a drag is still in flight, before
+    /// it has been written to the document.
+    @State private var pickedBackground: RGBAColor?
+    @State private var backgroundCommit: Task<Void, Never>?
     private let presets: [(String, Int, Int)] = [
         ("TikTok · 9:16", 1080, 1920), ("Instagram Reel · 9:16", 1080, 1920),
         ("Instagram Feed · 4:5", 1080, 1350), ("Instagram Square · 1:1", 1080, 1080),
@@ -457,14 +462,78 @@ struct CanvasTools: View {
                 }.font(.subheadline)
                 Button("Match original video") { model.setCanvas(width: model.project.metadata.displayWidth, height: model.project.metadata.displayHeight) }.font(.caption).frame(height: 44)
                 Text("Clips fit inside the canvas. Use Transform to reposition or enlarge them. Export Original preserves this canvas size.").font(.caption2).foregroundStyle(.secondary)
+                background
             }.padding(16)
         }.disabled(model.isPreparingTimeline)
+    }
+
+    /// The colour the canvas is filled with wherever no clip covers it.
+    ///
+    /// Part of the exported frame, not a viewing preference: scale a clip down
+    /// and this is what surrounds it in the file. The outline drawn on the
+    /// preview keeps saying where the canvas is whatever colour it is given, so
+    /// a white canvas is still recognisably the canvas and not the workspace.
+    private var background: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text("BACKGROUND").font(.caption.weight(.semibold)).tracking(1.2)
+                .frame(maxWidth: .infinity, alignment: .leading)
+            HStack(spacing: 8) {
+                backgroundPreset("Black", color: .black)
+                backgroundPreset("White", color: .white)
+                Spacer(minLength: 0)
+                // Fixed size keeps the wheel beside its own label instead of
+                // letting the picker stretch the two apart across the row.
+                ColorPicker("Custom", selection: backgroundBinding, supportsOpacity: false)
+                    .font(.caption).fixedSize().frame(minHeight: 44)
+            }
+            Text("Fills the canvas wherever no clip covers it, and is part of the export. The outline on the preview shows where the canvas ends.")
+                .font(.caption2).foregroundStyle(.secondary)
+        }
+    }
+
+    private func backgroundPreset(_ title: LocalizedStringKey, color: RGBAColor) -> some View {
+        Button { model.setCanvasBackground(color) } label: {
+            HStack(spacing: 7) {
+                Circle().fill(Color(.sRGB, red: color.red, green: color.green, blue: color.blue, opacity: 1))
+                    .frame(width: 18, height: 18)
+                    .overlay(Circle().stroke(.white.opacity(0.25), lineWidth: 1))
+                Text(title)
+            }.font(.caption).frame(minHeight: 44)
+        }
+        .buttonStyle(.plain)
+        .foregroundStyle(model.project.canvas.background == color ? AppColors.accent : AppColors.textSecondary)
+        .accessibilityAddTraits(model.project.canvas.background == color ? .isSelected : [])
+    }
+
+    /// The picker writes to local state and the document is written once the
+    /// drag settles. A colour wheel emits continuously, and every distinct
+    /// value would otherwise be its own undo step.
+    private var backgroundBinding: Binding<Color> {
+        Binding {
+            let color = pickedBackground ?? model.project.canvas.background
+            return Color(.sRGB, red: color.red, green: color.green, blue: color.blue, opacity: 1)
+        } set: { color in
+            var red: CGFloat = 0, green: CGFloat = 0, blue: CGFloat = 0, alpha: CGFloat = 0
+            UIColor(color).getRed(&red, green: &green, blue: &blue, alpha: &alpha)
+            let value = RGBAColor(red: red, green: green, blue: blue)
+            pickedBackground = value
+            backgroundCommit?.cancel()
+            backgroundCommit = Task { @MainActor in
+                try? await Task.sleep(for: .milliseconds(250))
+                guard !Task.isCancelled else { return }
+                model.setCanvasBackground(value)
+                pickedBackground = nil
+            }
+        }
     }
 }
 
 struct EditorSettings: View {
     @AppStorage("editor.frameStep") private var frameStep = 2
     @AppStorage("keyframes.hintDismissed") private var hintDismissed = false
+    @AppStorage("timeline.showsClipNames") private var showsClipNames = true
+    @AppStorage("timeline.showsClipDurations") private var showsClipDurations = true
+    @AppStorage("preview.showsCanvasEdge") private var showsCanvasEdge = true
     @Environment(\.dismiss) private var dismiss
     var body: some View {
         NavigationStack {
@@ -476,6 +545,17 @@ struct EditorSettings: View {
                     }
                     Stepper("Custom: \(frameStep) frames", value: $frameStep, in: 1...120)
                 } header: { Text("Frame-step buttons") } footer: { Text("Backward and forward step by project frames. This preference is saved for all projects.") }
+
+                Section {
+                    Toggle("Canvas outline", isOn: $showsCanvasEdge)
+                } header: { Text("Preview") }
+                  footer: { Text("A thin line around the canvas on the preview, so the frame you are exporting stays visible against the workspace even when a clip is scaled down inside it. The canvas colour itself is set per project in the Canvas tool.") }
+
+                Section {
+                    Toggle("Clip names", isOn: $showsClipNames)
+                    Toggle("Clip lengths", isOn: $showsClipDurations)
+                } header: { Text("Timeline labels") }
+                  footer: { Text("The file name and the length shown on each clip. Turning them off uncovers the thumbnails and the waveform, which is worth doing once you know your own footage.") }
 
                 Section {
                     HStack(alignment: .top, spacing: 12) {

@@ -100,6 +100,19 @@ struct VideoProject: Codable, Identifiable, Equatable, Sendable {
 
     var needsLayerCompositor: Bool {
         if !timeline.transitions.isEmpty { return true }
+        // A track matte is a relationship BETWEEN layers, so it exists only in
+        // the compositor. Checked explicitly rather than relying on the layer
+        // count below: two clips on one track can carry one and still satisfy
+        // every other single-source condition.
+        if timeline.hasTrackMatte { return true }
+        if timeline.tracks.flatMap(\.items).contains(where: {
+            if case .video(let clip) = $0 { return clip.resolvedBackgroundRemoval != nil }
+            return false
+        }) { return true }
+        // A canvas colour other than black only exists once something composites
+        // onto it: the passthrough path writes the source frames as they are and
+        // would drop the background silently.
+        if canvas.background != .black { return true }
         return canvas.width != metadata.displayWidth || canvas.height != metadata.displayHeight ||
         drawsOnMoreThanThePrimaryAsset || timeline.tracks.count > 1 || timeline.tracks.contains { !$0.isEnabled } ||
         timeline.hasAnimation ||
@@ -110,7 +123,8 @@ struct VideoProject: Codable, Identifiable, Equatable, Sendable {
             // Frame blending needs two source frames at once, which only the
             // custom compositor can supply.
             return !clip.placement.isEnabled || clip.transform != VisualTransform() || clip.opacity != 1 ||
-                clip.blendMode != .normal || clip.resolvedLayerMask.isEnabled || editedAudio || clip.smoothsMotion
+                clip.blendMode != .normal || clip.resolvedLayerMask.isEnabled ||
+                clip.resolvedBackgroundRemoval != nil || editedAudio || clip.smoothsMotion
         }
     }
 
@@ -166,6 +180,7 @@ struct VideoProject: Codable, Identifiable, Equatable, Sendable {
               clip.sourceRange == primaryAsset.sourceRange,
               clip.placement.duration == primaryAsset.sourceRange.duration,
               clip.transform == VisualTransform(), clip.opacity == 1, !clip.isAnimated,
+              clip.resolvedBackgroundRemoval == nil,
               !clip.isRetimed,
               clip.embeddedAudio == (metadata.hasAudio ? EmbeddedAudio() : nil),
               canvas.width == metadata.displayWidth, canvas.height == metadata.displayHeight,
@@ -175,21 +190,21 @@ struct VideoProject: Codable, Identifiable, Equatable, Sendable {
     }
 
     func validate() throws {
-        guard projectVersion == Self.currentVersion else { throw TimelineError.invalid("Unsupported document version.") }
+        guard projectVersion == Self.currentVersion else { throw TimelineError.invalid(String(localized: "Unsupported document version.")) }
         guard Set(assets.map(\.id)).count == assets.count,
               let primary = assets.first(where: { $0.id == primaryAssetID }), primary.videoMetadata != nil else {
-            throw TimelineError.invalid("Missing or duplicate source asset.")
+            throw TimelineError.invalid(String(localized: "Missing or duplicate source asset."))
         }
         guard canvas.width > 0, canvas.height > 0,
               canvas.frameDuration.map({ $0 > .zero }) ?? true else {
-            throw TimelineError.invalid("Invalid canvas dimensions or frame duration.")
+            throw TimelineError.invalid(String(localized: "Invalid canvas dimensions or frame duration."))
         }
         guard Set(timeline.tracks.map(\.id)).count == timeline.tracks.count else {
-            throw TimelineError.invalid("Duplicate track identifiers.")
+            throw TimelineError.invalid(String(localized: "Duplicate track identifiers."))
         }
         for asset in assets {
             guard asset.url.isFileURL, asset.sourceRange.start >= .zero,
-                  asset.sourceRange.duration > .zero else { throw TimelineError.invalid("Invalid asset range or URL.") }
+                  asset.sourceRange.duration > .zero else { throw TimelineError.invalid(String(localized: "Invalid asset range or URL.")) }
             _ = try asset.sourceRange.end
         }
         var itemIDs = Set<UUID>()
@@ -199,30 +214,30 @@ struct VideoProject: Codable, Identifiable, Equatable, Sendable {
                 guard itemIDs.insert(item.id).inserted, track.accepts(item),
                       item.placement.trackID == track.id,
                       item.placement.timelineStart >= .zero, item.placement.duration > .zero else {
-                    throw TimelineError.invalid("Invalid clip placement or track membership.")
+                    throw TimelineError.invalid(String(localized: "Invalid clip placement or track membership."))
                 }
                 _ = try item.placement.range.end
                 if case .video(let clip) = item, let linked = clip.embeddedAudio,
                    !linked.volume.isFinite || !(0...1).contains(linked.volume) {
-                    throw TimelineError.invalid("Audio volume must be between 0 and 100 percent.")
+                    throw TimelineError.invalid(String(localized: "Audio volume must be between 0 and 100 percent."))
                 }
                 if case .audio = item, assets.first(where: { $0.id == item.assetID })?.stillImage != nil {
-                    throw TimelineError.invalid("An audio clip cannot reference an image.")
+                    throw TimelineError.invalid(String(localized: "An audio clip cannot reference an image."))
                 }
                 if case .text(let clip) = item {
                     guard clip.text.count <= 20_000, clip.opacity.isFinite, (0...1).contains(clip.opacity),
                           clip.style.fontSize.isFinite, (6...2048).contains(clip.style.fontSize),
                           clip.strokeWidth.isFinite, (0...64).contains(clip.strokeWidth), clip.curve.isFinite, (-1...1).contains(clip.curve) else {
-                        throw TimelineError.invalid("Invalid text style.")
+                        throw TimelineError.invalid(String(localized: "Invalid text style."))
                     }
                     let values = [clip.transform.positionX, clip.transform.positionY, clip.transform.scale, clip.transform.widthScale, clip.transform.heightScale, clip.transform.rotationDegrees, clip.transform.anchorX, clip.transform.anchorY, clip.style.characterSpacing, clip.style.lineSpacing, clip.style.layoutWidth, clip.shadowRadius, clip.shadowOffsetX, clip.shadowOffsetY, clip.cornerRadius]
                     let decoration = clip.decoration ?? .init()
                     let colors = [clip.color, clip.strokeColor, clip.backgroundColor, decoration.shadowColor, decoration.glowColor]
                     guard colors.allSatisfy({ color in [color.red, color.green, color.blue, color.alpha].allSatisfy { $0.isFinite && (0...1).contains($0) } }),
-                          [decoration.padding, decoration.glowRadius, clip.shadowRadius, clip.cornerRadius].allSatisfy({ $0.isFinite && (0...2048).contains($0) }) else { throw TimelineError.invalid("Invalid text color or decoration.") }
+                          [decoration.padding, decoration.glowRadius, clip.shadowRadius, clip.cornerRadius].allSatisfy({ $0.isFinite && (0...2048).contains($0) }) else { throw TimelineError.invalid(String(localized: "Invalid text color or decoration.")) }
                     guard values.allSatisfy(\.isFinite), clip.transform.scale > 0, clip.transform.widthScale > 0, clip.transform.heightScale > 0,
                           (0.05...1.5).contains(clip.style.layoutWidth), (-20...100).contains(clip.style.characterSpacing), (0...300).contains(clip.style.lineSpacing),
-                          [clip.backgroundOpacity, clip.shadowOpacity, clip.glowOpacity].allSatisfy({ $0.isFinite && (0...1).contains($0) }) else { throw TimelineError.invalid("Invalid text geometry or appearance.") }
+                          [clip.backgroundOpacity, clip.shadowOpacity, clip.glowOpacity].allSatisfy({ $0.isFinite && (0...1).contains($0) }) else { throw TimelineError.invalid(String(localized: "Invalid text geometry or appearance.")) }
                 }
                 if case .shape(let clip) = item {
                     let sizes = [clip.width, clip.height, clip.strokeWidth, clip.cornerRadius,
@@ -247,7 +262,7 @@ struct VideoProject: Codable, Identifiable, Equatable, Sendable {
                               [color.red, color.green, color.blue, color.alpha]
                                   .allSatisfy { $0.isFinite && (0...1).contains($0) }
                           }) else {
-                        throw TimelineError.invalid("Invalid shape geometry or appearance.")
+                        throw TimelineError.invalid(String(localized: "Invalid shape geometry or appearance."))
                     }
                 }
                 switch item {
@@ -280,21 +295,22 @@ struct VideoProject: Codable, Identifiable, Equatable, Sendable {
                           sourceRange.start >= .zero,
                           expectedDuration == item.placement.duration,
                           try asset.stillImage != nil || (sourceRange.start >= asset.sourceRange.start && sourceRange.end <= asset.sourceRange.end) else {
-                        throw TimelineError.invalid("Clip exceeds its source range or references missing media.")
+                        throw TimelineError.invalid(String(localized: "Clip exceeds its source range or references missing media."))
                     }
                 }
                 if case .video = item,
                    assets.first(where: { $0.id == item.assetID })?.videoMetadata == nil,
                    assets.first(where: { $0.id == item.assetID })?.stillImage == nil {
-                    throw TimelineError.invalid("A video clip references non-video media.")
+                    throw TimelineError.invalid(String(localized: "A video clip references non-video media."))
                 }
             }
         }
         guard Set(timeline.markers.map(\.id)).count == timeline.markers.count,
               timeline.markers.allSatisfy({ $0.time >= .zero }) else {
-            throw TimelineError.invalid("Invalid timeline markers.")
+            throw TimelineError.invalid(String(localized: "Invalid timeline markers."))
         }
         try TimelineTransitionEditing.validate(project: self)
+        try TrackMatteEditing.validate(project: self)
     }
 
     /// Malformed animation is rejected here with a readable reason rather than reaching
@@ -308,36 +324,36 @@ struct VideoProject: Codable, Identifiable, Equatable, Sendable {
         var seen = Set<UUID>()
         for mask in masks {
             guard seen.insert(mask.id).inserted else {
-                throw TimelineError.invalid("Duplicate mask identifier on a clip.")
+                throw TimelineError.invalid(String(localized: "Duplicate mask identifier on a clip."))
             }
             guard mask.strength.isFinite, (0...1).contains(mask.strength) else {
-                throw TimelineError.invalid("Mask strength must be between 0 and 100 percent.")
+                throw TimelineError.invalid(String(localized: "Mask strength must be between 0 and 100 percent."))
             }
             guard mask.geometry.points.count <= MaskGeometry.maximumPoints else {
-                throw TimelineError.invalid("A freehand mask has too many points.")
+                throw TimelineError.invalid(String(localized: "A freehand mask has too many points."))
             }
             guard mask.geometry.points.allSatisfy({ $0.x.isFinite && $0.y.isFinite }) else {
-                throw TimelineError.invalid("A freehand mask has an invalid point.")
+                throw TimelineError.invalid(String(localized: "A freehand mask has an invalid point."))
             }
             guard let animation = mask.animation else { continue }
             var properties = Set<AnimatableProperty>()
             for track in animation.tracks {
                 guard properties.insert(track.property).inserted else {
-                    throw TimelineError.invalid("Duplicate mask animation track for \(track.property.title).")
+                    throw TimelineError.invalid(String(localized: "Duplicate mask animation track for \(track.property.title)."))
                 }
                 guard MaskedGradeLayer.animatableProperties.contains(track.property) else {
-                    throw TimelineError.invalid("\(track.property.title) cannot be animated on a mask.")
+                    throw TimelineError.invalid(String(localized: "\(track.property.title) cannot be animated on a mask."))
                 }
                 guard track.keyframes.count <= AnimationTrack.keyframeLimit else {
-                    throw TimelineError.invalid("Too many keyframes on \(track.property.title).")
+                    throw TimelineError.invalid(String(localized: "Too many keyframes on \(track.property.title)."))
                 }
                 for frame in track.keyframes {
                     guard frame.time >= .zero, frame.value.isFinite,
                           frame.value.kind == track.property.kind else {
-                        throw TimelineError.invalid("Invalid mask keyframe on \(track.property.title).")
+                        throw TimelineError.invalid(String(localized: "Invalid mask keyframe on \(track.property.title)."))
                     }
                     if case .number(let number) = frame.value, !track.property.range.contains(number) {
-                        throw TimelineError.invalid("\(track.property.title) keyframe is out of range.")
+                        throw TimelineError.invalid(String(localized: "\(track.property.title) keyframe is out of range."))
                     }
                     try validateCurveKeyframe(frame, property: track.property)
                 }
@@ -350,30 +366,30 @@ struct VideoProject: Codable, Identifiable, Equatable, Sendable {
         var seen = Set<AnimatableProperty>()
         for track in animation.tracks {
             guard seen.insert(track.property).inserted else {
-                throw TimelineError.invalid("Duplicate animation track for \(track.property.title).")
+                throw TimelineError.invalid(String(localized: "Duplicate animation track for \(track.property.title)."))
             }
             guard Clip.supports(track.property) else {
-                throw TimelineError.invalid("\(track.property.title) cannot be animated on this clip.")
+                throw TimelineError.invalid(String(localized: "\(track.property.title) cannot be animated on this clip."))
             }
             guard track.keyframes.count <= AnimationTrack.keyframeLimit else {
-                throw TimelineError.invalid("Too many keyframes on \(track.property.title).")
+                throw TimelineError.invalid(String(localized: "Too many keyframes on \(track.property.title)."))
             }
             var previous: TimelineTime?
             for frame in track.keyframes {
-                guard frame.time >= .zero else { throw TimelineError.invalid("Keyframe time cannot be negative.") }
+                guard frame.time >= .zero else { throw TimelineError.invalid(String(localized: "Keyframe time cannot be negative.")) }
                 if let previous, frame.time <= previous {
-                    throw TimelineError.invalid("Keyframes on \(track.property.title) are out of order.")
+                    throw TimelineError.invalid(String(localized: "Keyframes on \(track.property.title) are out of order."))
                 }
                 previous = frame.time
                 guard frame.value.isFinite, frame.value.kind == track.property.kind else {
-                    throw TimelineError.invalid("Invalid keyframe value on \(track.property.title).")
+                    throw TimelineError.invalid(String(localized: "Invalid keyframe value on \(track.property.title)."))
                 }
                 if case .number(let number) = frame.value, !track.property.range.contains(number) {
-                    throw TimelineError.invalid("\(track.property.title) keyframe is out of range.")
+                    throw TimelineError.invalid(String(localized: "\(track.property.title) keyframe is out of range."))
                 }
                 if case .color(let color) = frame.value,
                    ![color.red, color.green, color.blue, color.alpha].allSatisfy({ (0...1).contains($0) }) {
-                    throw TimelineError.invalid("\(track.property.title) keyframe color is out of range.")
+                    throw TimelineError.invalid(String(localized: "\(track.property.title) keyframe color is out of range."))
                 }
                 try validateCurveKeyframe(frame, property: track.property)
             }
@@ -387,14 +403,14 @@ struct VideoProject: Codable, Identifiable, Equatable, Sendable {
     private static func validateCurveKeyframe(_ frame: Keyframe, property: AnimatableProperty) throws {
         guard case .curve(let curve) = frame.value else { return }
         guard case .curve(let expected) = property.gradeSlot, curve.type == expected else {
-            throw TimelineError.invalid("\(property.title) keyframe holds the wrong curve.")
+            throw TimelineError.invalid(String(localized: "\(property.title) keyframe holds the wrong curve."))
         }
         guard curve.points.count <= AdvancedCurve.maximumSnapshotPoints else {
-            throw TimelineError.invalid("\(property.title) keyframe has too many control points.")
+            throw TimelineError.invalid(String(localized: "\(property.title) keyframe has too many control points."))
         }
         let lowerY: Float = curve.type.isMapping ? 0 : -1
         guard curve.points.allSatisfy({ (0...1).contains($0.x) && (lowerY...1).contains($0.y) }) else {
-            throw TimelineError.invalid("\(property.title) keyframe is out of range.")
+            throw TimelineError.invalid(String(localized: "\(property.title) keyframe is out of range."))
         }
     }
 
@@ -450,6 +466,11 @@ struct VideoProject: Codable, Identifiable, Equatable, Sendable {
                       updatedAt: try c.decode(Date.self, forKey: .updatedAt),
                       colorMode: try c.decodeIfPresent(ProjectColorMode.self, forKey: .colorMode))
         }
+        // A stored track matte whose source no longer exists is repaired rather
+        // than refused: the relationship is dropped, the layers are untouched,
+        // and the document opens. Runs before `validate`, which then treats an
+        // unresolvable matte graph as the bug it would be.
+        timeline.reconcileTrackMattes()
         try validate()
     }
 

@@ -11,18 +11,18 @@ struct SequenceComposition {
         if project.needsLayerCompositor { return try await buildLayers(project: project, forExport: forExport, context: context) }
         let clips = try TimelineEditing.clips(in: project)
         guard !clips.isEmpty, let frame = project.canvas.frameDuration else {
-            throw TimelineError.invalid("Add a clip with a known frame rate before playing or exporting.")
+            throw TimelineError.invalid(String(localized: "Add a clip with a known frame rate before playing or exporting."))
         }
         let original = try await ExportSourceInspector.inspect(VideoAsset(url: project.sourceURL, metadata: project.metadata), requireExportColorTags: forExport)
         try Task.checkCancellation()
         let composition = AVMutableComposition()
         guard let video = composition.addMutableTrack(withMediaType: .video, preferredTrackID: kCMPersistentTrackID_Invalid) else {
-            throw TimelineError.invalid("Could not create the sequence video track.")
+            throw TimelineError.invalid(String(localized: "Could not create the sequence video track."))
         }
         var audio: [ExportAudioTrackInfo] = []
         for originalAudio in original.audioTracks {
             guard let track = composition.addMutableTrack(withMediaType: .audio, preferredTrackID: kCMPersistentTrackID_Invalid) else {
-                throw TimelineError.invalid("Could not create a linked audio track.")
+                throw TimelineError.invalid(String(localized: "Could not create a linked audio track."))
             }
             for clip in clips {
                 let intersection = CMTimeRangeGetIntersection(clip.sourceRange.cmTimeRange, otherRange: originalAudio.timeRange)

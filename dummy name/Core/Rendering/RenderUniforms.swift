@@ -207,11 +207,17 @@ struct HDRLayerUniforms: Sendable {
     var row0: SIMD4<Float>
     var row1: SIMD4<Float>
     var params: SIMD4<Float>
+    /// Track matte parameters. `x` is 1 when coverage is `1 - sourceAlpha`
+    /// rather than `sourceAlpha`; the remaining three are spare, and are where
+    /// the luma readings will go rather than a fourth vector.
+    var matte: SIMD4<Float>
 
     /// - Parameters:
     ///   - transform: source → canvas, in Core Image's bottom-left coordinates.
     ///   - sourceSize: the source texture's pixel size.
     ///   - canvasSize: the render canvas' pixel size.
+    ///   - matteInverted: whether this layer's track matte keeps it where the
+    ///     matte source is transparent rather than where it is opaque.
     init(
         transform: CGAffineTransform,
         sourceSize: CGSize,
@@ -219,7 +225,8 @@ struct HDRLayerUniforms: Sendable {
         opacity: Double,
         blendAmount: Double = 0,
         sourceIsSDR: Bool = false,
-        premultiplied: Bool = false
+        premultiplied: Bool = false,
+        matteInverted: Bool = false
     ) {
         // Canvas pixel (top-left origin) → Core Image canvas point → source
         // point → normalised source coordinate with the row order flipped back.
@@ -239,6 +246,7 @@ struct HDRLayerUniforms: Sendable {
             sourceIsSDR ? 1 : 0,
             premultiplied ? 1 : 0
         )
+        matte = SIMD4(matteInverted ? 1 : 0, 0, 0, 0)
     }
 }
 
@@ -265,5 +273,24 @@ struct LayerMaskUniforms: Sendable {
             Float(mask.rotationDegrees * .pi / 180), Float(mask.feather),
             mask.isEnabled ? 1 : -1, flags
         )
+    }
+}
+
+/// Parameters shared by matte generation and the alpha-application pass.
+struct BackgroundRemovalUniforms: Sendable {
+    var keyColor: SIMD4<Float>
+    var controls: SIMD4<Float>
+    var edge: SIMD4<Float>
+
+    init(_ authored: BackgroundRemovalSettings) {
+        let settings = authored.clamped
+        let key = settings.colorKey
+        keyColor = SIMD4(Float(key.color.red), Float(key.color.green), Float(key.color.blue), 1)
+        // Chroma distance tops out below one. These ranges make the friendly
+        // 0...100 controls useful without exposing color-space units.
+        controls = SIMD4(Float(key.similarity / 200), Float(max(0.002, key.smoothness / 300)),
+                         Float(key.spill / 100), settings.mode == .colorKey ? 1 : 0)
+        edge = SIMD4(Float(settings.feather / 4_000), Float(settings.edgeShift / 3_000),
+                     settings.isInverted ? 1 : 0, settings.isEnabled ? 1 : 0)
     }
 }

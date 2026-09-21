@@ -100,8 +100,11 @@ protocol GradingModel: ObservableObject, AnyObject {
     var canCopyGrade: Bool { get }
     var canPasteGrade: Bool { get }
     var canResetGrade: Bool { get }
+    /// True when a paste would land on something that is already graded, and so
+    /// would throw work away unless the user is asked first.
+    var pasteWouldOverwriteGrade: Bool { get }
     func copyGrade()
-    func pasteGrade()
+    func pasteGrade(_ mode: GradePasteMode)
     func resetGrade()
 
     // MARK: Scopes
@@ -116,6 +119,12 @@ protocol GradingModel: ObservableObject, AnyObject {
 }
 
 extension GradingModel {
+    /// A drawn window on its own is deliberately not counted: it changes no
+    /// pixel, and a paste replacing nothing is not worth a question.
+    var pasteWouldOverwriteGrade: Bool {
+        canPasteGrade && settings.hasCreativeChangeIgnoringMask
+    }
+
     /// Masked local grades are a timeline-clip feature: a still has one picture
     /// and no clip to hang windows on. The still editor therefore never shows
     /// the Masks tool rather than showing an empty one.

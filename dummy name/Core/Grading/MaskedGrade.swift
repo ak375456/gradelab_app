@@ -422,7 +422,7 @@ extension Array where Element == MaskedGradeLayer {
     func nextDefaultName() -> String {
         let taken = Set(map(\.name))
         var index = count + 1
-        while taken.contains("Mask \(index)") { index += 1 }
-        return "Mask \(index)"
+        while taken.contains(String(localized: "Mask \(index)")) { index += 1 }
+        return String(localized: "Mask \(index)")
     }
 }

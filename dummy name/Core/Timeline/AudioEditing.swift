@@ -12,7 +12,7 @@ enum AudioEditing {
     static func editable(_ id: UUID, in project: VideoProject) throws -> AudioClip {
         guard let clip = project.timeline.audioClip(id: id), !clip.placement.isLocked,
               project.timeline.tracks.first(where: { $0.id == clip.placement.trackID })?.isLocked == false else {
-            throw TimelineError.invalid("Unlock the audio track before editing.")
+            throw TimelineError.invalid(String(localized: "Unlock the audio track before editing."))
         }
         return clip
     }
@@ -29,18 +29,18 @@ enum AudioEditing {
             guard case .audio(let clip) = item, clip.volume.isFinite, (0...1).contains(clip.volume),
                   clip.fadeIn.map({ $0.isFinite && $0 >= 0 }) ?? true,
                   clip.fadeOut.map({ $0.isFinite && $0 >= 0 }) ?? true,
-                  clip.sourceTrackIndex.map({ $0 >= 0 }) ?? true else { throw TimelineError.invalid("Invalid audio clip.") }
+                  clip.sourceTrackIndex.map({ $0 >= 0 }) ?? true else { throw TimelineError.invalid(String(localized: "Invalid audio clip.")) }
         }
         for (left, right) in zip(ordered, ordered.dropFirst()) {
             guard try left.placement.range.end <= right.placement.timelineStart else {
-                throw TimelineError.invalid("Audio clips on this track cannot overlap. Paste onto a new audio track to mix them.")
+                throw TimelineError.invalid(String(localized: "Audio clips on this track cannot overlap. Paste onto a new audio track to mix them."))
             }
         }
     }
     static func separate(_ id: UUID, in project: inout VideoProject) throws -> UUID {
         var candidate = project
         var video = try TimelineEditing.editable(id, in: candidate)
-        guard let linked = video.embeddedAudio else { throw TimelineError.invalid("This clip has no linked audio to separate.") }
+        guard let linked = video.embeddedAudio else { throw TimelineError.invalid(String(localized: "This clip has no linked audio to separate.")) }
         let trackID = UUID()
         let clip = AudioClip(placement: .init(id: UUID(), trackID: trackID, timelineStart: video.placement.timelineStart,
             duration: video.placement.duration, isEnabled: video.placement.isEnabled), assetID: video.assetID,
@@ -65,7 +65,7 @@ enum AudioEditing {
         var left = try editable(id, in: project)
         let boundary = try TimelineEditing.snapped(time, frame: project.canvas.frameDuration)
         guard splitTarget(in: project, at: boundary, trackID: left.placement.trackID) == id else {
-            throw TimelineError.invalid("Place the playhead inside the audio clip, away from its edges.")
+            throw TimelineError.invalid(String(localized: "Place the playhead inside the audio clip, away from its edges."))
         }
         let length = try boundary.subtracting(left.placement.timelineStart)
         var right = left
@@ -86,7 +86,7 @@ enum AudioEditing {
         var target = max(.zero, try TimelineEditing.snapped(time, frame: project.canvas.frameDuration))
         let minimum = try project.canvas.frameDuration ?? TimelineTime.seconds(0.01)
         if clamping, operation != .move {
-            guard let media = project.assets.first(where: { $0.id == clip.assetID }) else { throw TimelineError.invalid("Audio source is missing.") }
+            guard let media = project.assets.first(where: { $0.id == clip.assetID }) else { throw TimelineError.invalid(String(localized: "Audio source is missing.")) }
             let end = try clip.placement.range.end
             let others = project.timeline.audioClips.filter { $0.id != id && $0.placement.trackID == clip.placement.trackID }
             if operation == .trimStart {
@@ -110,7 +110,7 @@ enum AudioEditing {
         case .trimEnd: clip.placement.duration = try target.subtracting(clip.placement.timelineStart)
         }
         guard clip.placement.duration >= minimum else {
-            throw TimelineError.invalid("Keep at least one frame of audio.")
+            throw TimelineError.invalid(String(localized: "Keep at least one frame of audio."))
         }
         clip.sourceRange.duration = clip.placement.duration
         var candidate = project
@@ -123,7 +123,7 @@ enum AudioEditing {
         let end = try start.adding(clip.placement.duration)
         var index = project.timeline.tracks.firstIndex { $0.id == trackID && $0.kind == .audio }
         if let i = index {
-            guard !project.timeline.tracks[i].isLocked else { throw TimelineError.invalid("Unlock this audio track before pasting.") }
+            guard !project.timeline.tracks[i].isLocked else { throw TimelineError.invalid(String(localized: "Unlock this audio track before pasting.")) }
             if project.timeline.tracks[i].items.contains(where: { $0.placement.timelineStart < end && ((try? $0.placement.range.end) ?? .zero) > start }) { index = nil }
         }
         if index == nil {

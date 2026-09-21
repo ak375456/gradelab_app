@@ -101,7 +101,7 @@ final class FontRegistry: @unchecked Sendable {
         style.isBold = traits.contains(.boldTrait); style.isItalic = traits.contains(.italicTrait)
     }
     func importFont(_ url: URL) throws -> String {
-        guard url.pathExtension.lowercased() == "ttf" else { throw TimelineError.invalid("Choose a .ttf font file.") }
+        guard url.pathExtension.lowercased() == "ttf" else { throw TimelineError.invalid(String(localized: "Choose a .ttf font file.")) }
         let access = url.startAccessingSecurityScopedResource()
         defer { if access { url.stopAccessingSecurityScopedResource() } }
         let data = try Data(contentsOf: url)
@@ -109,7 +109,7 @@ final class FontRegistry: @unchecked Sendable {
               let descriptors = CTFontManagerCreateFontDescriptorsFromData(data as CFData) as? [CTFontDescriptor],
               let descriptor = descriptors.first,
               let name = CTFontDescriptorCopyAttribute(descriptor, kCTFontNameAttribute) as? String else {
-            throw TimelineError.invalid("This file is not a readable TrueType font.")
+            throw TimelineError.invalid(String(localized: "This file is not a readable TrueType font."))
         }
         try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
         let target = directory.appendingPathComponent(UUID().uuidString).appendingPathExtension("ttf")

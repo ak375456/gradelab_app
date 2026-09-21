@@ -73,15 +73,18 @@ struct ImageExportConfiguration: Equatable, Sendable {
     var format: ImageExportFormat = .jpeg
     /// 0...1, as ImageIO wants it. Ignored for PNG.
     var quality: Double = 0.92
+    /// JPEG and HEIC do not use the editor's transparent canvas. When a cutout
+    /// is present they are flattened deliberately onto this authored colour.
+    var flattenColor: RGBAColor = .white
 
     static let qualityRange: ClosedRange<Double> = 0.4...1.0
 
     var qualityLabel: String {
         switch quality {
-        case 1.0: "Maximum"
-        case 0.9..<1.0: "High"
-        case 0.75..<0.9: "Good"
-        default: "Smaller file"
+        case 1.0: String(localized: "Maximum")
+        case 0.9..<1.0: String(localized: "High")
+        case 0.75..<0.9: String(localized: "Good")
+        default: String(localized: "Smaller file")
         }
     }
 

@@ -95,15 +95,15 @@ struct ImageMetadata: Codable, Equatable, Sendable {
 
     var orientationLabel: String {
         switch orientation {
-        case 1: "Normal"
-        case 2: "Mirrored"
-        case 3: "Rotated 180°"
-        case 4: "Mirrored, rotated 180°"
-        case 5: "Mirrored, rotated 90° CCW"
-        case 6: "Rotated 90° CW"
-        case 7: "Mirrored, rotated 90° CW"
-        case 8: "Rotated 90° CCW"
-        default: "Unknown"
+        case 1: String(localized: "Normal")
+        case 2: String(localized: "Mirrored")
+        case 3: String(localized: "Rotated 180°")
+        case 4: String(localized: "Mirrored, rotated 180°")
+        case 5: String(localized: "Mirrored, rotated 90° CCW")
+        case 6: String(localized: "Rotated 90° CW")
+        case 7: String(localized: "Mirrored, rotated 90° CW")
+        case 8: String(localized: "Rotated 90° CCW")
+        default: String(localized: "Unknown")
         }
     }
 

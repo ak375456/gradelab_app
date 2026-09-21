@@ -1,6 +1,7 @@
 import CoreGraphics
 import CoreMedia
 import Foundation
+import Metal
 
 struct RGBAColor: Codable, Equatable, Sendable {
     var red: Double
@@ -9,6 +10,35 @@ struct RGBAColor: Codable, Equatable, Sendable {
     var alpha: Double = 1
     static let black = Self(red: 0, green: 0, blue: 0)
     static let white = Self(red: 1, green: 1, blue: 1)
+
+    /// The colour as CoreGraphics and CoreImage want it. Authored values are
+    /// sRGB, which is the assumption every other colour in the document makes
+    /// (`TextRenderer` writes them the same way).
+    var cgColor: CGColor {
+        CGColor(srgbRed: red, green: green, blue: blue, alpha: alpha)
+    }
+
+    /// The same colour in the wide working space the HDR and Apple Log
+    /// compositors carry: **linear** light on BT.2020 primaries, diffuse white
+    /// at 1.0. Handing those surfaces the authored sRGB numbers would light a
+    /// mid grey far too brightly and pull a saturated colour outside the gamut
+    /// it was picked in.
+    ///
+    /// Opaque on purpose: this is a canvas fill, and a transparent one is a
+    /// hole rather than a background.
+    var linearBT2020ClearColor: MTLClearColor {
+        func linear(_ value: Double) -> Double {
+            let c = min(max(value, 0), 1)
+            return c <= 0.04045 ? c / 12.92 : pow((c + 0.055) / 1.055, 2.4)
+        }
+        let r = linear(red), g = linear(green), b = linear(blue)
+        // Rec.709 -> Rec.2020 for linear light, D65 throughout (ITU-R BT.2087).
+        return MTLClearColor(
+            red: 0.6274 * r + 0.3293 * g + 0.0433 * b,
+            green: 0.0691 * r + 0.9195 * g + 0.0114 * b,
+            blue: 0.0164 * r + 0.0880 * g + 0.8956 * b,
+            alpha: 1)
+    }
 }
 
 /// Composition coordinates, not screen pixels. Independent of preview size.
@@ -124,6 +154,18 @@ struct VideoClip: TimelineClip {
     /// Optional so every project written before masked grading decodes as the
     /// unchanged, single-grade clip it was.
     var maskedGrades: [MaskedGradeLayer]? = nil
+    /// Track matte: another layer supplies this clip's coverage.
+    ///
+    /// A third, separate thing from the two above. `layerMask` is a shape this
+    /// clip carries; a masked grade is colour confined to a region and never
+    /// changes transparency. This multiplies the finished clip's alpha by
+    /// another layer's alpha, in canvas coordinates.
+    ///
+    /// Optional so every project written before track mattes decodes unchanged.
+    var trackMatte: TrackMatteConfiguration? = nil
+    /// Source-local alpha cutout. Generated Vision masks are cached separately;
+    /// only this small authored description belongs in project JSON.
+    var backgroundRemoval: BackgroundRemovalSettings? = nil
     // Follows this video's source range and placement until explicitly separated.
     var embeddedAudio: EmbeddedAudio?
     /// Optional so projects saved before keyframes existed still decode unchanged.
@@ -156,6 +198,10 @@ struct VideoClip: TimelineClip {
     var isRetimed: Bool { speed != ClipSpeed.normal }
     var resolvedLayerMask: LayerMask { (layerMask ?? .disabled).clamped }
     var resolvedMaskedGrades: [MaskedGradeLayer] { maskedGrades ?? [] }
+    var resolvedBackgroundRemoval: BackgroundRemovalSettings? {
+        guard let value = backgroundRemoval?.clamped, value.isEnabled else { return nil }
+        return value
+    }
 
     /// The masked grades as rendered at a clip-local time, with every geometry
     /// keyframe evaluated. Authored values are never touched.
@@ -266,6 +312,9 @@ struct TextClip: TimelineClip {
     var decoration: TextDecoration? = nil
     /// Optional: replaces the flat fill. Nil keeps `color` and old documents decodable.
     var gradient: GradientFill? = nil
+    /// Another layer supplies this title's coverage. Optional for the same
+    /// backwards-compatible reason as everything else here.
+    var trackMatte: TrackMatteConfiguration? = nil
     /// Optional so projects saved before keyframes existed still decode unchanged.
     var animation: ClipAnimation? = nil
 }

@@ -14,7 +14,7 @@ enum TimelineError: LocalizedError {
 
     var errorDescription: String? {
         switch self {
-        case .invalid(let reason): return "Invalid project: \(reason)"
+        case .invalid(let reason): return String(localized: "Invalid project: \(reason)")
         case .unsupportedVersion(let reason): return reason
         }
     }
@@ -29,19 +29,19 @@ struct TimelineTime: Codable, Equatable, Comparable, Sendable {
     static let zero = try! TimelineTime(value: 0, timescale: 1)
 
     init(value: Int64, timescale: Int32) throws {
-        guard timescale > 0 else { throw TimelineError.invalid("Time scale must be positive.") }
+        guard timescale > 0 else { throw TimelineError.invalid(String(localized: "Time scale must be positive.")) }
         self.value = value
         self.timescale = timescale
     }
 
     init(_ time: CMTime) throws {
-        guard time.isNumeric, time.epoch == 0 else { throw TimelineError.invalid("Time must be finite.") }
+        guard time.isNumeric, time.epoch == 0 else { throw TimelineError.invalid(String(localized: "Time must be finite.")) }
         try self.init(value: time.value, timescale: time.timescale)
     }
 
     /// Only for UI input and migration of old documents that stored seconds.
     static func seconds(_ seconds: Double) throws -> Self {
-        guard seconds.isFinite else { throw TimelineError.invalid("Time must be finite.") }
+        guard seconds.isFinite else { throw TimelineError.invalid(String(localized: "Time must be finite.")) }
         return try Self(CMTime(seconds: seconds, preferredTimescale: projectTimescale))
     }
 
@@ -53,7 +53,7 @@ struct TimelineTime: Codable, Equatable, Comparable, Sendable {
     func subtracting(_ other: Self) throws -> Self { try exact(CMTimeSubtract(cmTime, other.cmTime)) }
     private func exact(_ time: CMTime) throws -> Self {
         guard !time.flags.contains(.hasBeenRounded) else {
-            throw TimelineError.invalid("Time arithmetic exceeded exact representation.")
+            throw TimelineError.invalid(String(localized: "Time arithmetic exceeded exact representation."))
         }
         return try Self(time)
     }

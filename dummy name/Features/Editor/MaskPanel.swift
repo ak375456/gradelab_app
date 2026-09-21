@@ -210,16 +210,16 @@ struct MaskPanel: View {
     /// still neutral is the thing a user actually needs to know.
     private func subtitle(_ mask: MaskedGradeLayer) -> String {
         var parts = [mask.geometry.shape.title]
-        if mask.geometry.isInverted { parts.append("inverted") }
+        if mask.geometry.isInverted { parts.append(String(localized: "inverted")) }
         if !mask.localGrade.hasCreativeChangeIgnoringMask && !mask.hasGradeAnimation {
-            parts.append("no grade yet")
+            parts.append(String(localized: "no grade yet"))
         } else if mask.resolvedStrength < 1 {
             parts.append("\(Int((mask.resolvedStrength * 100).rounded()))%")
         }
         // A mask whose colour animates is doing something the list would
         // otherwise describe as neutral at whichever frame is showing.
-        if mask.hasGradeAnimation { parts.append("animated grade") }
-        else if mask.isAnimated { parts.append("animated") }
+        if mask.hasGradeAnimation { parts.append(String(localized: "animated grade")) }
+        else if mask.isAnimated { parts.append(String(localized: "animated")) }
         return parts.joined(separator: " · ")
     }
 }
@@ -302,10 +302,10 @@ private struct MaskInspector: View {
     /// composited into a frame, and the exporters cannot reach either one.
     private var viewToggles: some View {
         HStack(spacing: AppSpacing.small) {
-            toggle("Show Mask", systemImage: "circle.righthalf.filled", isOn: isMatte) {
+            toggle(String(localized: "Show Mask"), systemImage: "circle.righthalf.filled", isOn: isMatte) {
                 model.maskMatteID = isMatte ? nil : mask.id
             }
-            toggle("Overlay", systemImage: "square.on.square.dashed", isOn: model.showsMaskOverlay) {
+            toggle(String(localized: "Overlay"), systemImage: "square.on.square.dashed", isOn: model.showsMaskOverlay) {
                 model.showsMaskOverlay.toggle()
             }
         }

@@ -175,15 +175,15 @@ enum ColorPipelineSupport: Equatable, Sendable {
         case .supported:
             nil
         case .assumedRec709:
-            "This 8-bit SDR source has incomplete color tags. GradeLab uses the standard Rec.709 interpretation consistently for preview and export; the original file remains unchanged."
+            String(localized: "This 8-bit SDR source has incomplete color tags. GradeLab uses the standard Rec.709 interpretation consistently for preview and export; the original file remains unchanged.")
         case .hdrSupported(let transfer):
-            "\(transfer) HDR is decoded, previewed and graded at full 10-bit precision. HDR export is still being validated and stays disabled until then — this source is never converted to SDR without you choosing it."
+            String(localized: "\(transfer) HDR is decoded, previewed and graded at full 10-bit precision. HDR export is still being validated and stays disabled until then — this source is never converted to SDR without you choosing it.")
         case .sdrWideSupported(let depth):
-            "This \(depth)-bit Rec.709 source is decoded, graded and exported at full precision — the colour handling is the same as any SDR clip, and nothing is reduced to 8-bit along the way."
+            String(localized: "This \(depth)-bit Rec.709 source is decoded, graded and exported at full precision — the colour handling is the same as any SDR clip, and nothing is reduced to 8-bit along the way.")
         case .appleLogSupported:
-            "Apple Log is decoded with Apple's published transfer function into scene light, graded there, and delivered as Rec.709. The log encoding is never graded directly."
+            String(localized: "Apple Log is decoded with Apple's published transfer function into scene light, graded there, and delivered as Rec.709. The log encoding is never graded directly.")
         case .appleLog2Supported:
-            "Apple Log 2 uses the same transfer function as Apple Log on wider primaries, so it is decoded to scene light, converted from Apple Wide Gamut to BT.2020, and graded and delivered exactly as Apple Log is. Colour beyond BT.2020 is carried through the grade and only clips at the final Rec.709 encode."
+            String(localized: "Apple Log 2 uses the same transfer function as Apple Log on wider primaries, so it is decoded to scene light, converted from Apple Wide Gamut to BT.2020, and graded and delivered exactly as Apple Log is. Colour beyond BT.2020 is carried through the grade and only clips at the final Rec.709 encode.")
         case .unsupported(let reason):
             reason
         case .recognizedUnsupported(_, let reason):

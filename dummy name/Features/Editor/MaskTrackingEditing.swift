@@ -65,7 +65,7 @@ extension EditorViewModel {
 
     func startMaskTracking(_ plan: MaskTrackingPlan) {
         guard maskTrackingSession == nil, trackingContextMatches(plan) else {
-            editError = "The clip or mask changed. Place the playhead and start tracking again."
+            editError = String(localized: "The clip or mask changed. Place the playhead and start tracking again.")
             return
         }
         let request = plan.request
@@ -124,7 +124,7 @@ extension EditorViewModel {
         maskTrackingSession = nil
         maskTrackingWorker = nil
         guard trackingContextMatches(plan) else {
-            editError = "Tracking stopped because the clip or mask geometry changed. Start tracking again from the current frame."
+            editError = String(localized: "Tracking stopped because the clip or mask geometry changed. Start tracking again from the current frame.")
             return
         }
         let result = outcome.result

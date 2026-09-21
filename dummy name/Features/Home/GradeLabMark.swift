@@ -111,10 +111,12 @@ struct GradeLabMark: View {
     }
 
     private var accessibilityValue: String {
-        guard !grade.isNeutral else { return "Neutral" }
-        return "Hue \(Int(grade.hue.rounded())) degrees,"
-            + " vibrance \(Int(grade.vibrance.rounded())) percent,"
-            + " lift \(Int(grade.lift.rounded())) percent"
+        guard !grade.isNeutral else { return String(localized: "Neutral") }
+        return String(localized: """
+            Hue \(Int(grade.hue.rounded())) degrees, \
+            vibrance \(Int(grade.vibrance.rounded())) percent, \
+            lift \(Int(grade.lift.rounded())) percent
+            """)
     }
 }
 

@@ -33,6 +33,12 @@ struct YUVUniforms {
     float4 offset;
 };
 
+struct BackgroundRemovalUniforms {
+    float4 keyColor; // RGB key, alpha spare
+    float4 controls; // similarity, smoothness, spill, mode (1 = color)
+    float4 edge;     // feather radius, signed shift, invert, enabled
+};
+
 vertex RasterData videoVertex(
     uint vertexID [[vertex_id]],
     constant VideoVertex *vertices [[buffer(0)]])
@@ -1201,6 +1207,7 @@ struct HDRLayerUniforms {
     float4 row0;
     float4 row1;
     float4 params;   // x = opacity, y = blend amount, z = source is SDR, w = premultiplied
+    float4 matte;    // x = track matte is inverted (coverage is 1 - alpha); y..w spare
 };
 
 struct LayerMaskUniforms {
@@ -1210,6 +1217,58 @@ struct LayerMaskUniforms {
 
 inline float layerMaskWeight(float2 uv, constant LayerMaskUniforms &mask) {
     return softShapeMaskWeight(uv, mask.geometry, mask.options);
+}
+
+// Track matte coverage at a CANVAS pixel.
+//
+// The matte is rendered full-canvas, in the same top-left pixel order the
+// destination is written in, so the lookup is the pixel's own position and no
+// per-layer transform is involved: the target and the source agree only in
+// canvas space, which is the whole reason the matte is built there.
+//
+// ALPHA only. The source's colour never reaches this - opaque black and opaque
+// white cut identically - and where no matte is set the bound texture is a 1x1
+// opaque pixel, so this returns 1 and coverage is unchanged.
+//
+// `inverted` is 0 or 1 and selects between alpha and 1 - alpha. A branchless
+// mix, and nothing is thresholded: a glyph edge at 0.15 becomes 0.85 and stays
+// exactly as smooth, which is the whole point of reading alpha rather than a
+// binary mask.
+inline float trackMatteCoverage(texture2d<float, access::sample> matte, float2 canvasUV, float inverted) {
+    // An UNBOUND matte samples as zero, which reads as "no coverage" and blacks
+    // the layer out entirely. The compositor always binds something - a 1x1
+    // opaque pixel when a layer has no matte - but a caller that drives these
+    // kernels directly need not know that, and a silently black frame is the
+    // worst possible way to tell it. No matte means full coverage.
+    if (is_null_texture(matte)) { return 1.0; }
+    constexpr sampler matteSampler(coord::normalized, address::clamp_to_edge, filter::linear);
+    float coverage = matte.sample(matteSampler, canvasUV).a;
+    return mix(coverage, 1.0 - coverage, inverted);
+}
+
+inline float trackMatteCoverage(texture2d<float, access::sample> matte, uint2 position,
+                                float2 canvasSize, float inverted) {
+    return trackMatteCoverage(matte, (float2(position) + 0.5) / canvasSize, inverted);
+}
+
+inline float backgroundRemovalCoverage(texture2d<float, access::sample> matte, float2 uv) {
+    if (is_null_texture(matte)) return 1.0;
+    constexpr sampler s(coord::normalized, address::clamp_to_edge, filter::linear);
+    return matte.sample(s, uv).r;
+}
+
+inline float3 suppressBackgroundSpill(float3 color, float coverage,
+                                      constant BackgroundRemovalUniforms &u) {
+    if (u.controls.w <= 0.5 || u.controls.z <= 0.0 || coverage <= 0.01 || coverage >= 0.995) {
+        return color;
+    }
+    float edge = (1.0 - abs(coverage * 2.0 - 1.0)) * u.controls.z;
+    uint dominant = u.keyColor.g >= u.keyColor.r && u.keyColor.g >= u.keyColor.b ? 1
+                  : (u.keyColor.b >= u.keyColor.r ? 2 : 0);
+    float others = dominant == 0 ? max(color.g, color.b)
+                 : dominant == 1 ? max(color.r, color.b) : max(color.r, color.g);
+    color[dominant] = mix(color[dominant], min(color[dominant], others), edge);
+    return color;
 }
 
 // ITU-R BT.2087 Rec.709 -> BT.2020, derived from the two sets of primaries with
@@ -1235,6 +1294,19 @@ inline float2 layerCoordinate(constant HDRLayerUniforms &layer, uint2 position) 
     return float2(dot(layer.row0.xyz, p), dot(layer.row1.xyz, p));
 }
 
+// Preview-only bottom canvas for communicating transparency. Export-created
+// render state never enables it, so these pixels cannot reach an output file.
+kernel void fillEditorCheckerboard(
+    texture2d<float, access::write> destination [[texture(0)]],
+    uint2 position [[thread_position_in_grid]])
+{
+    if (position.x >= destination.get_width() || position.y >= destination.get_height()) return;
+    uint square = 14;
+    bool alternate = ((position.x / square) + (position.y / square)) & 1;
+    float level = alternate ? 0.0331 : 0.0152; // roughly sRGB 0.20 / 0.13 in linear light
+    destination.write(float4(level, level, level, 1.0), position);
+}
+
 // Composites one video layer onto the working-space canvas.
 //
 // Frame blending happens here, between the two frames' WORKING-space values,
@@ -1248,10 +1320,13 @@ kernel void compositeVideoHDR(
     texture2d<float, access::write> destination [[texture(3)]],
     texture3d<float, access::sample> lutTexture [[texture(4)]],
     texture2d<float, access::sample> curveLUT [[texture(6)]],
+    texture2d<float, access::sample> trackMatte [[texture(8)]],
+    texture2d<float, access::sample> backgroundMatte [[texture(9)]],
     constant GradeUniforms &grade [[buffer(0)]],
     constant HDRDisplayUniforms &hdr [[buffer(1)]],
     constant HDRLayerUniforms &layer [[buffer(2)]],
     constant LayerMaskUniforms &mask [[buffer(3)]],
+    constant BackgroundRemovalUniforms &backgroundRemoval [[buffer(4)]],
     uint2 position [[thread_position_in_grid]],
     constant LocalGradeStack &locals [[buffer(8)]])
 {
@@ -1275,7 +1350,13 @@ kernel void compositeVideoHDR(
         working = mix(working, next, layer.params.y);
     }
     working = applyLookAndGradeHDR(working, uv, grade, lutTexture, curveLUT, locals);
-    float alpha = layer.params.x * layerMaskWeight(uv, mask);
+    float backgroundCoverage = backgroundRemovalCoverage(backgroundMatte, uv);
+    working = suppressBackgroundSpill(working, backgroundCoverage, backgroundRemoval);
+    float alpha = layer.params.x * backgroundCoverage
+        * layerMaskWeight(uv, mask)
+        * trackMatteCoverage(trackMatte, position,
+                             float2(destination.get_width(), destination.get_height()),
+                             layer.matte.x);
     destination.write(float4(mix(under, working, alpha), 1.0), position);
 }
 
@@ -1286,8 +1367,11 @@ kernel void compositeImageHDR(
     texture2d<float, access::sample> source [[texture(0)]],
     texture2d<float, access::read> base [[texture(2)]],
     texture2d<float, access::write> destination [[texture(3)]],
+    texture2d<float, access::sample> trackMatte [[texture(8)]],
+    texture2d<float, access::sample> backgroundMatte [[texture(9)]],
     constant HDRLayerUniforms &layer [[buffer(2)]],
     constant LayerMaskUniforms &mask [[buffer(3)]],
+    constant BackgroundRemovalUniforms &backgroundRemoval [[buffer(4)]],
     uint2 position [[thread_position_in_grid]])
 {
     if (position.x >= destination.get_width() || position.y >= destination.get_height()) {
@@ -1301,8 +1385,14 @@ kernel void compositeImageHDR(
     }
     constexpr sampler imageSampler(coord::normalized, address::clamp_to_edge, filter::linear);
     float4 sample = source.sample(imageSampler, uv);
-    float alpha = sample.a * layer.params.x * layerMaskWeight(uv, mask);
+    float backgroundCoverage = backgroundRemovalCoverage(backgroundMatte, uv);
+    float alpha = sample.a * layer.params.x * backgroundCoverage
+        * layerMaskWeight(uv, mask)
+        * trackMatteCoverage(trackMatte, position,
+                             float2(destination.get_width(), destination.get_height()),
+                             layer.matte.x);
     float3 straight = layer.params.w > 0.5 && sample.a > 0.0001 ? sample.rgb / sample.a : sample.rgb;
+    straight = suppressBackgroundSpill(straight, backgroundCoverage, backgroundRemoval);
     destination.write(float4(mix(under, sdrToWorking(straight), alpha), 1.0), position);
 }
 
@@ -1408,6 +1498,142 @@ inline float3 decodeYUV(float y, float2 uv, constant YUVUniforms &transform) {
          + transform.column2.xyz * sample.z;
 }
 
+inline float keyDistance(float3 rgb, float3 key) {
+    // Chroma-only Y'CbCr distance. Luma is intentionally absent: a shadowed
+    // green and a lit green remain the same screen colour.
+    float2 c = float2(-0.168736 * rgb.r - 0.331264 * rgb.g + 0.5 * rgb.b,
+                       0.5 * rgb.r - 0.418688 * rgb.g - 0.081312 * rgb.b);
+    float2 k = float2(-0.168736 * key.r - 0.331264 * key.g + 0.5 * key.b,
+                       0.5 * key.r - 0.418688 * key.g - 0.081312 * key.b);
+    return distance(c, k);
+}
+
+inline float colorKeyCoverage(float3 rgb, constant BackgroundRemovalUniforms &u) {
+    float low = u.controls.x;
+    return smoothstep(low, low + max(u.controls.y, 0.0005), keyDistance(rgb, u.keyColor.rgb));
+}
+
+inline float sampledMask(texture2d<float, access::sample> mask, float2 uv, float fallback) {
+    if (is_null_texture(mask)) return fallback;
+    constexpr sampler s(coord::normalized, address::clamp_to_edge, filter::linear);
+    return mask.sample(s, uv).r;
+}
+
+inline float finishBackgroundCoverage(float base, float2 uv,
+                                      texture2d<float, access::sample> addMask,
+                                      texture2d<float, access::sample> removeMask,
+                                      constant BackgroundRemovalUniforms &u) {
+    base = max(base, sampledMask(addMask, uv, 0.0));
+    base *= 1.0 - sampledMask(removeMask, uv, 0.0);
+    return mix(saturate(base), 1.0 - saturate(base), u.edge.z);
+}
+
+kernel void buildBackgroundMaskYUV(
+    texture2d<float, access::sample> luma [[texture(0)]],
+    texture2d<float, access::sample> chroma [[texture(1)]],
+    texture2d<float, access::sample> automaticMask [[texture(2)]],
+    texture2d<float, access::sample> addMask [[texture(3)]],
+    texture2d<float, access::sample> removeMask [[texture(4)]],
+    texture2d<float, access::write> output [[texture(5)]],
+    constant BackgroundRemovalUniforms &u [[buffer(0)]],
+    constant YUVUniforms &yuv [[buffer(1)]],
+    uint2 p [[thread_position_in_grid]]) {
+    if (p.x >= output.get_width() || p.y >= output.get_height()) return;
+    constexpr sampler s(coord::normalized, address::clamp_to_edge, filter::linear);
+    float2 size = float2(output.get_width(), output.get_height());
+    float2 uv = (float2(p) + 0.5) / size;
+    float radius = abs(u.edge.y);
+    float feather = u.edge.x;
+    float base = u.controls.w > 0.5
+        ? colorKeyCoverage(decodeYUV(luma.sample(s, uv).r, chroma.sample(s, uv).rg, yuv), u)
+        : sampledMask(automaticMask, uv, 1.0);
+    const float2 directions[8] = { float2(-1,-1), float2(0,-1), float2(1,-1), float2(-1,0),
+                                   float2(1,0), float2(-1,1), float2(0,1), float2(1,1) };
+    if (radius > 0.00001) {
+        float shifted = base;
+        for (uint i = 0; i < 8; ++i) {
+            float2 q = uv + directions[i] * radius;
+            float v = u.controls.w > 0.5
+                ? colorKeyCoverage(decodeYUV(luma.sample(s, q).r, chroma.sample(s, q).rg, yuv), u)
+                : sampledMask(automaticMask, q, 1.0);
+            shifted = u.edge.y > 0 ? max(shifted, v) : min(shifted, v);
+        }
+        base = shifted;
+    }
+    if (feather > 0.00001) {
+        float total = base;
+        for (uint i = 0; i < 8; ++i) {
+            float2 q = uv + directions[i] * feather;
+            total += u.controls.w > 0.5
+                ? colorKeyCoverage(decodeYUV(luma.sample(s, q).r, chroma.sample(s, q).rg, yuv), u)
+                : sampledMask(automaticMask, q, 1.0);
+        }
+        base = total / 9.0;
+    }
+    output.write(float4(finishBackgroundCoverage(base, uv, addMask, removeMask, u)), p);
+}
+
+kernel void buildBackgroundMaskBGRA(
+    texture2d<float, access::sample> source [[texture(0)]],
+    texture2d<float, access::sample> automaticMask [[texture(2)]],
+    texture2d<float, access::sample> addMask [[texture(3)]],
+    texture2d<float, access::sample> removeMask [[texture(4)]],
+    texture2d<float, access::write> output [[texture(5)]],
+    constant BackgroundRemovalUniforms &u [[buffer(0)]],
+    uint2 p [[thread_position_in_grid]]) {
+    if (p.x >= output.get_width() || p.y >= output.get_height()) return;
+    constexpr sampler s(coord::normalized, address::clamp_to_edge, filter::linear);
+    float2 uv = (float2(p) + 0.5) / float2(output.get_width(), output.get_height());
+    float base = u.controls.w > 0.5 ? colorKeyCoverage(source.sample(s, uv).rgb, u)
+                                    : sampledMask(automaticMask, uv, 1.0);
+    const float2 directions[8] = { float2(-1,-1), float2(0,-1), float2(1,-1), float2(-1,0),
+                                   float2(1,0), float2(-1,1), float2(0,1), float2(1,1) };
+    float radius = abs(u.edge.y);
+    if (radius > 0.00001) {
+        float shifted = base;
+        for (uint i = 0; i < 8; ++i) {
+            float2 q = uv + directions[i] * radius;
+            float v = u.controls.w > 0.5 ? colorKeyCoverage(source.sample(s, q).rgb, u)
+                                         : sampledMask(automaticMask, q, 1.0);
+            shifted = u.edge.y > 0 ? max(shifted, v) : min(shifted, v);
+        }
+        base = shifted;
+    }
+    if (u.edge.x > 0.00001) {
+        float total = base;
+        for (uint i = 0; i < 8; ++i) {
+            float2 q = uv + directions[i] * u.edge.x;
+            total += u.controls.w > 0.5 ? colorKeyCoverage(source.sample(s, q).rgb, u)
+                                        : sampledMask(automaticMask, q, 1.0);
+        }
+        base = total / 9.0;
+    }
+    output.write(float4(finishBackgroundCoverage(base, uv, addMask, removeMask, u)), p);
+}
+
+kernel void applyBackgroundRemovalBGRA(
+    texture2d<float, access::read> source [[texture(0)]],
+    texture2d<float, access::sample> matte [[texture(1)]],
+    texture2d<float, access::write> destination [[texture(2)]],
+    constant BackgroundRemovalUniforms &u [[buffer(0)]],
+    uint2 p [[thread_position_in_grid]]) {
+    if (p.x >= destination.get_width() || p.y >= destination.get_height()) return;
+    float2 uv = (float2(p) + 0.5) / float2(destination.get_width(), destination.get_height());
+    float coverage = backgroundRemovalCoverage(matte, uv);
+    float4 pixel = source.read(p);
+    float3 straight = pixel.a > 0.00001 ? pixel.rgb / pixel.a : float3(0);
+    if (u.controls.w > 0.5 && u.controls.z > 0 && coverage > 0.01 && coverage < 0.995) {
+        float edge = (1.0 - abs(coverage * 2.0 - 1.0)) * u.controls.z;
+        uint dominant = u.keyColor.g >= u.keyColor.r && u.keyColor.g >= u.keyColor.b ? 1
+                      : (u.keyColor.b >= u.keyColor.r ? 2 : 0);
+        float others = dominant == 0 ? max(straight.g, straight.b)
+                     : dominant == 1 ? max(straight.r, straight.b) : max(straight.r, straight.g);
+        straight[dominant] = mix(straight[dominant], min(straight[dominant], others), edge);
+    }
+    float alpha = pixel.a * coverage;
+    destination.write(float4(straight * alpha, alpha), p);
+}
+
 fragment float4 gradeFragmentYUV(
     RasterData in [[stage_in]],
     texture2d<float, access::sample> lumaTexture [[texture(0)]],
@@ -1433,8 +1659,12 @@ fragment float4 gradeFragmentBGRA(
     constant LocalGradeStack &locals [[buffer(8)]])
 {
     constexpr sampler videoSampler(coord::normalized, address::clamp_to_edge, filter::linear);
-    float3 source = sourceTexture.sample(videoSampler, in.textureCoordinate).rgb;
-    return float4(applyLookAndGrade(source, in.textureCoordinate, grade, lutTexture, curveLUT, locals), 1.0);
+    float4 pixel = sourceTexture.sample(videoSampler, in.textureCoordinate);
+    float3 straight = pixel.a > 0.00001 ? pixel.rgb / pixel.a : float3(0);
+    float3 graded = applyLookAndGrade(straight, in.textureCoordinate, grade, lutTexture, curveLUT, locals);
+    float2 cell = floor(in.position.xy / 14.0);
+    float checker = fmod(cell.x + cell.y, 2.0) < 1.0 ? 0.16 : 0.24;
+    return float4(mix(float3(checker), graded, pixel.a), 1.0);
 }
 
 kernel void gradeExportBGRA(
@@ -1537,7 +1767,13 @@ fragment float4 presentFragmentSDR(
     texture2d<float, access::sample> source [[texture(0)]])
 {
     constexpr sampler videoSampler(coord::normalized, address::clamp_to_edge, filter::linear);
-    return float4(saturate(source.sample(videoSampler, in.textureCoordinate).rgb), 1.0);
+    float4 pixel = source.sample(videoSampler, in.textureCoordinate);
+    // Editor-only transparency furniture. The exported pixels never pass this
+    // fragment; it simply makes a cutout legible when no lower layer exists.
+    float2 cell = floor(in.position.xy / 14.0);
+    float checker = fmod(cell.x + cell.y, 2.0) < 1.0 ? 0.16 : 0.24;
+    float3 straight = saturate(pixel.rgb);
+    return float4(mix(float3(checker), straight, pixel.a), 1.0);
 }
 
 // Preview: a finished HDR frame is in working space, so the display transform
@@ -2147,6 +2383,9 @@ inline float4 gradedHDRTransitionSample(
     constant LayerMaskUniforms &mask,
     texture3d<float, access::sample> lutTexture,
     texture2d<float, access::sample> curveLUT,
+    texture2d<float, access::sample> trackMatte,
+    texture2d<float, access::sample> backgroundMatte,
+    constant BackgroundRemovalUniforms &backgroundRemoval,
     constant LocalGradeStack &locals)
 {
     if (screenUV.x < 0.0 || screenUV.x > 1.0 || screenUV.y < 0.0 || screenUV.y > 1.0) return float4(0.0);
@@ -2158,7 +2397,14 @@ inline float4 gradedHDRTransitionSample(
     float3 signal = source.sample(s, uv).rgb;
     float3 working = layer.params.z > 0.5 ? sdrToWorking(signal) : toWorkingSpace(signal, hdr);
     working = applyLookAndGradeHDR(working, uv, grade, lutTexture, curveLUT, locals);
-    float alpha = layer.params.x * layerMaskWeight(uv, mask);
+    // The matte is sampled at the SCREEN coordinate this sample is being drawn
+    // from, not the layer's, so a wipe that reads a displaced part of the clip
+    // still reads the matte where the pixel lands.
+    float backgroundCoverage = backgroundRemovalCoverage(backgroundMatte, uv);
+    working = suppressBackgroundSpill(working, backgroundCoverage, backgroundRemoval);
+    float alpha = layer.params.x * backgroundCoverage
+        * layerMaskWeight(uv, mask)
+        * trackMatteCoverage(trackMatte, screenUV, layer.matte.x);
     return float4(working * alpha, alpha);
 }
 
@@ -2171,6 +2417,10 @@ kernel void compositeTransitionHDR(
     texture3d<float, access::sample> incomingLUT [[texture(5)]],
     texture2d<float, access::sample> outgoingCurve [[texture(6)]],
     texture2d<float, access::sample> incomingCurve [[texture(7)]],
+    texture2d<float, access::sample> outgoingMatte [[texture(8)]],
+    texture2d<float, access::sample> incomingMatte [[texture(9)]],
+    texture2d<float, access::sample> outgoingBackground [[texture(10)]],
+    texture2d<float, access::sample> incomingBackground [[texture(11)]],
     constant GradeUniforms &outgoingGrade [[buffer(0)]],
     constant HDRDisplayUniforms &hdr [[buffer(1)]],
     constant HDRLayerUniforms &outgoingLayer [[buffer(2)]],
@@ -2181,7 +2431,9 @@ kernel void compositeTransitionHDR(
     constant TransitionUniforms &u [[buffer(7)]],
     uint2 position [[thread_position_in_grid]],
     constant LocalGradeStack &outgoingLocals [[buffer(8)]],
-    constant LocalGradeStack &incomingLocals [[buffer(9)]])
+    constant LocalGradeStack &incomingLocals [[buffer(9)]],
+    constant BackgroundRemovalUniforms &outgoingBackgroundRemoval [[buffer(10)]],
+    constant BackgroundRemovalUniforms &incomingBackgroundRemoval [[buffer(11)]])
 {
     if (position.x >= destination.get_width() || position.y >= destination.get_height()) return;
     uint2 size = uint2(destination.get_width(), destination.get_height());
@@ -2189,11 +2441,13 @@ kernel void compositeTransitionHDR(
     float p = clamp(u.progress, 0.0, 1.0), e = easeTransition(p);
     auto sampleA = [&](float2 coordinate) {
         return gradedHDRTransitionSample(outgoing, coordinate, size, outgoingGrade, hdr,
-            outgoingLayer, outgoingMask, outgoingLUT, outgoingCurve, outgoingLocals);
+            outgoingLayer, outgoingMask, outgoingLUT, outgoingCurve, outgoingMatte,
+            outgoingBackground, outgoingBackgroundRemoval, outgoingLocals);
     };
     auto sampleB = [&](float2 coordinate) {
         return gradedHDRTransitionSample(incoming, coordinate, size, incomingGrade, hdr,
-            incomingLayer, incomingMask, incomingLUT, incomingCurve, incomingLocals);
+            incomingLayer, incomingMask, incomingLUT, incomingCurve, incomingMatte,
+            incomingBackground, incomingBackgroundRemoval, incomingLocals);
     };
     float4 a = sampleA(uv), b = sampleB(uv), mixed;
     switch (u.type) {
@@ -2654,10 +2908,13 @@ kernel void compositeVideoAppleLog(
     texture2d<float, access::sample> partnerLuma [[texture(4)]],
     texture2d<float, access::sample> partnerChroma [[texture(5)]],
     texture2d<float, access::sample> curves [[texture(6)]],
+    texture2d<float, access::sample> trackMatte [[texture(8)]],
+    texture2d<float, access::sample> backgroundMatte [[texture(9)]],
     constant GradeUniforms &grade [[buffer(0)]],
     constant YUVUniforms &yuv [[buffer(1)]],
     constant HDRLayerUniforms &layer [[buffer(2)]],
     constant LayerMaskUniforms &mask [[buffer(3)]],
+    constant BackgroundRemovalUniforms &backgroundRemoval [[buffer(4)]],
     constant uint2 &origin [[buffer(7)]],
     constant LocalGradeStack &locals [[buffer(8)]],
     uint2 tid [[thread_position_in_grid]]) {
@@ -2670,7 +2927,13 @@ kernel void compositeVideoAppleLog(
         working = mix(working, logLayerWorking(partnerLuma, partnerChroma, uv, layer, yuv), layer.params.y);
     }
     working = applyLookAndGradeHDR(working, uv, grade, lut, curves, locals);
-    float alpha = layer.params.x * layerMaskWeight(uv, mask);
+    float backgroundCoverage = backgroundRemovalCoverage(backgroundMatte, uv);
+    working = suppressBackgroundSpill(working, backgroundCoverage, backgroundRemoval);
+    float alpha = layer.params.x * backgroundCoverage
+        * layerMaskWeight(uv, mask)
+        * trackMatteCoverage(trackMatte, p,
+                             float2(destination.get_width(), destination.get_height()),
+                             layer.matte.x);
     destination.write(float4(working * alpha, alpha), p);
 }
 
@@ -2679,9 +2942,12 @@ kernel void compositeImageAppleLog(
     texture2d<float, access::write> destination [[texture(2)]],
     texture3d<float, access::sample> lut [[texture(3)]],
     texture2d<float, access::sample> curves [[texture(6)]],
+    texture2d<float, access::sample> trackMatte [[texture(8)]],
+    texture2d<float, access::sample> backgroundMatte [[texture(9)]],
     constant GradeUniforms &grade [[buffer(0)]],
     constant HDRLayerUniforms &layer [[buffer(2)]],
     constant LayerMaskUniforms &mask [[buffer(3)]],
+    constant BackgroundRemovalUniforms &backgroundRemoval [[buffer(4)]],
     constant uint2 &origin [[buffer(7)]],
     constant LocalGradeStack &locals [[buffer(8)]],
     uint2 tid [[thread_position_in_grid]]) {
@@ -2692,8 +2958,14 @@ kernel void compositeImageAppleLog(
     constexpr sampler s(coord::normalized, address::clamp_to_edge, filter::linear);
     float4 sample = source.sample(s, uv);
     float3 straight = layer.params.w > 0.5 && sample.a > 0.0001 ? sample.rgb / sample.a : sample.rgb;
+    float backgroundCoverage = backgroundRemovalCoverage(backgroundMatte, uv);
+    straight = suppressBackgroundSpill(straight, backgroundCoverage, backgroundRemoval);
     float3 working = applyLookAndGradeHDR(sdrToWorking(straight), uv, grade, lut, curves, locals);
-    float alpha = sample.a * layer.params.x * layerMaskWeight(uv, mask);
+    float alpha = sample.a * layer.params.x * backgroundCoverage
+        * layerMaskWeight(uv, mask)
+        * trackMatteCoverage(trackMatte, p,
+                             float2(destination.get_width(), destination.get_height()),
+                             layer.matte.x);
     destination.write(float4(working * alpha, alpha), p);
 }
 

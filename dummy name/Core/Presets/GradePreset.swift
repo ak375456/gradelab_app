@@ -108,7 +108,7 @@ enum GradePresetName {
 
     /// Name for a duplicate: "Tokyo Copy", then "Tokyo Copy 2".
     static func copy(of name: String, among existing: [String]) -> String {
-        let base = String("\(name) Copy".prefix(maximumLength))
+        let base = String(String(localized: "\(name) Copy").prefix(maximumLength))
         return unique(base: base, among: existing)
     }
 }
