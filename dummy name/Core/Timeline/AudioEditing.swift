@@ -101,7 +101,12 @@ enum AudioEditing {
             }
         }
         switch operation {
-        case .move: clip.placement.timelineStart = target
+        case .move:
+            // A row holds a sequence, so a move stops against whatever else is
+            // on this one rather than being refused for landing on it.
+            clip.placement.timelineStart = try TimelineEditing.clampedStart(
+                target, duration: clip.placement.duration, itemID: id,
+                on: clip.placement.trackID, fallback: clip.placement.timelineStart, in: project)
         case .trimStart:
             let delta = try target.subtracting(clip.placement.timelineStart)
             clip.sourceRange.start = try clip.sourceRange.start.adding(delta)

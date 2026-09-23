@@ -7,6 +7,8 @@ struct ImageExportView: View {
     @ObservedObject private var store = ProStore.shared
     @Environment(\.dismiss) private var dismiss
     @State private var paywallFeature: ProFeature?
+    @State private var showsSaveFile = false
+    @State private var savedToFile = false
 
     init(project: ImageProject) {
         _model = StateObject(wrappedValue: ImageExportViewModel(project: project))
@@ -35,6 +37,12 @@ struct ImageExportView: View {
         // own copy — rather than left for the system to collect eventually.
         .onDisappear { model.discardOutput() }
         .paywallSheet($paywallFeature)
+        .sheet(isPresented: $showsSaveFile) {
+            if let url = model.output?.url {
+                SaveFileSheet(url: url) { savedToFile = true; showsSaveFile = false }
+            }
+        }
+        .onChange(of: model.output?.url) { _, _ in savedToFile = false }
         .sheet(isPresented: $model.showsShareSheet) {
             if let url = model.output?.url { VideoShareSheet(videoURL: url).ignoresSafeArea() }
         }
@@ -216,6 +224,13 @@ struct ImageExportView: View {
                 }
             }
             VStack(spacing: AppSpacing.compact) {
+                AppButton(savedToFile ? "Save Another Copy" : "Save to Files", systemImage: "folder",
+                          expandsHorizontally: true) { showsSaveFile = true }
+                    .disabled(model.isSaving)
+                if savedToFile {
+                    Label("Saved to Files", systemImage: "checkmark.circle")
+                        .font(AppTypography.caption).foregroundStyle(AppColors.positive)
+                }
                 AppButton(model.savedToPhotos ? "Saved to Photos" : "Save to Photos",
                           systemImage: model.savedToPhotos ? "checkmark" : "square.and.arrow.down",
                           expandsHorizontally: true, action: model.saveToPhotos)

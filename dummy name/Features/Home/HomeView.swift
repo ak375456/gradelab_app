@@ -4,8 +4,9 @@ import UIKit
 
 struct HomeView: View {
     @ObservedObject var coordinator: AppCoordinator
-    @State private var selectedItems: [PhotosPickerItem] = []
-    @State private var selectedImage: PhotosPickerItem?
+    @State private var importPicker = false
+    @State private var importingImage = false
+    @State private var importFromFiles = AppPlatform.isMac
     @State private var settings = false
     @State private var pendingDeletion: RecentProject?
     @ObservedObject private var store = ProStore.shared
@@ -34,6 +35,8 @@ struct HomeView: View {
             .padding(.horizontal, AppSpacing.standard)
             .padding(.top, AppSpacing.large)
             .padding(.bottom, AppSpacing.xLarge)
+            .frame(maxWidth: AppPlatform.isMac ? 1000 : .infinity)
+            .frame(maxWidth: .infinity)
         }
         .scrollIndicators(.hidden)
         .background(grade.background.ignoresSafeArea())
@@ -44,16 +47,15 @@ struct HomeView: View {
         .numericEntryHost()
         .sheet(isPresented: $settings) { EditorSettings() }
         .sheet(isPresented: $paywall) { PaywallView() }
-        .onChange(of: selectedItems) { _, newValue in
-            guard !newValue.isEmpty else { return }
-            coordinator.importVideos(from: newValue)
-            selectedItems = []
-        }
-        .onChange(of: selectedImage) { _, item in
-            guard let item else { return }
-            coordinator.importImage(from: item)
-            selectedImage = nil
-        }
+        .modifier(MediaImportPicker(isPresented: $importPicker, images: importingImage,
+                                    allowsMultipleSelection: !importingImage, useFiles: importFromFiles,
+                                    onSelection: { sources in
+            if importingImage {
+                if let source = sources.first { coordinator.importImage(from: source) }
+            } else { coordinator.importVideos(from: sources) }
+        }, onFailure: { error in
+            coordinator.alert = .init(title: "Couldn’t Import", message: error.localizedDescription)
+        }))
         // Catches the grade of someone who set it and then left without closing
         // the panel, which the close handler alone would lose.
         .onChange(of: scenePhase) { _, phase in
@@ -141,7 +143,7 @@ struct HomeView: View {
                 Text("GradeLab")
                     .font(AppTypography.display)
                     .foregroundStyle(AppColors.textPrimary)
-                Text("Professional color grading on iPhone.")
+                Text("Professional color grading.")
                     .font(AppTypography.secondary)
                     .foregroundStyle(AppColors.textSecondary)
             }
@@ -155,6 +157,12 @@ struct HomeView: View {
         // the row contains its children instead of collapsing them into one
         // element that would bury both buttons behind the app's name.
         .accessibilityElement(children: .contain)
+    }
+
+    private func showImport(images: Bool, alternate: Bool = false) {
+        importingImage = images
+        importFromFiles = alternate ? !AppPlatform.isMac : AppPlatform.isMac
+        importPicker = true
     }
 
     private var importHero: some View {
@@ -174,18 +182,20 @@ struct HomeView: View {
             }
 
             VStack(spacing: AppSpacing.small) {
-                PhotosPicker(selection: $selectedItems, selectionBehavior: .ordered, matching: .videos, preferredItemEncoding: .current) {
+                Button { showImport(images: false) } label: {
                     Label("Import Videos", systemImage: "plus")
                         .font(AppTypography.bodyEmphasized)
                         .foregroundStyle(AppColors.editorBackground)
                         .frame(maxWidth: .infinity, minHeight: 48)
                         .background(grade.accent, in: RoundedRectangle(cornerRadius: AppCornerRadius.control, style: .continuous))
                 }
-                .accessibilityHint("Opens the system video picker")
+                .buttonStyle(.plain)
+                .workspaceShortcut(.importVideos)
+                .accessibilityHint(AppPlatform.isMac ? "Choose videos from Finder" : "Choose videos from Photos")
 
                 // A photograph goes to the same grading tools, so it is imported
                 // from the same place rather than from a separate corner of the app.
-                PhotosPicker(selection: $selectedImage, matching: .images, preferredItemEncoding: .current) {
+                Button { showImport(images: true) } label: {
                     Label("Import Photo", systemImage: "photo")
                         .font(AppTypography.bodyEmphasized)
                         .foregroundStyle(AppColors.textPrimary)
@@ -196,7 +206,20 @@ struct HomeView: View {
                                 .strokeBorder(AppColors.border, lineWidth: 1)
                         }
                 }
-                .accessibilityHint("Opens the system photo picker")
+                .buttonStyle(.plain)
+                .workspaceShortcut(.importPhoto)
+                .accessibilityHint(AppPlatform.isMac ? "Choose an image from Finder" : "Choose an image from Photos")
+
+                Menu {
+                    Button("Import Videos", systemImage: "film") { showImport(images: false, alternate: true) }
+                    Button("Import Photo", systemImage: "photo") { showImport(images: true, alternate: true) }
+                } label: {
+                    Label(AppPlatform.isMac ? "Import from Photos" : "Import from Files",
+                          systemImage: AppPlatform.isMac ? "photo.on.rectangle" : "folder")
+                        .font(AppTypography.callout)
+                        .foregroundStyle(AppColors.textSecondary)
+                        .frame(minHeight: 44)
+                }
             }
 
             HStack(spacing: AppSpacing.standard) {

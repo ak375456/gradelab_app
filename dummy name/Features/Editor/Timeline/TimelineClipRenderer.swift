@@ -62,8 +62,12 @@ struct TimelineClipPresentation {
     /// Length shown on the clip's duration chip.
     var duration: Double
     var isSelected = false
-    /// The single selection that owns trim handles and keyframe markers.
+    /// The single selection that owns keyframe markers.
     var isFocused = false
+    /// Whether this clip draws trim handles. Every selected clip does: a trim
+    /// carries the whole selection, so any of their edges is a valid grab and
+    /// all of them have to look like one.
+    var showsTrimHandles = false
     var isLocked = false
     /// A row that is hidden or muted draws faded rather than disappearing.
     var isDimmed = false
@@ -175,7 +179,7 @@ struct TimelineClipRenderer {
         context.restoreGState()
 
         drawBorder(presentation, path: path)
-        if presentation.isFocused && !presentation.isLocked { drawTrimHandles(presentation, layout: layout) }
+        if presentation.showsTrimHandles && !presentation.isLocked { drawTrimHandles(presentation, layout: layout) }
         if presentation.isFocused { drawKeyframes(presentation, layout: layout) }
 
         context.restoreGState()

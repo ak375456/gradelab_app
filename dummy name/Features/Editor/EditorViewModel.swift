@@ -2,6 +2,7 @@ import AVFoundation
 import Combine
 import Foundation
 import SwiftUI
+import UniformTypeIdentifiers
 import PhotosUI
 import CoreMedia
 import CoreGraphics
@@ -287,6 +288,28 @@ final class EditorViewModel: ObservableObject, GradingModel {
             return self.selectedClipID
         }
     }
+    /// Row height and waveform size change nothing the compositor reads, so
+    /// like a rename they must not tear down and rebuild the player. They do go
+    /// through `commit`, because they live in the document: that is what makes
+    /// a row someone set to compact still compact after the app is closed.
+    func setTrackHeight(_ id: UUID, _ choice: TimelineTrackHeightChoice) {
+        guard project.timeline.tracks.first(where: { $0.id == id })?.resolvedHeight != choice else { return }
+        commit("Track height", rebuildsSequence: false) { project in
+            guard let index = project.timeline.tracks.firstIndex(where: { $0.id == id }) else { return self.selectedClipID }
+            project.timeline.tracks[index].heightChoice = choice
+            return self.selectedClipID
+        }
+    }
+
+    func setWaveformSize(_ id: UUID, _ size: TimelineWaveformSize) {
+        guard project.timeline.tracks.first(where: { $0.id == id })?.resolvedWaveformSize != size else { return }
+        commit("Waveform size", rebuildsSequence: false) { project in
+            guard let index = project.timeline.tracks.firstIndex(where: { $0.id == id }) else { return self.selectedClipID }
+            project.timeline.tracks[index].waveformSize = size
+            return self.selectedClipID
+        }
+    }
+
     func reorderTrack(_ id: UUID, direction: Int) {
         commit("Layer order") { project in
             guard let i = project.timeline.tracks.firstIndex(where: { $0.id == id }), project.timeline.tracks.indices.contains(i+direction) else { return self.selectedClipID }
@@ -311,18 +334,18 @@ final class EditorViewModel: ObservableObject, GradingModel {
             let time = try TimelineTime.seconds(seconds)
             switch target {
             case .track(let trackID):
-                try TimelineEditing.moveToVideoLayer(id, destinationTrackID: trackID,
-                                                     at: time, in: &project)
-            case .newOverlay(let index):
-                try TimelineEditing.moveToVideoLayer(id, destinationTrackID: nil,
-                                                     newOverlayIndex: index,
-                                                     at: time, in: &project)
+                try TimelineEditing.moveToLayer(id, destinationTrackID: trackID,
+                                                at: time, in: &project)
+            case .newTrack(_, let index):
+                try TimelineEditing.moveToLayer(id, destinationTrackID: nil,
+                                                newTrackIndex: index,
+                                                at: time, in: &project)
             }
-            self.selectedTrackID = project.timeline.videoClip(id: id)?.placement.trackID
+            self.selectedTrackID = project.timeline.item(id: id)?.placement.trackID
             return id
         }
     }
-    func addMedia(_ item: PhotosPickerItem, overlay: Bool) async {
+    func addMedia(_ item: MediaImportSource, overlay: Bool) async {
         guard !isImporting else { return }
         isImporting = true; defer { isImporting = false }
         do {
@@ -380,7 +403,7 @@ final class EditorViewModel: ObservableObject, GradingModel {
             }
         } catch { editError = error.localizedDescription }
     }
-    func addImage(_ item: PhotosPickerItem) async {
+    func addImage(_ item: MediaImportSource) async {
         guard !isImporting else { return }
         isImporting = true; defer { isImporting = false }
         do {
@@ -1075,6 +1098,203 @@ final class EditorViewModel: ObservableObject, GradingModel {
             }
         } catch { editError = error.localizedDescription }
     }
+    // MARK: - Importing into the bin
+
+    /// What a chosen file turns out to be.
+    ///
+    /// Read from the file rather than asked of the user, so one Import button
+    /// and one drop target can serve video, stills and audio. Someone dragging
+    /// a folder of rushes in should not have to sort them first.
+    enum ImportedMediaKind {
+        case video, image, audio
+
+        init?(_ url: URL) {
+            guard let type = UTType(filenameExtension: url.pathExtension) else { return nil }
+            // Order matters: some container types conform to more than one of
+            // these, and a movie that also reports as audio is still a movie.
+            if type.conforms(to: .movie) || type.conforms(to: .video) { self = .video }
+            else if type.conforms(to: .image) { self = .image }
+            else if type.conforms(to: .audio) { self = .audio }
+            else { return nil }
+        }
+    }
+
+    /// Imports files into the project's media list **without** putting anything
+    /// on the timeline.
+    ///
+    /// That separation is the point of having a bin. Import answers "what am I
+    /// working with", placing answers "where does it go", and running them
+    /// together meant every import also edited the sequence — so bringing in
+    /// six takes to choose between them left six clips to delete again.
+    @discardableResult
+    func importIntoBin(_ urls: [URL]) async -> [UUID] {
+        guard !isImporting, !urls.isEmpty else { return [] }
+        isImporting = true
+        defer { isImporting = false }
+        var imported: [ProjectMediaAsset] = []
+        for url in urls {
+            do {
+                imported.append(try await importedAsset(for: url))
+                try Task.checkCancellation()
+            } catch is CancellationError {
+                return []
+            } catch {
+                editError = error.localizedDescription
+                break
+            }
+        }
+        guard !imported.isEmpty else { return [] }
+        // One history entry for the whole drop, so undo takes back the gesture
+        // the user made rather than one file of it.
+        // The count branch is only ever reached with two or more, so a single
+        // plural form is correct in every shipped language.
+        let label = imported.count == 1
+            ? String(localized: "Import media")
+            : String(localized: "Import \(imported.count) files")
+        commit(label) { project in
+            for asset in imported { project.addAsset(asset) }
+            return nil
+        }
+        return imported.map(\.id)
+    }
+
+    /// Files dropped straight onto the picture: imported into the bin first,
+    /// because that is where media lives, then placed so the drop does what it
+    /// looked like it would do.
+    func importAndPlaceOnCanvas(_ urls: [URL]) async {
+        for id in await importIntoBin(urls) { placeAsset(id, as: .overlay) }
+    }
+
+    private func importedAsset(for url: URL) async throws -> ProjectMediaAsset {
+        switch ImportedMediaKind(url) {
+        case .video:
+            let imported = try await VideoImportService(projectStore: ProjectStore()).importVideo(from: url)
+            let asset = try await VideoMetadataReader().read(from: imported.url,
+                                                            originalFileName: imported.originalFilename)
+            _ = try await ExportSourceInspector.inspect(asset, requireExportColorTags: false)
+            let range = try asset.sourceRange ?? .init(start: .zero,
+                                                       duration: .seconds(asset.metadata.durationSeconds))
+            return ProjectMediaAsset(id: UUID(), url: asset.url, sourceRange: range,
+                                     videoMetadata: asset.metadata, frameDuration: asset.frameDuration)
+        case .image:
+            return try await ImageImportService.load(.file(url))
+        case .audio:
+            return try await AudioImportService.load(url)
+        case nil:
+            throw TimelineError.invalid(
+                String(localized: "\(url.lastPathComponent) is not a video, image or audio file."))
+        }
+    }
+
+    /// Where a bin placement should land, so the caller says what it means
+    /// rather than passing two booleans that can disagree.
+    enum MediaPlacement: Equatable {
+        /// Append to the main video track, after whatever is already there.
+        case mainTrack
+        /// A layer of its own. `at` is a time the caller chose — where a drop
+        /// on the timeline let go — or nil for the playhead.
+        case overlay(at: Double?)
+
+        static var overlay: MediaPlacement { .overlay(at: nil) }
+
+        var startTime: Double? {
+            if case .overlay(let time) = self { time } else { nil }
+        }
+    }
+
+    /// Puts media the project already holds back on the timeline.
+    ///
+    /// The media bin hands over an asset that has already been imported,
+    /// validated and copied into project storage, so nothing here re-reads the
+    /// original file and nothing is copied a second time. The same source can
+    /// therefore appear on the timeline as many times as the edit wants, which
+    /// is the whole point of having a bin rather than re-importing.
+    func placeAsset(_ assetID: UUID, as placement: MediaPlacement) {
+        commit(placement == .mainTrack ? String(localized: "Add video") : String(localized: "Add overlay"),
+               seekToSelection: true) { project in
+            guard let media = project.assets.first(where: { $0.id == assetID }) else {
+                throw TimelineError.invalid(String(localized: "That media is no longer part of this project."))
+            }
+            // A still has no length of its own, so it gets the same default the
+            // image import uses. Everything else plays for as long as it lasts.
+            let duration: TimelineTime
+            if media.stillImage == nil {
+                duration = media.sourceRange.duration
+            } else {
+                duration = try TimelineEditing.snapped(.seconds(3), frame: project.canvas.frameDuration)
+            }
+
+            if media.audioName != nil {
+                let trackID = UUID()
+                let start = try TimelineEditing.snapped(.seconds(placement.startTime ?? self.timelineTime),
+                                                        frame: project.canvas.frameDuration)
+                let clip = AudioClip(placement: .init(id: UUID(), trackID: trackID, timelineStart: start,
+                                                      duration: duration),
+                                     assetID: media.id, sourceRange: media.sourceRange)
+                project.timeline.tracks.append(.init(id: trackID, name: media.audioName ?? "Audio",
+                                                     kind: .audio, items: [.audio(clip)]))
+                self.selectedTrackID = trackID
+                return clip.id
+            }
+
+            let sourceRange = media.stillImage == nil
+                ? media.sourceRange
+                : TimelineRange(start: .zero, duration: duration)
+            let hasAudio = media.videoMetadata?.hasAudio == true
+
+            switch placement {
+            case .mainTrack:
+                guard let index = project.timeline.tracks.firstIndex(where: { $0.kind == .mainVideo }) else {
+                    throw TimelineError.invalid(String(localized: "This project has no main video track."))
+                }
+                guard !project.timeline.tracks[index].isLocked else {
+                    throw TimelineError.invalid(String(localized: "Unlock the main track before adding media."))
+                }
+                let track = project.timeline.tracks[index]
+                let existing = try TimelineEditing.clips(in: project).filter { $0.placement.trackID == track.id }
+                let start = try existing.last?.placement.range.end ?? .zero
+                let clip = VideoClip(placement: .init(id: UUID(), trackID: track.id, timelineStart: start,
+                                                      duration: duration),
+                                     assetID: media.id, sourceRange: sourceRange,
+                                     embeddedAudio: hasAudio ? EmbeddedAudio() : nil)
+                project.timeline.tracks[index].items.append(.video(clip))
+                self.selectedTrackID = track.id
+                return clip.id
+
+            case .overlay:
+                let trackID = UUID()
+                let start = try TimelineEditing.snapped(.seconds(placement.startTime ?? self.timelineTime),
+                                                        frame: project.canvas.frameDuration)
+                let clip = VideoClip(placement: .init(id: UUID(), trackID: trackID, timelineStart: start,
+                                                      duration: duration),
+                                     assetID: media.id, sourceRange: sourceRange,
+                                     embeddedAudio: hasAudio ? EmbeddedAudio() : nil)
+                project.timeline.tracks.insert(
+                    .init(id: trackID, name: "Overlay \(project.timeline.tracks.count)",
+                          kind: .videoOverlay, items: [.video(clip)]), at: 0)
+                self.selectedTrackID = trackID
+                return clip.id
+            }
+        }
+    }
+
+    /// How many clips currently use an asset, so the bin can show what is in
+    /// the edit and what was imported and never used.
+    /// Every asset's clip count in one pass, for the bin to read.
+    var assetUsageCounts: [UUID: Int] {
+        var counts: [UUID: Int] = [:]
+        for track in project.timeline.tracks {
+            for item in track.items {
+                if let id = item.assetID { counts[id, default: 0] += 1 }
+            }
+        }
+        return counts
+    }
+
+    func usageCount(of assetID: UUID) -> Int {
+        project.timeline.tracks.flatMap(\.items).count { $0.assetID == assetID }
+    }
+
     func addText() {
         commit("Add text", seekToSelection: true) { project in
             let trackID = UUID()
@@ -1144,6 +1364,48 @@ final class EditorViewModel: ObservableObject, GradingModel {
             guard let local = clip.localTime(for: time) else { return clip }
             return clip.evaluated(atLocal: local)
         }
+    }
+
+    /// The selected clip when it is a picture on a layer of its own — an image
+    /// or video overlay — evaluated at the playhead.
+    ///
+    /// Main-track clips are excluded on purpose. That track is the background
+    /// the rest of the frame sits on, and putting drag handles on it would mean
+    /// a stray drag across the picture moved the whole programme. It still
+    /// transforms from the Transform tool, as before.
+    var evaluatedMediaOverlay: VideoClip? {
+        guard let clip = selectedClip, isOverlayTrack(clip.placement.trackID) else { return nil }
+        guard let local = clip.localTime(for: playheadTime) else { return clip }
+        return clip.evaluated(atLocal: local)
+    }
+
+    /// Every visible picture overlay at the playhead, so a title lines up on an
+    /// image's edge exactly as it does on another title's.
+    var visibleEvaluatedMediaOverlays: [VideoClip] {
+        let time = playheadTime
+        return project.timeline.items.compactMap { item in
+            guard case .video(let clip) = item,
+                  isOverlayTrack(clip.placement.trackID),
+                  clip.placement.isEnabled,
+                  clip.placement.timelineStart <= time,
+                  let end = try? clip.placement.range.end,
+                  end > time else { return nil }
+            guard let local = clip.localTime(for: time) else { return clip }
+            return clip.evaluated(atLocal: local)
+        }
+    }
+
+    private func isOverlayTrack(_ id: UUID) -> Bool {
+        project.timeline.tracks.first { $0.id == id }?.kind == .videoOverlay
+    }
+
+    /// The size a clip's picture draws at before its own transform, which is
+    /// what the canvas handles measure against.
+    func displaySize(of clip: VideoClip) -> CGSize? {
+        guard let asset = project.assets.first(where: { $0.id == clip.assetID }) else { return nil }
+        if let still = asset.stillImage { return CGSize(width: still.width, height: still.height) }
+        guard let metadata = asset.videoMetadata else { return nil }
+        return CGSize(width: metadata.displayWidth, height: metadata.displayHeight)
     }
 
     /// The shape counterpart of `editText`, with the same undo grouping.
@@ -1520,7 +1782,8 @@ final class EditorViewModel: ObservableObject, GradingModel {
             // clear the relationship in the SAME undo step that removed it.
             after.timeline.reconcileTrackMattes()
             _ = try TimelineEditing.clips(in: after)
-            guard before.timeline != after.timeline || before.canvas != after.canvas else {
+            guard before.timeline != after.timeline || before.canvas != after.canvas
+                    || before.assets != after.assets else {
                 selectedClipID = selection
                 selectedClipIDs = Set(selection.map { [$0] } ?? [])
                 return
@@ -1733,6 +1996,42 @@ final class EditorViewModel: ObservableObject, GradingModel {
             }
         }
     }
+    /// Trims every selected clip by the same amount, in one undo step.
+    ///
+    /// `delta` is travel, not a destination: each clip applies it to its own
+    /// edge, so clips of different lengths keep their difference instead of
+    /// being flattened to a shared time. The drag has already clamped it to
+    /// what the most restricted clip can give, and this re-clamps per clip
+    /// anyway — a keyframe-accurate limit is the editing layer's to enforce,
+    /// not the gesture's.
+    func trimClips(_ ids: Set<UUID>, operation: TimelineGestureEdit, delta: Double) {
+        guard operation != .move, delta != 0, !ids.isEmpty else { return }
+        commit(operation.rawValue) { project in
+            // The id list is fixed up front so nothing is missed or visited
+            // twice, but each edge is read back from the project as it is
+            // reached. That matters on the main row: trimming one clip there
+            // repacks the row and carries the next one along with it, so a
+            // position captured beforehand would be stale by the time it is
+            // used and the second clip would come out unchanged.
+            for id in project.timeline.items.map(\.id) where ids.contains(id) {
+                guard let item = project.timeline.item(id: id) else { continue }
+                let edge = operation == .trimEnd
+                    ? ((try? item.placement.range.end.seconds) ?? 0)
+                    : item.placement.timelineStart.seconds
+                let target = try TimelineTime.seconds(max(0, edge + delta))
+                if project.timeline.audioClip(id: id) != nil {
+                    try AudioEditing.edit(id, operation: operation, to: target, clamping: true, in: &project)
+                } else if item.isDrawnOverlay {
+                    try OverlayEditing.edit(id, operation: operation, to: target, in: &project)
+                } else {
+                    try TimelineEditing.trimClosingGaps(
+                        id, edge: operation == .trimStart ? .left : .right, to: target, in: &project)
+                }
+            }
+            return self.selectedClipID
+        }
+    }
+
     func editTiming(id: UUID, operation: TimelineGestureEdit, seconds: Double) {
         commit(operation.rawValue) { project in
             let time = try TimelineTime.seconds(seconds)
@@ -1777,7 +2076,27 @@ final class EditorViewModel: ObservableObject, GradingModel {
         rebuildSequence()
     }
 
+    private var previewSuspendedForExport = false
+
+    func suspendPreviewForExport() {
+        guard !previewSuspendedForExport else { return }
+        previewSuspendedForExport = true
+        stopMaskTracking()
+        sequenceTask?.cancel()
+        sequenceTask = nil
+        isPreparingTimeline = false
+        playback.releaseSequenceResources()
+        layerState = nil
+    }
+
+    func resumePreviewAfterExport() {
+        guard previewSuspendedForExport else { return }
+        previewSuspendedForExport = false
+        rebuildSequence(at: playback.currentTime)
+    }
+
     private func rebuildSequence(at requestedTime: Double? = nil) {
+        guard !previewSuspendedForExport else { return }
         sequenceTask?.cancel()
         playback.pause()
         let snapshot = project, time = requestedTime ?? timelineTime

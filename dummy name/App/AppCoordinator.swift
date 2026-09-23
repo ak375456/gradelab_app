@@ -77,7 +77,7 @@ final class AppCoordinator: ObservableObject {
     /// check — whether its colour can be handled — and that is decided during
     /// the import, which either succeeds or explains itself. Anything else would
     /// be a screen between the user and the picture.
-    func importImage(from item: PhotosPickerItem) {
+    func importImage(from item: MediaImportSource) {
         importTask?.cancel()
         analyzingFileName = nil
         analyzingMedia = .image
@@ -212,11 +212,11 @@ final class AppCoordinator: ObservableObject {
         }
     }
 
-    func importVideo(from item: PhotosPickerItem) {
+    func importVideo(from item: MediaImportSource) {
         importVideos(from: [item])
     }
 
-    func importVideos(from items: [PhotosPickerItem]) {
+    func importVideos(from items: [MediaImportSource]) {
         guard let item = items.first else { return }
         importTask?.cancel()
         analyzingFileName = nil

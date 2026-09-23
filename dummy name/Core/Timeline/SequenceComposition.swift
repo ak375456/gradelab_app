@@ -7,8 +7,12 @@ struct SequenceComposition {
     var layerState: LayerRenderState? = nil
     var audioRouting = TimelineAudioMix()
 
-    static func build(project: VideoProject, forExport: Bool = true, context: MetalContext? = nil) async throws -> Self {
-        if project.needsLayerCompositor { return try await buildLayers(project: project, forExport: forExport, context: context) }
+    static func build(project: VideoProject, forExport: Bool = true, context: MetalContext? = nil,
+                      requestedRenderSize: CGSize? = nil) async throws -> Self {
+        if project.needsLayerCompositor {
+            return try await buildLayers(project: project, forExport: forExport, context: context,
+                                         requestedRenderSize: requestedRenderSize)
+        }
         let clips = try TimelineEditing.clips(in: project)
         guard !clips.isEmpty, let frame = project.canvas.frameDuration else {
             throw TimelineError.invalid(String(localized: "Add a clip with a known frame rate before playing or exporting."))

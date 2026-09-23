@@ -19,6 +19,13 @@ enum StillImageImportService {
         let displayName: String
     }
 
+    static func load(_ source: MediaImportSource, store: ImageProjectStore = ImageProjectStore()) async throws -> Imported {
+        switch source {
+        case .photos(let item): return try await load(item, store: store)
+        case .file(let url): return try await load(url: url, store: store, displayName: url.lastPathComponent)
+        }
+    }
+
     static func load(_ item: PhotosPickerItem, store: ImageProjectStore = ImageProjectStore()) async throws -> Imported {
         guard let file = try await item.loadTransferable(type: TransferredStill.self) else {
             throw TimelineError.invalid(String(localized: "The image could not be imported."))

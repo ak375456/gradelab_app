@@ -109,7 +109,14 @@ final class VideoExporter: @unchecked Sendable {
                 try session.checkCancellation()
                 try ExportMediaSettings.validate(configuration)
                 let source: ExportSourceInfo
-                if let project { source = try await SequenceComposition.build(project: project, context: self.context).source }
+                if let project {
+                    // Composite at the size being written, not at the canvas.
+                    let target = configuration.dimensions(width: project.canvas.width,
+                                                          height: project.canvas.height)
+                    source = try await SequenceComposition.build(
+                        project: project, context: self.context,
+                        requestedRenderSize: CGSize(width: target.width, height: target.height)).source
+                }
                 else { source = try await ExportSourceInspector.inspect(asset) }
                 try session.checkCancellation()
 
@@ -236,7 +243,16 @@ final class VideoExporter: @unchecked Sendable {
         let videoOutput: AVAssetReaderOutput
         if let composition = source.videoComposition {
             let output = AVAssetReaderVideoCompositionOutput(videoTracks: source.compositionVideoTracks ?? [source.videoTrack], videoSettings: ExportMediaSettings.videoReaderSettings(colorMode: source.colorMode))
-            output.videoComposition = composition
+            // Schedule only the requested output frames. Sampling a 60 fps
+            // composition at 30 fps afterwards renders and discards half of
+            // the fully graded/layered frames.
+            if let fps = configuration.frameRate.value,
+               let scheduled = composition.mutableCopy() as? AVMutableVideoComposition {
+                scheduled.frameDuration = CMTime(value: 1, timescale: CMTimeScale(fps))
+                output.videoComposition = scheduled
+            } else {
+                output.videoComposition = composition
+            }
             videoOutput = output
         } else {
             videoOutput = AVAssetReaderTrackOutput(track: source.videoTrack, outputSettings: ExportMediaSettings.videoReaderSettings(colorMode: source.colorMode))
@@ -428,7 +444,10 @@ final class VideoExporter: @unchecked Sendable {
         // The render loop only reads the LUT cache, so every look this export
         // can reach has to be on the GPU before the first frame.
         prepareLooks(settings: settings, source: source)
-        let sampler = ExportFrameSampler(output: pipeline.videoOutput, range: source.videoTimeRange, fps: configuration.frameRate.value)
+        // Still normalize timestamps: AVFoundation can emit an extra sample at
+        // an edit/gap boundary even when the composition has a fixed cadence.
+        let sampler = ExportFrameSampler(output: pipeline.videoOutput, range: source.videoTimeRange,
+            fps: configuration.frameRate.value)
 
         while videoIsActive || audioIsActive.contains(true) {
             try session.checkCancellation()

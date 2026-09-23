@@ -166,6 +166,163 @@ enum TimelineEditing {
         _ = try clips(in: candidate)
         project = candidate
     }
+    /// Whether an item would be sounding, or on screen, at the same time as
+    /// something already on a row.
+    ///
+    /// Clips that merely touch — one ending exactly where the next begins — do
+    /// not overlap. That is the whole point: a row holds a *sequence*, so a
+    /// second sound or title may share it with one already there as long as the
+    /// two never run together.
+    static func overlaps(_ item: TimelineItem, in track: TimelineTrack) -> Bool {
+        guard let end = try? item.placement.range.end else { return true }
+        let start = item.placement.timelineStart
+        return track.items.contains { other in
+            guard other.id != item.id, let otherEnd = try? other.placement.range.end else { return false }
+            return start < otherEnd && other.placement.timelineStart < end
+        }
+    }
+
+    /// Keeps a clip inside the gap it is being dragged through, so a row
+    /// holding several clips slides them up against each other instead of
+    /// refusing the edit.
+    ///
+    /// The bounds are its neighbours on that row: the end of the last clip
+    /// starting before the target, and the start of the first clip beginning at
+    /// or after it. A gap too short to hold the clip leaves it where it was —
+    /// there is nowhere to put it, and sliding it somewhere else entirely is not
+    /// what the drag asked for.
+    static func clampedStart(_ target: TimelineTime, duration: TimelineTime, itemID: UUID,
+                             on trackID: UUID, fallback: TimelineTime,
+                             in project: VideoProject) throws -> TimelineTime {
+        guard let track = project.timeline.tracks.first(where: { $0.id == trackID }),
+              track.items.contains(where: { $0.id != itemID }) else { return target }
+        var lower = TimelineTime.zero
+        var upper: TimelineTime?
+        for other in track.items where other.id != itemID {
+            let otherEnd = try other.placement.range.end
+            if other.placement.timelineStart <= target {
+                if otherEnd > lower { lower = otherEnd }
+            } else if upper.map({ other.placement.timelineStart < $0 }) ?? true {
+                upper = other.placement.timelineStart
+            }
+        }
+        let latest = try upper.map { try $0.subtracting(duration) }
+        guard latest.map({ lower <= $0 }) ?? true else { return fallback }
+        var result = max(target, lower)
+        if let latest { result = min(result, latest) }
+        return result
+    }
+
+    /// Moves one item to another row of its own kind, or to a new row of that
+    /// kind when no destination is given.
+    ///
+    /// Video keeps its own path below: the main row packs from zero and its
+    /// overlays have stacking rules. Audio, text and shapes all behave the same
+    /// way — a plain non-overlapping sequence per row — so they share one body.
+    static func moveToLayer(_ id: UUID, destinationTrackID: UUID?, newTrackIndex: Int? = nil,
+                            at time: TimelineTime, in project: inout VideoProject) throws {
+        guard let item = project.timeline.item(id: id) else {
+            throw TimelineError.invalid(String(localized: "That clip is no longer on the timeline."))
+        }
+        if case .video = item {
+            try moveToVideoLayer(id, destinationTrackID: destinationTrackID,
+                                 newOverlayIndex: newTrackIndex, at: time, in: &project)
+            return
+        }
+        try moveToSequencedLayer(item, destinationTrackID: destinationTrackID,
+                                 newTrackIndex: newTrackIndex, at: time, in: &project)
+    }
+
+    /// The move for rows that hold nothing but a non-overlapping sequence.
+    ///
+    /// A destination that has gone away, is locked, holds another kind, or is
+    /// already busy at this moment gets the clip a fresh row instead of an
+    /// error. The drag preview and this frame-snapped result can disagree by
+    /// less than a frame, and a sub-frame disagreement is not something to hand
+    /// back to somebody as a failed edit. Assembled on a copy, so none of those
+    /// outcomes can leave the source row half-edited.
+    private static func moveToSequencedLayer(
+        _ item: TimelineItem,
+        destinationTrackID: UUID?,
+        newTrackIndex: Int?,
+        at time: TimelineTime,
+        in project: inout VideoProject
+    ) throws {
+        let kind = item.trackKind
+        guard let sourceIndex = project.timeline.tracks.firstIndex(where: { $0.id == item.placement.trackID }),
+              !project.timeline.tracks[sourceIndex].isLocked, !item.placement.isLocked else {
+            throw TimelineError.invalid(String(localized: "Unlock this clip's layer before moving it."))
+        }
+        var placement = item.placement
+        placement.timelineStart = max(.zero, try snapped(time, frame: project.canvas.frameDuration))
+
+        // Dropped back on the row it started from, this is an ordinary move.
+        // Taking the general path would empty the row, delete it for being
+        // empty, and build a replacement — costing the row its name, its
+        // height, its lock and the identity the timeline keys those to.
+        if destinationTrackID == item.placement.trackID {
+            placement.timelineStart = try clampedStart(
+                placement.timelineStart, duration: placement.duration, itemID: item.id,
+                on: item.placement.trackID, fallback: item.placement.timelineStart, in: project)
+            var candidate = project
+            let row = candidate.timeline.tracks.firstIndex { $0.id == item.placement.trackID }!
+            let slot = candidate.timeline.tracks[row].items.firstIndex { $0.id == item.id }!
+            candidate.timeline.tracks[row].items[slot] = item.withPlacement(placement)
+            _ = try clips(in: candidate)
+            project = candidate
+            return
+        }
+        let placed = item.withPlacement(placement)
+
+        var candidate = project
+        candidate.timeline.tracks[sourceIndex].items.removeAll { $0.id == item.id }
+
+        // An emptied row disappears, the same way it does when its last clip is
+        // deleted. That shifts every later index, so the destination is resolved
+        // by identity afterwards rather than from an index read before the
+        // removal.
+        var removedSourceIndex: Int?
+        if candidate.timeline.tracks[sourceIndex].items.isEmpty {
+            candidate.timeline.tracks.remove(at: sourceIndex)
+            removedSourceIndex = sourceIndex
+        }
+
+        var destination = destinationTrackID.flatMap { id in
+            candidate.timeline.tracks.firstIndex { $0.id == id }
+        }
+        if let index = destination,
+           candidate.timeline.tracks[index].isLocked
+            || candidate.timeline.tracks[index].kind != kind
+            || overlaps(placed, in: candidate.timeline.tracks[index]) {
+            destination = nil
+        }
+
+        let target: Int
+        if let destination {
+            target = destination
+        } else {
+            // Sound goes under the picture and drawn layers go over it, which is
+            // where each was put when it was added and where the eye expects to
+            // find it. Enforced here rather than trusted to the caller: a drawn
+            // layer under the picture is simply hidden by it, so an index that
+            // says otherwise is a mistake whatever asked for it.
+            var insertion = newTrackIndex ?? (kind == .audio ? project.timeline.tracks.count : 0)
+            if let removedSourceIndex, removedSourceIndex < insertion { insertion -= 1 }
+            let main = candidate.timeline.tracks.firstIndex { $0.kind == .mainVideo }
+                ?? candidate.timeline.tracks.count
+            insertion = kind == .audio ? max(insertion, main + 1) : min(insertion, main)
+            insertion = min(max(insertion, 0), candidate.timeline.tracks.count)
+            candidate.timeline.tracks.insert(
+                .init(id: UUID(), name: TimelineTrack.defaultName(for: kind), kind: kind), at: insertion)
+            target = insertion
+        }
+
+        placement.trackID = candidate.timeline.tracks[target].id
+        candidate.timeline.tracks[target].items.append(placed.withPlacement(placement))
+        _ = try clips(in: candidate)
+        project = candidate
+    }
+
     static func clips(in project: VideoProject) throws -> [VideoClip] {
         try project.validate()
         var result: [VideoClip] = []

@@ -30,8 +30,13 @@ struct EditorView: View {
     @State private var audioPicker = false
     @State private var soundEffects = false
     @State private var audioURL: URL?
-    @State private var mediaItem: PhotosPickerItem?
+    @State private var mediaItem: MediaImportSource?
     @State private var mediaPicker = false
+    /// The media bin's own file browser: video, stills and audio at once.
+    @State private var binImporter = false
+    /// Set just before an edit that creates a title, so the selection change it
+    /// causes opens the text dock instead of closing it.
+    @State private var startsTypingOnSelection = false
     @State private var importOverlay = false
     @State private var importImage = false
     @State private var layers = false
@@ -73,6 +78,7 @@ struct EditorView: View {
     private var previewInteraction: PreviewInteraction {
         if backgroundToolArmed { return .pinchOnly }
         let drawsOnPicture = model.selectedText != nil || model.selectedShape != nil
+            || model.evaluatedMediaOverlay != nil
             || model.isPickingCurveHue || maskMode || localMaskMode || maskedGradeMode
         return drawsOnPicture ? .off : .full
     }
@@ -85,14 +91,31 @@ struct EditorView: View {
     // divider. Stored rather than remembered per session, because a workspace
     // someone has arranged should still be arranged tomorrow.
     @AppStorage("editor.inspectorWidth") private var storedInspectorWidth: Double = 0
+    /// The media bin's width, and whether it is showing at all. Both are part of
+    /// how someone has arranged their workspace rather than part of the
+    /// document, so they outlive the session like every other size here.
+    @AppStorage("editor.mediaBinWidth") private var storedMediaBinWidth: Double = 0
+    @AppStorage("editor.showsMediaBin") private var showsMediaBin = true
     @AppStorage("editor.timelineHeight") private var storedTimelineHeight: Double = 0
     @AppStorage("editor.previewHeight") private var storedPreviewHeight: Double = 0
     @AppStorage("editor.scopeHeight") private var storedScopeHeight: Double = 0
+    /// Which pane a size belongs to, so one pair of accessors can stand in
+    /// front of all five `@AppStorage` values.
+    private enum WorkspacePane: Hashable { case inspector, mediaBin, timeline, preview, scope }
+    @State private var isResizing = false
+    /// The sizes a divider is currently dragging.
+    ///
+    /// Held here rather than written straight through to `@AppStorage`. A
+    /// divider reports every two points of travel, and each of those was a
+    /// UserDefaults write that republished the whole editor mid-gesture: the
+    /// Metal drawable resized, the timeline canvas re-laid out, and the panes
+    /// lagged the handle instead of tracking it — the visible flicker, on every
+    /// platform. Now the gesture moves `@State` and the defaults are written
+    /// once, when the handle is let go.
+    @State private var liveSizes: [WorkspacePane: Double] = [:]
     @State private var markers = false
     @State private var help = false
     @State private var comparePinned = false
-    @State private var timelineTrackHeights: [UUID: TimelineTrackHeightChoice] = [:]
-    @State private var timelineWaveformSizes: [UUID: TimelineWaveformSize] = [:]
     /// Timeline zoom in points per second, and whether the magnet is on. Both
     /// are how someone has set their workspace up rather than part of the
     /// document, so they persist across sessions and across projects.
@@ -125,6 +148,34 @@ struct EditorView: View {
                     // Wide layout: preview and timeline on the left, tools on
                     // the right, with a draggable edge on each boundary.
                     HStack(spacing: 0) {
+                        // A desktop window has the width to keep the project's
+                        // media on screen beside the edit. Narrow windows — a
+                        // phone in landscape, an iPad sharing the screen — do
+                        // not, and a third column there would cost the picture
+                        // more than the list is worth.
+                        if mediaBinVisible(geometry.size) {
+                            MediaBinPanel(
+                                assets: model.project.assets,
+                                usageCounts: model.assetUsageCounts,
+                                assetFrames: assetFrames,
+                                isEnabled: !model.isPreparingTimeline && !model.isImporting && warmup.isReady,
+                                onImport: { binImporter = true },
+                                onPlace: { model.placeAsset($0, as: $1) },
+                                onImportFiles: { urls in Task { await model.importIntoBin(urls) } })
+                                .equatable()
+                                .frame(width: mediaBinWidth(geometry.size))
+                            WorkspaceDivider(
+                                orientation: .vertical,
+                                label: "Resize the media bin",
+                                onResize: { delta in
+                                    // The handle is on the bin's trailing edge,
+                                    // so dragging right widens it.
+                                    setMediaBinWidth(mediaBinWidth(geometry.size) + delta, in: geometry.size)
+                                },
+                                onBegin: beginWorkspaceResize,
+                                onEnd: endWorkspaceResize,
+                                onReset: { resetSize(.mediaBin) })
+                        }
                         VStack(spacing: 0) {
                             preview
                             if scopesVisible {
@@ -137,7 +188,7 @@ struct EditorView: View {
                                     },
                                     onBegin: beginWorkspaceResize,
                                     onEnd: endWorkspaceResize,
-                                    onReset: { storedScopeHeight = 0 })
+                                    onReset: { resetSize(.scope) })
                                 ScopePanel(model: model, isRegularWidth: true,
                                            traceHeight: scopeHeight(geometry.size, regular: true))
                             }
@@ -145,7 +196,7 @@ struct EditorView: View {
                             // visible beside every inspector, like a desktop
                             // NLE. Phone landscape keeps the compact behaviour
                             // so its preview is not squeezed by two panels.
-                            let showsTimeline = UIDevice.current.userInterfaceIdiom == .pad
+                            let showsTimeline = AppPlatform.usesDesktopWorkspace
                                 || (!colorMode && !transforms && !canvasTool && !speedTool && !backgroundMode)
                             if showsTimeline {
                                 WorkspaceDivider(
@@ -159,7 +210,7 @@ struct EditorView: View {
                                     },
                                     onBegin: beginWorkspaceResize,
                                     onEnd: endWorkspaceResize,
-                                    onReset: { storedTimelineHeight = 0 })
+                                    onReset: { resetSize(.timeline) })
                             }
                             transport
                             if showsTimeline { timeline(height: timelineHeight(geometry.size)) }
@@ -174,10 +225,20 @@ struct EditorView: View {
                             },
                             onBegin: beginWorkspaceResize,
                             onEnd: endWorkspaceResize,
-                            onReset: { storedInspectorWidth = 0 })
-                        VStack(spacing: 0) { inspector; modeBar }
-                            .frame(width: inspectorWidth(geometry.size))
+                            onReset: { resetSize(.inspector) })
+                        VStack(spacing: 0) {
+                            inspector
+                            // On Mac the bar spans the window instead (below),
+                            // where twelve tools fit without scrolling.
+                            if !spansModeBar(geometry.size) { modeBar }
+                        }
+                        .frame(width: inspectorWidth(geometry.size))
                     }
+                    // A desktop window is wider than the tool bar needs, and the
+                    // bar was being folded into a 360-point column and scrolled
+                    // — the one place the extra width was worth the most. Across
+                    // the window every tool is one click away, with its name.
+                    if spansModeBar(geometry.size) { modeBar }
                 } else {
                     // Tall layout: one edge, between the picture and everything
                     // below it. Dragging up is how a tool panel that needs the
@@ -191,7 +252,7 @@ struct EditorView: View {
                         },
                         onBegin: beginWorkspaceResize,
                         onEnd: endWorkspaceResize,
-                        onReset: { storedPreviewHeight = 0 })
+                        onReset: { resetSize(.preview) })
                     if scopesVisible {
                         WorkspaceDivider(
                             orientation: .horizontal,
@@ -202,7 +263,7 @@ struct EditorView: View {
                             },
                             onBegin: beginWorkspaceResize,
                             onEnd: endWorkspaceResize,
-                            onReset: { storedScopeHeight = 0 })
+                            onReset: { resetSize(.scope) })
                         ScopePanel(model: model, isRegularWidth: false,
                                    traceHeight: scopeHeight(geometry.size, regular: false))
                     }
@@ -223,7 +284,7 @@ struct EditorView: View {
                             },
                             onBegin: beginWorkspaceResize,
                             onEnd: endWorkspaceResize,
-                            onReset: { storedTimelineHeight = 0 })
+                            onReset: { resetSize(.timeline) })
                     }
                     inspector
                     modeBar
@@ -242,9 +303,68 @@ struct EditorView: View {
     // the screen a moment after it was full width, and a panel remembered at
     // 600 points would otherwise leave nothing for the picture.
 
+    private func storedSize(_ pane: WorkspacePane) -> Double {
+        if let live = liveSizes[pane] { return live }
+        switch pane {
+        case .inspector: return storedInspectorWidth
+        case .mediaBin: return storedMediaBinWidth
+        case .timeline: return storedTimelineHeight
+        case .preview: return storedPreviewHeight
+        case .scope: return storedScopeHeight
+        }
+    }
+
+    private func setStoredSize(_ pane: WorkspacePane, _ value: Double) {
+        if isResizing { liveSizes[pane] = value } else { writeStoredSize(pane, value) }
+    }
+
+    private func writeStoredSize(_ pane: WorkspacePane, _ value: Double) {
+        switch pane {
+        case .inspector: storedInspectorWidth = value
+        case .mediaBin: storedMediaBinWidth = value
+        case .timeline: storedTimelineHeight = value
+        case .preview: storedPreviewHeight = value
+        case .scope: storedScopeHeight = value
+        }
+    }
+
+    /// Double tap on a handle: back to the automatic size, and drop any live
+    /// value so the reset is not undone by the end of an in-flight gesture.
+    private func resetSize(_ pane: WorkspacePane) {
+        liveSizes[pane] = nil
+        writeStoredSize(pane, 0)
+    }
+
+    /// The bin needs its own width and still has to leave a workable picture
+    /// and inspector beside it, so it appears only once the window is wide
+    /// enough to seat all three.
+    private func mediaBinVisible(_ size: CGSize) -> Bool {
+        showsMediaBin && AppPlatform.isMac && size.width >= 1000
+    }
+
+    /// Whether the mode bar runs the full width of the window rather than
+    /// sitting under the inspector. Mac only: an iPad's landscape layout is the
+    /// one the user approved, and its width does not buy the same room.
+    private func spansModeBar(_ size: CGSize) -> Bool {
+        AppPlatform.isMac && size.width >= 900
+    }
+
+    private func mediaBinWidth(_ size: CGSize) -> CGFloat {
+        clampedMediaBinWidth(storedSize(.mediaBin) > 0 ? CGFloat(storedSize(.mediaBin)) : 232, in: size)
+    }
+
+    private func clampedMediaBinWidth(_ value: CGFloat, in size: CGSize) -> CGFloat {
+        let lower: CGFloat = 180
+        return min(max(value, lower), max(lower, min(380, size.width * 0.28)))
+    }
+
+    private func setMediaBinWidth(_ value: CGFloat, in size: CGSize) {
+        setStoredSize(.mediaBin, Double(clampedMediaBinWidth(value, in: size)))
+    }
+
     private func inspectorWidth(_ size: CGSize) -> CGFloat {
         let automatic = min(360, size.width * 0.46)
-        return clampedInspectorWidth(storedInspectorWidth > 0 ? CGFloat(storedInspectorWidth) : automatic, in: size)
+        return clampedInspectorWidth(storedSize(.inspector) > 0 ? CGFloat(storedSize(.inspector)) : automatic, in: size)
     }
 
     private func clampedInspectorWidth(_ value: CGFloat, in size: CGSize) -> CGFloat {
@@ -256,12 +376,12 @@ struct EditorView: View {
     }
 
     private func setInspectorWidth(_ value: CGFloat, in size: CGSize) {
-        storedInspectorWidth = Double(clampedInspectorWidth(value, in: size))
+        setStoredSize(.inspector, Double(clampedInspectorWidth(value, in: size)))
     }
 
     private func timelineHeight(_ size: CGSize) -> CGFloat {
         clampedTimelineHeight(
-            storedTimelineHeight > 0 ? CGFloat(storedTimelineHeight) : automaticTimelineHeight, in: size)
+            storedSize(.timeline) > 0 ? CGFloat(storedSize(.timeline)) : automaticTimelineHeight, in: size)
     }
 
     private func clampedTimelineHeight(_ value: CGFloat, in size: CGSize) -> CGFloat {
@@ -270,7 +390,7 @@ struct EditorView: View {
     }
 
     private func setTimelineHeight(_ value: CGFloat, in size: CGSize) {
-        storedTimelineHeight = Double(clampedTimelineHeight(value, in: size))
+        setStoredSize(.timeline, Double(clampedTimelineHeight(value, in: size)))
     }
 
     /// The timeline's height in the TALL layout, where it shares the window with
@@ -282,7 +402,7 @@ struct EditorView: View {
     /// the window cannot always grant. Granting it anyway pushes the mode bar,
     /// and the first-run notice under it, off the bottom of the screen.
     private func compactTimelineHeight(_ size: CGSize) -> CGFloat {
-        let wanted = storedTimelineHeight > 0 ? CGFloat(storedTimelineHeight) : automaticTimelineHeight
+        let wanted = storedSize(.timeline) > 0 ? CGFloat(storedSize(.timeline)) : automaticTimelineHeight
         return clampedCompactTimelineHeight(wanted, in: size)
     }
 
@@ -299,7 +419,7 @@ struct EditorView: View {
     }
 
     private func setCompactTimelineHeight(_ value: CGFloat, in size: CGSize) {
-        storedTimelineHeight = Double(clampedCompactTimelineHeight(value, in: size))
+        setStoredSize(.timeline, Double(clampedCompactTimelineHeight(value, in: size)))
     }
 
     private func previewHeight(_ size: CGSize) -> CGFloat {
@@ -310,7 +430,7 @@ struct EditorView: View {
             ? (scopesVisible ? 0.30 : 0.43)
             : model.project.timeline.tracks.count > 1 ? 0.36 : 0.40)
         return clampedPreviewHeight(
-            storedPreviewHeight > 0 ? CGFloat(storedPreviewHeight) : automatic, in: size)
+            storedSize(.preview) > 0 ? CGFloat(storedSize(.preview)) : automatic, in: size)
     }
 
     private func clampedPreviewHeight(_ value: CGFloat, in size: CGSize) -> CGFloat {
@@ -334,13 +454,13 @@ struct EditorView: View {
     }
 
     private func setPreviewHeight(_ value: CGFloat, in size: CGSize) {
-        storedPreviewHeight = Double(clampedPreviewHeight(value, in: size))
+        setStoredSize(.preview, Double(clampedPreviewHeight(value, in: size)))
     }
 
     private func scopeHeight(_ size: CGSize, regular: Bool) -> CGFloat {
         let automatic = ScopeLayout.automaticTraceHeight(isRegularWidth: regular)
         return clampedScopeHeight(
-            storedScopeHeight > 0 ? CGFloat(storedScopeHeight) : automatic, in: size)
+            storedSize(.scope) > 0 ? CGFloat(storedSize(.scope)) : automatic, in: size)
     }
 
     private func clampedScopeHeight(_ value: CGFloat, in size: CGSize) -> CGFloat {
@@ -352,17 +472,23 @@ struct EditorView: View {
     }
 
     private func setScopeHeight(_ value: CGFloat, in size: CGSize) {
-        storedScopeHeight = Double(clampedScopeHeight(value, in: size))
+        setStoredSize(.scope, Double(clampedScopeHeight(value, in: size)))
     }
 
     /// A drag changes the drawable every frame. Telling the renderer means the
     /// spatial effects stage stands down for the length of it rather than
     /// reallocating two drawable-sized surfaces per frame.
     private func beginWorkspaceResize() {
+        isResizing = true
         model.renderer.setInteractiveResize(true)
     }
 
     private func endWorkspaceResize() {
+        isResizing = false
+        // One write per pane for the whole gesture, rather than one every two
+        // points of travel.
+        for (pane, value) in liveSizes { writeStoredSize(pane, value) }
+        liveSizes = [:]
         model.renderer.setInteractiveResize(false)
     }
 
@@ -426,6 +552,19 @@ struct EditorView: View {
                 catch { waveforms[asset.id] = [] }
             }
         }
+        // One browser for all three kinds. What was chosen decides where it is
+        // routed, so the bin needs a single button rather than one per kind.
+        .fileImporter(isPresented: $binImporter, allowedContentTypes: [.movie, .image, .audio],
+                      allowsMultipleSelection: true) { result in
+            switch result {
+            case .success(let urls): Task { await model.importIntoBin(urls) }
+            case .failure(let error):
+                let cocoa = error as NSError
+                if cocoa.domain != NSCocoaErrorDomain || cocoa.code != NSUserCancelledError {
+                    model.editError = error.localizedDescription
+                }
+            }
+        }
         .fileImporter(isPresented: $audioPicker, allowedContentTypes: [.audio]) { result in
             switch result {
             case .success(let url): audioURL = url
@@ -437,7 +576,9 @@ struct EditorView: View {
             await model.addAudio(audioURL)
             self.audioURL = nil
         }
-        .photosPicker(isPresented: $mediaPicker, selection: $mediaItem, matching: importImage ? .images : .videos, preferredItemEncoding: .current)
+        .modifier(MediaImportPicker(isPresented: $mediaPicker, images: importImage,
+                                    onSelection: { mediaItem = $0.first },
+                                    onFailure: { model.editError = $0.localizedDescription }))
         .task(id: mediaItem) {
             guard let mediaItem else { return }
             if importImage { await model.addImage(mediaItem) }
@@ -461,7 +602,11 @@ struct EditorView: View {
         .animation(.easeInOut(duration: 0.18), value: model.statusMessage)
         .onChange(of: model.project) { _, project in onSettingsChanged(project, false) }
         .onChange(of: model.selectedClipID, initial: true) { _, _ in
-            typingText = false; textFocused = false
+            // A title that was just created to be typed into opens the dock;
+            // every other selection change closes it.
+            let startsTyping = startsTypingOnSelection && model.selectedText != nil
+            startsTypingOnSelection = false
+            typingText = startsTyping; textFocused = startsTyping
             if case .text = model.selectedItem {
                 openTextTool()
             } else if case .shape = model.selectedItem {
@@ -481,11 +626,15 @@ struct EditorView: View {
             if phase != .active { comparePinned = false; model.setOriginalVisible(false); onSettingsChanged(model.project, true) }
         }
         .onDisappear { model.stopMaskTracking(); model.playback.pause(); model.setOriginalVisible(false) }
-        .sheet(isPresented: $model.showsExport) { ExportView(project: model.project, settings: model.settings) }
+        .sheet(isPresented: $model.showsExport, onDismiss: model.resumePreviewAfterExport) {
+            ExportView(project: model.project, settings: model.settings)
+                .onAppear { model.suspendPreviewForExport() }
+        }
         .sheet(isPresented: $savingPreset) { SaveGradePresetSheet(model: model) }
-        .sheet(item: $clipExport) { project in
+        .sheet(item: $clipExport, onDismiss: model.resumePreviewAfterExport) { project in
             ExportView(project: project,
                        settings: project.timeline.firstVideoClip?.gradeSettings ?? .neutral)
+                .onAppear { model.suspendPreviewForExport() }
         }
         .sheet(isPresented: $help) {
             VStack(alignment: .leading, spacing: 24) {
@@ -505,19 +654,95 @@ struct EditorView: View {
             : String(localized: "Every colour adjustment on the selected mask goes back to neutral. The clip's own grade is not affected.")
     }
 
+    private var shortcutsEnabled: Bool {
+        !typingText && !model.showsExport && clipExport == nil && !savingPreset && !help
+            && !settingsSheet && !layers && !markers && !soundEffects && !audioPicker && !mediaPicker
+            && !clipOptions && !confirmsResetAll && !colorInfo && model.editError == nil
+    }
+
+    private var workspaceShortcuts: [WorkspaceShortcut] {
+        let ready = !model.isPreparingTimeline && !model.isImporting
+        let canImport = ready && warmup.isReady
+        let singleSelection = model.selectedClipIDs.count == 1 && model.selectedItem != nil
+        return [
+            .init(.addVideo, isEnabled: canImport) {
+                importImage = false; importOverlay = false; mediaPicker = true
+            },
+            .init(.addImageOverlay, isEnabled: canImport) {
+                importImage = true; importOverlay = true; mediaPicker = true
+            },
+            .init(.addAudio, isEnabled: canImport) { audioPicker = true },
+            .init(.saveProject) {
+                model.flushGradeHistory(); onSettingsChanged(model.project, true)
+            },
+            .init(.export, isEnabled: ready && model.hasMedia) {
+                model.playback.pause(); comparePinned = false; model.showsExport = true
+            },
+            .init(.playPause, isEnabled: ready && model.hasMedia, run: model.playback.togglePlayback),
+            .init(.previousFrame, isEnabled: ready && model.hasMedia) { model.stepFrames(-1) },
+            .init(.nextFrame, isEnabled: ready && model.hasMedia) { model.stepFrames(1) },
+            .init(.backTenFrames, isEnabled: ready && model.hasMedia) { model.stepFrames(-10) },
+            .init(.forwardTenFrames, isEnabled: ready && model.hasMedia) { model.stepFrames(10) },
+            .init(.undo, isEnabled: ready && model.canUndo, run: model.undo),
+            .init(.redo, isEnabled: ready && model.canRedo, run: model.redo),
+            .init(.cutClip, isEnabled: ready && singleSelection && model.canEditSelection) { model.deleteClip(cutting: true) },
+            .init(.copyClip, isEnabled: singleSelection, run: model.copyClip),
+            .init(.pasteClip, isEnabled: ready && model.clipboard != nil, run: model.pasteClip),
+            .init(.duplicateClip, isEnabled: ready && singleSelection && model.canEditSelection, run: model.duplicateClip),
+            .init(.splitAtPlayhead, isEnabled: ready && model.canSplit && model.canEditSelection, run: model.split),
+            .init(.deleteClips, isEnabled: ready && model.canEditSelection) { model.deleteClip() },
+            .init(.toggleMarker, isEnabled: ready, run: model.toggleMarker),
+            .init(.toggleSnapping) { timelineSnapping.toggle() },
+            .init(.compareOriginal, isEnabled: model.hasMedia) { comparePinned.toggle() },
+            .init(.zoomInTimeline) { timelineZoom = TimelineZoomScale.stepped(timelineZoom, by: 1.8) },
+            .init(.zoomOutTimeline) { timelineZoom = TimelineZoomScale.stepped(timelineZoom, by: 1 / 1.8) },
+            .init(.toggleMediaBin) { showsMediaBin.toggle() },
+            // Deliberately enabled even for a tool that is not available yet.
+            // `select` answers with the reason, exactly as tapping the tab
+            // does; a key that silently does nothing would explain less.
+            .init(.toolTimeline, isEnabled: ready) { select(.timeline) },
+            .init(.toolText, isEnabled: ready, run: addTextAndType),
+            .init(.toolShape, isEnabled: ready) { select(.shape) },
+            .init(.toolAudio, isEnabled: ready) { select(.audio) },
+            .init(.toolColor, isEnabled: ready) { select(.color) },
+            .init(.toolTransform, isEnabled: ready) { select(.transform) },
+            .init(.toolMask, isEnabled: ready) { select(.mask) },
+            .init(.toolMatte, isEnabled: ready) { select(.matte) },
+            .init(.toolBackground, isEnabled: ready) { select(.background) },
+            .init(.toolSpeed, isEnabled: ready) { select(.speed) }
+        ]
+    }
+
     private var header: some View {
         HStack(spacing: 0) {
             Button { model.playback.pause(); onBack(model.project) } label: {
                 Image(systemName: "chevron.left").frame(width: 44, height: 44)
             }.accessibilityLabel("Back")
+            if AppPlatform.isMac {
+                Button { showsMediaBin.toggle() } label: {
+                    Image(systemName: showsMediaBin ? "sidebar.leading" : "sidebar.left")
+                        .frame(width: 36, height: 44)
+                        .foregroundStyle(showsMediaBin ? AppColors.accent : AppColors.textSecondary)
+                }
+                .accessibilityLabel(showsMediaBin ? "Hide the media bin" : "Show the media bin")
+                .help(showsMediaBin ? "Hide the media bin" : "Show the media bin")
+            }
             Text(model.project.displayName).font(.caption.weight(.medium)).lineLimit(1).truncationMode(.middle)
                 .frame(maxWidth: .infinity, alignment: .leading)
             Spacer(minLength: 0)
+            // Mac only. On a touch iPad a keyboard menu is a button that
+            // explains keys the device has no way to press.
+            if AppPlatform.isMac {
+                WorkspaceShortcutMenu(shortcuts: workspaceShortcuts, isEnabled: shortcutsEnabled)
+            }
             Button(action: model.undo) { Image(systemName: "arrow.uturn.backward").frame(width: 36, height: 44) }
                 .disabled(!model.canUndo).accessibilityLabel("Undo")
             Button(action: model.redo) { Image(systemName: "arrow.uturn.forward").frame(width: 36, height: 44) }
                 .disabled(!model.canRedo).accessibilityLabel("Redo")
             Menu {
+                if AppPlatform.isMac {
+                    Toggle(isOn: $showsMediaBin) { Label("Media Bin", systemImage: "tray.full") }
+                }
                 Button("Settings", systemImage: "gearshape") { settingsSheet = true }
                 Button("Source information", systemImage: "info.circle", action: onShowSource)
                 // Confirmed, like every other action in the app that throws
@@ -586,6 +811,9 @@ struct EditorView: View {
         .accessibilityLabel("Tap the picture to pick a colour")
     }
 
+    /// A media-bin drag is over the picture.
+    @State private var isCanvasDropTarget = false
+
     private var preview: some View {
         ZStack(alignment: .topLeading) {
             PreviewViewport(interaction: previewInteraction,
@@ -626,6 +854,12 @@ struct EditorView: View {
                 Color.black
                 if model.isPreparingTimeline { ProgressView().frame(maxWidth: .infinity, maxHeight: .infinity) }
                 else { Text("Timeline is empty").font(.subheadline).frame(maxWidth: .infinity, maxHeight: .infinity) }
+            }
+            if isCanvasDropTarget {
+                RoundedRectangle(cornerRadius: 6, style: .continuous)
+                    .strokeBorder(AppColors.accent, style: StrokeStyle(lineWidth: 2, dash: [7, 5]))
+                    .padding(6)
+                    .allowsHitTesting(false)
             }
             if model.isPickingCurveHue { colorPickingLayer }
             if model.showsOriginal {
@@ -697,6 +931,47 @@ struct EditorView: View {
         }
             .accessibilityLabel("Video preview")
             .accessibilityAction(named: comparePinned ? "Show edited" : "Show original") { comparePinned.toggle() }
+            // Dropping on the picture is how you say "put this in the frame".
+            // It lands as its own layer at the playhead, already selected, so
+            // the handles are on it the moment the pointer lets go. Files from
+            // the Finder are imported first and then placed the same way.
+            //
+            // `onDrop` rather than `dropDestination`, because two different
+            // payloads arrive here: a bin row carries the asset's id as text,
+            // and the Finder carries file URLs.
+            .onDrop(of: AppPlatform.isMac ? [.fileURL, .text] : [],
+                    isTargeted: $isCanvasDropTarget) { providers in
+                guard AppPlatform.isMac, !model.isPreparingTimeline,
+                      !model.isImporting, warmup.isReady else { return false }
+                return acceptCanvasDrop(providers)
+            }
+    }
+
+    private func acceptCanvasDrop(_ providers: [NSItemProvider]) -> Bool {
+        // Files first: a Finder drag also answers to plain text, and reading it
+        // as text would place nothing.
+        let files = providers.filter { $0.hasItemConformingToTypeIdentifier(UTType.fileURL.identifier) }
+        if !files.isEmpty {
+            let group = DispatchGroup()
+            let collected = URLBox()
+            for provider in files {
+                group.enter()
+                _ = provider.loadObject(ofClass: URL.self) { url, _ in
+                    if let url { collected.append(url) }
+                    group.leave()
+                }
+            }
+            group.notify(queue: .main) {
+                Task { await model.importAndPlaceOnCanvas(collected.urls) }
+            }
+            return true
+        }
+        guard let provider = providers.first(where: { $0.canLoadObject(ofClass: String.self) }) else { return false }
+        _ = provider.loadObject(ofClass: String.self) { text, _ in
+            guard let text, let assetID = MediaBinEntry.assetID(fromDrag: text) else { return }
+            Task { @MainActor in model.placeAsset(assetID, as: .overlay) }
+        }
+        return true
     }
 
     private var transport: some View {
@@ -734,7 +1009,7 @@ struct EditorView: View {
                     .layoutPriority(1)
                     .accessibilityLabel("Position \(TimecodeFormatter.frameString(from: model.timelineTime, frameRate: frameRate)) of \(TimecodeFormatter.frameString(from: model.project.timeline.duration.seconds, frameRate: frameRate))")
                 Spacer(minLength: 0)
-                if UIDevice.current.userInterfaceIdiom == .pad {
+                if AppPlatform.usesDesktopWorkspace {
                     persistentTimelineActions
                     previewQualityButton
                 } else {
@@ -778,8 +1053,10 @@ struct EditorView: View {
                 if model.isImporting { ProgressView() }
                 else { Image(systemName: "plus") }
             }
-            .frame(width: UIDevice.current.userInterfaceIdiom == .pad ? 40 : 44,
-                   height: UIDevice.current.userInterfaceIdiom == .pad ? 36 : 44)
+            // A pointer can hit 40x36; a finger needs 44, and iPad is a
+            // finger even when its window is desktop-sized.
+            .frame(width: AppPlatform.isMac ? 40 : 44,
+                   height: AppPlatform.isMac ? 36 : 44)
         }
         .accessibilityLabel("Add media")
         .disabled(model.isImporting || !warmup.isReady)
@@ -799,7 +1076,7 @@ struct EditorView: View {
         Button("Add image overlay", systemImage: "photo") {
             importImage = true; importOverlay = true; mediaPicker = true
         }
-        Button("Add text", systemImage: "textformat") { openTextTool(); model.addText() }
+        Button("Add text", systemImage: "textformat", action: addTextAndType)
         Button("Add shape", systemImage: "square.on.circle") { openShapeTool(); model.addShape() }
     }
 
@@ -877,7 +1154,7 @@ struct EditorView: View {
         TimelineToolbar<EmptyView>.height
             + min(audioMode || textMode || shapeMode ? 156 : 230,
                   model.project.timeline.tracks.reduce(TimelineMetrics.rowsTop) {
-                      $0 + (timelineTrackHeights[$1.id] ?? .regular).points(for: $1.kind) + TimelineMetrics.rowGap
+                      $0 + $1.resolvedHeight.points(for: $1.kind) + TimelineMetrics.rowGap
                   })
     }
 
@@ -903,7 +1180,7 @@ struct EditorView: View {
             Button("Audio from Files", systemImage: "waveform") { audioPicker = true }
         }
         Section("Overlays") {
-            Button("Text", systemImage: "textformat") { openTextTool(); model.addText() }
+            Button("Text", systemImage: "textformat", action: addTextAndType)
             Button("Shape", systemImage: "square.on.circle") { openShapeTool(); model.addShape() }
         }
     }
@@ -919,8 +1196,6 @@ struct EditorView: View {
                     selectedIDs: model.selectedClipIDs,
                     selectedTransitionID: model.selectedTransitionID,
                     thumbnails: filmstrip.frames,
-                    trackHeights: timelineTrackHeights,
-                    waveformSizes: timelineWaveformSizes,
                     pixelsPerSecond: timelineZoom,
                     isSnappingEnabled: timelineSnapping,
                     showsClipNames: showsClipNames,
@@ -939,13 +1214,15 @@ struct EditorView: View {
                     onSelectTransition: { id in openTransitionTool(id: id) },
                     onDragSelect: { model.selectClip(id: $0, seek: false) },
                     onOptions: { model.selectClip(id: $0, seek: false); clipOptions = true },
+                    onDropAsset: { assetID, time in model.placeAsset(assetID, as: .overlay(at: time)) },
                     onMoveClipToLayer: model.moveClipToLayer,
                     onToggleTrackVisibility: { model.toggleTrack($0, lock: false) },
                     onToggleTrackLock: { model.toggleTrack($0, lock: true) },
                     onToggleTrackMute: model.toggleTrackMute,
-                    onSetTrackHeight: { timelineTrackHeights[$0] = $1 },
-                    onSetWaveformSize: { timelineWaveformSizes[$0] = $1 },
+                    onSetTrackHeight: model.setTrackHeight,
+                    onSetWaveformSize: model.setWaveformSize,
                     onEdit: model.editTiming,
+                    onTrimMany: model.trimClips,
                     onBeginEdit: model.playback.pause,
                     onBeginSeek: model.playback.beginSeeking,
                     onSeek: { model.seekTimeline(to: $0, finishing: false) },
@@ -1243,7 +1520,7 @@ struct EditorView: View {
                 HStack {
                     Text("Text").font(.caption.weight(.semibold))
                     Spacer()
-                    Button { model.addText() } label: { Label("Add text", systemImage: "plus").font(.caption.weight(.medium)).frame(minHeight: 44) }
+                    Button(action: addTextAndType) { Label("Add text", systemImage: "plus").font(.caption.weight(.medium)).frame(minHeight: 44) }
                         .disabled(model.isPreparingTimeline)
                 }.padding(.horizontal, 20)
                 ScrollView {
@@ -1337,6 +1614,21 @@ struct EditorView: View {
     private func openTextTool() {
         model.flushGradeHistory()
         activate(.text)
+    }
+
+    /// ⌘T, and every Add text button: open the tool, make a title, and put the
+    /// cursor in it. Reaching for the text tool and then having to find a
+    /// second button before a single character can be typed is a step nobody
+    /// wants; with a title already selected this edits that one instead of
+    /// stacking another on top of it.
+    private func addTextAndType() {
+        openTextTool()
+        if model.selectedText != nil {
+            typingText = true
+        } else {
+            startsTypingOnSelection = true
+            model.addText()
+        }
     }
 
     private func openShapeTool() {

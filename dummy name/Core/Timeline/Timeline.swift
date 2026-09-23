@@ -1,5 +1,44 @@
 import Foundation
 
+/// How tall a row is drawn, and how large its waveform.
+///
+/// Both live on the track, in the document. They are display-only, like `name`
+/// — nothing in the composition, render or export path reads them — but they
+/// are still something a person arranged about *this* project's rows, and a
+/// row someone set to compact should still be compact tomorrow.
+///
+/// The raw values are the stored representation and are **English in every
+/// language**, for the same reason `TimelineTrack.defaultName(for:)` is: they
+/// are written into the document, and a project made in one language must not
+/// stop decoding when opened in another. `title` is what anybody reads.
+enum TimelineTrackHeightChoice: String, Codable, CaseIterable, Sendable {
+    case compact = "Compact"
+    case regular = "Regular"
+    case tall = "Tall"
+
+    var title: String {
+        switch self {
+        case .compact: String(localized: "Compact")
+        case .regular: String(localized: "Regular")
+        case .tall: String(localized: "Tall")
+        }
+    }
+}
+
+enum TimelineWaveformSize: String, Codable, CaseIterable, Sendable {
+    case small = "Small"
+    case medium = "Medium"
+    case large = "Large"
+
+    var title: String {
+        switch self {
+        case .small: String(localized: "Small")
+        case .medium: String(localized: "Medium")
+        case .large: String(localized: "Large")
+        }
+    }
+}
+
 struct TimelineTrack: Codable, Equatable, Identifiable, Sendable {
     enum Kind: String, Codable, Sendable {
         case mainVideo, videoOverlay, text, shape, audio
@@ -15,6 +54,15 @@ struct TimelineTrack: Codable, Equatable, Identifiable, Sendable {
     var isEnabled = true
     var isLocked = false
     var items: [TimelineItem] = []
+    /// How tall this row is drawn, and how large its waveform; nil means the
+    /// default. Optional rather than defaulted, because a synthesized decoder
+    /// ignores property defaults and throws on a missing key — this is what
+    /// keeps every project written before row heights readable.
+    var heightChoice: TimelineTrackHeightChoice? = nil
+    var waveformSize: TimelineWaveformSize? = nil
+
+    var resolvedHeight: TimelineTrackHeightChoice { heightChoice ?? .regular }
+    var resolvedWaveformSize: TimelineWaveformSize { waveformSize ?? .medium }
 
     /// Layer names are display-only: nothing in the composition, render or export path
     /// reads them, so they are free to edit. Sanitising here keeps a pasted paragraph or an

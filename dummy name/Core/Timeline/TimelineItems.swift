@@ -420,4 +420,31 @@ enum TimelineItem: Codable, Equatable, Identifiable, Sendable {
     var isDrawnOverlay: Bool {
         switch self { case .text, .shape: true; case .video, .audio: false }
     }
+
+    /// The same item carrying a different placement.
+    ///
+    /// Moving an item to another row is the one edit that rewrites a placement
+    /// without caring which case holds it, and a track stores the erased
+    /// `TimelineItem` rather than the concrete clip. Without this the move has
+    /// to switch over all four cases purely to put the value back.
+    func withPlacement(_ placement: ItemPlacement) -> TimelineItem {
+        switch self {
+        case .video(var c): c.placement = placement; return .video(c)
+        case .audio(var c): c.placement = placement; return .audio(c)
+        case .text(var c): c.placement = placement; return .text(c)
+        case .shape(var c): c.placement = placement; return .shape(c)
+        }
+    }
+
+    /// The kind of row this item belongs on. A video clip answers
+    /// `.videoOverlay` because it is the row kind that can be *created* for
+    /// one; it is equally at home on `.mainVideo`.
+    var trackKind: TimelineTrack.Kind {
+        switch self {
+        case .video: .videoOverlay
+        case .audio: .audio
+        case .text: .text
+        case .shape: .shape
+        }
+    }
 }

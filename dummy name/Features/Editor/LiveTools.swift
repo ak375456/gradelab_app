@@ -579,6 +579,27 @@ struct EditorSettings: View {
                 } header: { Text("Sliders") }
                   footer: { Text("A double tap on an animated property resets its value at the playhead. Use Reset in the property's Animation menu to clear its keyframes as well.") }
 
+                // Mac only, matching where the shortcuts themselves live.
+                if AppPlatform.isMac {
+                    Section {
+                        NavigationLink {
+                            WorkspaceShortcutList()
+                                .background(AppColors.background.ignoresSafeArea())
+                        } label: {
+                            HStack(alignment: .top, spacing: 12) {
+                                Image(systemName: "keyboard").font(.title3).foregroundStyle(AppColors.accent)
+                                    .frame(width: 28, height: 28)
+                                VStack(alignment: .leading, spacing: 3) {
+                                    Text("Keyboard shortcuts").font(.subheadline.weight(.medium))
+                                    Text("Import, play, cut, copy, paste, split and export without leaving the keyboard.")
+                                        .font(.caption).foregroundStyle(AppColors.textSecondary)
+                                }
+                            }.padding(.vertical, 2)
+                        }
+                    } header: { Text("Keyboard") }
+                      footer: { Text("The keyboard button in an editor's header opens the same list, and greys out whatever is unavailable right now.") }
+                }
+
                 Section {
                     NavigationLink {
                         ScrollView { KeyframeGuide().padding(20) }

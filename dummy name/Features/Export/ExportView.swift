@@ -5,6 +5,8 @@ struct ExportView: View {
     @ObservedObject private var store = ProStore.shared
     @Environment(\.dismiss) private var dismiss
     @State private var confirmsClose = false
+    @State private var showsSaveFile = false
+    @State private var savedToFile = false
     @State private var paywallFeature: ProFeature?
 
     init(project: GradeProject, settings: GradeSettings) {
@@ -72,13 +74,19 @@ struct ExportView: View {
         .preferredColorScheme(.dark)
         .numericEntryHost()
         .keepsScreenAwake(model.isBusy || model.isSaving)
-        .interactiveDismissDisabled(model.isBusy || model.isSaving || (model.outputURL != nil && !model.savedToPhotos))
+        .interactiveDismissDisabled(model.isBusy || model.isSaving || (model.outputURL != nil && !model.savedToPhotos && !savedToFile))
         .alert("Close this export?", isPresented: $confirmsClose) {
             Button("Keep Export Open", role: .cancel) {}
             Button("Close", role: .destructive) { dismiss() }
         } message: {
-            Text("The temporary file will be removed. Save to Photos or use Share to save a copy to Files first.")
+            Text("The temporary file will be removed. Save a copy using Save to Files, Save to Photos, or Share first.")
         }
+        .sheet(isPresented: $showsSaveFile) {
+            if let url = model.outputURL {
+                SaveFileSheet(url: url) { savedToFile = true; showsSaveFile = false }
+            }
+        }
+        .onChange(of: model.outputURL) { _, _ in savedToFile = false }
         .onAppear(perform: model.prepare)
         .paywallSheet($paywallFeature)
         .sheet(isPresented: $model.showsShareSheet) {
@@ -461,6 +469,15 @@ struct ExportView: View {
                 }
 
                 VStack(spacing: AppSpacing.small) {
+                    AppButton(savedToFile ? "Save Another Copy" : "Save to Files",
+                              systemImage: "folder", expandsHorizontally: true) {
+                        showsSaveFile = true
+                    }
+                    .disabled(model.isSaving)
+                    if savedToFile {
+                        Label("Saved to Files", systemImage: "checkmark.circle")
+                            .font(AppTypography.caption).foregroundStyle(AppColors.positive)
+                    }
                     AppButton(
                         model.savedToPhotos ? "Saved to Photos" : (model.isSaving ? "Saving…" : "Save to Photos"),
                         systemImage: model.savedToPhotos ? "checkmark" : "photo.badge.plus",
@@ -506,7 +523,7 @@ struct ExportView: View {
     }
 
     private func requestClose() {
-        if model.outputURL != nil && !model.savedToPhotos { confirmsClose = true }
+        if model.outputURL != nil && !model.savedToPhotos && !savedToFile { confirmsClose = true }
         else { dismiss() }
     }
 }

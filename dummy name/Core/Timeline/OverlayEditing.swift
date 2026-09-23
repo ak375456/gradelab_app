@@ -131,18 +131,35 @@ enum OverlayEditing {
     static func edit<Clip: DrawnOverlayClip>(_ original: Clip, operation: TimelineGestureEdit, to time: TimelineTime, in project: inout VideoProject) throws {
         var clip = original
         let target = max(.zero, try TimelineEditing.snapped(time, frame: project.canvas.frameDuration))
+        // Every edge stops at this clip's neighbours on the row. A row is a
+        // sequence, so an edge dragged past the clip beside it would put two of
+        // them on screen at once.
+        let neighbours = (project.timeline.tracks.first { $0.id == clip.placement.trackID }?.items ?? [])
+            .filter { $0.id != clip.id }
         switch operation {
-        case .move: clip.placement.timelineStart = target
+        case .move:
+            clip.placement.timelineStart = try TimelineEditing.clampedStart(
+                target, duration: clip.placement.duration, itemID: clip.id,
+                on: clip.placement.trackID, fallback: clip.placement.timelineStart, in: project)
         case .trimStart:
+            var head = target
+            for other in neighbours where other.placement.timelineStart < clip.placement.timelineStart {
+                head = max(head, try other.placement.range.end)
+            }
             let end = try clip.placement.range.end
             let previousStart = clip.placement.timelineStart
-            clip.placement.timelineStart = min(target, try end.subtracting(project.canvas.frameDuration ?? .zero))
+            clip.placement.timelineStart = min(head, try end.subtracting(project.canvas.frameDuration ?? .zero))
             clip.placement.duration = try end.subtracting(clip.placement.timelineStart)
             // The head moved but the content did not: slide the animation window with it.
             clip.shiftAnimationWindow(by: try clip.placement.timelineStart.subtracting(previousStart))
         case .trimEnd:
+            var tail = target
+            let end = try clip.placement.range.end
+            for other in neighbours where other.placement.timelineStart >= end {
+                tail = min(tail, other.placement.timelineStart)
+            }
             clip.placement.duration = max(project.canvas.frameDuration ?? .zero,
-                                          try target.subtracting(clip.placement.timelineStart))
+                                          try tail.subtracting(clip.placement.timelineStart))
         }
         guard clip.placement.duration >= (project.canvas.frameDuration ?? .zero) else {
             throw TimelineError.invalid(String(localized: "Keep at least one frame of \(Clip.noun)."))

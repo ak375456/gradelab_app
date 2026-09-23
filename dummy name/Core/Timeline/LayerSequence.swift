@@ -22,7 +22,24 @@ extension SequenceComposition {
         return CGSize(width: even(width), height: even(height))
     }
 
-    static func buildLayers(project: VideoProject, forExport: Bool, context: MetalContext? = nil) async throws -> Self {
+    /// The size a layered export should actually composite at.
+    ///
+    /// Never larger than the canvas — compositing above the authored resolution
+    /// invents nothing — and rounded to even dimensions because 4:2:0 chroma is
+    /// subsampled by two in each direction.
+    static func exportRenderSize(requested: CGSize, canvas: CGSize) -> CGSize {
+        guard requested.width > 0, requested.height > 0,
+              requested.width.isFinite, requested.height.isFinite,
+              max(requested.width, requested.height) < max(canvas.width, canvas.height) else { return canvas }
+        func even(_ value: CGFloat) -> CGFloat { max(2, (value / 2).rounded() * 2) }
+        return CGSize(width: even(requested.width), height: even(requested.height))
+    }
+
+    /// - Parameter requestedRenderSize: the size the export will actually
+    ///   write. Compositing above it is work and memory thrown away — the
+    ///   writer only scales the result back down again.
+    static func buildLayers(project: VideoProject, forExport: Bool, context: MetalContext? = nil,
+                            requestedRenderSize: CGSize? = nil) async throws -> Self {
         if project.colorMode.isAppleLog {
             let expected: SourceColorProfile = project.colorMode == .appleLog2 ? .appleLog2 : .appleLog
             guard let identifier = project.metadata.logProfileIdentifier,
@@ -51,13 +68,30 @@ extension SequenceComposition {
         var ids: [UUID: CMPersistentTrackID] = [:]
         var blendIDs: [UUID: CMPersistentTrackID] = [:]
         var videos: [AVAssetTrack] = []
+        // Sequential edits of one asset share a decoder track. Overlapping
+        // layers and transition handles still need independent source frames.
+        var videoSlots: [(assetID: UUID, track: AVMutableCompositionTrack, end: CMTime)] = []
+        var blendSlots: [(assetID: UUID, track: AVMutableCompositionTrack, end: CMTime)] = []
+        func decoderTrack(assetID: UUID, start: CMTime, end: CMTime,
+                          slots: inout [(assetID: UUID, track: AVMutableCompositionTrack, end: CMTime)]) throws -> AVMutableCompositionTrack {
+            if let index = slots.firstIndex(where: { $0.assetID == assetID && $0.end <= start }) {
+                slots[index].end = end
+                return slots[index].track
+            }
+            guard let track = composition.addMutableTrack(withMediaType: .video,
+                                                          preferredTrackID: kCMPersistentTrackID_Invalid) else {
+                throw TimelineError.invalid(String(localized: "Could not create video layer."))
+            }
+            slots.append((assetID, track, end))
+            videos.append(track)
+            return track
+        }
         var audio: [ExportAudioTrackInfo] = []
         var routing = TimelineAudioMix()
-        for clip in clips {
+        for clip in clips.sorted(by: { $0.placement.timelineStart < $1.placement.timelineStart }) {
             let media = project.assets.first(where: { $0.id == clip.assetID })
             if media?.stillImage != nil { continue }
-            guard let source = sources[clip.assetID],
-                  let video = composition.addMutableTrack(withMediaType: .video, preferredTrackID: kCMPersistentTrackID_Invalid) else {
+            guard let source = sources[clip.assetID] else {
                 throw TimelineError.invalid(String(localized: "Could not create video layer."))
             }
             // Transition handles are scheduled on the clip's own composition
@@ -77,6 +111,8 @@ extension SequenceComposition {
             let extendedSourceDuration = try clip.sourceRange.duration.adding(sourceLead).adding(sourceTail)
             let extendedTimelineStart = try clip.placement.timelineStart.subtracting(lead)
             let extendedTimelineDuration = try clip.placement.duration.adding(lead).adding(tail)
+            let video = try decoderTrack(assetID: clip.assetID, start: extendedTimelineStart.cmTime,
+                end: CMTimeAdd(extendedTimelineStart.cmTime, extendedTimelineDuration.cmTime), slots: &videoSlots)
             try video.insertTimeRange(
                 CMTimeRange(start: extendedSourceStart.cmTime, duration: extendedSourceDuration.cmTime),
                 of: source.videoTrack, at: extendedTimelineStart.cmTime)
@@ -91,7 +127,7 @@ extension SequenceComposition {
                     toDuration: extendedTimelineDuration.cmTime
                 )
             }
-            ids[clip.id] = video.trackID; videos.append(video)
+            ids[clip.id] = video.trackID
 
             // Smoothing needs the NEXT source frame as well as the current one,
             // and a compositor is only handed the frame at the composition time.
@@ -109,12 +145,13 @@ extension SequenceComposition {
                 ?? (loadedMinFrameDuration?.isNumeric == true && loadedMinFrameDuration! > .zero
                     ? loadedMinFrameDuration : nil)
             if clip.smoothsMotion,
-               let frameDuration = blendFrameDuration, frameDuration > .zero,
-               let partner = composition.addMutableTrack(withMediaType: .video, preferredTrackID: kCMPersistentTrackID_Invalid) {
+               let frameDuration = blendFrameDuration, frameDuration > .zero {
                 let shifted = CMTimeAdd(clip.sourceRange.start.cmTime, frameDuration)
                 let available = CMTimeSubtract(source.videoTimeRange.end, shifted)
                 let duration = CMTimeMinimum(clip.sourceRange.duration.cmTime, available)
                 if duration > .zero {
+                    let partner = try decoderTrack(assetID: clip.assetID, start: clip.placement.timelineStart.cmTime,
+                        end: clip.placement.range.end.cmTime, slots: &blendSlots)
                     try partner.insertTimeRange(
                         CMTimeRange(start: shifted, duration: duration),
                         of: source.videoTrack, at: clip.placement.timelineStart.cmTime)
@@ -255,8 +292,14 @@ extension SequenceComposition {
                 range: CMTimeRange(start: last.timeRange.start, end: composedDuration),
                 tracks: last.trackIDs, blendTracks: last.blendTrackIDs, state: state)
         }
+        let canvas = CGSize(width: project.canvas.width, height: project.canvas.height)
+        // Export used to composite at the full canvas whatever resolution was
+        // asked for, so a 1080p export of a 4K project built every layer at 4K
+        // and then handed the writer frames it immediately scaled back down —
+        // four times the pixels, in every working buffer and every decoded
+        // still, for a file that could never show them.
         let renderSize = forExport
-            ? CGSize(width: project.canvas.width, height: project.canvas.height)
+            ? requestedRenderSize.map { Self.exportRenderSize(requested: $0, canvas: canvas) } ?? canvas
             : Self.previewRenderSize(width: project.canvas.width, height: project.canvas.height)
         let vc = AVMutableVideoComposition()
         // Compositor types rather than one configured instance:

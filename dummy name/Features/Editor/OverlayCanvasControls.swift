@@ -17,8 +17,12 @@ struct CanvasOverlay: Identifiable {
     let anchorBounds: CGRect
     /// The frame drawn around the selection, padded clear of the ink or outline.
     let frame: CGRect
+    /// What the layer is. Titles, shapes and pictures are dragged, pinched and
+    /// rotated by identical rules; only the wording and the double tap differ.
+    enum Kind { case text, shape, media }
+    let kind: Kind
     /// Whether a double tap opens a content editor. Only a title has content.
-    let editsContent: Bool
+    var editsContent: Bool { kind == .text }
 
     init(_ clip: TextClip, canvas: CGSize) {
         let layout = TextRenderer.layout(clip, canvas: canvas)
@@ -28,7 +32,7 @@ struct CanvasOverlay: Identifiable {
         anchorBounds = layout.fittedBounds
         // Frame the glyphs, not the full wrapping width.
         frame = layout.fittedBounds.insetBy(dx: -max(6, clip.strokeWidth), dy: -6)
-        editsContent = true
+        kind = .text
     }
 
     init(_ clip: ShapeClip, canvas: CGSize) {
@@ -40,7 +44,27 @@ struct CanvasOverlay: Identifiable {
         // A centred stroke hangs half its width outside the figure.
         let pad = max(6, clip.strokeWidth/2)
         frame = bounds.insetBy(dx: -pad, dy: -pad)
-        editsContent = false
+        kind = .shape
+    }
+
+    /// A picture layer — an image or video overlay.
+    ///
+    /// Its bounds are the source fitted to the canvas, which is the size the
+    /// compositor draws it at before the clip's own transform. Handing those
+    /// already-fitted bounds to `VisualTransform.placement` reproduces the
+    /// compositor's `fit * scale` exactly, so the outline sits on the picture
+    /// rather than near it.
+    init(_ clip: VideoClip, displaySize: CGSize, canvas: CGSize) {
+        id = clip.id
+        transform = clip.transform
+        range = clip.placement.range
+        let fit = min(canvas.width/displaySize.width, canvas.height/displaySize.height)
+        let fitted = CGRect(origin: .zero, size: CGSize(width: displaySize.width*fit,
+                                                        height: displaySize.height*fit))
+        anchorBounds = fitted
+        // A picture has no ink to clear: its edge IS the frame.
+        frame = fitted
+        kind = .media
     }
 
     func placement(canvas: CGSize) -> CGAffineTransform {
@@ -54,6 +78,30 @@ struct CanvasOverlay: Identifiable {
         copy.transform.positionX = x
         copy.transform.positionY = y
         return copy
+    }
+
+    var selectionAccessibilityLabel: String {
+        switch kind {
+        case .text: String(localized: "Selected text. Drag to move, pinch to resize, rotate with two fingers.")
+        case .shape: String(localized: "Selected shape. Drag to move, pinch to resize, rotate with two fingers.")
+        case .media: String(localized: "Selected picture. Drag to move, pinch to resize, rotate with two fingers.")
+        }
+    }
+
+    var resizeAccessibilityLabel: String {
+        switch kind {
+        case .text: String(localized: "Resize and rotate text")
+        case .shape: String(localized: "Resize and rotate shape")
+        case .media: String(localized: "Resize and rotate picture")
+        }
+    }
+
+    var deleteAccessibilityLabel: String {
+        switch kind {
+        case .text: String(localized: "Delete text clip")
+        case .shape: String(localized: "Delete shape clip")
+        case .media: String(localized: "Delete picture clip")
+        }
     }
 
     /// Axis-aligned screen-space bounds in canvas units, origin at top-left.
@@ -165,9 +213,7 @@ struct OverlayCanvasControls: View {
                         model.setAnimatableValue(.rotation, .number(snapped.value))
                     }.onEnded { _ in initialRotation = nil; rotationGuide = nil; model.flushGradeHistory() })
                     .onTapGesture(count: 2) { if overlay.editsContent { editContent() } }
-                    .accessibilityLabel(overlay.editsContent
-                        ? "Selected text. Drag to move, pinch to resize, rotate with two fingers."
-                        : "Selected shape. Drag to move, pinch to resize, rotate with two fingers.")
+                    .accessibilityLabel(overlay.selectionAccessibilityLabel)
                 let center = CGPoint(x: offset.x+overlay.transform.positionX*canvas.width*fit,
                                      y: offset.y+overlay.transform.positionY*canvas.height*fit)
                 Circle().fill(.cyan).frame(width: 12, height: 12).frame(width: 44, height: 44).contentShape(Rectangle())
@@ -184,7 +230,7 @@ struct OverlayCanvasControls: View {
                         model.setAnimatableValue(.scale, .number(min(6, max(0.05, origin!.scale*ratio))))
                         model.setAnimatableValue(.rotation, .number(snapped.value))
                     }.onEnded { _ in origin = nil; rotationGuide = nil; model.flushGradeHistory() })
-                    .accessibilityLabel(overlay.editsContent ? "Resize and rotate text" : "Resize and rotate shape")
+                    .accessibilityLabel(overlay.resizeAccessibilityLabel)
                 Button { model.deleteClip() } label: {
                     Image(systemName: "xmark").font(.system(size: 11, weight: .bold)).foregroundStyle(.black)
                         .frame(width: 22, height: 22).background(Circle().fill(.cyan))
@@ -200,6 +246,9 @@ struct OverlayCanvasControls: View {
     private func selection(canvas: CGSize) -> CanvasOverlay? {
         if let clip = model.evaluatedText { return CanvasOverlay(clip, canvas: canvas) }
         if let clip = model.evaluatedShape { return CanvasOverlay(clip, canvas: canvas) }
+        if let clip = model.evaluatedMediaOverlay, let size = model.displaySize(of: clip) {
+            return CanvasOverlay(clip, displaySize: size, canvas: canvas)
+        }
         return nil
     }
 
@@ -209,6 +258,9 @@ struct OverlayCanvasControls: View {
     private func peers(canvas: CGSize, excluding id: UUID) -> [CanvasOverlay] {
         model.visibleEvaluatedTexts.filter { $0.id != id }.map { CanvasOverlay($0, canvas: canvas) }
             + model.visibleEvaluatedShapes.filter { $0.id != id }.map { CanvasOverlay($0, canvas: canvas) }
+            + model.visibleEvaluatedMediaOverlays.filter { $0.id != id }.compactMap { clip in
+                model.displaySize(of: clip).map { CanvasOverlay(clip, displaySize: $0, canvas: canvas) }
+            }
     }
 
     /// Returns the magnetised value and, when held, the stop it locked onto.

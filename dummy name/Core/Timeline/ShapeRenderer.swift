@@ -12,9 +12,44 @@ import Foundation
 /// position have one meaning in this app, and a shape and a title dragged to the
 /// same spot must land in the same spot.
 enum ShapeRenderer {
-    private struct Cached { let clip: ShapeClip; let canvas: CGSize; let image: CIImage }
+    private struct Cached {
+        let clip: ShapeClip; let canvas: CGSize; let image: CIImage
+        var bytes: Int { Int(max(0, image.extent.width) * max(0, image.extent.height)) * 4 }
+    }
     private static let lock = NSLock()
     private static var cache: [UUID: Cached] = [:]
+    /// Least-recently-used first.
+    private static var order: [UUID] = []
+    private static let cacheBudget = 48 * 1024 * 1024
+
+    /// Files a raster and drops the oldest until the cache is inside its
+    /// budget.
+    ///
+    /// A count was the wrong unit, and six was the wrong count. The limit used
+    /// to be `if cache.count >= 6 { cache.removeAll() }`, so a timeline with
+    /// eleven titles threw away every cached raster the moment a seventh was
+    /// reached — and then re-rasterized glyphs, gradients, strokes and shadows
+    /// from scratch on the next frame, over and over. Ordering by age and
+    /// measuring the actual pixels keeps the working set and bounds the memory.
+    private static func remember(_ entry: Cached, for id: UUID) {
+        cache[id] = entry
+        order.removeAll { $0 == id }
+        order.append(id)
+        var total = cache.values.reduce(0) { $0 + $1.bytes }
+        while total > cacheBudget, order.count > 1, let oldest = order.first {
+            total -= cache[oldest]?.bytes ?? 0
+            cache.removeValue(forKey: oldest)
+            order.removeFirst()
+        }
+    }
+
+    /// Releases every cached raster. Called when the system reports memory
+    /// pressure: a dropped raster costs one re-render, which is always better
+    /// than being killed.
+    static func purge() {
+        lock.lock(); cache.removeAll(); order.removeAll(); lock.unlock()
+    }
+
 
     /// The shape's own box, untransformed, origin at zero. This is the frame
     /// anchors are measured against and the frame the canvas handles draw.
@@ -124,6 +159,10 @@ enum ShapeRenderer {
         key.placement = .init(id: clip.id, trackID: clip.placement.trackID, timelineStart: .zero, duration: .zero)
         lock.lock()
         let existing = cache[clip.id]
+        // A hit is a use: without this the order would record only when each
+        // raster was first made, and eviction would drop the one being read
+        // every frame in favour of one nothing has touched since.
+        if existing != nil { order.removeAll { $0 == clip.id }; order.append(clip.id) }
         lock.unlock()
         let raster: CIImage
         if let existing, existing.clip == key, existing.canvas == canvas {
@@ -203,8 +242,7 @@ enum ShapeRenderer {
                 .transformed(by: .init(scaleX: 1/quality, y: 1/quality))
                 .transformed(by: .init(translationX: pixels.minX, y: pixels.minY))
             lock.lock()
-            if cache.count >= 6 { cache.removeAll() }
-            cache[clip.id] = .init(clip: key, canvas: canvas, image: raster)
+            remember(.init(clip: key, canvas: canvas, image: raster), for: clip.id)
             lock.unlock()
         }
         return raster.transformed(by: placement(clip, bounds: geometry, canvas: canvas))

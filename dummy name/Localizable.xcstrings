@@ -631,6 +631,34 @@
         }
       }
     },
+    "%@ is not a video, image or audio file." : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ ist keine Video-, Bild- oder Audiodatei."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ no es un archivo de vídeo, imagen o audio."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ n’est pas un fichier vidéo, image ou audio."
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ non è un file video, immagine o audio."
+          }
+        }
+      }
+    },
     "%@ is too large to be a look LUT." : {
       "localizations" : {
         "de" : {
@@ -2008,6 +2036,34 @@
         }
       }
     },
+    "%lld%% off the %@ standard lifetime price. %@" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%lld %% Rabatt auf den Standardpreis von %@ für die Lebenszeit-Lizenz. %@"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Un %lld %% de descuento sobre el precio estándar de por vida de %@. %@"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%lld %% de réduction sur le prix standard à vie de %@. %@"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%lld%% di sconto sul prezzo standard a vita di %@. %@"
+          }
+        }
+      }
+    },
     "%lld%% showing the ungraded image" : {
       "localizations" : {
         "de" : {
@@ -2035,6 +2091,9 @@
           }
         }
       }
+    },
+    "%lld×" : {
+      "shouldTranslate" : false
     },
     "•" : {
       "shouldTranslate" : false
@@ -2806,6 +2865,34 @@
         }
       }
     },
+    "A text field keeps its own typing, selection and cut, copy and paste while you are in it. Editor shortcuts resume when you leave the field." : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ein Textfeld behält seine eigene Eingabe, Auswahl sowie Ausschneiden, Kopieren und Einsetzen, solange du darin bist. Die Editor-Kurzbefehle greifen wieder, sobald du das Feld verlässt."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Mientras estás en un campo de texto, este conserva su propia escritura, selección y las funciones Cortar, Copiar y Pegar. Los atajos del editor vuelven en cuanto sales del campo."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Un champ de texte conserve sa propre saisie, sa sélection et ses commandes Couper, Copier et Coller tant que vous y êtes. Les raccourcis de l’éditeur reprennent dès que vous quittez le champ."
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Un campo di testo mantiene la propria digitazione, la selezione e i comandi Taglia, Copia e Incolla finché ci sei dentro. Le abbreviazioni dell’editor tornano attive appena esci dal campo."
+          }
+        }
+      }
+    },
     "A thin line around the canvas on the preview, so the frame you are exporting stays visible against the workspace even when a clip is scaled down inside it. The canvas colour itself is set per project in the Canvas tool." : {
       "localizations" : {
         "de" : {
@@ -3312,6 +3399,34 @@
         }
       }
     },
+    "Add / Remove Marker" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Marker hinzufügen / entfernen"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Añadir / quitar marcador"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ajouter / retirer un marqueur"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Aggiungi / rimuovi marcatore"
+          }
+        }
+      }
+    },
     "Add %@ at playhead" : {
       "localizations" : {
         "de" : {
@@ -3364,6 +3479,34 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Aggiungi maschera %@"
+          }
+        }
+      }
+    },
+    "Add %@ to the timeline" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ zur Timeline hinzufügen"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Añadir %@ a la línea de tiempo"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ajouter %@ à la timeline"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Aggiungi %@ alla timeline"
           }
         }
       }
@@ -3540,6 +3683,62 @@
         }
       }
     },
+    "Add as Overlay" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Als Overlay hinzufügen"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Añadir como superposición"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ajouter en superposition"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Aggiungi come sovrapposizione"
+          }
+        }
+      }
+    },
+    "Add Audio" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Audio hinzufügen"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Añadir audio"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ajouter de l’audio"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Aggiungi audio"
+          }
+        }
+      }
+    },
     "Add audio from Files" : {
       "localizations" : {
         "de" : {
@@ -3599,6 +3798,34 @@
       }
     },
     "Add image overlay" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Bild-Overlay hinzufügen"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Añadir imagen superpuesta"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ajouter une image en superposition"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Aggiungi immagine sovrapposta"
+          }
+        }
+      }
+    },
+    "Add Image Overlay" : {
       "localizations" : {
         "de" : {
           "stringUnit" : {
@@ -3824,6 +4051,34 @@
         }
       }
     },
+    "Add overlay" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Overlay hinzufügen"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Añadir superposición"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ajouter une superposition"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Aggiungi sovrapposizione"
+          }
+        }
+      }
+    },
     "Add shape" : {
       "localizations" : {
         "de" : {
@@ -3876,6 +4131,62 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Aggiungi testo"
+          }
+        }
+      }
+    },
+    "Add to the timeline" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Zur Timeline hinzufügen"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Añadir a la línea de tiempo"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ajouter à la timeline"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Aggiungi alla timeline"
+          }
+        }
+      }
+    },
+    "Add to Timeline" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Zur Timeline hinzufügen"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Añadir a la línea de tiempo"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ajouter à la timeline"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Aggiungi alla timeline"
           }
         }
       }
@@ -3962,6 +4273,62 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Aggiungi transizione alla testina"
+          }
+        }
+      }
+    },
+    "Add video" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Video hinzufügen"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Añadir vídeo"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ajouter une vidéo"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Aggiungi video"
+          }
+        }
+      }
+    },
+    "Add Video" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Video hinzufügen"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Añadir vídeo"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ajouter une vidéo"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Aggiungi video"
           }
         }
       }
@@ -5961,6 +6328,34 @@
         }
       }
     },
+    "Audio Tool" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Audiowerkzeug"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Herramienta de audio"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Outil Audio"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Strumento audio"
+          }
+        }
+      }
+    },
     "Audio track %lld cannot be added to the output movie." : {
       "localizations" : {
         "de" : {
@@ -6289,6 +6684,34 @@
                 }
               }
             }
+          }
+        }
+      }
+    },
+    "Back 10 Frames" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "10 Frames zurück"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "10 fotogramas atrás"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "10 images en arrière"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "10 fotogrammi indietro"
           }
         }
       }
@@ -8163,6 +8586,14 @@
         }
       }
     },
+    "Choose an image from Finder" : {
+      "comment" : "A hint that appears when importing an image from Photos.",
+      "isCommentAutoGenerated" : true
+    },
+    "Choose an image from Photos" : {
+      "comment" : "A label for a button that allows the user to choose an image from their Photos library.",
+      "isCommentAutoGenerated" : true
+    },
     "Choose an MP3, M4A, AAC, WAV or AIFF audio file." : {
       "localizations" : {
         "de" : {
@@ -8276,6 +8707,14 @@
           }
         }
       }
+    },
+    "Choose videos from Finder" : {
+      "comment" : "A hint for choosing videos from the Finder.",
+      "isCommentAutoGenerated" : true
+    },
+    "Choose videos from Photos" : {
+      "comment" : "A suggestion to choose videos from the Photos app.",
+      "isCommentAutoGenerated" : true
     },
     "Cinematic" : {
       "comment" : "The name of a sound effect category.",
@@ -9077,6 +9516,34 @@
         }
       }
     },
+    "Color Tool" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Farbwerkzeug"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Herramienta de color"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Outil Couleur"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Strumento colore"
+          }
+        }
+      }
+    },
     "Color with character" : {
       "localizations" : {
         "de" : {
@@ -9185,6 +9652,62 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Community"
+          }
+        }
+      }
+    },
+    "Compact" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Kompakt"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Compacta"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Compacte"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Compatta"
+          }
+        }
+      }
+    },
+    "Compare Original" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Original vergleichen"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Comparar con el original"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Comparer à l’original"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Confronta con l’originale"
           }
         }
       }
@@ -9381,6 +9904,34 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Copia"
+          }
+        }
+      }
+    },
+    "Copy Clip" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Clip kopieren"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Copiar el clip"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Copier le clip"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Copia clip"
           }
         }
       }
@@ -10025,6 +10576,34 @@
         }
       }
     },
+    "Cut Clip" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Clip ausschneiden"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Cortar el clip"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Couper le clip"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Taglia clip"
+          }
+        }
+      }
+    },
     "Cutout changes clip transparency. Color grading masks remain separate." : {
       "comment" : "A description below the background removal mode buttons, explaining how the background removal affects the final output.",
       "isCommentAutoGenerated" : true,
@@ -10495,6 +11074,34 @@
         }
       }
     },
+    "Delete picture clip" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Bildclip löschen"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Eliminar el clip de imagen"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Supprimer le clip d’image"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Elimina la clip di immagine"
+          }
+        }
+      }
+    },
     "Delete Preset" : {
       "localizations" : {
         "de" : {
@@ -10547,6 +11154,34 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Elimina il progetto"
+          }
+        }
+      }
+    },
+    "Delete Selected Clips" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ausgewählte Clips löschen"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Eliminar los clips seleccionados"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Supprimer les clips sélectionnés"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Elimina le clip selezionate"
           }
         }
       }
@@ -11653,6 +12288,34 @@
         }
       }
     },
+    "Drop video, photos and audio here, or use Import Media. Then drag one onto the canvas or the timeline." : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Lege Videos, Fotos und Audio hier ab oder nutze „Medien importieren“. Zieh dann eines auf die Arbeitsfläche oder die Timeline."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Suelta aquí vídeos, fotos y audio, o usa Importar material. Después arrastra uno al lienzo o a la línea de tiempo."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Déposez vidéos, photos et audio ici, ou utilisez Importer des médias. Faites ensuite glisser l’un d’eux sur le canevas ou la timeline."
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Trascina qui video, foto e audio, oppure usa Importa contenuti. Poi trascinane uno sul canvas o sulla timeline."
+          }
+        }
+      }
+    },
     "Duplicate" : {
       "localizations" : {
         "de" : {
@@ -11705,6 +12368,34 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Traccia di animazione duplicata per %@."
+          }
+        }
+      }
+    },
+    "Duplicate Clip" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Clip duplizieren"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Duplicar el clip"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Dupliquer le clip"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Duplica clip"
           }
         }
       }
@@ -11933,6 +12624,62 @@
         }
       }
     },
+    "EARLY ADOPTER — %lld%% OFF" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "FRÜHBUCHER — %lld %% RABATT"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ANTICIPADO — %lld %% DE DESCUENTO"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "DÉCOUVERTE — %lld %% DE RÉDUCTION"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "PIONIERI — %lld%% DI SCONTO"
+          }
+        }
+      }
+    },
+    "EARLY ADOPTER PRICE" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "FRÜHBUCHERPREIS"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "PRECIO ANTICIPADO"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "PRIX DÉCOUVERTE"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "PREZZO PIONIERI"
+          }
+        }
+      }
+    },
     "Ease In" : {
       "localizations" : {
         "de" : {
@@ -12153,6 +12900,34 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Le timeline modificate vengono renderizzate sulla griglia di fotogrammi del progetto. I file sorgente restano invariati."
+          }
+        }
+      }
+    },
+    "Editing" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Bearbeiten"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Edición"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Édition"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Modifica"
           }
         }
       }
@@ -13865,6 +14640,34 @@
         }
       }
     },
+    "Forward 10 Frames" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "10 Frames vorwärts"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "10 fotogramas adelante"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "10 images en avant"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "10 fotogrammi avanti"
+          }
+        }
+      }
+    },
     "FOUNDING — %lld%% OFF" : {
       "localizations" : {
         "de" : {
@@ -15425,6 +16228,62 @@
         }
       }
     },
+    "GROWTH — %lld%% OFF" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "AUFBAU — %lld %% RABATT"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "CRECIMIENTO — %lld %% DE DESCUENTO"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "CROISSANCE — %lld %% DE RÉDUCTION"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "CRESCITA — %lld%% DI SCONTO"
+          }
+        }
+      }
+    },
+    "GROWTH PRICE" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "AUFBAUPREIS"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "PRECIO DE CRECIMIENTO"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "PRIX DE CROISSANCE"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "PREZZO DI CRESCITA"
+          }
+        }
+      }
+    },
     "Halation" : {
       "localizations" : {
         "de" : {
@@ -16071,6 +16930,34 @@
         }
       }
     },
+    "Home" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Start"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Inicio"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Accueil"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Home"
+          }
+        }
+      }
+    },
     "How keyframes work" : {
       "localizations" : {
         "de" : {
@@ -16437,6 +17324,34 @@
         }
       }
     },
+    "Import %lld files" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%lld Dateien importieren"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Importar %lld archivos"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Importer %lld fichiers"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Importa %lld file"
+          }
+        }
+      }
+    },
     "Import a clip or a photograph, inspect its real format, grade on the GPU, and export at its original dimensions." : {
       "localizations" : {
         "de" : {
@@ -16549,6 +17464,70 @@
         }
       }
     },
+    "Import from Files" : {
+      "comment" : "A menu item that lets users import images or videos from their file system.",
+      "isCommentAutoGenerated" : true
+    },
+    "Import from Photos" : {
+      "comment" : "A menu item that allows users to import images or videos from their Photos library.",
+      "isCommentAutoGenerated" : true
+    },
+    "Import media" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Medien importieren"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Importar material"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Importer des médias"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Importa contenuti"
+          }
+        }
+      }
+    },
+    "Import Media" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Medien importieren"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Importar material"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Importer des médias"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Importa contenuti"
+          }
+        }
+      }
+    },
     "Import Photo" : {
       "localizations" : {
         "de" : {
@@ -16601,6 +17580,34 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Importa font TTF"
+          }
+        }
+      }
+    },
+    "Import video, photos or audio" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Video, Fotos oder Audio importieren"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Importar vídeo, fotos o audio"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Importer de la vidéo, des photos ou de l’audio"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Importa video, foto o audio"
           }
         }
       }
@@ -16661,6 +17668,34 @@
         }
       }
     },
+    "Import, play, cut, copy, paste, split and export without leaving the keyboard." : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Importieren, abspielen, schneiden, kopieren, einsetzen, teilen und exportieren, ohne die Tastatur zu verlassen."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Importa, reproduce, corta, copia, pega, divide y exporta sin soltar el teclado."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Importez, lisez, coupez, copiez, collez, scindez et exportez sans quitter le clavier."
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Importa, riproduci, taglia, copia, incolla, dividi ed esporta senza lasciare la tastiera."
+          }
+        }
+      }
+    },
     "Imported look." : {
       "localizations" : {
         "de" : {
@@ -16713,6 +17748,35 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Video importato"
+          }
+        }
+      }
+    },
+    "Imported video, photos and audio collect here. Drag one onto the timeline, or press the button under it." : {
+      "extractionState" : "stale",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Importierte Videos, Fotos und Audiodateien sammeln sich hier. Zieh eines auf die Timeline oder verwende die Schaltflächen darunter."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Los vídeos, las fotos y el audio que importas se reúnen aquí. Arrastra uno a la línea de tiempo o usa los botones de abajo."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Les vidéos, photos et fichiers audio importés s’accumulent ici. Faites-en glisser un sur la timeline, ou utilisez les boutons en dessous."
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "I video, le foto e l’audio che importi si raccolgono qui. Trascinane uno sulla timeline oppure usa i pulsanti qui sotto."
           }
         }
       }
@@ -16797,6 +17861,62 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Ispezione dei metadati generati…"
+          }
+        }
+      }
+    },
+    "Introductory price" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Einführungspreis"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Precio introductorio"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tarif de lancement"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Prezzo introduttivo"
+          }
+        }
+      }
+    },
+    "Introductory price. One purchase, yours forever." : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Einführungspreis. Einmal kaufen, für immer deins."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Precio introductorio. Una compra, tuyo para siempre."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tarif de lancement. Un seul achat, à vous pour toujours."
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Prezzo introduttivo. Un acquisto, tuo per sempre."
           }
         }
       }
@@ -17615,6 +18735,64 @@
         }
       }
     },
+    "Keyboard" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tastatur"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Teclado"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Clavier"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tastiera"
+          }
+        }
+      }
+    },
+    "Keyboard shortcuts" : {
+      "comment" : "A label for the keyboard shortcuts menu.",
+      "isCommentAutoGenerated" : true,
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tastaturkurzbefehle"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Atajos de teclado"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Raccourcis clavier"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Abbreviazioni da tastiera"
+          }
+        }
+      }
+    },
     "Keyframe at the playhead" : {
       "localizations" : {
         "de" : {
@@ -17755,6 +18933,34 @@
         }
       }
     },
+    "Large" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Groß"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Grande"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Grande"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Grande"
+          }
+        }
+      }
+    },
     "Largest compatibility, larger files." : {
       "localizations" : {
         "de" : {
@@ -17839,6 +19045,62 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Selezione con lazo"
+          }
+        }
+      }
+    },
+    "LAUNCH — %lld%% OFF" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "START — %lld %% RABATT"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "SALIDA — %lld %% DE DESCUENTO"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "DÉPART — %lld %% DE RÉDUCTION"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "PARTENZA — %lld%% DI SCONTO"
+          }
+        }
+      }
+    },
+    "LAUNCH PRICE" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "STARTPREIS"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "PRECIO DE SALIDA"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "PRIX DE DÉPART"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "PREZZO DI PARTENZA"
           }
         }
       }
@@ -19106,6 +20368,34 @@
         }
       }
     },
+    "Mask Tool" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Maskenwerkzeug"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Herramienta de máscara"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Outil Masque"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Strumento maschera"
+          }
+        }
+      }
+    },
     "Mask tracking progress" : {
       "localizations" : {
         "de" : {
@@ -19394,6 +20684,34 @@
         }
       }
     },
+    "Matte Tool" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Matte-Werkzeug"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Herramienta de máscara de pista"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Outil Cache"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Strumento maschera traccia"
+          }
+        }
+      }
+    },
     "Maximum" : {
       "localizations" : {
         "de" : {
@@ -19475,6 +20793,62 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Contenuti"
+          }
+        }
+      }
+    },
+    "Media Bin" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Medienablage"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Bandeja de material"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Chutier"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Raccoglitore"
+          }
+        }
+      }
+    },
+    "Media, %lld items" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Medien, %lld Objekte"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Material, %lld elementos"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Médias, %lld éléments"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Contenuti, %lld elementi"
           }
         }
       }
@@ -20669,6 +22043,34 @@
         }
       }
     },
+    "Next Frame" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Nächster Frame"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Fotograma siguiente"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Image suivante"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Fotogramma successivo"
+          }
+        }
+      }
+    },
     "No clear subject was found. Try the Lasso tool instead." : {
       "comment" : "Message shown in the background analysis UI when the analysis completes without finding a clear subject.",
       "isCommentAutoGenerated" : true,
@@ -21005,6 +22407,34 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Non animato"
+          }
+        }
+      }
+    },
+    "Nothing imported yet" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Noch nichts importiert"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Aún no has importado nada"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Rien d’importé pour l’instant"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Non hai ancora importato nulla"
           }
         }
       }
@@ -21684,6 +23114,7 @@
       }
     },
     "Opens the system photo picker" : {
+      "extractionState" : "stale",
       "localizations" : {
         "de" : {
           "stringUnit" : {
@@ -21712,6 +23143,7 @@
       }
     },
     "Opens the system video picker" : {
+      "extractionState" : "stale",
       "localizations" : {
         "de" : {
           "stringUnit" : {
@@ -22365,6 +23797,34 @@
         }
       }
     },
+    "Paste Clip" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Clip einsetzen"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Pegar el clip"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Coller le clip"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Incolla clip"
+          }
+        }
+      }
+    },
     "Paste Grade" : {
       "localizations" : {
         "de" : {
@@ -22563,6 +24023,34 @@
         }
       }
     },
+    "Photo" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Foto"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Foto"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Photo"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Foto"
+          }
+        }
+      }
+    },
     "Photo %@" : {
       "localizations" : {
         "de" : {
@@ -22587,6 +24075,34 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Foto %@"
+          }
+        }
+      }
+    },
+    "Photo editor" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Fotoeditor"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Editor de fotos"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Éditeur photo"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Editor di foto"
           }
         }
       }
@@ -22957,6 +24473,62 @@
         }
       }
     },
+    "Play / Pause" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Wiedergabe / Pause"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Reproducir / Pausa"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Lecture / Pause"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Riproduci / Pausa"
+          }
+        }
+      }
+    },
+    "Playback" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Wiedergabe"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Reproducción"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Lecture"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Riproduzione"
+          }
+        }
+      }
+    },
     "Playback preview quality" : {
       "localizations" : {
         "de" : {
@@ -23097,7 +24669,11 @@
         }
       }
     },
+    "Please choose a supported video file." : {
+
+    },
     "Please choose a video from your photo library." : {
+      "extractionState" : "stale",
       "localizations" : {
         "de" : {
           "stringUnit" : {
@@ -23861,6 +25437,34 @@
         }
       }
     },
+    "Previous Frame" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Vorheriger Frame"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Fotograma anterior"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Image précédente"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Fotogramma precedente"
+          }
+        }
+      }
+    },
     "Primaries" : {
       "localizations" : {
         "de" : {
@@ -24005,6 +25609,7 @@
       }
     },
     "Professional color grading on iPhone." : {
+      "extractionState" : "stale",
       "localizations" : {
         "de" : {
           "stringUnit" : {
@@ -24032,6 +25637,10 @@
         }
       }
     },
+    "Professional color grading." : {
+      "comment" : "A description of the app's main feature.",
+      "isCommentAutoGenerated" : true
+    },
     "Profile" : {
       "localizations" : {
         "de" : {
@@ -24056,6 +25665,34 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Profilo"
+          }
+        }
+      }
+    },
+    "Project" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Projekt"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Proyecto"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Projet"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Progetto"
           }
         }
       }
@@ -24652,6 +26289,34 @@
         }
       }
     },
+    "Regular" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Normal"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Normal"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Normale"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Normale"
+          }
+        }
+      }
+    },
     "Remaps saturation. Lowering the right compresses colors that are already strong; lifting the left brings up quiet ones." : {
       "localizations" : {
         "de" : {
@@ -24960,6 +26625,34 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Rimuovi l’eliminazione dello sfondo"
+          }
+        }
+      }
+    },
+    "Remove Background Tool" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Werkzeug „Hintergrund entfernen“"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Herramienta Quitar fondo"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Outil Retirer le fond"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Strumento Rimuovi sfondo"
           }
         }
       }
@@ -25868,6 +27561,34 @@
         }
       }
     },
+    "Resize and rotate picture" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Bild skalieren und drehen"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Redimensionar y girar la imagen"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Redimensionner et faire pivoter l’image"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ridimensiona e ruota l’immagine"
+          }
+        }
+      }
+    },
     "Resize and rotate shape" : {
       "localizations" : {
         "de" : {
@@ -26144,6 +27865,34 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Restituisce a questa schermata i colori originali di GradeLab"
+          }
+        }
+      }
+    },
+    "Reveal in Finder" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Im Finder zeigen"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Mostrar en el Finder"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Afficher dans le Finder"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Mostra nel Finder"
           }
         }
       }
@@ -26568,6 +28317,10 @@
         }
       }
     },
+    "Save Another Copy" : {
+      "comment" : "Label for a button that allows the user to save another copy of the exported file.",
+      "isCommentAutoGenerated" : true
+    },
     "Save Current Grade" : {
       "localizations" : {
         "de" : {
@@ -26680,6 +28433,38 @@
         }
       }
     },
+    "Save Project" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Projekt sichern"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Guardar el proyecto"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Enregistrer le projet"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Salva progetto"
+          }
+        }
+      }
+    },
+    "Save to Files" : {
+      "comment" : "Label for a button that saves the exported video to the user's file system.",
+      "isCommentAutoGenerated" : true
+    },
     "Save to Photos" : {
       "localizations" : {
         "de" : {
@@ -26707,6 +28492,10 @@
           }
         }
       }
+    },
+    "Saved to Files" : {
+      "comment" : "A label indicating that the exported content has been saved to files.",
+      "isCommentAutoGenerated" : true
     },
     "Saved to Photos" : {
       "localizations" : {
@@ -27388,6 +29177,34 @@
         }
       }
     },
+    "Selected picture. Drag to move, pinch to resize, rotate with two fingers." : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ausgewähltes Bild. Ziehen zum Bewegen, Zusammenziehen für die Größe, mit zwei Fingern drehen."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Imagen seleccionada. Arrastra para mover, pellizca para redimensionar, gira con dos dedos."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Image sélectionnée. Faites glisser pour déplacer, pincez pour redimensionner, tournez à deux doigts pour faire pivoter."
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Immagine selezionata. Trascina per spostare, pizzica per ridimensionare, ruota con due dita."
+          }
+        }
+      }
+    },
     "Selected shape. Drag to move, pinch to resize, rotate with two fingers." : {
       "localizations" : {
         "de" : {
@@ -27892,6 +29709,34 @@
         }
       }
     },
+    "Shape Tool" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Formwerkzeug"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Herramienta de forma"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Outil Forme"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Strumento forma"
+          }
+        }
+      }
+    },
     "Shaping and undoing it" : {
       "localizations" : {
         "de" : {
@@ -28000,6 +29845,34 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Mostra / elimina marcatori"
+          }
+        }
+      }
+    },
+    "Show / Hide Media Bin" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Medienablage ein-/ausblenden"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Mostrar / ocultar la bandeja de material"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Afficher / masquer le chutier"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Mostra / nascondi il raccoglitore"
           }
         }
       }
@@ -28540,6 +30413,34 @@
         }
       }
     },
+    "Small" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Klein"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Pequeña"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Petite"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Piccola"
+          }
+        }
+      }
+    },
     "Smaller file" : {
       "localizations" : {
         "de" : {
@@ -28992,6 +30893,34 @@
         }
       }
     },
+    "Space" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Leertaste"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Espacio"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Espace"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Spazio"
+          }
+        }
+      }
+    },
     "Speed" : {
       "localizations" : {
         "de" : {
@@ -29016,6 +30945,34 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Velocità"
+          }
+        }
+      }
+    },
+    "Speed Tool" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tempowerkzeug"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Herramienta de velocidad"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Outil Vitesse"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Strumento velocità"
           }
         }
       }
@@ -29096,6 +31053,34 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Diviser à la tête de lecture"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Dividi alla testina"
+          }
+        }
+      }
+    },
+    "Split at Playhead" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Am Abspielkopf teilen"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Dividir en el cabezal"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Scinder à la tête de lecture"
           }
         },
         "it" : {
@@ -29898,6 +31883,34 @@
         }
       }
     },
+    "Tall" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Hoch"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Alta"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Haute"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Alta"
+          }
+        }
+      }
+    },
     "Tap a colour in the picture" : {
       "localizations" : {
         "de" : {
@@ -30514,6 +32527,64 @@
         }
       }
     },
+    "Text Tool" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Textwerkzeug"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Herramienta de texto"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Outil Texte"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Strumento testo"
+          }
+        }
+      }
+    },
+    "That clip is no longer on the timeline." : {
+      "comment" : "Error message when a user tries to move a clip that is no longer on the timeline.",
+      "isCommentAutoGenerated" : true,
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Dieser Clip ist nicht mehr in der Timeline."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ese clip ya no está en la línea de tiempo."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ce clip n’est plus dans la timeline."
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Quella clip non è più nella timeline."
+          }
+        }
+      }
+    },
     "That color could not be sampled. Try another point." : {
       "localizations" : {
         "de" : {
@@ -30594,6 +32665,34 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Quel livello dipende già da questo, quindi usarlo creerebbe un ciclo."
+          }
+        }
+      }
+    },
+    "That media is no longer part of this project." : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Dieses Medium gehört nicht mehr zu diesem Projekt."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ese material ya no forma parte de este proyecto."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ce média ne fait plus partie de ce projet."
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Questo contenuto non fa più parte di questo progetto."
           }
         }
       }
@@ -31722,6 +33821,34 @@
         }
       }
     },
+    "The keyboard button in an editor's header opens the same list, and greys out whatever is unavailable right now." : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Die Tastaturtaste in der Kopfzeile eines Editors öffnet dieselbe Liste und stellt alles grau dar, was gerade nicht verfügbar ist."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "El botón de teclado en la cabecera de un editor abre esta misma lista y atenúa lo que no está disponible en ese momento."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Le bouton clavier dans l’en-tête d’un éditeur ouvre la même liste et grise tout ce qui n’est pas disponible pour l’instant."
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Il pulsante tastiera nell’intestazione di un editor apre lo stesso elenco e rende grigio ciò che al momento non è disponibile."
+          }
+        }
+      }
+    },
     "The look or curve tables could not be prepared." : {
       "localizations" : {
         "de" : {
@@ -32590,7 +34717,40 @@
         }
       }
     },
+    "The standard lifetime price is US%@. %@" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Der Standardpreis für die Lebenszeit-Lizenz beträgt US%@. %@"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "El precio estándar de por vida es de %@. %@"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Le prix standard à vie est de %@. %@"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Il prezzo standard a vita è di %@. %@"
+          }
+        }
+      }
+    },
+    "The temporary file will be removed. Save a copy using Save to Files, Save to Photos, or Share first." : {
+      "comment" : "A message displayed when the user closes an export that hasn't been saved.",
+      "isCommentAutoGenerated" : true
+    },
     "The temporary file will be removed. Save to Photos or use Share to save a copy to Files first." : {
+      "extractionState" : "stale",
       "localizations" : {
         "de" : {
           "stringUnit" : {
@@ -34302,6 +36462,34 @@
         }
       }
     },
+    "This project has no main video track." : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Dieses Projekt hat keine Hauptvideospur."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Este proyecto no tiene pista de vídeo principal."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ce projet n’a pas de piste vidéo principale."
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Questo progetto non ha una traccia video principale."
+          }
+        }
+      }
+    },
     "This project is set to %@, but the source declares no Log profile. GradeLab does not apply the Apple Log transform to footage that does not identify itself as Log." : {
       "localizations" : {
         "de" : {
@@ -34950,6 +37138,34 @@
         }
       }
     },
+    "Timeline Tool" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Timeline-Werkzeug"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Herramienta de línea de tiempo"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Outil Timeline"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Strumento timeline"
+          }
+        }
+      }
+    },
     "Timeline zoom" : {
       "comment" : "A label describing the slider that adjusts the zoom of the timeline.",
       "isCommentAutoGenerated" : true,
@@ -35092,6 +37308,34 @@
         }
       }
     },
+    "Toggle Snapping" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Einrasten umschalten"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Activar o desactivar el ajuste"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Activer ou désactiver le magnétisme"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Attiva o disattiva l’aggancio"
+          }
+        }
+      }
+    },
     "Tonal range" : {
       "localizations" : {
         "de" : {
@@ -35172,6 +37416,34 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Troppi look condividono il nome «%@». Rinomina il file e riprova."
+          }
+        }
+      }
+    },
+    "Tools" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Werkzeuge"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Herramientas"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Outils"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Strumenti"
           }
         }
       }
@@ -36042,6 +38314,34 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Trasforma"
+          }
+        }
+      }
+    },
+    "Transform Tool" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Transformationswerkzeug"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Herramienta de transformación"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Outil Transformer"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Strumento trasforma"
           }
         }
       }
@@ -36974,6 +39274,36 @@
         }
       }
     },
+    "Unlock this clip's layer before moving it." : {
+      "comment" : "Warning text to display when a user tries to move a clip to a new track while that track is locked.",
+      "isCommentAutoGenerated" : true,
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Entsperre die Ebene dieses Clips, bevor du ihn verschiebst."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Desbloquea la capa de este clip antes de moverlo."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Déverrouillez le calque de ce clip avant de le déplacer."
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Sblocca il livello di questa clip prima di spostarla."
+          }
+        }
+      }
+    },
     "Unlock this track before changing its sound." : {
       "localizations" : {
         "de" : {
@@ -37546,6 +39876,34 @@
         }
       }
     },
+    "Video editor" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Video-Editor"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Editor de vídeo"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Éditeur vidéo"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Editor video"
+          }
+        }
+      }
+    },
     "Video overlay" : {
       "comment" : "A button that adds a video overlay to the timeline.",
       "isCommentAutoGenerated" : true,
@@ -37712,6 +40070,34 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "I video con timestamp sorgente negativi non possono ancora essere esportati senza ricalcolare la sincronia."
+          }
+        }
+      }
+    },
+    "View" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ansicht"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Visualización"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Affichage"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Vista"
           }
         }
       }
@@ -39036,6 +41422,34 @@
         }
       }
     },
+    "Zoom In Timeline" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Timeline vergrößern"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Acercar la línea de tiempo"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Zoom avant sur la timeline"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ingrandisci la timeline"
+          }
+        }
+      }
+    },
     "Zoom out" : {
       "comment" : "A button label that zooms out the timeline.",
       "isCommentAutoGenerated" : true,
@@ -39094,282 +41508,30 @@
         }
       }
     },
-    "EARLY ADOPTER — %lld%% OFF" : {
+    "Zoom Out Timeline" : {
       "localizations" : {
         "de" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "FRÜHBUCHER — %lld %% RABATT"
+            "value" : "Timeline verkleinern"
           }
         },
         "es" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "ANTICIPADO — %lld %% DE DESCUENTO"
+            "value" : "Alejar la línea de tiempo"
           }
         },
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "DÉCOUVERTE — %lld %% DE RÉDUCTION"
+            "value" : "Zoom arrière sur la timeline"
           }
         },
         "it" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "PIONIERI — %lld%% DI SCONTO"
-          }
-        }
-      }
-    },
-    "EARLY ADOPTER PRICE" : {
-      "localizations" : {
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "FRÜHBUCHERPREIS"
-          }
-        },
-        "es" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "PRECIO ANTICIPADO"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "PRIX DÉCOUVERTE"
-          }
-        },
-        "it" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "PREZZO PIONIERI"
-          }
-        }
-      }
-    },
-    "LAUNCH — %lld%% OFF" : {
-      "localizations" : {
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "START — %lld %% RABATT"
-          }
-        },
-        "es" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "SALIDA — %lld %% DE DESCUENTO"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "DÉPART — %lld %% DE RÉDUCTION"
-          }
-        },
-        "it" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "PARTENZA — %lld%% DI SCONTO"
-          }
-        }
-      }
-    },
-    "LAUNCH PRICE" : {
-      "localizations" : {
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "STARTPREIS"
-          }
-        },
-        "es" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "PRECIO DE SALIDA"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "PRIX DE DÉPART"
-          }
-        },
-        "it" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "PREZZO DI PARTENZA"
-          }
-        }
-      }
-    },
-    "GROWTH — %lld%% OFF" : {
-      "localizations" : {
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "AUFBAU — %lld %% RABATT"
-          }
-        },
-        "es" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "CRECIMIENTO — %lld %% DE DESCUENTO"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "CROISSANCE — %lld %% DE RÉDUCTION"
-          }
-        },
-        "it" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "CRESCITA — %lld%% DI SCONTO"
-          }
-        }
-      }
-    },
-    "GROWTH PRICE" : {
-      "localizations" : {
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "AUFBAUPREIS"
-          }
-        },
-        "es" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "PRECIO DE CRECIMIENTO"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "PRIX DE CROISSANCE"
-          }
-        },
-        "it" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "PREZZO DI CRESCITA"
-          }
-        }
-      }
-    },
-    "%lld%% off the %@ standard lifetime price. %@" : {
-      "localizations" : {
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "%lld %% Rabatt auf den Standardpreis von %@ für die Lebenszeit-Lizenz. %@"
-          }
-        },
-        "es" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Un %lld %% de descuento sobre el precio estándar de por vida de %@. %@"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "%lld %% de réduction sur le prix standard à vie de %@. %@"
-          }
-        },
-        "it" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "%lld%% di sconto sul prezzo standard a vita di %@. %@"
-          }
-        }
-      }
-    },
-    "The standard lifetime price is US%@. %@" : {
-      "localizations" : {
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Der Standardpreis für die Lebenszeit-Lizenz beträgt US%@. %@"
-          }
-        },
-        "es" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "El precio estándar de por vida es de %@. %@"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Le prix standard à vie est de %@. %@"
-          }
-        },
-        "it" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Il prezzo standard a vita è di %@. %@"
-          }
-        }
-      }
-    },
-    "Introductory price" : {
-      "localizations" : {
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Einführungspreis"
-          }
-        },
-        "es" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Precio introductorio"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Tarif de lancement"
-          }
-        },
-        "it" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Prezzo introduttivo"
-          }
-        }
-      }
-    },
-    "Introductory price. One purchase, yours forever." : {
-      "localizations" : {
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Einführungspreis. Einmal kaufen, für immer deins."
-          }
-        },
-        "es" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Precio introductorio. Una compra, tuyo para siempre."
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Tarif de lancement. Un seul achat, à vous pour toujours."
-          }
-        },
-        "it" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Prezzo introduttivo. Un acquisto, tuo per sempre."
+            "value" : "Riduci la timeline"
           }
         }
       }

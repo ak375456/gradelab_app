@@ -31,6 +31,7 @@ struct ValidateSequence {
         let library = try await device.makeLibrary(source: shader, options: nil)
         let context = try MetalContext(library: library)
         let exporter = try VideoExporter(context: context)
+        try await validateExportScheduling(asset: asset, context: context, exporter: exporter, root: root)
         var configuration = ExportConfiguration(codec: .h264)
         configuration.container = .mp4
         let output = try await exporter.export(asset: asset, settings: .neutral, configuration: configuration,
@@ -478,6 +479,95 @@ struct ValidateSequence {
     }
 
     static func tryData(_ url: URL) -> Data { try! Data(contentsOf: url) }
+
+    static func validateExportScheduling(asset: VideoAsset, context: MetalContext,
+                                         exporter: VideoExporter, root: URL) async throws {
+        var cuts = VideoProject(sourceURL: asset.url, displayName: "Eleven cuts", metadata: asset.metadata,
+            sourceRange: asset.sourceRange, frameDuration: asset.frameDuration)
+        var tail = cuts.timeline.firstVideoClip!.id
+        for index in 1...10 {
+            tail = try TimelineEditing.split(tail, at: TimelineTime(CMTime(value: Int64(index * 8), timescale: 30)), in: &cuts)
+        }
+        for (index, clip) in try TimelineEditing.clips(in: cuts).enumerated() {
+            var grade = GradeSettings.neutral
+            grade.exposure = index.isMultiple(of: 2) ? 0 : -2
+            cuts.timeline.setGrade(grade, for: clip.id)
+        }
+        cuts.timeline.tracks.append(.init(id: UUID(), name: "Overlay", kind: .videoOverlay))
+        cuts.canvas.frameDuration = try TimelineTime(CMTime(value: 1, timescale: 60))
+        let sequence = try await SequenceComposition.build(project: cuts, context: context)
+        precondition(sequence.source.compositionVideoTracks?.count == 1,
+                     "Eleven sequential cuts of the same source must share one decoder track")
+        let instructions = sequence.source.videoComposition!.instructions.compactMap { $0 as? LayerInstruction }
+        precondition(instructions.allSatisfy { $0.requiredSourceTrackIDs?.count == 1 })
+
+        var configuration = ExportConfiguration(codec: .h264)
+        configuration.container = .mp4
+        configuration.frameRate = .fps30
+        let url = try await exporter.export(asset: asset, settings: .neutral, configuration: configuration,
+            project: cuts, outputURL: root.appendingPathComponent("eleven-cuts.mp4"))
+        let movie = AVURLAsset(url: url)
+        let track = try await movie.loadTracks(withMediaType: .video).first!
+        let reader = try AVAssetReader(asset: movie)
+        let output = AVAssetReaderTrackOutput(track: track, outputSettings: [
+            kCVPixelBufferPixelFormatTypeKey as String: kCVPixelFormatType_32BGRA])
+        reader.add(output)
+        precondition(reader.startReading())
+        var frameCount = 0
+        while let sample = output.copyNextSampleBuffer() {
+            let actual = CMSampleBufferGetPresentationTimeStamp(sample).seconds
+            precondition(abs(actual - Double(frameCount) / 30) < 0.0001, "Incorrect output frame cadence")
+            frameCount += 1
+        }
+        precondition(reader.status == .completed && frameCount == 90, "Export must contain all 90 scheduled frames")
+        let generator = AVAssetImageGenerator(asset: movie)
+        generator.requestedTimeToleranceBefore = .zero; generator.requestedTimeToleranceAfter = .zero
+        for index in 0...10 {
+            let color = try await pixel(generator, time: Double(index * 8 + 4) / 30)
+            let intensity = color.prefix(3).max()!
+            precondition(index.isMultiple(of: 2) ? intensity > 0.65 : intensity < 0.5,
+                         "Per-clip grade lost at cut \(index): \(color)")
+        }
+
+        // Overlapping clips from the SAME file need different source times.
+        var overlap = cuts
+        let trackID = overlap.timeline.tracks[1].id
+        let overlay = VideoClip(placement: .init(id: UUID(), trackID: trackID, timelineStart: .zero,
+            duration: try .seconds(1)), assetID: overlap.primaryAssetID,
+            sourceRange: .init(start: try .seconds(1), duration: try .seconds(1)))
+        overlap.timeline.tracks[1].items = [.video(overlay)]
+        let overlapped = try await SequenceComposition.build(project: overlap, context: context)
+        let firstInstruction = overlapped.source.videoComposition!.instructions.first as! LayerInstruction
+        precondition(Set(firstInstruction.trackIDs.values).count == 2, "Overlapping source frames cannot share a decoder")
+
+        var transitioned = cuts
+        _ = try TimelineTransitionEditing.apply(.crossDissolve, at: .seconds(8.0 / 30),
+            preferredTrackID: nil, in: &transitioned)
+        let transitionSequence = try await SequenceComposition.build(project: transitioned, context: context)
+        let transitionInstructions = transitionSequence.source.videoComposition!.instructions.compactMap { $0 as? LayerInstruction }
+        precondition(transitionInstructions.contains { Set($0.trackIDs.values).count == 2 },
+                     "Transition handles must preserve both source frames")
+
+        var smoothed = VideoProject(sourceURL: asset.url, displayName: "Retimed cuts", metadata: asset.metadata,
+            sourceRange: asset.sourceRange, frameDuration: asset.frameDuration)
+        _ = try TimelineEditing.split(smoothed.timeline.firstVideoClip!.id, at: .seconds(1), in: &smoothed)
+        for clip in try TimelineEditing.clips(in: smoothed) {
+            try TimelineEditing.setSpeed(clip.id, to: 0.5, in: &smoothed)
+        }
+        smoothed.timeline.tracks[0].items = smoothed.timeline.tracks[0].items.map { item in
+            guard case .video(var clip) = item else { return item }
+            clip.smoothsMotion = true
+            return .video(clip)
+        }
+        let smoothSequence = try await SequenceComposition.build(project: smoothed, context: context)
+        precondition(smoothSequence.source.compositionVideoTracks?.count == 2,
+                     "Sequential smoothed clips must reuse a primary and a next-frame decoder")
+        let smoothURL = try await exporter.export(asset: asset, settings: .neutral, configuration: configuration,
+            project: smoothed, outputURL: root.appendingPathComponent("smoothed-cuts.mp4"))
+        let smoothDuration = try await AVURLAsset(url: smoothURL).load(.duration)
+        precondition(abs(smoothDuration.seconds - 6) < 0.05, "Reusing a retimed track changed the timeline duration")
+        log("PASS: 11 cuts share one decoder; 60 fps composition exports 90 frames at 30 fps with per-cut grades; overlaps, transitions and smoothed retiming preserve their source frames and duration")
+    }
 
     static func generateSource(_ url: URL, portraitPattern: Bool = false) async throws {
         let writer = try AVAssetWriter(outputURL: url, fileType: .mov)

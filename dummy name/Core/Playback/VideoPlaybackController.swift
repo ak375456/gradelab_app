@@ -235,7 +235,20 @@ final class VideoPlaybackController: ObservableObject {
     private var hasPendingCompositionRefresh = false
 
     func clearSequence() {
-        pause(); duration = 0; currentTime = 0
+        releaseSequenceResources()
+        duration = 0; currentTime = 0
+    }
+
+    /// Pausing retains the decoder and custom compositor. Release them while
+    /// exporting, but keep the playhead and duration for the editor underneath.
+    func releaseSequenceResources() {
+        pause()
+        pendingSeekTask?.cancel(); pendingSeekTask = nil
+        preciseSeekTask?.cancel(); preciseSeekTask = nil
+        if let observer = periodicTimeObserver { player.removeTimeObserver(observer); periodicTimeObserver = nil }
+        if let observer = endObserver { NotificationCenter.default.removeObserver(observer); endObserver = nil }
+        statusObservation = nil
+        isReady = false
         fullVideoComposition = nil
         playbackVideoCompositions = [:]
         appliedVideoComposition = nil
@@ -414,9 +427,9 @@ final class VideoPlaybackController: ObservableObject {
     private func installObservers(for item: AVPlayerItem) {
         statusObservation = item.publisher(for: \.status)
             .receive(on: DispatchQueue.main)
-            .sink { [weak self] status in
+            .sink { [weak self, weak item] status in
                 MainActor.assumeIsolated {
-                    guard let self else { return }
+                    guard let self, let item, self.player.currentItem === item else { return }
                     switch status {
                     case .readyToPlay:
                         self.isReady = true
@@ -438,7 +451,7 @@ final class VideoPlaybackController: ObservableObject {
         let interval = CMTime(seconds: 1 / 30, preferredTimescale: 600)
         periodicTimeObserver = player.addPeriodicTimeObserver(forInterval: interval, queue: .main) { [weak self, weak item] time in
             MainActor.assumeIsolated {
-                guard let self else { return }
+                guard let self, let item, self.player.currentItem === item else { return }
                 if !self.isSeeking {
                     self.currentTime = max(0, time.seconds.isFinite ? time.seconds : 0)
                 }
@@ -449,8 +462,8 @@ final class VideoPlaybackController: ObservableObject {
                 // or the end of the item. The picture has to come back to full
                 // resolution either way.
                 else if wasPlaying != self.isPlaying { self.updatePreviewComposition() }
-                self.isReady = item?.status == .readyToPlay
-                if item?.status == .failed {
+                self.isReady = item.status == .readyToPlay
+                if item.status == .failed {
                     self.errorMessage = "This video could not be prepared for playback."
                 }
             }
@@ -459,11 +472,12 @@ final class VideoPlaybackController: ObservableObject {
             forName: .AVPlayerItemDidPlayToEndTime,
             object: item,
             queue: .main
-        ) { [weak self] _ in
+        ) { [weak self, weak item] _ in
             MainActor.assumeIsolated {
-                self?.isPlaying = false
-                self?.currentTime = self?.duration ?? 0
-                self?.updatePreviewComposition()
+                guard let self, let item, self.player.currentItem === item else { return }
+                self.isPlaying = false
+                self.currentTime = self.duration
+                self.updatePreviewComposition()
             }
         }
     }

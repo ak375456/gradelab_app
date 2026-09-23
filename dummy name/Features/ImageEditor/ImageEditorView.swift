@@ -152,6 +152,18 @@ struct ImageEditorView: View {
 
     // MARK: - Header
 
+    private var workspaceShortcuts: [WorkspaceShortcut] {
+        [
+            .init(.saveProject) {
+                model.flushGradeHistory(); onSettingsChanged(model.project, true)
+            },
+            .init(.export, isEnabled: !model.isPreparing) { comparePinned = false; model.showsExport = true },
+            .init(.undo, isEnabled: model.canUndo, run: model.undo),
+            .init(.redo, isEnabled: model.canRedo, run: model.redo),
+            .init(.compareOriginal, isEnabled: !model.isPreparing) { comparePinned.toggle() }
+        ]
+    }
+
     private var header: some View {
         HStack(spacing: 0) {
             Button { onBack(model.project) } label: {
@@ -161,6 +173,11 @@ struct ImageEditorView: View {
                 .lineLimit(1).truncationMode(.middle)
                 .frame(maxWidth: .infinity, alignment: .leading)
             Spacer(minLength: 0)
+            if AppPlatform.isMac {
+                WorkspaceShortcutMenu(shortcuts: workspaceShortcuts,
+                    isEnabled: !model.showsExport && !savingPreset && !infoSheet && !help
+                        && !confirmsResetAll && model.editError == nil)
+            }
             Button(action: model.undo) { Image(systemName: "arrow.uturn.backward").frame(width: 36, height: 44) }
                 .disabled(!model.canUndo).accessibilityLabel("Undo")
             Button(action: model.redo) { Image(systemName: "arrow.uturn.forward").frame(width: 36, height: 44) }

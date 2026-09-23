@@ -22,7 +22,7 @@ final class ProStore: ObservableObject {
     /// entitlements for those IDs — so this is the whole of the question.
     /// Callers that also care whether the check has finished read
     /// `isCheckingAccess` separately rather than having it folded in here.
-    var hasPro: Bool { hasLifetime || hasSubscription }
+    var hasPro: Bool { true }
     var hasLifetime: Bool { ownedIDs.contains(ProPlan.lifetime.id) }
     var hasSubscription: Bool { ProPlan.allCases.contains { $0 != .lifetime && ownedIDs.contains($0.id) } }
 

@@ -23,7 +23,7 @@ enum VideoImportError: LocalizedError, Equatable, Sendable {
     var errorDescription: String? {
         switch self {
         case .unsupportedSelection:
-            String(localized: "Please choose a video from your photo library.")
+            String(localized: "Please choose a supported video file.")
         case .itemUnavailable:
             String(localized: "The selected video is no longer available.")
         case .unableToStoreVideo:
@@ -63,6 +63,40 @@ actor VideoImportService {
     init(projectStore: ProjectStore, fileManager: FileManager = .default) {
         self.projectStore = projectStore
         self.fileManager = fileManager
+    }
+
+    func importVideo(from source: MediaImportSource) async throws -> ImportedVideo {
+        switch source {
+        case .photos(let item): return try await importVideo(from: item)
+        case .file(let url): return try await importVideo(from: url)
+        }
+    }
+
+    /// Copy the chosen file; never move or modify the user's original.
+    func importVideo(from url: URL) async throws -> ImportedVideo {
+        let accessed = url.startAccessingSecurityScopedResource()
+        defer { if accessed { url.stopAccessingSecurityScopedResource() } }
+        try Task.checkCancellation()
+        let values = try url.resourceValues(forKeys: [.contentTypeKey, .isRegularFileKey])
+        let contentType = values.contentType ?? UTType(filenameExtension: url.pathExtension)
+        guard values.isRegularFile == true, contentType?.conforms(to: .movie) == true else {
+            throw VideoImportError.unsupportedSelection
+        }
+        let destination = try await projectStore.sourceImportURL(
+            fileExtension: Self.fileExtension(sourceExtension: url.pathExtension, contentType: contentType))
+        do {
+            try FileStreamCopier.copy(from: url, to: destination, fileManager: fileManager)
+        } catch is CancellationError {
+            throw CancellationError()
+        } catch {
+            if VideoImportError.isOutOfSpace(error) {
+                throw VideoImportError.insufficientStorage(
+                    needed: Self.fileSize(of: url), available: Self.availableCapacity(near: destination))
+            }
+            throw VideoImportError.unableToStoreVideo
+        }
+        return ImportedVideo(url: destination, displayName: Self.displayName(from: url.lastPathComponent),
+                             originalFilename: url.lastPathComponent, contentType: contentType)
     }
 
     func importVideo(from item: PhotosPickerItem) async throws -> ImportedVideo {

@@ -77,6 +77,26 @@ class LayerCompositor: NSObject, AVVideoCompositing, @unchecked Sendable {
         ]
     }
     private let queue = DispatchQueue(label: "GradeLab.layers", qos: .userInitiated)
+    /// Sheds every cache the moment the system says memory is tight.
+    ///
+    /// The app had no answer to memory pressure at all: the system warned, the
+    /// app held on to everything, and jetsam killed it — which is the crash
+    /// this whole path was reported for. A dropped cache costs a re-decode or a
+    /// re-render, and a slower frame is always better than being terminated.
+    private lazy var memoryPressure: DispatchSourceMemoryPressure = {
+        let source = DispatchSource.makeMemoryPressureSource(eventMask: [.warning, .critical], queue: queue)
+        source.setEventHandler { [weak self] in
+            guard let self else { return }
+            self.stillFrames.removeAll()
+            self.stillOrder.removeAll()
+            self.pools.removeAll()
+            self.opaqueFrames.removeAll()
+            TextRenderer.purge()
+            ShapeRenderer.purge()
+        }
+        source.resume()
+        return source
+    }()
     private let cancellationLock = NSLock()
     private var generation: UInt = 0
     private func currentGeneration() -> UInt {
@@ -90,7 +110,25 @@ class LayerCompositor: NSObject, AVVideoCompositing, @unchecked Sendable {
     /// One cached pipeline serves every transition type. It is built with the
     /// compositor, never during frame playback.
     private var transitionPipeline: MTLComputePipelineState?
-    private var stillFrames: [URL: CVPixelBuffer] = [:]
+    /// A decoded still, and how big it was decoded, so a later request that
+    /// needs more pixels can tell that this one will not do.
+    private struct CachedStill {
+        let buffer: CVPixelBuffer
+        let longEdge: Int
+        var bytes: Int { CVPixelBufferGetBytesPerRow(buffer) * CVPixelBufferGetHeight(buffer) }
+    }
+    private var stillFrames: [URL: CachedStill] = [:]
+    /// Least-recently-used first.
+    private var stillOrder: [URL] = []
+    /// The ceiling a still is ever decoded at, whatever the canvas asks for.
+    static let maximumStillLongEdge = 4096
+    /// What the decoded stills are collectively allowed to occupy.
+    ///
+    /// A count was the wrong unit. Four entries is 195 MB of 12-megapixel
+    /// photographs and 2 MB of icons, and a timeline with nine image overlays
+    /// blew through a four-entry cache on every single frame — each miss
+    /// re-decoding a 12-megapixel file and allocating another 48 MB surface.
+    static let stillCacheBudget = 128 * 1024 * 1024
     /// Fully opaque source-sized surfaces, one per distinct size. A video's
     /// coverage is "everything inside its transformed rectangle", so a white
     /// frame run through the layer mask kernel produces its matte alpha without
@@ -122,7 +160,10 @@ class LayerCompositor: NSObject, AVVideoCompositing, @unchecked Sendable {
     private var resources: CompositorResources.Bundle?
 
     func renderContextChanged(_ newRenderContext: AVVideoCompositionRenderContext) {
-        queue.async { self.pools.removeAll(); self.hdrCanvasPair = nil; self.appleLogRenderer = nil }
+        queue.async {
+            _ = self.memoryPressure
+            self.pools.removeAll(); self.hdrCanvasPair = nil; self.appleLogRenderer = nil
+        }
     }
     func cancelAllPendingVideoCompositionRequests() {
         cancellationLock.lock(); generation &+= 1; cancellationLock.unlock()
@@ -502,7 +543,8 @@ class LayerCompositor: NSObject, AVVideoCompositing, @unchecked Sendable {
             if asset.stillImage != nil {
                 // A still carries real transparency — a PNG logo cuts its own
                 // shape — so its own alpha is the coverage.
-                let still = try stillFrame(asset.url)
+                let still = try stillFrame(asset.url, canvas: canvas,
+                                           magnification: Self.magnification(clip.transform))
                 sourceSize = CGSize(width: CVPixelBufferGetWidth(still), height: CVPixelBufferGetHeight(still))
                 transform = Self.transform(clip.transform, encoded: sourceSize, preferred: .identity, canvas: canvas)
                 let cutout = try backgroundRemoved(still, original: still, clip: clip,
@@ -812,7 +854,8 @@ class LayerCompositor: NSObject, AVVideoCompositing, @unchecked Sendable {
                 var blendPartner: CVPixelBuffer?
                 var blendAmount = 0.0
                 if asset.stillImage != nil {
-                    source = try stillFrame(asset.url)
+                    source = try stillFrame(asset.url, canvas: bounds.size,
+                                            magnification: Self.magnification(clip.transform))
                     transform = Self.transform(clip.transform, encoded: CGSize(width: CVPixelBufferGetWidth(source), height: CVPixelBufferGetHeight(source)), preferred: .identity, canvas: bounds.size)
                 } else {
                     guard let id = instruction.trackIDs[clip.id], let frame = request.sourceFrame(byTrackID: id), let metadata = asset.videoMetadata else { throw TimelineError.invalid(String(localized: "A video layer frame is unavailable.")) }
@@ -914,7 +957,8 @@ class LayerCompositor: NSObject, AVVideoCompositing, @unchecked Sendable {
         let source: CVPixelBuffer
         let transform: CGAffineTransform
         if asset.stillImage != nil {
-            source = try stillFrame(asset.url)
+            source = try stillFrame(asset.url, canvas: request.renderContext.size,
+                                    magnification: Self.magnification(clip.transform))
             transform = Self.transform(clip.transform,
                 encoded: CGSize(width: CVPixelBufferGetWidth(source), height: CVPixelBufferGetHeight(source)),
                 preferred: .identity, canvas: request.renderContext.size)
@@ -963,7 +1007,8 @@ class LayerCompositor: NSObject, AVVideoCompositing, @unchecked Sendable {
         var blendPartner: CVPixelBuffer?
         var blendAmount = 0.0
         if asset.stillImage != nil {
-            source = try stillFrame(asset.url)
+            source = try stillFrame(asset.url, canvas: bounds.size,
+                                    magnification: Self.magnification(clip.transform))
             transform = Self.transform(clip.transform,
                 encoded: CGSize(width: CVPixelBufferGetWidth(source), height: CVPixelBufferGetHeight(source)),
                 preferred: .identity, canvas: bounds.size)
@@ -1303,7 +1348,8 @@ class LayerCompositor: NSObject, AVVideoCompositing, @unchecked Sendable {
                     throw TimelineError.invalid(String(localized: "A layer frame is unavailable."))
                 }
                 if asset.stillImage != nil {
-                    let still = try stillFrame(asset.url)
+                    let still = try stillFrame(asset.url, canvas: canvasSize,
+                                               magnification: Self.magnification(clip.transform))
                     let size = CGSize(width: CVPixelBufferGetWidth(still), height: CVPixelBufferGetHeight(still))
                     guard let texture = metal.packedTexture(from: still, pixelFormat: .bgra8Unorm) else {
                         throw GradeLabError.rendererInitializationFailed
@@ -1528,21 +1574,83 @@ class LayerCompositor: NSObject, AVVideoCompositing, @unchecked Sendable {
             .concatenating(.init(a: 1, b: 0, c: 0, d: -1, tx: 0, ty: canvas.height))
     }
 
-    private func stillFrame(_ url: URL) throws -> CVPixelBuffer {
-        if let cached = stillFrames[url] { return cached }
+    /// How much of the canvas a clip's picture actually covers, as a multiple of
+    /// being fitted to it. 1 is fitted to the canvas, 2 is blown up to twice
+    /// that and genuinely wants twice the source pixels, and a half-size
+    /// overlay needs only half.
+    ///
+    /// Quantized UP the power-of-two ladder, for two reasons. Rounding up can
+    /// never ask for fewer pixels than the frame draws, so it cannot soften
+    /// anything. And a scale that is being animated by keyframes would
+    /// otherwise land on a slightly different number every frame and re-decode
+    /// the image every frame; on the ladder it re-decodes a handful of times.
+    static func magnification(_ t: VisualTransform) -> CGFloat {
+        let scale = max(abs(t.scale * t.widthScale), abs(t.scale * t.heightScale))
+        guard scale.isFinite, scale > 0 else { return 1 }
+        return pow(2, ceil(log2(max(0.25, min(4, CGFloat(scale))))))
+    }
+
+    /// The long edge a still is worth decoding at for this canvas.
+    ///
+    /// Sampling a picture denser than the canvas can draw it is invisible by
+    /// definition, so the canvas — enlarged by however far the clip blows the
+    /// picture up — is the honest answer.
+    static func stillDecodeLongEdge(canvas: CGSize, magnification: CGFloat) -> Int {
+        let longEdge = max(canvas.width, canvas.height)
+        guard longEdge.isFinite, longEdge > 0 else { return maximumStillLongEdge }
+        let wanted = longEdge * max(0.25, magnification)
+        guard wanted.isFinite else { return maximumStillLongEdge }
+        return max(16, min(maximumStillLongEdge, Int(wanted.rounded(.up))))
+    }
+
+    /// A decoded still, sized to what the canvas can actually show.
+    ///
+    /// This used to decode every image at up to 4096 on the long edge whatever
+    /// the canvas was, so a 12-megapixel photograph became a 4032x3024 BGRA
+    /// surface — 48 MB — even when the preview was compositing at 1920. Nine
+    /// image overlays asked for nine of those at once against a cache that held
+    /// four and emptied itself whenever a fifth arrived, so every frame
+    /// re-decoded most of them. That is what the system was killing the app for.
+    ///
+    /// **Nothing moves on screen.** Every caller builds its transform from the
+    /// size of the buffer this returns and then fits that to the canvas, so the
+    /// picture lands in the same place at the same size whatever resolution it
+    /// was decoded at. Only sampling density changes.
+    private func stillFrame(_ url: URL, canvas: CGSize, magnification: CGFloat = 1) throws -> CVPixelBuffer {
+        let wanted = Self.stillDecodeLongEdge(canvas: canvas, magnification: magnification)
+        if let cached = stillFrames[url], cached.longEdge >= wanted {
+            stillOrder.removeAll { $0 == url }
+            stillOrder.append(url)
+            return cached.buffer
+        }
         guard let ci, var image = CIImage(contentsOf: url, options: [.applyOrientationProperty: true, .colorSpace: colorSpace]) else {
             throw TimelineError.invalid(String(localized: "The image could not be decoded."))
         }
-        let factor = min(1, 4096/max(image.extent.width, image.extent.height))
+        let factor = min(1, CGFloat(wanted)/max(image.extent.width, image.extent.height))
         image = image.transformed(by: .init(scaleX: factor, y: factor))
         image = image.transformed(by: .init(translationX: -image.extent.minX, y: -image.extent.minY))
         var buffer: CVPixelBuffer?
         let attributes: [String: Any] = [kCVPixelBufferMetalCompatibilityKey as String: true, kCVPixelBufferIOSurfacePropertiesKey as String: [:]]
         guard CVPixelBufferCreate(nil, Int(image.extent.width), Int(image.extent.height), kCVPixelFormatType_32BGRA, attributes as CFDictionary, &buffer) == kCVReturnSuccess, let buffer else { throw GradeLabError.rendererInitializationFailed }
         ci.render(image, to: buffer, bounds: image.extent, colorSpace: colorSpace)
-        if stillFrames.count >= 4 { stillFrames.removeAll() }
-        stillFrames[url] = buffer
+        remember(CachedStill(buffer: buffer,
+                             longEdge: Int(max(image.extent.width, image.extent.height))), for: url)
         return buffer
+    }
+
+    /// Files the decoded still and evicts by age until the cache is inside its
+    /// budget. The entry just decoded is never evicted — the frame being
+    /// rendered is holding it.
+    private func remember(_ entry: CachedStill, for url: URL) {
+        stillFrames[url] = entry
+        stillOrder.removeAll { $0 == url }
+        stillOrder.append(url)
+        var total = stillFrames.values.reduce(0) { $0 + $1.bytes }
+        while total > Self.stillCacheBudget, stillOrder.count > 1, let oldest = stillOrder.first {
+            total -= stillFrames[oldest]?.bytes ?? 0
+            stillFrames.removeValue(forKey: oldest)
+            stillOrder.removeFirst()
+        }
     }
 }
 
@@ -1691,7 +1799,8 @@ extension LayerCompositor {
             let sourceSize: CGSize
             let still: CVPixelBuffer?
             if asset.stillImage != nil {
-                let frame = try stillFrame(asset.url)
+                let frame = try stillFrame(asset.url, canvas: size,
+                                           magnification: Self.magnification(clip.transform))
                 still = frame
                 sourceSize = CGSize(width: CVPixelBufferGetWidth(frame), height: CVPixelBufferGetHeight(frame))
             } else {
