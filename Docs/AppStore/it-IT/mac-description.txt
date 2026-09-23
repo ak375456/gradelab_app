@@ -1,0 +1,72 @@
+Trasforma foto e video di tutti i giorni in storie cinematografiche. GradeLab è un editor di grading per Mac: filtri LUT, look vintage, strumenti di colore professionali e montaggio video in un'unica app.
+
+Scegli un look, dosane l'intensità e rendilo tuo. Dai ritratti caldi ai clip di viaggio d'atmosfera, dai toni pellicola morbidi all'estetica retrò: controllo totale su luce, colore e atmosfera di ogni montaggio, su tutta l'immagine o su una sola parte.
+
+PENSATO PER IL MAC
+- Un raccoglitore elenca ogni clip, foto e file audio del progetto, e quante volte usi ciascuno.
+- Trascina i media dal Finder, poi mettili in timeline tutte le volte che serve.
+- Scorciatoie da tastiera ovunque, e clic destro su ogni clip della timeline.
+- Sposta, ridimensiona e ruota immagini e livelli direttamente sul canvas.
+
+LUT CINEMATOGRAFICHE E FILTRI VINTAGE
+- Sfoglia LUT cinematografiche con anteprima dal vivo sui tuoi media.
+- Look come Warm Cinema, Teal Orange e Soft Film, e un'intera collezione ispirata alla pellicola.
+- Regola l'intensità del look: una finitura discreta o uno stile cinema deciso.
+- Importa le tue LUT .cube e usale come i look integrati.
+- Salva il tuo grading come preset e applicalo a qualsiasi foto o video.
+
+GRADING PROFESSIONALE
+- Esposizione, contrasto, alte luci, ombre, bianchi e neri.
+- Temperatura, tinta, saturazione e vividezza.
+- HSL a otto bande per modellare ogni colore.
+- Ruote colore per ombre, mezzitoni e alte luci.
+- Curve Master, Rosso, Verde e Blu.
+- Curve di tonalità, saturazione e luminanza.
+- Fade, nitidezza e vignettatura.
+- Confronto prima e dopo mentre monti.
+
+MASCHERE E GRADING LOCALE
+- Fai il grading di una parte dell'immagine invece che di tutta l'inquadratura.
+- Maschere a ellisse, rettangolo, gradiente e mano libera.
+- Ammorbidisci il bordo, regola l'intensità o inverti la maschera.
+- Sovrapponi più maschere su una clip, ciascuna con il suo grading.
+- Traccia una maschera su un soggetto in movimento, in avanti o indietro.
+
+GRADING CON FOTOGRAMMI CHIAVE
+- Anima il grading: un look si costruisce nel corso dell'inquadratura o svanisce alla fine.
+- Fotogrammi chiave su esposizione, contrasto, temperatura, saturazione, HSL, ruote colore, vignettatura, curve ed effetti pellicola.
+
+TRANSIZIONI
+- 45 transizioni: dissolvenze, tendine, scorrimenti, zoom, dissolvenza sfocata, whip pan, bruciatura pellicola, glitch, prisma, voltapagina e altro.
+
+EFFETTI PELLICOLA
+- Grana, bloom, glow e halation per una resa analogica.
+
+SCOPE PROFESSIONALI
+- Istogramma, forma d'onda, parade RGB e vettorscopio.
+
+APPLE LOG, HDR E PRORES
+- Fai il grading di riprese Apple Log e Apple Log 2, e di video HLG HDR.
+- Apple Log 2 di iPhone 17 Pro usa la propria trasformazione a gamut esteso.
+- Esporta in ProRes 422 e ProRes 422 HQ per un master che torna in montaggio.
+- Esporta in 4K o alla risoluzione originale, con frame rate e bitrate personalizzati.
+
+MONTAGGIO VIDEO E FOTO
+- Taglia e dividi le clip, cambia la velocità, aggiungi titoli e audio.
+- Fai il grading delle foto con gli stessi strumenti del video.
+- Esporta in JPEG a piena risoluzione, HEIC o PNG senza perdita.
+- Nessuna filigrana sulle tue esportazioni.
+
+TESTO, LIVELLI E MOVIMENTO
+- Aggiungi titoli con i font inclusi o con i tuoi font TTF.
+- Sovrapponi livelli con i metodi di fusione.
+- Maschera un livello con ellisse, rettangolo o linea di separazione.
+- Ammorbidisci o inverti la maschera di un livello e animala come tendina.
+
+Un vlog di viaggio, un cortometraggio o un solo ritratto: GradeLab ti aiuta a creare un look inconfondibilmente tuo.
+
+La disponibilità di funzioni e formati dipende dai tuoi media e dal tuo Mac. Alcune funzioni richiedono un abbonamento o un acquisto unico.
+
+Informativa sulla privacy: https://ak375456.github.io/gradelab/privacy.html
+Termini di utilizzo (EULA): https://www.apple.com/legal/internet-services/itunes/dev/stdeula/
+Termini dell'app: https://ak375456.github.io/gradelab/terms.html

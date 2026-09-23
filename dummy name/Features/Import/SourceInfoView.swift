@@ -10,38 +10,86 @@ struct SourceInfoView: View {
 
     private var metadata: VideoMetadata { project.metadata }
 
+    /// Widest the two columns are allowed to get together.
+    ///
+    /// A label-left/value-right row stops being readable long before a Mac
+    /// window runs out of width — at full width the eye has to cross the whole
+    /// screen to pair "Duration" with "00:04". Two columns of roughly 540pt is
+    /// the shape this content actually wants; the rest of the window is margin.
+    private static let macContentWidth: CGFloat = 1120
+
+    /// The same cap for a Mac window too narrow to take two columns. Without it
+    /// a single column just inherits the old full-width stretch at a smaller
+    /// size, which is the original complaint rather than a fix for it.
+    private static let macSingleColumnWidth: CGFloat = 640
+
+    /// Below this the second column would be too narrow to be worth having, so
+    /// a resized-down Mac window gets the same single column as iPhone and iPad.
+    private static let twoColumnMinimum: CGFloat = 900
+
     var body: some View {
         VStack(spacing: 0) {
             topBar
-            ScrollView {
-                VStack(alignment: .leading, spacing: AppSpacing.large) {
-                    sourceHero
-                    technicalMetadata
-                    if hasColorMetadata { colorMetadata }
-                    appleLogHandling
-                    if ColorPipelineSupport(metadata: metadata).notice != nil { supportNotice }
+            GeometryReader { proxy in
+                let isTwoColumn = AppPlatform.isMac && proxy.size.width >= Self.twoColumnMinimum
+                ScrollView {
+                    Group {
+                        if isTwoColumn { twoColumnContent } else { singleColumnContent }
+                    }
+                    .padding(AppSpacing.standard)
+                    // On Mac the action lives in the top bar, so nothing has to
+                    // be kept clear at the bottom.
+                    .padding(.bottom, AppPlatform.isMac ? AppSpacing.large : 92)
                 }
-                .padding(AppSpacing.standard)
-                .padding(.bottom, 92)
+                .scrollIndicators(.hidden)
             }
-            .scrollIndicators(.hidden)
         }
         .background(AppColors.background.ignoresSafeArea())
         .safeAreaInset(edge: .bottom) {
-            AppButton(
-                ColorPipelineSupport(metadata: metadata).allowsEditor ? "Open Editor" : "Editor Unavailable",
-                systemImage: ColorPipelineSupport(metadata: metadata).allowsEditor
-                    ? "slider.horizontal.3"
-                    : "exclamationmark.triangle",
-                expandsHorizontally: true,
-                action: onEdit
-            )
-                .disabled(!ColorPipelineSupport(metadata: metadata).allowsEditor)
-                .padding(AppSpacing.standard)
-                .background(AppColors.background.opacity(0.96))
-                .overlay(alignment: .top) { AppDivider() }
+            if !AppPlatform.isMac {
+                editorButton(expands: true)
+                    .padding(AppSpacing.standard)
+                    .background(AppColors.background.opacity(0.96))
+                    .overlay(alignment: .top) { AppDivider() }
+            }
         }
         .preferredColorScheme(.dark)
+    }
+
+    private var singleColumnContent: some View {
+        VStack(alignment: .leading, spacing: AppSpacing.large) {
+            sourceHero
+            technicalMetadata
+            if hasColorMetadata { colorMetadata }
+            appleLogHandling
+            if ColorPipelineSupport(metadata: metadata).notice != nil { supportNotice }
+        }
+        .frame(maxWidth: AppPlatform.isMac ? Self.macSingleColumnWidth : .infinity)
+        .frame(maxWidth: .infinity)
+    }
+
+    /// What the file is on the left, how its colour is handled on the right.
+    ///
+    /// The split follows the grouping the single column already had — nothing is
+    /// added, removed or reordered, the groups just sit side by side where there
+    /// is room for them.
+    private var twoColumnContent: some View {
+        HStack(alignment: .top, spacing: AppSpacing.large) {
+            VStack(alignment: .leading, spacing: AppSpacing.large) {
+                sourceHero
+                technicalMetadata
+            }
+            .frame(maxWidth: .infinity, alignment: .top)
+
+            VStack(alignment: .leading, spacing: AppSpacing.large) {
+                if hasColorMetadata { colorMetadata }
+                appleLogHandling
+                if ColorPipelineSupport(metadata: metadata).notice != nil { supportNotice }
+            }
+            .frame(maxWidth: .infinity, alignment: .top)
+        }
+        .frame(maxWidth: Self.macContentWidth)
+        .frame(maxWidth: .infinity)
     }
 
     private var topBar: some View {
@@ -51,11 +99,34 @@ struct SourceInfoView: View {
             }
             .accessibilityLabel("Back")
             Text("Source Information").font(AppTypography.headline).frame(maxWidth: .infinity)
-            Color.clear.frame(width: 44, height: 44).accessibilityHidden(true)
+            if AppPlatform.isMac {
+                // Top-trailing is where a Mac window's primary action belongs,
+                // and putting it here buys back the whole bottom bar.
+                editorButton(expands: false)
+                    // The centred title takes all the width it is offered, which
+                    // squeezed this down to "Open Edi…" in a narrow window.
+                    // Its own width wins; the title gets what is left.
+                    .fixedSize(horizontal: true, vertical: false)
+                    .padding(.trailing, AppSpacing.compact)
+            } else {
+                Color.clear.frame(width: 44, height: 44).accessibilityHidden(true)
+            }
         }
         .padding(.horizontal, AppSpacing.xSmall)
+        .padding(.vertical, AppPlatform.isMac ? AppSpacing.small : 0)
         .background(AppColors.background)
         .overlay(alignment: .bottom) { AppDivider() }
+    }
+
+    private func editorButton(expands: Bool) -> some View {
+        let support = ColorPipelineSupport(metadata: metadata)
+        return AppButton(
+            support.allowsEditor ? "Open Editor" : "Editor Unavailable",
+            systemImage: support.allowsEditor ? "slider.horizontal.3" : "exclamationmark.triangle",
+            expandsHorizontally: expands,
+            action: onEdit
+        )
+        .disabled(!support.allowsEditor)
     }
 
     private var sourceHero: some View {

@@ -1,0 +1,1 @@
+GradeLab comes to the Mac: a media bin, keyboard shortcuts, drag and drop from the Finder, and the whole grading toolset in one window.

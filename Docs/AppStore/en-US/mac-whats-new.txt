@@ -1,0 +1,18 @@
+GradeLab for Mac.
+
+The same color grading editor, the same projects and the same LUTs — laid out for a desktop window.
+
+A MEDIA BIN
+Every clip, photo and audio file in your project in a column of its own, with a thumbnail, its length or size, and how many times it is used. Import once, place it as often as the edit needs.
+
+IMPORT FROM THE FINDER
+Drag video, stills and audio straight onto the bin or the picture. One Import Media button takes all three and sorts them out for you.
+
+KEYBOARD SHORTCUTS
+Playback, trimming, splitting, undo, export and every tool on a key. Press the keyboard icon in the editor for the ones available right now, or see the full list in Settings.
+
+RIGHT-CLICK AND DRAG
+Right-click a clip on the timeline for its options. Drag pictures and overlays on the canvas itself to move, scale and rotate them.
+
+GRADING
+Cinematic LUTs, curves, HSL, color wheels, masks and keyframes. Apple Log, Apple Log 2 and HLG HDR. ProRes 422 and ProRes 422 HQ export.

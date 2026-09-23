@@ -1,0 +1,72 @@
+Transformez vos photos et vidéos du quotidien en histoires cinématographiques. GradeLab est un éditeur d'étalonnage pour Mac : filtres LUT, looks vintage, outils de couleur professionnels et montage vidéo dans une seule app.
+
+Choisissez un look, dosez son intensité, puis faites-le vôtre. Des portraits chaleureux aux clips de voyage travaillés, des tons pellicule doux à l'esthétique rétro : contrôle total sur la lumière, la couleur et l'atmosphère.
+
+CONÇU POUR LE MAC
+- Un chutier liste chaque clip, photo et fichier audio, et combien de fois chacun sert.
+- Glissez vos médias depuis le Finder, puis placez-les autant de fois que nécessaire.
+- Raccourcis clavier partout, et clic droit sur chaque clip de la timeline.
+- Déplacez, redimensionnez et faites pivoter images et calques sur le canevas.
+
+LUTS CINÉMATOGRAPHIQUES ET FILTRES VINTAGE
+- Parcourez les LUTs avec aperçu en direct sur vos médias.
+- Des looks comme Warm Cinema, Teal Orange et Soft Film, et toute une collection inspirée de la pellicule.
+- Ajustez l'intensité du look : finition subtile ou style franchement cinéma.
+- Importez vos fichiers LUT .cube et utilisez-les comme les looks intégrés.
+- Enregistrez votre étalonnage comme préréglage, réutilisable partout.
+
+ÉTALONNAGE PROFESSIONNEL
+- Exposition, contraste, hautes lumières, ombres, blancs et noirs.
+- Température, nuance, saturation et vibrance.
+- HSL à huit bandes pour façonner chaque couleur.
+- Roues chromatiques : ombres, tons moyens, hautes lumières.
+- Courbes Master, Rouge, Vert et Bleu.
+- Courbes de teinte, saturation et luminance.
+- Fade, netteté et vignettage.
+- Comparaison avant/après pendant le montage.
+
+MASQUES ET ÉTALONNAGE LOCAL
+- Étalonnez une partie de l'image plutôt que tout le plan.
+- Masques ellipse, rectangle, dégradé et main levée.
+- Adoucissez le contour, réglez l'intensité ou inversez le masque.
+- Empilez plusieurs masques sur un clip, chacun avec son étalonnage.
+- Suivez un masque sur un sujet en mouvement, en avant ou en arrière.
+
+ÉTALONNAGE AVEC IMAGES CLÉS
+- Animez l'étalonnage : un look se construit au fil du plan ou s'efface à la fin.
+- Images clés sur l'exposition, le contraste, la température, la saturation, le HSL, les roues chromatiques, le vignettage, les courbes et les effets pellicule.
+
+TRANSITIONS
+- 45 transitions : fondus, volets, glissements, zooms, fondu flou, filé, brûlure pellicule, glitch, prisme, tourne-page et plus.
+
+EFFETS PELLICULE
+- Grain, bloom, glow et halation pour un rendu analogique.
+
+SCOPES PROFESSIONNELS
+- Histogramme, forme d'onde, parade RVB et vectorscope.
+
+APPLE LOG, HDR ET PRORES
+- Étalonnez des rushes Apple Log et Apple Log 2, et la vidéo HLG HDR.
+- Apple Log 2 de l'iPhone 17 Pro utilise sa propre transformation en gamut étendu.
+- Exportez en ProRes 422 et ProRes 422 HQ pour un master réutilisable en montage.
+- Exportez en 4K ou à la résolution source, cadence et débit personnalisés.
+
+MONTAGE VIDÉO ET PHOTO
+- Coupez et divisez les clips, changez la vitesse, ajoutez titres et audio.
+- Étalonnez vos photos avec les mêmes outils que la vidéo.
+- Exportez en JPEG pleine résolution, HEIC ou PNG sans perte.
+- Aucun filigrane sur vos exports.
+
+TEXTE, CALQUES ET MOUVEMENT
+- Ajoutez des titres avec les polices fournies ou vos propres TTF.
+- Superposez des calques avec modes de fusion.
+- Masquez un calque par ellipse, rectangle ou ligne de séparation.
+- Adoucissez ou inversez un masque de calque, animez-le en volet.
+
+Vlog de voyage, court métrage ou simple portrait : GradeLab vous aide à créer un look qui n'appartient qu'à vous.
+
+La disponibilité des fonctionnalités et des formats dépend de vos médias source et de votre Mac. Certaines nécessitent un abonnement ou un achat unique.
+
+Politique de confidentialité : https://ak375456.github.io/gradelab/privacy.html
+Conditions d'utilisation (CLUF) : https://www.apple.com/legal/internet-services/itunes/dev/stdeula/
+Conditions de l'app : https://ak375456.github.io/gradelab/terms.html
