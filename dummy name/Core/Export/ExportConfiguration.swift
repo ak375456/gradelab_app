@@ -35,6 +35,21 @@ struct ExportConfiguration: Equatable, Sendable {
             }
         }
 
+        /// The same codec as VideoToolbox names it, for the pre-flight probe.
+        ///
+        /// Deliberately exhaustive and sitting next to `avCodec`: the probe used
+        /// to pick its codec with `codec == .hevc ? HEVC : H.264`, so both ProRes
+        /// cases asked the hardware about H.264 — a question every device says
+        /// yes to — and a ProRes export was never actually pre-flighted.
+        var cmCodecType: CMVideoCodecType {
+            switch self {
+            case .hevc: kCMVideoCodecType_HEVC
+            case .h264: kCMVideoCodecType_H264
+            case .proRes422HQ: kCMVideoCodecType_AppleProRes422HQ
+            case .proRes422: kCMVideoCodecType_AppleProRes422
+            }
+        }
+
         /// ProRes is constant-quality: it has no bitrate target to set, and
         /// offering one would be a control that does nothing.
         var usesBitRate: Bool {

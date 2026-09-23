@@ -23,6 +23,12 @@ final class ExportViewModel: ObservableObject {
     private var exporter: VideoExporter?
     private var operationTask: Task<Void, Never>?
     private var completedURL: URL?
+    /// True from the moment Cancel is tapped until the export task has unwound.
+    ///
+    /// The exporter keeps reporting the frames that were already in flight when
+    /// the tap landed, and letting those through would raise the progress view
+    /// back over an export the person has already been told is cancelled.
+    private var isCancelling = false
 
     // MARK: - Estimates
 
@@ -130,7 +136,7 @@ final class ExportViewModel: ObservableObject {
                 self.isCheckingCapabilities = false
                 self.capabilities = ExportCapabilities(
                     sourceIsSupported: false,
-                    hardwareHEVCIsSupported: false,
+                    encoderIsSupported: false,
                     writerAcceptsVideoSettings: false,
                     writerAcceptsAudioSettings: false,
                     issues: [error.localizedDescription]
@@ -145,6 +151,7 @@ final class ExportViewModel: ObservableObject {
         // is the last point before frames are written.
         guard let exporter, canStart, !isLocked else { return }
         let configuration = configuration
+        isCancelling = false
         state = .preparing
         outputMetadata = nil
         isInspectingOutput = false
@@ -166,7 +173,14 @@ final class ExportViewModel: ObservableObject {
                 ) { [weak self] newState in
                     self?.apply(newState)
                 }
-                guard !Task.isCancelled else { return }
+                guard !Task.isCancelled, !self.isCancelling else {
+                    // It finished between the tap and the unwind. Nobody asked
+                    // for this file, so it does not get to sit in the temporary
+                    // directory until the app is killed.
+                    try? FileManager.default.removeItem(at: url)
+                    self.state = .cancelled
+                    return
+                }
                 self.completedURL = url
                 self.isInspectingOutput = true
                 do {
@@ -176,11 +190,16 @@ final class ExportViewModel: ObservableObject {
                     self.message = "Export finished, but its metadata could not be inspected."
                 }
                 self.isInspectingOutput = false
-            } catch let error as GradeLabError where error == .exportCancelled {
-                self.isInspectingOutput = false
-                self.state = .cancelled
             } catch {
                 self.isInspectingOutput = false
+                // A cancelled export can surface as any error the teardown
+                // happened to reach first — a rejected frame, a cancelled
+                // reader — so what the person asked for decides the state, not
+                // whichever failure won the race.
+                guard !self.isCancelling, (error as? GradeLabError) != .exportCancelled else {
+                    self.state = .cancelled
+                    return
+                }
                 if case .failed = self.state { return }
                 self.state = .failed(error.localizedDescription)
             }
@@ -191,6 +210,9 @@ final class ExportViewModel: ObservableObject {
     /// remaining-time estimate is measured from the same progress the ring is
     /// drawn from rather than from a second clock of its own.
     private func apply(_ newState: ExportState) {
+        // Cancelled has already been shown. Frames still draining out of the
+        // exporter do not get to put the progress view back.
+        guard !isCancelling else { return }
         state = newState
         switch newState {
         case .exporting(let progress):
@@ -209,8 +231,19 @@ final class ExportViewModel: ObservableObject {
     }
 
     func cancel() {
-        exporter?.cancel()
+        guard isBusy, !isCancelling else { return }
+        isCancelling = true
+        // The task cancel is what actually stops the export: the frame loop
+        // checks for it every iteration and unwinds through its own cleanup.
+        // The exporter's cancel only asks AVFoundation to stop, and that now
+        // happens on the exporter's own queue, so neither call blocks here.
         operationTask?.cancel()
+        exporter?.cancel()
+        timeRemaining = nil
+        // Said now, not when the last frame finally unwinds. The file is being
+        // deleted either way, and waiting on the exporter to confirm is what
+        // left a cancelled export sitting on the progress ring.
+        state = .cancelled
     }
 
     private func checkCapabilities() {
@@ -231,6 +264,7 @@ final class ExportViewModel: ObservableObject {
 
     func resetAfterFailure() {
         guard !isBusy else { return }
+        isCancelling = false
         state = .idle
         isInspectingOutput = false
         message = nil

@@ -16,6 +16,33 @@ enum ExportMediaSettings {
         }
     }
 
+    /// The codec the writer is actually handed, which is not always the one that
+    /// was picked: a wide-precision source forces HEVC because H.264 cannot
+    /// carry 10 bits. ProRes can, so a deliberate ProRes choice is honoured.
+    ///
+    /// Every pre-flight probe asks about *this*, never about
+    /// `configuration.codec`. A second copy of this rule lived in
+    /// `ExportCapabilityChecker` and drifted — it was missing the `usesBitRate`
+    /// half, so a 10-bit source with ProRes selected was probed for HEVC Main 10
+    /// and could be refused over an encoder the export never asks for.
+    static func effectiveCodec(
+        colorMode: ProjectColorMode,
+        configuration: ExportConfiguration
+    ) -> ExportConfiguration.Codec {
+        colorMode.isWidePrecision && configuration.codec.usesBitRate
+            ? .hevc
+            : configuration.codec
+    }
+
+    /// Whether the export will ask for the HEVC Main 10 profile. Main 10 support
+    /// is not implied by Main support, so the probe has to name it exactly.
+    static func requiresMain10(
+        colorMode: ProjectColorMode,
+        configuration: ExportConfiguration
+    ) -> Bool {
+        colorMode.isWidePrecision && configuration.codec.usesBitRate
+    }
+
     static func videoWriterSettings(
         source: ExportSourceInfo,
         configuration: ExportConfiguration
@@ -28,12 +55,15 @@ enum ExportMediaSettings {
         // profile level and frame reordering are all meaningless to it, and
         // passing them makes the writer reject the settings outright.
         if configuration.codec.usesBitRate {
+            // Derived from the same two helpers the probe uses, so the profile
+            // that gets written and the profile that gets tested cannot disagree.
             let profileLevel: CFString
-            switch (source.colorMode, configuration.codec) {
-            case (.hdrHLG, _), (.sdrWide, _), (.appleLog, _), (.appleLog2, _):
+            if requiresMain10(colorMode: source.colorMode, configuration: configuration) {
                 profileLevel = kVTProfileLevel_HEVC_Main10_AutoLevel
-            case (.sdr, .hevc): profileLevel = kVTProfileLevel_HEVC_Main_AutoLevel
-            case (.sdr, _): profileLevel = kVTProfileLevel_H264_High_AutoLevel
+            } else {
+                profileLevel = configuration.codec == .hevc
+                    ? kVTProfileLevel_HEVC_Main_AutoLevel
+                    : kVTProfileLevel_H264_High_AutoLevel
             }
             compressionProperties = [
                 AVVideoAverageBitRateKey: configuration.resolvedBitRate(width: dimensions.width, height: dimensions.height, fps: fps),
@@ -62,11 +92,7 @@ enum ExportMediaSettings {
             ]
 
         return [
-            // A wide-precision source forced HEVC because H.264 cannot carry 10
-            // bits. ProRes can, so a deliberate ProRes choice is honoured
-            // rather than overridden.
-            AVVideoCodecKey: (source.colorMode.isWidePrecision && configuration.codec.usesBitRate
-                              ? ExportConfiguration.Codec.hevc : configuration.codec).avCodec,
+            AVVideoCodecKey: effectiveCodec(colorMode: source.colorMode, configuration: configuration).avCodec,
             AVVideoWidthKey: dimensions.width,
             AVVideoHeightKey: dimensions.height,
             AVVideoColorPropertiesKey: colorProperties,

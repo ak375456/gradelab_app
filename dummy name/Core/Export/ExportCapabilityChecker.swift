@@ -4,7 +4,7 @@ import VideoToolbox
 
 struct ExportCapabilities: Equatable, Sendable {
     let sourceIsSupported: Bool
-    let hardwareHEVCIsSupported: Bool
+    let encoderIsSupported: Bool
     let writerAcceptsVideoSettings: Bool
     let writerAcceptsAudioSettings: Bool
     let issues: [String]
@@ -13,7 +13,7 @@ struct ExportCapabilities: Equatable, Sendable {
 
     var canExport: Bool {
         sourceIsSupported
-            && hardwareHEVCIsSupported
+            && encoderIsSupported
             && writerAcceptsVideoSettings
             && writerAcceptsAudioSettings
             && issues.isEmpty
@@ -30,13 +30,20 @@ struct ExportCapabilityChecker: Sendable {
             let source = try await ExportSourceInspector.inspect(asset)
             let dimensions = configuration.dimensions(width: source.encodedWidth, height: source.encodedHeight)
             let fps = configuration.frameRate.value ?? source.nominalFrameRate
-            let hardwareSupported = ExportCapabilityProbe.hardwareHEVCIsSupported(
+            let effectiveCodec = ExportMediaSettings.effectiveCodec(colorMode: source.colorMode, configuration: configuration)
+            let requiresMain10 = ExportMediaSettings.requiresMain10(colorMode: source.colorMode, configuration: configuration)
+            let encoderSupported = ExportCapabilityProbe.encoderIsSupported(
                 width: dimensions.width,
                 height: dimensions.height,
                 expectedFrameRate: fps,
-                videoBitRate: configuration.resolvedBitRate(width: dimensions.width, height: dimensions.height, fps: fps),
-                codec: source.colorMode.isWidePrecision ? .hevc : configuration.codec,
-                requiresMain10: source.colorMode.isWidePrecision
+                // A ProRes rate comes from the format itself and exists only for
+                // the size estimate; handing it to the encoder would set a 211
+                // Mbps average bitrate on a session that has no such control.
+                videoBitRate: effectiveCodec.usesBitRate
+                    ? configuration.resolvedBitRate(width: dimensions.width, height: dimensions.height, fps: fps)
+                    : nil,
+                codec: effectiveCodec,
+                requiresMain10: requiresMain10
             )
 
             let checkURL = FileManager.default.temporaryDirectory
@@ -72,10 +79,19 @@ struct ExportCapabilityChecker: Sendable {
             if colorSupport == .assumedRec709, let notice = colorSupport.notice {
                 notes.append(notice)
             }
-            if !hardwareSupported {
-                issues.append(source.colorMode.isWidePrecision
-                    ? "This iPhone cannot encode HEVC Main 10 at \(dimensions.width)×\(dimensions.height)\(fps.map { String(format: " at %.2f fps", locale: .current, $0) } ?? ""). Try a smaller size or a lower frame rate."
-                    : "This iPhone cannot encode the selected codec, dimensions, and frame rate. Try H.264, 1080p, or a lower frame rate.")
+            if !encoderSupported {
+                // Name the codec that was actually tested. Saying "HEVC Main 10"
+                // whenever the source happened to be 10-bit told a ProRes
+                // customer to change a setting they had not chosen. Codec
+                // identifiers stay English, like every other one in the app.
+                let codecName = requiresMain10 ? "HEVC Main 10" : effectiveCodec.rawValue
+                let size = "\(dimensions.width)×\(dimensions.height)"
+                if let fps, fps > 0 {
+                    let rate = String(format: "%.2f", locale: .current, fps)
+                    issues.append(String(localized: "This device cannot encode \(codecName) at \(size) at \(rate) fps. Try a smaller size, a lower frame rate, or another codec."))
+                } else {
+                    issues.append(String(localized: "This device cannot encode \(codecName) at \(size). Try a smaller size or another codec."))
+                }
             }
             if !acceptsVideo {
                 issues.append("The selected video settings are unavailable. Try a lower resolution or another codec.")
@@ -93,7 +109,7 @@ struct ExportCapabilityChecker: Sendable {
             }
             return ExportCapabilities(
                 sourceIsSupported: true,
-                hardwareHEVCIsSupported: hardwareSupported,
+                encoderIsSupported: encoderSupported,
                 writerAcceptsVideoSettings: acceptsVideo,
                 writerAcceptsAudioSettings: acceptsAudio,
                 issues: issues,
@@ -102,7 +118,7 @@ struct ExportCapabilityChecker: Sendable {
         } catch {
             return ExportCapabilities(
                 sourceIsSupported: false,
-                hardwareHEVCIsSupported: false,
+                encoderIsSupported: false,
                 writerAcceptsVideoSettings: false,
                 writerAcceptsAudioSettings: false,
                 issues: [error.localizedDescription]
@@ -112,7 +128,14 @@ struct ExportCapabilityChecker: Sendable {
 }
 
 enum ExportCapabilityProbe {
-    static func hardwareHEVCIsSupported(
+    /// Asks VideoToolbox whether this machine can encode the codec the export is
+    /// actually going to request, at its real dimensions, frame rate and bitrate.
+    ///
+    /// Pass the codec from `ExportMediaSettings.effectiveCodec(colorMode:configuration:)`,
+    /// not the configured one — a wide-precision source is written as HEVC, and
+    /// probing what was picked rather than what will be written is how this check
+    /// came to pass ProRes exports without testing anything.
+    static func encoderIsSupported(
         width: Int,
         height: Int,
         expectedFrameRate: Double?,
@@ -124,15 +147,22 @@ enum ExportCapabilityProbe {
             return false
         }
 
-        let encoderSpecification = [
-            kVTVideoEncoderSpecification_RequireHardwareAcceleratedVideoEncoder as String: true
-        ] as CFDictionary
+        // Hardware is required only for the long-GOP codecs, where a software
+        // fallback would take longer than anyone would sit through. ProRes is
+        // intra-frame and encodes acceptably in software — which is how every
+        // Mac without a ProRes engine writes it — so requiring hardware there
+        // would refuse exports that work perfectly well. Measured on an M-series
+        // Mac: asking for a hardware ProRes encoder fails the session outright
+        // with -12908, `kVTCouldNotFindVideoEncoderErr`.
+        let encoderSpecification: CFDictionary? = codec.usesBitRate
+            ? [kVTVideoEncoderSpecification_RequireHardwareAcceleratedVideoEncoder as String: true] as CFDictionary
+            : nil
         var optionalSession: VTCompressionSession?
         let creationStatus = VTCompressionSessionCreate(
             allocator: kCFAllocatorDefault,
             width: Int32(width),
             height: Int32(height),
-            codecType: codec == .hevc ? kCMVideoCodecType_HEVC : kCMVideoCodecType_H264,
+            codecType: codec.cmCodecType,
             encoderSpecification: encoderSpecification,
             imageBufferAttributes: nil,
             compressedDataAllocator: nil,
@@ -145,46 +175,60 @@ enum ExportCapabilityProbe {
         }
         defer { VTCompressionSessionInvalidate(session) }
 
-        // Probe the exact profile the export will request. Main 10 support is
-        // not implied by Main support, so asking for the wrong one would report a
-        // capability the encoder does not actually have.
-        let profile: CFString
-        if requiresMain10 {
-            profile = kVTProfileLevel_HEVC_Main10_AutoLevel
-        } else {
-            profile = codec == .hevc ? kVTProfileLevel_HEVC_Main_AutoLevel : kVTProfileLevel_H264_High_AutoLevel
-        }
-        guard VTSessionSetProperty(
-            session,
-            key: kVTCompressionPropertyKey_ProfileLevel,
-            value: profile
-        ) == noErr else {
-            return false
-        }
-        if let expectedFrameRate, expectedFrameRate > 0 {
+        // None of the three properties below exists on a ProRes session. ProRes
+        // is constant-quality and intra-frame, so it has no profile level, no
+        // bitrate target and — measured, not assumed — no frame-rate hint
+        // either: `ExpectedFrameRate` returns -12900, `kVTPropertyNotSupportedErr`.
+        // Setting any of them fails, and failing the probe on a property the
+        // format simply does not have would report ProRes as unsupported on
+        // hardware that encodes it perfectly well.
+        //
+        // `videoWriterSettings` withholds the profile and the bitrate for the
+        // same reason. It does still pass `AVVideoExpectedSourceFrameRateKey`
+        // for every codec, which is fine — AVFoundation drops a compression
+        // property the encoder does not take, where VideoToolbox reports it.
+        if codec.usesBitRate {
+            // Probe the exact profile the export will request. Main 10 support is
+            // not implied by Main support, so asking for the wrong one would report a
+            // capability the encoder does not actually have.
+            let profile: CFString
+            if requiresMain10 {
+                profile = kVTProfileLevel_HEVC_Main10_AutoLevel
+            } else {
+                profile = codec == .hevc ? kVTProfileLevel_HEVC_Main_AutoLevel : kVTProfileLevel_H264_High_AutoLevel
+            }
             guard VTSessionSetProperty(
                 session,
-                key: kVTCompressionPropertyKey_ExpectedFrameRate,
-                value: NSNumber(value: expectedFrameRate)
+                key: kVTCompressionPropertyKey_ProfileLevel,
+                value: profile
             ) == noErr else {
                 return false
             }
-        }
-        if let videoBitRate {
-            guard VTSessionSetProperty(
-                session,
-                key: kVTCompressionPropertyKey_AverageBitRate,
-                value: NSNumber(value: videoBitRate)
-            ) == noErr else {
-                return false
+            if let expectedFrameRate, expectedFrameRate > 0 {
+                guard VTSessionSetProperty(
+                    session,
+                    key: kVTCompressionPropertyKey_ExpectedFrameRate,
+                    value: NSNumber(value: expectedFrameRate)
+                ) == noErr else {
+                    return false
+                }
             }
-        } else {
-            guard VTSessionSetProperty(
-                session,
-                key: kVTCompressionPropertyKey_Quality,
-                value: NSNumber(value: 1.0)
-            ) == noErr else {
-                return false
+            if let videoBitRate {
+                guard VTSessionSetProperty(
+                    session,
+                    key: kVTCompressionPropertyKey_AverageBitRate,
+                    value: NSNumber(value: videoBitRate)
+                ) == noErr else {
+                    return false
+                }
+            } else {
+                guard VTSessionSetProperty(
+                    session,
+                    key: kVTCompressionPropertyKey_Quality,
+                    value: NSNumber(value: 1.0)
+                ) == noErr else {
+                    return false
+                }
             }
         }
 

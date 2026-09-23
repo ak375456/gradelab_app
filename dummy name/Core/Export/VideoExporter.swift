@@ -157,8 +157,22 @@ final class VideoExporter: @unchecked Sendable {
                     let audioEnd = CMTimeRangeGetEnd(audio.timeRange)
                     if CMTimeCompare(audioEnd, endTime) > 0 { endTime = audioEnd }
                 }
-                pipeline.writer.endSession(atSourceTime: endTime)
-                await pipeline.writer.finishWriting()
+                // Closing the file and cancelling cannot overlap: a
+                // `cancelWriting()` landing inside `finishWriting()` can leave
+                // the completion handler uncalled, and this await would then
+                // never resume. Taking the window first means a cancel arriving
+                // during the close is recorded and acted on by the check below.
+                guard session.beginFinishing() else { throw GradeLabError.exportCancelled }
+                do {
+                    defer { session.endFinishing() }
+                    guard pipeline.writer.status == .writing else {
+                        throw pipeline.writer.status == .cancelled
+                            ? GradeLabError.exportCancelled
+                            : writerFailure(pipeline.writer)
+                    }
+                    pipeline.writer.endSession(atSourceTime: endTime)
+                    await pipeline.writer.finishWriting()
+                }
                 try session.checkCancellation()
                 guard pipeline.writer.status == .completed else {
                     throw writerFailure(pipeline.writer)
@@ -215,12 +229,19 @@ final class VideoExporter: @unchecked Sendable {
     ) throws -> MediaPipeline {
         let dimensions = configuration.dimensions(width: source.encodedWidth, height: source.encodedHeight)
         let fps = configuration.frameRate.value ?? source.nominalFrameRate
-        guard ExportCapabilityProbe.hardwareHEVCIsSupported(
+        // Same two helpers the checker uses. This site additionally never passed
+        // `requiresMain10`, so a 10-bit source was probed for HEVC Main and
+        // could start an export the encoder could not finish.
+        let effectiveCodec = ExportMediaSettings.effectiveCodec(colorMode: source.colorMode, configuration: configuration)
+        guard ExportCapabilityProbe.encoderIsSupported(
             width: dimensions.width,
             height: dimensions.height,
             expectedFrameRate: fps,
-            videoBitRate: configuration.resolvedBitRate(width: dimensions.width, height: dimensions.height, fps: fps),
-            codec: configuration.codec
+            videoBitRate: effectiveCodec.usesBitRate
+                ? configuration.resolvedBitRate(width: dimensions.width, height: dimensions.height, fps: fps)
+                : nil,
+            codec: effectiveCodec,
+            requiresMain10: ExportMediaSettings.requiresMain10(colorMode: source.colorMode, configuration: configuration)
         ) else {
             throw GradeLabError.unsupportedExport(
                 String(localized: "This device cannot encode the selected configuration. Try another codec or lower dimensions.")
@@ -1306,8 +1327,25 @@ private final class ExportSession: @unchecked Sendable {
     let outputURL: URL
 
     private let lock = NSLock()
+    /// Where the reader and writer are torn down — never the calling thread.
+    ///
+    /// `cancelReading()` and `cancelWriting()` both block until AVFoundation has
+    /// stopped its in-flight work, and on a composited timeline that work is a
+    /// whole 4K frame: several Metal passes, the still decodes behind the image
+    /// overlays, and the text and shape layers on top. Cancel used to make those
+    /// two calls straight from the main actor, so tapping Cancel froze the UI
+    /// for as long as the teardown took — and because the export loop was
+    /// appending to the same writer from another thread while it ran, sometimes
+    /// it never came back at all.
+    ///
+    /// Serial on purpose: a second teardown runs after the first has finished,
+    /// by which time the statuses below already read `.cancelled` and it does
+    /// nothing, so overlapping cancels cannot reach AVFoundation at once.
+    private let teardownQueue = DispatchQueue(label: "GradeLab.export.teardown", qos: .userInitiated)
     private var cancellationRequested = false
     private var completed = false
+    /// True only while `finishWriting()` is closing the file.
+    private var finishing = false
     private var reader: AVAssetReader?
     private var writer: AVAssetWriter?
 
@@ -1329,10 +1367,7 @@ private final class ExportSession: @unchecked Sendable {
         let shouldCancel = cancellationRequested
         lock.unlock()
 
-        if shouldCancel {
-            reader.cancelReading()
-            writer.cancelWriting()
-        }
+        if shouldCancel { tearDownIO() }
     }
 
     func checkCancellation() throws {
@@ -1341,34 +1376,72 @@ private final class ExportSession: @unchecked Sendable {
         }
     }
 
+    /// Records the cancel, then releases the caller.
+    ///
+    /// The flag is what actually ends the export: the frame loop reads it every
+    /// iteration and unwinds through its own error path, which is also what
+    /// deletes the partial file. Stopping the reader and writer is cleanup that
+    /// follows, so no caller — least of all the main actor — waits on it.
     func requestCancellation() {
         lock.lock()
         cancellationRequested = true
-        let reader = self.reader
-        let writer = self.writer
-        let completed = self.completed
         lock.unlock()
-
-        guard !completed else { return }
-        reader?.cancelReading()
-        writer?.cancelWriting()
+        tearDownIO()
     }
 
+    /// Teardown from the export's own failure path, for the errors that are not
+    /// cancellations.
     func cancelIO() {
-        lock.lock()
-        let reader = self.reader
-        let writer = self.writer
-        let completed = self.completed
-        lock.unlock()
+        tearDownIO()
+    }
 
-        guard !completed else { return }
-        reader?.cancelReading()
-        writer?.cancelWriting()
+    /// Claims the window in which the writer closes the file, or refuses it
+    /// because a cancel already landed.
+    ///
+    /// `cancelWriting()` arriving inside `finishWriting()` can leave the
+    /// completion handler uncalled, and awaiting a callback that never comes is
+    /// a hang with nothing left to interrupt it. While this window is open a
+    /// cancel only sets the flag; the check after the file closes sees it and
+    /// throws, and the finished file is removed like any other partial output.
+    func beginFinishing() -> Bool {
+        lock.lock()
+        defer { lock.unlock() }
+        guard !cancellationRequested else { return false }
+        finishing = true
+        return true
+    }
+
+    func endFinishing() {
+        lock.lock()
+        let cancelled = cancellationRequested
+        finishing = false
+        lock.unlock()
+        // A cancel that arrived mid-close was deliberately not acted on. Now
+        // that the writer is done with the file, it can be.
+        if cancelled { tearDownIO() }
     }
 
     func markCompleted() {
         lock.lock()
         completed = true
+        finishing = false
         lock.unlock()
+    }
+
+    private func tearDownIO() {
+        lock.lock()
+        let reader = self.reader
+        let writer = self.writer
+        let skip = completed || finishing
+        lock.unlock()
+
+        guard !skip else { return }
+        teardownQueue.async {
+            // Both calls are only legal once their object has started, and both
+            // are no-ops once it has stopped, so each is gated on its own status
+            // rather than on a flag of ours that could disagree with it.
+            if reader?.status == .reading { reader?.cancelReading() }
+            if writer?.status == .writing { writer?.cancelWriting() }
+        }
     }
 }
