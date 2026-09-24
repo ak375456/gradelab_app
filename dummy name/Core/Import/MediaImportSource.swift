@@ -31,6 +31,65 @@ enum MediaImportSource: Equatable {
     case file(URL)
 }
 
+extension View {
+    /// A file browser carried on a branch of its own, beside the content
+    /// rather than above it.
+    ///
+    /// SwiftUI presents only the **outermost** `fileImporter` in a hosting
+    /// controller's view tree. A second one anywhere below it never opens —
+    /// chained onto the same view, or attached inside a child view, and whether
+    /// or not the outer one's binding is ever set. Measured on a Mac Catalyst
+    /// run and on an iOS simulator: two importers on one chain, only the outer
+    /// one presents; an importer inside a child view, dead as soon as an
+    /// ancestor has one; two importers on sibling branches, both present with
+    /// their own content types.
+    ///
+    /// That is what the media bin's Import Media button ran into. A screen that
+    /// contains panels with importers of their own — the editor holds one for
+    /// fonts and one for `.cube` looks — therefore keeps its own browser on a
+    /// sibling, where it shadows nothing.
+    func sideFileImporter(isPresented: Binding<Bool>,
+                          allowedContentTypes: [UTType],
+                          allowsMultipleSelection: Bool = false,
+                          onCompletion: @escaping (Result<[URL], Error>) -> Void) -> some View {
+        background {
+            Color.clear
+                .allowsHitTesting(false)
+                .fileImporter(isPresented: isPresented,
+                              allowedContentTypes: allowedContentTypes,
+                              allowsMultipleSelection: allowsMultipleSelection,
+                              onCompletion: onCompletion)
+        }
+    }
+}
+
+/// The Photos half of an import, on its own.
+///
+/// A screen that already installs its own `fileImporter` takes this rather than
+/// `MediaImportPicker`: SwiftUI presents only the outermost `fileImporter` in a
+/// chain, so a second one — even one whose binding is never set — silently
+/// kills the first. `EditorView` is that screen; see the note on its importer.
+struct PhotoImportPicker: ViewModifier {
+    @Binding var isPresented: Bool
+    var images: Bool = false
+    var allowsMultipleSelection: Bool = false
+    var onSelection: ([MediaImportSource]) -> Void
+    @State private var photoItems: [PhotosPickerItem] = []
+
+    func body(content: Content) -> some View {
+        content
+            .photosPicker(isPresented: $isPresented, selection: $photoItems,
+                          maxSelectionCount: allowsMultipleSelection ? nil : 1,
+                          selectionBehavior: .ordered, matching: images ? .images : .videos,
+                          preferredItemEncoding: .current)
+            .onChange(of: photoItems) { _, items in
+                guard !items.isEmpty else { return }
+                onSelection(items.map(MediaImportSource.photos))
+                photoItems = []
+            }
+    }
+}
+
 /// Files on Mac, Photos on iPhone/iPad. File imports can also be requested
 /// explicitly on mobile, without changing the normal Photos workflow.
 struct MediaImportPicker: ViewModifier {
@@ -40,7 +99,6 @@ struct MediaImportPicker: ViewModifier {
     var useFiles: Bool = AppPlatform.isMac
     var onSelection: ([MediaImportSource]) -> Void
     var onFailure: (Error) -> Void
-    @State private var photoItems: [PhotosPickerItem] = []
 
     private func presentation(files: Bool) -> Binding<Bool> {
         Binding(get: { isPresented && useFiles == files },
@@ -60,14 +118,8 @@ struct MediaImportPicker: ViewModifier {
                     if cocoa.domain != NSCocoaErrorDomain || cocoa.code != NSUserCancelledError { onFailure(error) }
                 }
             }
-            .photosPicker(isPresented: presentation(files: false), selection: $photoItems,
-                          maxSelectionCount: allowsMultipleSelection ? nil : 1,
-                          selectionBehavior: .ordered, matching: images ? .images : .videos,
-                          preferredItemEncoding: .current)
-            .onChange(of: photoItems) { _, items in
-                guard !items.isEmpty else { return }
-                onSelection(items.map(MediaImportSource.photos))
-                photoItems = []
-            }
+            .modifier(PhotoImportPicker(isPresented: presentation(files: false), images: images,
+                                        allowsMultipleSelection: allowsMultipleSelection,
+                                        onSelection: onSelection))
     }
 }

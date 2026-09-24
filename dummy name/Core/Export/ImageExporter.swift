@@ -115,7 +115,8 @@ final class ImageExporter: @unchecked Sendable {
         let advanced = grade.advanced ?? .neutral
         if let identifier = advanced.lut { _ = context.luts.prepare(identifier) }
         guard let lut = context.luts.texture(for: advanced.lut),
-              let curves = context.curves.texture(for: advanced.resolvedCurves) else {
+              let curves = context.curves.texture(for: advanced.resolvedCurves),
+              let warps = context.warps.texture(for: advanced.resolvedColorWarp) else {
             throw GradeLabError.imageExportFailed(String(localized: "The look or curve tables could not be prepared."))
         }
 
@@ -132,7 +133,7 @@ final class ImageExporter: @unchecked Sendable {
         // every glow amount is zero in that case.
         let halo: MTLTexture? = try effectsActive
             ? makeHalo(sourceURL: project.sourceURL, source: source, imageSize: imageSize,
-                       uniforms: uniforms, lut: lut, curves: curves)
+                       uniforms: uniforms, lut: lut, curves: curves, warps: warps)
             : nil
         if effectsActive, halo == nil {
             throw GradeLabError.imageExportFailed(String(localized: "The finishing effects could not be prepared."))
@@ -165,7 +166,7 @@ final class ImageExporter: @unchecked Sendable {
                 try renderTile(
                     tile, padded: padded, padding: padding, imageSize: imageSize,
                     source: source, surfaces: surfaces, halo: halo,
-                    uniforms: &uniforms, lut: lut, curves: curves,
+                    uniforms: &uniforms, lut: lut, curves: curves, warps: warps,
                     effectsActive: effectsActive,
                     into: destination, bytesPerRow: bytesPerRow)
             }
@@ -272,6 +273,7 @@ final class ImageExporter: @unchecked Sendable {
         uniforms: inout GradeUniforms,
         lut: MTLTexture,
         curves: MTLTexture,
+        warps: MTLTexture,
         effectsActive: Bool,
         into destination: UnsafeMutableRawPointer,
         bytesPerRow: Int
@@ -306,6 +308,7 @@ final class ImageExporter: @unchecked Sendable {
         encoder.setTexture(gradeTarget, index: 2)
         encoder.setTexture(lut, index: 3)
         encoder.setTexture(curves, index: 6)
+        encoder.setTexture(warps, index: 12)
         encoder.setBytes(&uniforms, length: MemoryLayout<GradeUniforms>.stride, index: 0)
         encoder.setBytes(&tileInfo, length: MemoryLayout<SIMD4<Float>>.stride, index: 1)
         // Stills carry no masked local grades yet, but the grading kernels all
@@ -382,7 +385,7 @@ final class ImageExporter: @unchecked Sendable {
     /// `StillEffectGeometry.referenceLongEdge`.
     private func makeHalo(
         sourceURL: URL, source: CVPixelBuffer, imageSize: CGSize, uniforms: GradeUniforms,
-        lut: MTLTexture, curves: MTLTexture
+        lut: MTLTexture, curves: MTLTexture, warps: MTLTexture
     ) throws -> MTLTexture? {
         guard let effects else { return nil }
         // Sharpening alone needs no blur, but the composite kernel still has to
@@ -401,7 +404,7 @@ final class ImageExporter: @unchecked Sendable {
             // falls back to a decode at reference size, which is the same
             // picture at the same resolution.
             return try haloFromSecondDecode(sourceURL: sourceURL, imageSize: imageSize,
-                                            uniforms: uniforms, lut: lut, curves: curves)
+                                            uniforms: uniforms, lut: lut, curves: curves, warps: warps)
         }
         let descriptor = MTLTextureDescriptor.texture2DDescriptor(
             pixelFormat: .rgba16Float, width: width, height: height, mipmapped: false)
@@ -419,6 +422,7 @@ final class ImageExporter: @unchecked Sendable {
         encoder.setTexture(graded, index: 2)
         encoder.setTexture(lut, index: 3)
         encoder.setTexture(curves, index: 6)
+        encoder.setTexture(warps, index: 12)
         encoder.setBytes(&grade, length: MemoryLayout<GradeUniforms>.stride, index: 0)
         LocalGradeStack.empty.bind(encoder)
         dispatch(encoder, pipeline: downsampleGradePipeline, width: width, height: height)
@@ -438,7 +442,7 @@ final class ImageExporter: @unchecked Sendable {
     /// reference-sized copy instead of downsampling the full one on the GPU.
     private func haloFromSecondDecode(
         sourceURL url: URL, imageSize: CGSize, uniforms: GradeUniforms,
-        lut: MTLTexture, curves: MTLTexture
+        lut: MTLTexture, curves: MTLTexture, warps: MTLTexture
     ) throws -> MTLTexture? {
         guard let effects else { return nil }
         let reference = StillEffectGeometry.referenceSize(for: imageSize)
@@ -458,6 +462,7 @@ final class ImageExporter: @unchecked Sendable {
         encoder.setTexture(graded, index: 2)
         encoder.setTexture(lut, index: 3)
         encoder.setTexture(curves, index: 6)
+        encoder.setTexture(warps, index: 12)
         encoder.setBytes(&grade, length: MemoryLayout<GradeUniforms>.stride, index: 0)
         LocalGradeStack.empty.bind(encoder)
         dispatch(encoder, pipeline: downsampleGradePipeline, width: graded.width, height: graded.height)

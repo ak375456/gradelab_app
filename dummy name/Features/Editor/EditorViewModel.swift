@@ -137,6 +137,16 @@ final class EditorViewModel: ObservableObject, GradingModel {
     @Published var selectedCurve: CurveType = .master
     /// True while the eyedropper is armed and waiting for a tap on the preview.
     @Published var isPickingCurveHue = false
+    /// Color Warper editor state. The warp itself lives on the grade; which
+    /// plane is showing, which handle is selected and whether the eyedropper is
+    /// armed belong to the panel.
+    @Published var selectedWarpMode: ColorWarpMode = .hueSaturation
+    @Published var selectedWarpPoint: UUID?
+    @Published var isPickingWarpColor = false
+    /// The same, for a mask's colour qualifier. Separate from the curve picker
+    /// because both can be reached from different panels and arming one must
+    /// not silently disarm the other's button.
+    @Published var isPickingMaskQualifier = false
     @Published var showsOriginal = false {
         didSet { synchronizeRenderer() }
     }
@@ -195,6 +205,32 @@ final class EditorViewModel: ObservableObject, GradingModel {
         renderer.setScopes(scopeSettings)
     }
 
+    // MARK: - Viewer assist
+
+    /// False colour and zebras. A preference like the scope settings beside it,
+    /// and for the same reason: it describes how someone is looking at the
+    /// picture, not anything the project contains.
+    @Published private(set) var viewerAssist = ViewerAssistSettings.load()
+
+    func setViewerAssist(_ mode: ViewerAssist) {
+        guard viewerAssist.mode != mode else { return }
+        viewerAssist.mode = mode
+        applyViewerAssist()
+    }
+
+    func setZebraThreshold(_ threshold: Double) {
+        let clamped = min(max(threshold, ViewerAssistSettings.thresholdRange.lowerBound),
+                          ViewerAssistSettings.thresholdRange.upperBound)
+        guard viewerAssist.zebraThreshold != clamped else { return }
+        viewerAssist.zebraThreshold = clamped
+        applyViewerAssist()
+    }
+
+    private func applyViewerAssist() {
+        viewerAssist.save()
+        renderer.setViewerAssist(viewerAssist)
+    }
+
     init(project: GradeProject) throws {
         var project = project
         // Normalize transitions written by the first transition build. That
@@ -232,6 +268,7 @@ final class EditorViewModel: ObservableObject, GradingModel {
         }
         synchronizeRenderer()
         renderer.setScopes(scopeSettings)
+        renderer.setViewerAssist(viewerAssist)
         renderer.onDisplayStateChanged = { [weak self] in
             Task { @MainActor in self?.displayStateID &+= 1 }
         }
@@ -852,6 +889,24 @@ final class EditorViewModel: ObservableObject, GradingModel {
             editError = String(localized: "Use even canvas dimensions between 64 and 4096 pixels."); return
         }
         commit("Canvas") { project in project.canvas.width = width; project.canvas.height = height; return self.selectedClipID }
+    }
+
+    func setCanvasFrameDuration(_ duration: TimelineTime?) {
+        guard let duration, duration > .zero else {
+            editError = String(localized: "Choose a valid canvas frame rate."); return
+        }
+        commit("Canvas Frame Rate") { project in
+            project.canvas.frameDuration = duration
+            return self.selectedClipID
+        }
+    }
+
+    func setExportFollowsCanvas(_ enabled: Bool) {
+        guard project.canvas.usesCanvasExportSettings != enabled else { return }
+        commit("Export Follows Canvas", rebuildsSequence: false) { project in
+            project.canvas.usesCanvasExportSettings = enabled
+            return self.selectedClipID
+        }
     }
 
     /// The colour the canvas is filled with wherever no clip covers it.
@@ -1555,6 +1610,11 @@ final class EditorViewModel: ObservableObject, GradingModel {
     /// properties are redirected; mask GEOMETRY has its own panel and addresses
     /// its layer by id.
     var gradeKeyframeMaskID: UUID? { selectedMaskID }
+
+    /// See the protocol: the Colour controls follow `selectedMaskID`, so this is
+    /// the same question `settings` already answers when it decides which grade
+    /// to read and write.
+    var isEditingMaskGrade: Bool { selectedMaskID != nil }
 
     private func maskContext(for property: AnimatableProperty) -> UUID? {
         property.isGradeProperty ? gradeKeyframeMaskID : nil
@@ -2380,6 +2440,37 @@ final class EditorViewModel: ObservableObject, GradingModel {
         return true
     }
 
+
+    // MARK: - Color Warper eyedropper
+
+    /// Samples the picture under `point` and lands on the mesh handle for that
+    /// colour, placing one if there is none there yet.
+    ///
+    /// The sample is taken with the warper BYPASSED. Picking off the finished
+    /// picture would hand the warper a colour it had already moved, so the
+    /// handle would appear in the wrong place and each successive pick would
+    /// chase the last one. Everything else in the grade still applies, so this
+    /// is the colour the warper actually receives.
+    @discardableResult
+    func pickWarpColor(atViewPoint point: CGPoint) -> Bool {
+        guard isPickingWarpColor, canGrade else { return false }
+        guard let colour = renderer.sampleGradedColor(atViewPoint: point, warpBypass: true) else {
+            return false
+        }
+        let mode = selectedWarpMode
+        guard let position = ColorWarpPicker.position(of: colour, in: mode) else {
+            editError = ColorWarpPicker.neutralMessage
+            isPickingWarpColor = false
+            return false
+        }
+        beginCurveEdit(String(localized: "Pick color"))
+        let picked = addColorWarpPoint(x: position.x, y: position.y, mode: mode)
+        endCurveEdit()
+        selectedWarpPoint = picked
+        isPickingWarpColor = false
+        return true
+    }
+
     /// The point the curve editor has selected, so a readout and a delete
     /// action have something to refer to. UI state.
     @Published var selectedCurvePoint: UUID?
@@ -2676,6 +2767,15 @@ final class EditorViewModel: ObservableObject, GradingModel {
             selectedCurvePoint = nil
             isPickingCurveHue = false
         case .hsl: advanced.hsl = AdvancedGrade.neutral.hsl
+        case .warper:
+            // Points only. The density and the luminance choice are how this
+            // person works rather than part of the grade, so Reset leaves them.
+            if var warp = advanced.colorWarp {
+                warp.reset()
+                advanced.colorWarp = warp == ColorWarp() ? nil : warp
+            }
+            selectedWarpPoint = nil
+            isPickingWarpColor = false
         case .wheels: advanced.wheels = AdvancedGrade.neutral.wheels
         case .mask:
             changeVisual("Reset Local Mask", immediate: true) { clip in

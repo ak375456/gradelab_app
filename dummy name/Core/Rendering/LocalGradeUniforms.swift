@@ -58,8 +58,34 @@ struct LocalGradeUniforms: Sendable {
     var shadowWheel: SIMD4<Float>
     var midtoneWheel: SIMD4<Float>
     var highlightWheel: SIMD4<Float>
+    /// Colour qualifier: hue centre and half-width as turns, then the
+    /// saturation range.
+    ///
+    /// The qualifier's other four values do not get a word of their own. The
+    /// whole stack travels as ONE `setBytes`, which Metal caps at 4096 bytes,
+    /// and with eight layers and the shared point pool that allows exactly 19
+    /// words per layer — one more than this struct had. So the luma range rides
+    /// in `lightB`'s two unused slots and the softness and flags in `options`'s,
+    /// both of which were written as zero and read by nothing.
+    ///
+    /// This is also why a local layer has no offset wheel while the clip grade
+    /// does: there was no word left for one, and an offset is a primary control
+    /// rather than something a window needs. `offsetWheelFor` in Shaders.metal
+    /// is what lets the shared grading template compile without the field.
+    var qualifier: SIMD4<Float>
 
-    static let wordCount = 18
+    /// How many `float4`s one layer occupies in the stack.
+    ///
+    /// DERIVED from `words` rather than written as a number. It was 18 as a
+    /// literal, and adding a field without also editing that literal shipped a
+    /// stack 384 bytes shorter than the shader's struct — which Metal only
+    /// catches at dispatch, as a validation abort inside whichever kernel binds
+    /// it first. Deriving it means a new field cannot desynchronise the two.
+    static let wordCount = LocalGradeUniforms(
+        layer: MaskedGradeLayer(name: "", geometry: .default),
+        curveRow: 0,
+        pointOffset: 0
+    ).words.count
 
     /// - Parameters:
     ///   - layer: the authored layer, already evaluated for this frame.
@@ -72,10 +98,19 @@ struct LocalGradeUniforms: Sendable {
 
         lightA = SIMD4(settings.exposure, settings.contrast / 100,
                        settings.highlights / 100, settings.shadows / 100)
-        lightB = SIMD4(settings.whites / 100, settings.blacks / 100, 0, 0)
         color = SIMD4(settings.temperature / 100, settings.tint / 100,
                       settings.saturation / 100, settings.vibrance / 100)
-        options = SIMD4(0, 0, Float(advanced.curveMask), Float(curveRow))
+
+        // The colour key, spread across three words. See `qualifier` for why it
+        // does not get two of its own. Nil where there is no key, so every slot
+        // stays the zero it always was and the shader never keys.
+        let key = layer.qualifier?.clamped.isEnabled == true ? layer.qualifier?.clamped : nil
+        let keyFlags: Float = key.map { 1 + ($0.isInverted ? 2 : 0) + ($0.ignoresShape ? 4 : 0) } ?? 0
+
+        lightB = SIMD4(settings.whites / 100, settings.blacks / 100,
+                       Float(key?.lumaMin ?? 0), Float(key?.lumaMax ?? 0))
+        options = SIMD4(Float(key?.softness ?? 0), keyFlags,
+                        Float(advanced.curveMask), Float(curveRow))
 
         maskA = SIMD4(Float(geometry.centerX), Float(geometry.centerY),
                       Float(geometry.width), Float(geometry.height))
@@ -108,12 +143,17 @@ struct LocalGradeUniforms: Sendable {
         hsl0 = band(0); hsl1 = band(1); hsl2 = band(2); hsl3 = band(3)
         hsl4 = band(4); hsl5 = band(5); hsl6 = band(6); hsl7 = band(7)
         shadowWheel = wheel(0); midtoneWheel = wheel(1); highlightWheel = wheel(2)
+        // All-zero is inert: flags of zero is what tells the shader not to key.
+        qualifier = key.map {
+            SIMD4(Float($0.hueCenter / 360), Float($0.hueRange / 360),
+                  Float($0.saturationMin), Float($0.saturationMax))
+        } ?? .zero
     }
 
     var words: [SIMD4<Float>] {
         [lightA, lightB, color, options, maskA, maskB, maskC,
          hsl0, hsl1, hsl2, hsl3, hsl4, hsl5, hsl6, hsl7,
-         shadowWheel, midtoneWheel, highlightWheel]
+         shadowWheel, midtoneWheel, highlightWheel, qualifier]
     }
 }
 
@@ -250,6 +290,10 @@ struct GradeProgram: Sendable {
     var locals: LocalGradeStack
     /// One entry per curve block: global first, then the live masked layers.
     var curveRows: [AdvancedCurves?]
+    /// The clip's Color Warper, or nil when it cannot change a pixel. Only the
+    /// clip grade has one - see `colorWarpFor` in Shaders.metal for why a masked
+    /// layer does not.
+    var warp: ColorWarp?
     var lookIdentifier: String?
 
     init(
@@ -265,6 +309,7 @@ struct GradeProgram: Sendable {
         let live = bypass ? [] : masks
         locals = LocalGradeStack(layers: live, aspect: aspect, matte: bypass ? .none : matte)
         curveRows = LocalGradeStack.curveRows(settings: settings, layers: live, bypass: bypass)
+        warp = bypass ? nil : settings.advanced?.resolvedColorWarp
         lookIdentifier = bypass ? nil : settings.advanced?.lut
     }
 

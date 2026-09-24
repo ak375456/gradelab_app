@@ -16,6 +16,9 @@ final class VideoExporter: @unchecked Sendable {
         /// lookup texture, which cannot live inside the uniform block either.
         /// One block for the clip's own curves, then one per masked local grade.
         let curves: [AdvancedCurves?]
+        /// The Color Warper, resolved the same way and for the same reason: the
+        /// field is rebuilt from control points rather than carried as pixels.
+        let warp: ColorWarp?
         /// The clip's masked local grades. Never carries a matte: Show Mask is
         /// an editor state and this type has no way to express one, so a matte
         /// cannot reach a file.
@@ -28,6 +31,7 @@ final class VideoExporter: @unchecked Sendable {
             uniforms = program.uniforms
             lookIdentifier = program.lookIdentifier
             curves = program.curveRows
+            warp = program.warp
             locals = program.locals
         }
     }
@@ -83,9 +87,10 @@ final class VideoExporter: @unchecked Sendable {
 
     func capabilities(
         for asset: VideoAsset,
-        configuration: ExportConfiguration = .maximumQuality
+        configuration: ExportConfiguration = .maximumQuality,
+        project: VideoProject? = nil
     ) async -> ExportCapabilities {
-        await ExportCapabilityChecker().check(asset: asset, configuration: configuration)
+        await ExportCapabilityChecker().check(asset: asset, configuration: configuration, project: project)
     }
 
     /// Streams decoded NV12 frames through Metal and returns the completed movie URL.
@@ -704,6 +709,7 @@ final class VideoExporter: @unchecked Sendable {
         encoder.setTexture(chromaPlane.texture, index: 2)
         encoder.setTexture(context.luts.texture(for: grade.lookIdentifier), index: 3)
         encoder.setTexture(context.curves.texture(for: grade.curves), index: 6)
+        encoder.setTexture(context.warps.texture(for: grade.warp), index: 12)
         encoder.setBytes(&gradeUniforms, length: MemoryLayout<GradeUniforms>.stride, index: 0)
         encoder.setBytes(&hdrUniforms, length: MemoryLayout<HDRDisplayUniforms>.stride, index: 1)
         grade.locals.bind(encoder)
@@ -764,6 +770,7 @@ final class VideoExporter: @unchecked Sendable {
         encoder.setTexture(chroma, index: 1)
         encoder.setTexture(context.luts.texture(for: grade.lookIdentifier), index: 3)
         encoder.setTexture(context.curves.texture(for: grade.curves), index: 6)
+        encoder.setTexture(context.warps.texture(for: grade.warp), index: 12)
         encoder.setTexture(lumaPlane.texture, index: 4)
         encoder.setTexture(chromaPlane.texture, index: 5)
         encoder.setBytes(&gradeUniforms, length: MemoryLayout<GradeUniforms>.stride, index: 0)
@@ -850,6 +857,7 @@ final class VideoExporter: @unchecked Sendable {
         encoder.setTexture(lumaPlane.texture, index: 4)
         encoder.setTexture(chromaPlane.texture, index: 5)
         encoder.setTexture(context.curves.texture(for: grade.curves), index: 6)
+        encoder.setTexture(context.warps.texture(for: grade.warp), index: 12)
         encoder.setTexture(renderingLUT, index: 7)
         encoder.setBytes(&gradeUniforms, length: MemoryLayout<GradeUniforms>.stride, index: 0)
         grade.locals.bind(encoder)
@@ -961,6 +969,7 @@ final class VideoExporter: @unchecked Sendable {
         gradeEncoder.setTexture(surfaces.0, index: 2)
         gradeEncoder.setTexture(context.luts.texture(for: grade.lookIdentifier), index: 3)
         gradeEncoder.setTexture(context.curves.texture(for: grade.curves), index: 6)
+        gradeEncoder.setTexture(context.warps.texture(for: grade.warp), index: 12)
         gradeEncoder.setBytes(&gradeUniforms, length: MemoryLayout<GradeUniforms>.stride, index: 0)
         grade.locals.bind(gradeEncoder)
         Self.dispatch(gradeEncoder, pipeline: gradePipeline, width: width, height: height)
@@ -1144,6 +1153,7 @@ final class VideoExporter: @unchecked Sendable {
         encoder.setTexture(destination, index: 2)
         encoder.setTexture(context.luts.texture(for: grade.lookIdentifier), index: 3)
         encoder.setTexture(context.curves.texture(for: grade.curves), index: 6)
+        encoder.setTexture(context.warps.texture(for: grade.warp), index: 12)
         encoder.setBytes(
             &gradeUniforms,
             length: MemoryLayout<GradeUniforms>.stride,

@@ -23,15 +23,19 @@ struct ExportCapabilities: Equatable, Sendable {
 struct ExportCapabilityChecker: Sendable {
     func check(
         asset: VideoAsset,
-        configuration: ExportConfiguration = .maximumQuality
+        configuration: ExportConfiguration = .maximumQuality,
+        project: VideoProject? = nil
     ) async -> ExportCapabilities {
         do {
             try ExportMediaSettings.validate(configuration)
             let source = try await ExportSourceInspector.inspect(asset)
-            let dimensions = configuration.dimensions(width: source.encodedWidth, height: source.encodedHeight)
-            let fps = configuration.frameRate.value ?? source.nominalFrameRate
-            let effectiveCodec = ExportMediaSettings.effectiveCodec(colorMode: source.colorMode, configuration: configuration)
-            let requiresMain10 = ExportMediaSettings.requiresMain10(colorMode: source.colorMode, configuration: configuration)
+            let dimensions = configuration.dimensions(
+                width: project?.canvas.width ?? source.encodedWidth,
+                height: project?.canvas.height ?? source.encodedHeight)
+            let fps = configuration.frameRate.value ?? project?.canvas.frameRate ?? source.nominalFrameRate
+            let colorMode = project?.colorMode ?? source.colorMode
+            let effectiveCodec = ExportMediaSettings.effectiveCodec(colorMode: colorMode, configuration: configuration)
+            let requiresMain10 = ExportMediaSettings.requiresMain10(colorMode: colorMode, configuration: configuration)
             let encoderSupported = ExportCapabilityProbe.encoderIsSupported(
                 width: dimensions.width,
                 height: dimensions.height,
@@ -55,7 +59,8 @@ struct ExportCapabilityChecker: Sendable {
             let acceptsVideo = writer.canApply(
                 outputSettings: ExportMediaSettings.videoWriterSettings(
                     source: source,
-                    configuration: configuration
+                    configuration: configuration,
+                    project: project
                 ),
                 forMediaType: .video
             )

@@ -29,9 +29,10 @@ struct ValidateGrade {
         kernel void gradeProbe(device float4 *output [[buffer(0)]],
                                constant GradeUniforms &grade [[buffer(1)]],
                                texture2d<float, access::sample> curveLUT [[texture(0)]],
+                               texture2d<float, access::sample> warpField [[texture(1)]],
                                uint i [[thread_position_in_grid]]) {
             float3 colors[4] = {float3(0.3, 0.5, 0.7), float3(0.8, 0.3, 0.2), float3(0.05), float3(0.9)};
-            output[i] = float4(applyGrade(colors[i], float2(0.0), grade, curveLUT), 1.0);
+            output[i] = float4(applyGrade(colors[i], float2(0.0), grade, curveLUT, warpField), 1.0);
         }
 
         kernel void maskProbe(device float *output [[buffer(0)]],
@@ -65,6 +66,7 @@ struct ValidateGrade {
             )
         }
         let curveLibrary = CurveLUTLibrary(device: device)
+        let warpLibrary = ColorWarpFieldLibrary(device: device)
         func render(_ grade: GradeSettings, bypass: Bool = false) throws -> [SIMD4<Float>] {
             let buffer = device.makeBuffer(length: 64, options: .storageModeShared)!
             let command = queue.makeCommandBuffer()!
@@ -74,6 +76,7 @@ struct ValidateGrade {
             encoder.setBuffer(buffer, offset: 0, index: 0)
             encoder.setBytes(&uniforms, length: MemoryLayout<GradeUniforms>.stride, index: 1)
             encoder.setTexture(curveLibrary.texture(for: bypass ? nil : grade.advanced?.resolvedCurves), index: 0)
+            encoder.setTexture(warpLibrary.texture(for: bypass ? nil : grade.advanced?.resolvedColorWarp), index: 1)
             encoder.dispatchThreads(MTLSize(width: 4, height: 1, depth: 1), threadsPerThreadgroup: MTLSize(width: 4, height: 1, depth: 1))
             encoder.endEncoding(); command.commit(); command.waitUntilCompleted()
             if let error = command.error { throw error }
@@ -113,6 +116,13 @@ struct ValidateGrade {
             CurvePoint(x: 0, y: 0), CurvePoint(x: 0.25, y: 0.18),
             CurvePoint(x: 0.75, y: 0.82), CurvePoint(x: 1, y: 1)
         ])
+        // A warp that pulls blue toward purple and lifts its saturation. The
+        // source sits on the blue in the first probe colour, so it has to move.
+        var blueToPurple = ColorWarp()
+        blueToPurple.points = [
+            ColorWarpPoint(mode: .hueSaturation, sourceX: 0.58, sourceY: 0.6,
+                           targetX: 0.72, targetY: 0.78, radius: 0.25)
+        ]
         var blueHueShift = AdvancedCurves()
         blueHueShift[.hueVsHue] = AdvancedCurve(type: .hueVsHue, points: [
             CurvePoint(x: 0.5, y: 0), CurvePoint(x: 2.0 / 3.0, y: 0.5), CurvePoint(x: 0.8, y: 0)
@@ -125,7 +135,9 @@ struct ValidateGrade {
             { $0.advancedCurves = blueHueShift },
             { $0.hsl[0].hue = 30; $0.hsl[0].saturation = -50 },
             { $0.wheels[1].strength = 80; $0.wheels[1].hue = 220 },
-            { $0.vignette = -80 }
+            { $0.vignette = -80 },
+            // Drag the blues a sixth of the way round the wheel and out.
+            { $0.colorWarp = blueToPurple }
         ]
         for change in changes {
             var advanced = AdvancedGrade.neutral
@@ -137,6 +149,45 @@ struct ValidateGrade {
             let decoded = try JSONDecoder().decode(GradeSettings.self, from: JSONEncoder().encode(settings))
             precondition(decoded == settings)
         }
-        print("PASS: legacy decode, uniform layout, export dimensions, GPU neutral identity, local mask geometry/inversion, legacy+advanced curves/HSL/wheels/vignette effects, original bypass, advanced persistence")
+        // The warper has to be EXACTLY identity in the two states that mean
+        // "off", not merely close: a neutral field is bound on every frame of
+        // every project that has never opened the panel, and a strength of zero
+        // is what the slider's left end promises.
+        for neutralWarp in [ColorWarp(), { var w = blueToPurple; w.strength = 0; return w }()] {
+            var advanced = AdvancedGrade.neutral
+            advanced.colorWarp = neutralWarp
+            var warpSettings = GradeSettings.neutral
+            warpSettings.advanced = advanced
+            let rendered = try render(warpSettings)
+            for i in 0..<4 {
+                for c in 0..<4 {
+                    precondition(abs(rendered[i][c] - neutral[i][c]) < 0.0001,
+                                 "An inactive Color Warper changed a pixel")
+                }
+            }
+        }
+
+        // Preserve Luminance has to hold brightness while the hue moves. Checked
+        // on a saturated blue, which is the worst case: purple is markedly
+        // brighter, so an unprotected move is visible immediately.
+        func warpLuma(preserving: Bool) throws -> Float {
+            var warp = blueToPurple
+            warp.preservesLuminance = preserving
+            var advanced = AdvancedGrade.neutral
+            advanced.colorWarp = warp
+            var warpSettings = GradeSettings.neutral
+            warpSettings.advanced = advanced
+            let rendered = try render(warpSettings)[0]
+            return 0.2126 * rendered.x + 0.7152 * rendered.y + 0.0722 * rendered.z
+        }
+        let sourceLuma = 0.2126 * neutral[0].x + 0.7152 * neutral[0].y + 0.0722 * neutral[0].z
+        let held = try warpLuma(preserving: true)
+        let loose = try warpLuma(preserving: false)
+        precondition(abs(held - sourceLuma) < 0.01,
+                     "Preserve Luminance let brightness drift by \(abs(held - sourceLuma))")
+        precondition(abs(loose - sourceLuma) > abs(held - sourceLuma),
+                     "Preserve Luminance made no difference")
+
+        print("PASS: legacy decode, uniform layout, export dimensions, GPU neutral identity, local mask geometry/inversion, legacy+advanced curves/HSL/wheels/vignette effects, original bypass, advanced persistence, color warp effect/identity/luminance")
     }
 }

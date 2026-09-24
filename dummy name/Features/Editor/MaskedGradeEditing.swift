@@ -149,6 +149,80 @@ extension EditorViewModel {
         }
     }
 
+    // MARK: - Colour qualifier
+
+    /// A binding onto one of the qualifier's values.
+    ///
+    /// Reads fall back to a neutral qualifier so the controls show sensible
+    /// numbers before one exists, and the first write is what actually creates
+    /// it — opening the section therefore changes nothing until a control moves.
+    func maskQualifierBinding(_ id: UUID, _ keyPath: WritableKeyPath<ColorQualifier, Double>) -> Binding<Double> {
+        Binding(
+            get: { [weak self] in
+                (self?.displayedMask(id)?.qualifier ?? .skin)[keyPath: keyPath]
+            },
+            set: { [weak self] value in
+                self?.updateMask(id, label: "Qualifier") { layer in
+                    var key = layer.qualifier ?? .skin
+                    key[keyPath: keyPath] = value
+                    key.isEnabled = true
+                    layer.qualifier = key.clamped
+                }
+            }
+        )
+    }
+
+    func maskQualifierFlagBinding(_ id: UUID, _ keyPath: WritableKeyPath<ColorQualifier, Bool>) -> Binding<Bool> {
+        Binding(
+            get: { [weak self] in
+                (self?.displayedMask(id)?.qualifier ?? .skin)[keyPath: keyPath]
+            },
+            set: { [weak self] value in
+                self?.updateMask(id, label: "Qualifier", immediate: true) { layer in
+                    var key = layer.qualifier ?? .skin
+                    key[keyPath: keyPath] = value
+                    layer.qualifier = key.clamped
+                }
+            }
+        )
+    }
+
+    /// Switches the whole key off without discarding how it was tuned, so
+    /// toggling it back on returns to the same selection.
+    func setMaskQualifierEnabled(_ id: UUID, _ enabled: Bool) {
+        updateMask(id, label: "Qualifier", immediate: true) { layer in
+            var key = layer.qualifier ?? .skin
+            key.isEnabled = enabled
+            layer.qualifier = key.clamped
+        }
+    }
+
+    /// Centres the key on a colour tapped in the picture.
+    ///
+    /// Sampled from the GRADED frame, which is what the person is looking at and
+    /// therefore what they mean by "that colour". Returns false when the tap
+    /// lands on something with no usable hue, so the caller can say so rather
+    /// than silently keying on noise.
+    @discardableResult
+    func pickMaskQualifier(_ id: UUID, atViewPoint point: CGPoint) -> Bool {
+        guard canGrade, let colour = renderer.sampleGradedColor(atViewPoint: point) else { return false }
+        let components = ColorQualifier.components(of: colour)
+        guard components.saturation > 0.04 else {
+            editError = String(localized: "That area has almost no colour, so there is nothing to select. Try a more colourful part of the picture.")
+            isPickingMaskQualifier = false
+            return false
+        }
+        updateMask(id, label: "Pick colour", immediate: true) { layer in
+            var key = layer.qualifier ?? .skin
+            key.center(on: components.hue,
+                       saturation: components.saturation,
+                       luma: components.luma)
+            layer.qualifier = key.clamped
+        }
+        isPickingMaskQualifier = false
+        return true
+    }
+
     /// A geometry binding for the inspector sliders.
     ///
     /// Writes go through the keyframe engine when the property is animated, and

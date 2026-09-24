@@ -28,6 +28,14 @@ protocol GradingModel: ObservableObject, AnyObject {
     /// Identifies the subject being graded, so a view can reset per-subject UI
     /// state when it changes. A clip id for video; the project id for a still.
     var gradeSubjectID: UUID? { get }
+    /// True when the Colour controls are pointed at a masked local grade rather
+    /// than at the clip's own.
+    ///
+    /// Exists because the two are not quite the same set of controls: a local
+    /// layer has no offset wheel, since the whole mask stack must fit one
+    /// 4096-byte `setBytes` and there is no word left for one. A panel that
+    /// offered it anyway would move a slider and change nothing.
+    var isEditingMaskGrade: Bool { get }
     /// Mask geometry currently shown. A timeline model returns its evaluated
     /// keyframed value; a still-image model returns the authored value.
     var displayedGradeMask: GradeMask { get }
@@ -71,6 +79,24 @@ protocol GradingModel: ObservableObject, AnyObject {
     func resetCurve(_ type: CurveType)
     func beginCurveEdit(_ label: String)
     func endCurveEdit()
+
+    // MARK: Color Warper
+    //
+    // The warp itself lives on the grade and is reached through `editColorWarp`
+    // in ColorWarpEditing.swift, which is written once against this protocol.
+    // Only the editor's own state is declared here.
+
+    /// Which plane the mesh is showing. Editor state, not grade state: both
+    /// planes stay live whichever one is on screen.
+    var selectedWarpMode: ColorWarpMode { get set }
+    var selectedWarpPoint: UUID? { get set }
+    /// True while the warper's eyedropper is armed and waiting for a tap on the
+    /// preview.
+    var isPickingWarpColor: Bool { get set }
+    /// Samples the picture under `point` and selects the mesh handle for that
+    /// colour, placing one if there is none there yet.
+    @discardableResult
+    func pickWarpColor(atViewPoint point: CGPoint) -> Bool
 
     // MARK: Finishing effects
     var hasFilmEffects: Bool { get }
@@ -116,9 +142,21 @@ protocol GradingModel: ObservableObject, AnyObject {
     func setScopesEnabled(_ enabled: Bool)
     func selectScope(_ type: ScopeType)
     func setScopeIntensity(_ intensity: Double)
+
+    // MARK: Viewer assist
+    /// False colour and zebras. Both editors render through the same
+    /// `MetalVideoRenderer`, so a still gets this for the same reason it gets
+    /// the scopes: it is the same display path.
+    var viewerAssist: ViewerAssistSettings { get }
+    func setViewerAssist(_ mode: ViewerAssist)
+    func setZebraThreshold(_ threshold: Double)
 }
 
 extension GradingModel {
+    /// Most models have no masked grades at all, so they are always editing the
+    /// primary one.
+    var isEditingMaskGrade: Bool { false }
+
     /// A drawn window on its own is deliberately not counted: it changes no
     /// pixel, and a paste replacing nothing is not worth a question.
     var pasteWouldOverwriteGrade: Bool {

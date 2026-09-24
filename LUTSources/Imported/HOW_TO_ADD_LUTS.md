@@ -46,12 +46,30 @@ look stage is 3D only. You will get "Only 3D LUTs can be used as a look".
 rejected rather than applied wrongly. These are almost always log conversion
 LUTs.
 
-**Log / camera conversion LUTs.** Anything named for a camera transfer curve —
-Apple Log, S-Log2/3, V-Log, D-Log, C-Log, N-Log, Log-C, HLG, PQ, "to Rec.709",
-"709 conversion". These expect log-encoded input. The app applies looks to
-footage that is already Rec.709, so a log LUT will look flat, crushed or
-wrongly contrasted. That is not a bug in the LUT; it is the wrong stage. A
-technical conversion stage is a separate piece of work.
+**Log / camera conversion LUTs — on the wrong footage.** Anything named for a
+camera transfer curve (V-Log, D-Log, C-Log, N-Log, Log-C, HLG, PQ, "to
+Rec.709") expects log-encoded input. Applied to footage that is already
+Rec.709, it will look flat, crushed or wrongly contrasted. That is not a bug in
+the LUT; it is the wrong input.
+
+Applied to the footage it *names*, a conversion LUT works correctly today: the
+look stage runs before the grading tools (see `applyLookAndGrade` in
+`Shaders.metal`), which is exactly where an input transform belongs. That is why
+Sony's own S-Log2 and S-Log3 transforms are bundled — see
+`LUTAsset.bundledLogConversions`. Two things are still missing, and both are
+real limits rather than bugs:
+
+- **Nothing picks one for you.** The app cannot detect Log from file metadata,
+  because cameras do not record it: Sony tags every S-Log3 file as BT.709. Only
+  Apple Log and Apple Log 2 carry a real identifier, and those have their own
+  pipeline. So the user has to know what they shot and choose.
+- **There is one LUT slot.** Using it for a conversion means no creative look on
+  top, and vice versa.
+
+If you bundle more of these, add them to `bundledLogConversions` with
+`kind: .technical`, not to the folder for discovery — discovery labels whatever
+it finds as a creative look expecting Rec.709 input, which is the opposite of
+what these are.
 
 **LUTs over 65 points.** Rejected by the parser.
 

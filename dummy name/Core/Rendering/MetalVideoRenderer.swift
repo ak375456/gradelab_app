@@ -138,6 +138,7 @@ final class MetalVideoRenderer: NSObject, MTKViewDelegate, @unchecked Sendable {
         hdr: inout HDRDisplayUniforms,
         lut: MTLTexture?,
         curveLUT: MTLTexture?,
+        warpField: MTLTexture?,
         command: MTLCommandBuffer
     ) -> MTLTexture? {
         guard let stage = effectsStage,
@@ -166,6 +167,7 @@ final class MetalVideoRenderer: NSObject, MTKViewDelegate, @unchecked Sendable {
         encoder.setTexture(surfaces.0, index: 2)
         encoder.setTexture(lut, index: 3)
         encoder.setTexture(curveLUT, index: 6)
+        encoder.setTexture(warpField, index: 12)
         encoder.setBytes(&grade, length: MemoryLayout<GradeUniforms>.stride, index: 0)
         locals.bind(encoder)
         let threadWidth = max(1, min(pipeline.threadExecutionWidth, size.width))
@@ -271,6 +273,10 @@ final class MetalVideoRenderer: NSObject, MTKViewDelegate, @unchecked Sendable {
     /// picture. Nothing here is reachable from the export path.
     private var scopeAnalyzerStorage: ScopeAnalyzer?
     private var scopeSettings = ScopeSettings()
+    /// False colour / zebras. A display aid: it reaches the shader through
+    /// `GradeUniforms.reservedC`, is read only by display fragments, and is
+    /// never consulted by an export path.
+    private var viewerAssist = ViewerAssistSettings()
     private var lastScopeTime: CFTimeInterval = 0
     private var scopedRevision: UInt = .max
     /// While playing, scopes update at about this rate rather than every frame.
@@ -404,6 +410,20 @@ final class MetalVideoRenderer: NSObject, MTKViewDelegate, @unchecked Sendable {
         stateLock.unlock()
     }
 
+    /// Switches false colour or zebras on for the preview.
+    ///
+    /// Repaints on change for the same reason `setScopes` does: the assist is
+    /// the kind of thing someone toggles while looking at a paused frame, and
+    /// waiting for the next frame or slider move would read as a dead control.
+    func setViewerAssist(_ settings: ViewerAssistSettings) {
+        stateLock.lock()
+        if viewerAssist != settings {
+            viewerAssist = settings
+            revision &+= 1
+        }
+        stateLock.unlock()
+    }
+
     /// The live analyzer, for the scope view to read its density buffers from.
     var scopeAnalyzer: ScopeAnalyzer? {
         stateLock.lock(); defer { stateLock.unlock() }; return scopeAnalyzerStorage
@@ -416,6 +436,7 @@ final class MetalVideoRenderer: NSObject, MTKViewDelegate, @unchecked Sendable {
         locals: LocalGradeStack,
         lut: MTLTexture?,
         curveLUT: MTLTexture?,
+        warpField: MTLTexture?,
         revision: UInt
     ) {
         stateLock.lock()
@@ -441,14 +462,15 @@ final class MetalVideoRenderer: NSObject, MTKViewDelegate, @unchecked Sendable {
 
         var attempted = false
         var analyzed = false
-        if let lut, let curveLUT,
+        if let lut, let curveLUT, let warpField,
            let textures = PixelBufferTextures(pixelBuffer: pixelBuffer, context: context) {
             attempted = true
             analyzed = analyzer.analyze(
                 textures: textures, pixelBuffer: pixelBuffer, type: type, grade: grade,
                 locals: locals,
                 yuv: YUVUniforms.make(for: pixelBuffer, fallbackMatrix: fallbackMatrix),
-                hdr: HDRDisplayUniforms(), intensity: intensity, lut: lut, curveLUT: curveLUT)
+                hdr: HDRDisplayUniforms(), intensity: intensity, lut: lut, curveLUT: curveLUT,
+                warpField: warpField)
         }
         stateLock.lock()
         if analyzed || !attempted {
@@ -527,6 +549,7 @@ final class MetalVideoRenderer: NSObject, MTKViewDelegate, @unchecked Sendable {
         encoder.setTexture(output, index: 2)
         encoder.setTexture(context.luts.texture(for: nil), index: 3)
         encoder.setTexture(context.curves.texture(for: nil), index: 6)
+        encoder.setTexture(context.warps.texture(for: nil), index: 12)
         encoder.setBytes(&grade, length: MemoryLayout<GradeUniforms>.stride, index: 0)
         LocalGradeStack.empty.bind(encoder)
         encoder.dispatchThreads(
@@ -701,6 +724,10 @@ final class MetalVideoRenderer: NSObject, MTKViewDelegate, @unchecked Sendable {
                 aspect: encodedMaskAspect, matte: maskMatte)
             program.setGrainSeed(frameProvider.presentationTime.seconds)
             var grade = program.uniforms
+            // The assist is the viewer's, not the clip's, so it is stamped onto
+            // the uniforms here rather than built by `GradeUniforms.init` from
+            // the grade model. Nothing that writes a file reads this slot.
+            grade.viewerAssist = viewerAssist.uniform
             let locals = program.locals
             stateLock.unlock()
             // Cache read only: never parses on the render thread. Falls back to
@@ -711,6 +738,9 @@ final class MetalVideoRenderer: NSObject, MTKViewDelegate, @unchecked Sendable {
             // is one comparison. The stack holds the clip's own curves followed
             // by one block per masked layer.
             let curveTexture = context.curves.texture(for: program.curveRows)
+            // Same contract as the curve table above: a cache read on the render
+            // thread, falling back to a neutral field that cannot change a pixel.
+            let warpTexture = context.warps.texture(for: program.warp)
             if renderedBuffer === pixelBuffer, renderedRevision == currentRevision,
                renderedSize == view.drawableSize { return }
             // Same frame, same grade, same LUT the picture is about to be drawn
@@ -718,7 +748,8 @@ final class MetalVideoRenderer: NSObject, MTKViewDelegate, @unchecked Sendable {
             // costs nothing, and before the preview's in-flight gate so a busy
             // preview does not starve the scope of the frame it already has.
             analyzeScopes(pixelBuffer: pixelBuffer, grade: grade, locals: locals,
-                          lut: lutTexture, curveLUT: curveTexture, revision: currentRevision)
+                          lut: lutTexture, curveLUT: curveTexture, warpField: warpTexture,
+                          revision: currentRevision)
             guard inFlight.wait(timeout: .now()) == .success else { return }
             var submitted = false
             defer { if !submitted { inFlight.signal() } }
@@ -746,7 +777,8 @@ final class MetalVideoRenderer: NSObject, MTKViewDelegate, @unchecked Sendable {
                     textures: textures,
                     size: (max(1, Int(effectSize.width)), max(1, Int(effectSize.height))),
                     grade: &grade, locals: locals, yuv: &yuv, hdr: &hdrUniforms,
-                    lut: lutTexture, curveLUT: curveTexture, command: commandBuffer)
+                    lut: lutTexture, curveLUT: curveTexture, warpField: warpTexture,
+                    command: commandBuffer)
                 : nil
             if wantsEffects, effected == nil { return }
             guard let encoder = commandBuffer.makeRenderCommandEncoder(descriptor: renderPass) else { return }
@@ -765,6 +797,7 @@ final class MetalVideoRenderer: NSObject, MTKViewDelegate, @unchecked Sendable {
                 encoder.setFragmentTexture(lutTexture, index: 3)
                 encoder.setFragmentTexture(appleLogRenderingLUT, index: 4)
                 encoder.setFragmentTexture(curveTexture, index: 6)
+                encoder.setFragmentTexture(warpTexture, index: 12)
                 encoder.setFragmentBytes(&grade, length: MemoryLayout<GradeUniforms>.stride, index: 1)
                 locals.bindFragment(encoder)
             } else if effected == nil {
@@ -788,6 +821,7 @@ final class MetalVideoRenderer: NSObject, MTKViewDelegate, @unchecked Sendable {
                     encoder.setFragmentBytes(&grade, length: MemoryLayout<GradeUniforms>.stride, index: 1)
                     encoder.setFragmentTexture(lutTexture, index: 3)
                     encoder.setFragmentTexture(curveTexture, index: 6)
+                    encoder.setFragmentTexture(warpTexture, index: 12)
                     locals.bindFragment(encoder)
                 }
             } else if let effected, colorMode.isAppleLog, !composited, let present = appleLogPresentPipeline {
@@ -800,6 +834,10 @@ final class MetalVideoRenderer: NSObject, MTKViewDelegate, @unchecked Sendable {
                 encoder.setFragmentTexture(effected, index: 0)
                 if isHDRDraw {
                     encoder.setFragmentBytes(&hdrUniforms, length: MemoryLayout<HDRDisplayUniforms>.stride, index: 0)
+                    // The shared bind below is skipped for HDR, so the assist's
+                    // uniforms have to be handed over here. Index 1, because
+                    // index 0 is already the HDR display transform.
+                    encoder.setFragmentBytes(&grade, length: MemoryLayout<GradeUniforms>.stride, index: 1)
                 }
             } else {
                 encoder.endEncoding(); return
@@ -809,6 +847,7 @@ final class MetalVideoRenderer: NSObject, MTKViewDelegate, @unchecked Sendable {
             if !isHDRDraw {
                 encoder.setFragmentTexture(lutTexture, index: 3)
                 encoder.setFragmentTexture(curveTexture, index: 6)
+                encoder.setFragmentTexture(warpTexture, index: 12)
                 encoder.setFragmentBytes(&grade, length: MemoryLayout<GradeUniforms>.stride, index: 0)
                 // `presentFragmentSDR` reads no stack, but the YUV and BGRA
                 // grading fragments above do and this is their one shared bind.
@@ -878,7 +917,13 @@ final class MetalVideoRenderer: NSObject, MTKViewDelegate, @unchecked Sendable {
     ///   0...1 from its top-left corner.
     /// - Returns: the colour in the same space the curve stage works in, or nil
     ///   if the tap was on the letterbox or no frame has been decoded yet.
-    func sampleGradedColor(atViewPoint point: CGPoint) -> SIMD3<Float>? {
+    /// - Parameter warpBypass: renders the sample with the Color Warper switched
+    ///   off, which is what its own eyedropper needs. Picking off the finished
+    ///   picture would hand the warper a colour it had already moved, so the
+    ///   handle would land on the wrong part of the plane and each successive
+    ///   pick would chase the last one. Everything else in the grade still
+    ///   applies, so the sample is still the colour the warper actually sees.
+    func sampleGradedColor(atViewPoint point: CGPoint, warpBypass: Bool = false) -> SIMD3<Float>? {
         stateLock.lock()
         let videoSize = sourceSize
         let coordinates = textureCoordinates
@@ -924,6 +969,7 @@ final class MetalVideoRenderer: NSObject, MTKViewDelegate, @unchecked Sendable {
         let program = GradeProgram(settings: frameGrade, masks: frameMasks,
                                    bypass: false, aspect: aspect)
         var grade = program.uniforms
+        if warpBypass { grade.colorWarp = .zero }
 
         // Grading the whole frame at a fraction of its size costs a fraction of
         // a millisecond and reuses the pipelines the preview already built, so
@@ -969,6 +1015,7 @@ final class MetalVideoRenderer: NSObject, MTKViewDelegate, @unchecked Sendable {
         encoder.setTexture(destination, index: 2)
         encoder.setTexture(context.luts.texture(for: program.lookIdentifier), index: 3)
         encoder.setTexture(context.curves.texture(for: program.curveRows), index: 6)
+        encoder.setTexture(context.warps.texture(for: warpBypass ? nil : program.warp), index: 12)
         encoder.setBytes(&grade, length: MemoryLayout<GradeUniforms>.stride, index: 0)
         program.locals.bind(encoder)
         let threadWidth = max(1, min(pipeline.threadExecutionWidth, width))

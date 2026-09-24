@@ -23,10 +23,11 @@ struct ValidateHDRGrade {
                              constant uint &stage [[buffer(4)]],
                              texture3d<float, access::sample> lut [[texture(0)]],
                              texture2d<float, access::sample> curveLUT [[texture(1)]],
+                             texture2d<float, access::sample> warpField [[texture(2)]],
                              uint i [[thread_position_in_grid]]) {
             float3 c = input[i];
             if (stage == 0) {                       // grading only
-                output[i] = float4(applyGradeHDR(c, float2(0.5), grade, curveLUT), 1.0);
+                output[i] = float4(applyGradeHDR(c, float2(0.5), grade, curveLUT, warpField), 1.0);
             } else if (stage == 1) {                // HLG signal -> working space
                 output[i] = float4(toWorkingSpace(c, hdr), 1.0);
             } else if (stage == 2) {                // shaper round trip
@@ -57,6 +58,7 @@ struct ValidateHDRGrade {
 
         let identityLUT = try LUTTextureFactory.makeIdentity(device: device, size: 33)
         let neutralCurves = CurveLUTLibrary(device: device)
+        let neutralWarps = ColorWarpFieldLibrary(device: device)
 
         func run(_ colors: [SIMD3<Float>], grade: GradeSettings = .neutral, bypass: Bool = false,
                  stage: UInt32, lut: MTLTexture? = nil) throws -> [SIMD3<Float>] {
@@ -76,6 +78,9 @@ struct ValidateHDRGrade {
             enc.setBytes(&s, length: MemoryLayout<UInt32>.stride, index: 4)
             enc.setTexture(lut ?? identityLUT, index: 0)
             enc.setTexture(neutralCurves.texture(for: nil), index: 1)
+            // A neutral warp field: this harness measures the extended-range
+            // grade, so the warper must not be able to move a value.
+            enc.setTexture(neutralWarps.texture(for: nil), index: 2)
             enc.dispatchThreads(MTLSize(width: colors.count, height: 1, depth: 1),
                                 threadsPerThreadgroup: MTLSize(width: min(colors.count, 32), height: 1, depth: 1))
             enc.endEncoding(); cmd.commit(); cmd.waitUntilCompleted()

@@ -175,6 +175,111 @@ struct MaskGeometry: Codable, Equatable, Sendable {
 /// it. The grade starts neutral — a new mask changes nothing until a slider is
 /// moved, which is what makes "add a mask, then grade" feel like one action
 /// rather than a duplicated look.
+/// A colour-based selection: the secondary every grading app has and this one
+/// did not.
+///
+/// It selects by what a pixel *is* rather than by where it is, which is the
+/// difference between "darken this corner" and "warm the skin wherever it
+/// moves". That is also why it needs no tracking: a qualifier follows the
+/// subject for free, because it never knew where the subject was.
+///
+/// Qualifying happens on the colour the layer RECEIVES — after the clip's own
+/// grade, before this layer's. Picking a skin tone and then lifting exposure
+/// therefore keeps selecting skin, instead of the selection sliding off the
+/// thing it was pointed at as soon as the grade moves it.
+///
+/// Optional on `MaskedGradeLayer` so every project saved before it decodes as
+/// the purely geometric mask it was authored as.
+struct ColorQualifier: Codable, Equatable, Sendable {
+    var isEnabled = false
+    /// Degrees, 0...360.
+    var hueCenter: Double = 25
+    /// Half-width in degrees. The full selected arc is twice this.
+    var hueRange: Double = 20
+    var saturationMin: Double = 0.15
+    var saturationMax: Double = 1
+    var lumaMin: Double = 0.1
+    var lumaMax: Double = 0.95
+    /// How far outside each edge the selection fades. 0 is a hard key, which is
+    /// almost always the wrong answer on real footage and is why this does not
+    /// default to it.
+    var softness: Double = 0.25
+    /// Grades everything the key does NOT select.
+    var isInverted = false
+    /// Ignores the layer's shape and qualifies the whole frame.
+    ///
+    /// On by default because a colour secondary usually wants the whole
+    /// picture; switching it off is how the two are combined, which is the
+    /// "only the skin, and only in this corner" case.
+    var ignoresShape = true
+
+    /// Defaults centred on average skin, because that is what a qualifier is
+    /// reached for first.
+    static let skin = ColorQualifier()
+
+    var clamped: ColorQualifier {
+        var value = self
+        value.hueCenter = (value.hueCenter.isFinite ? value.hueCenter : 25)
+            .truncatingRemainder(dividingBy: 360)
+        if value.hueCenter < 0 { value.hueCenter += 360 }
+        value.hueRange = min(max(value.hueRange.isFinite ? value.hueRange : 20, 1), 180)
+        value.saturationMin = min(max(value.saturationMin.isFinite ? value.saturationMin : 0, 0), 1)
+        value.saturationMax = min(max(value.saturationMax.isFinite ? value.saturationMax : 1, 0), 1)
+        value.lumaMin = min(max(value.lumaMin.isFinite ? value.lumaMin : 0, 0), 1)
+        value.lumaMax = min(max(value.lumaMax.isFinite ? value.lumaMax : 1, 0), 1)
+        // A reversed range selects nothing and reads as a broken control rather
+        // than as an empty selection, so the pair is ordered instead.
+        if value.saturationMin > value.saturationMax {
+            swap(&value.saturationMin, &value.saturationMax)
+        }
+        if value.lumaMin > value.lumaMax { swap(&value.lumaMin, &value.lumaMax) }
+        value.softness = min(max(value.softness.isFinite ? value.softness : 0.25, 0), 1)
+        return value
+    }
+
+    /// A sampled colour as the qualifier measures it.
+    ///
+    /// The same HSL definition `rgbToHSL` uses in Shaders.metal — hue in
+    /// degrees, saturation and lightness 0...1 — so a picked colour lands in the
+    /// middle of the key rather than near its edge. If the two ever disagreed,
+    /// picking a colour would select a slightly different one.
+    static func components(of colour: SIMD3<Float>) -> (hue: Double, saturation: Double, luma: Double) {
+        let r = Double(min(max(colour.x, 0), 1))
+        let g = Double(min(max(colour.y, 0), 1))
+        let b = Double(min(max(colour.z, 0), 1))
+        let hi = max(r, max(g, b)), lo = min(r, min(g, b))
+        let delta = hi - lo
+        let luma = (hi + lo) / 2
+        guard delta > 0.00001 else { return (0, 0, luma) }
+        let saturation = luma > 0.5 ? delta / (2 - hi - lo) : delta / (hi + lo)
+        var hue: Double
+        if hi == r {
+            hue = (g - b) / delta + (g < b ? 6 : 0)
+        } else if hi == g {
+            hue = (b - r) / delta + 2
+        } else {
+            hue = (r - g) / delta + 4
+        }
+        hue *= 60
+        return (hue, saturation, luma)
+    }
+
+    /// Centres the key on a colour picked off the picture, keeping the widths
+    /// the user has already dialled in.
+    mutating func center(on hue: Double, saturation: Double, luma: Double) {
+        isEnabled = true
+        hueCenter = hue
+        // Widths are set around the sample rather than replaced, so a pick
+        // re-aims the key without discarding a tuned selection.
+        let satPad = max(0.12, softness * 0.4)
+        saturationMin = max(0, saturation - satPad)
+        saturationMax = min(1, saturation + satPad)
+        let lumaPad = max(0.15, softness * 0.5)
+        lumaMin = max(0, luma - lumaPad)
+        lumaMax = min(1, luma + lumaPad)
+    }
+}
+
 struct MaskedGradeLayer: Codable, Equatable, Identifiable, Sendable {
     /// How many layers one clip can render. The whole stack travels as a single
     /// 4 KB `setBytes` block on every pass, which is what bounds this; it is not
@@ -194,6 +299,9 @@ struct MaskedGradeLayer: Codable, Equatable, Identifiable, Sendable {
     /// a trim or a split moves mask keyframes exactly as it moves transform
     /// ones. Reuses the project-wide keyframe engine; there is no second one.
     var animation: ClipAnimation?
+    /// The colour selection, when this layer has one. Nil is a purely
+    /// geometric mask, which is what every layer authored before this was.
+    var qualifier: ColorQualifier?
     var createdAt: Date
 
     init(
@@ -204,6 +312,7 @@ struct MaskedGradeLayer: Codable, Equatable, Identifiable, Sendable {
         localGrade: GradeSettings = .neutral,
         strength: Double = 1,
         animation: ClipAnimation? = nil,
+        qualifier: ColorQualifier? = nil,
         createdAt: Date = .now
     ) {
         self.id = id
@@ -213,11 +322,12 @@ struct MaskedGradeLayer: Codable, Equatable, Identifiable, Sendable {
         self.localGrade = localGrade
         self.strength = strength
         self.animation = animation
+        self.qualifier = qualifier
         self.createdAt = createdAt
     }
 
     private enum CodingKeys: String, CodingKey {
-        case id, name, isEnabled, geometry, localGrade, strength, animation, createdAt
+        case id, name, isEnabled, geometry, localGrade, strength, animation, qualifier, createdAt
     }
 
     /// Tolerant of documents written by a newer build: anything missing falls
@@ -231,6 +341,7 @@ struct MaskedGradeLayer: Codable, Equatable, Identifiable, Sendable {
         localGrade = try container.decodeIfPresent(GradeSettings.self, forKey: .localGrade) ?? .neutral
         strength = try container.decodeIfPresent(Double.self, forKey: .strength) ?? 1
         animation = try container.decodeIfPresent(ClipAnimation.self, forKey: .animation)
+        qualifier = try container.decodeIfPresent(ColorQualifier.self, forKey: .qualifier)
         createdAt = try container.decodeIfPresent(Date.self, forKey: .createdAt) ?? .now
     }
 

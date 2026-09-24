@@ -52,8 +52,12 @@ struct GradeUniforms: Sendable {
     /// rotation in radians, feather, opacity, and packed shape/invert flags.
     /// opacity is -1 when the mask is disabled, meaning a full-frame grade.
     var gradeMaskB: SIMD4<Float>
-    var reservedC: SIMD4<Float>
-    var reservedD: SIMD4<Float>
+    /// Viewer assist: mode, then the zebra threshold. Written by the renderer
+    /// rather than by this initializer — it is how someone is looking at the
+    /// picture, not part of the grade — and read only by display fragments.
+    var viewerAssist: SIMD4<Float>
+    /// The offset wheel: hue, colour strength, brightness.
+    var offsetWheel: SIMD4<Float>
     var hsl0: SIMD4<Float>
     var hsl1: SIMD4<Float>
     var hsl2: SIMD4<Float>
@@ -70,6 +74,18 @@ struct GradeUniforms: Sendable {
     var effectsA: SIMD4<Float>
     /// bloom, glow, halation, spare
     var effectsB: SIMD4<Float>
+    /// The Color Warper: strength 0...1, the active-plane mask, and whether
+    /// luminance is held. Appended rather than folded into a spare slot on
+    /// purpose - `LocalGradeUniforms` names its colour fields identically so the
+    /// two grade through one templated core, and every spare float over there is
+    /// already carrying part of the colour qualifier. `colorWarpFor` in
+    /// Shaders.metal is what lets that template compile without this field, the
+    /// same mechanism the offset wheel already uses.
+    ///
+    /// The struct is memcpy'd into the shader, so growing it is safe only
+    /// because `Scripts/ValidateGrade.swift` asserts the two sides agree on
+    /// `sizeof` rather than on a fixed number.
+    var colorWarp: SIMD4<Float>
 
     /// Grain has to move, or it reads as dirt on the lens rather than as film.
     /// The seed comes from the frame's presentation time so preview and export
@@ -121,11 +137,26 @@ struct GradeUniforms: Sendable {
         let flags: Float = (mask.shape == .rectangle ? 1 : 0) + (mask.isInverted ? 4 : 0)
         gradeMaskB = SIMD4(mask.rotation * .pi / 180, mask.feather / 100,
                            mask.isEnabled ? mask.opacity / 100 : -1, flags)
-        reservedC = .zero; reservedD = .zero
+        // Retired curve slots, reused rather than widening the struct: the
+        // 352-byte layout is shared byte-for-byte with the Metal side and is
+        // asserted by a test. reservedC carries the viewer assist, which is a
+        // display aid rather than part of the grade and so is written by the
+        // renderer, not here. reservedD is the offset wheel.
+        viewerAssist = .zero
+        offsetWheel = bypass ? .zero : wheel(3)
         hsl0 = band(0); hsl1 = band(1); hsl2 = band(2); hsl3 = band(3)
         hsl4 = band(4); hsl5 = band(5); hsl6 = band(6); hsl7 = band(7)
         shadowWheel = wheel(0); midtoneWheel = wheel(1); highlightWheel = wheel(2)
         vignette = SIMD4(advanced.vignette / 100, advanced.vignetteMidpoint / 100, advanced.vignetteFeather / 100, 0)
+        // Resolved to nil when it cannot change a pixel, so an untouched warper
+        // leaves the mask at zero and the shader never fetches the field.
+        let warp = bypass ? nil : advanced.resolvedColorWarp
+        colorWarp = SIMD4(
+            (warp?.resolvedStrength ?? 0) / 100,
+            Float(warp?.activeMask ?? 0),
+            warp?.preservesLuminance == true ? 1 : 0,
+            0
+        )
     }
 }
 

@@ -38,15 +38,17 @@ struct ValidateLUT {
                                constant GradeUniforms &grade [[buffer(2)]],
                                texture3d<float, access::sample> lut [[texture(0)]],
                                texture2d<float, access::sample> curveLUT [[texture(1)]],
+                               texture2d<float, access::sample> warpField [[texture(2)]],
                                constant LocalGradeStack &locals [[buffer(3)]],
                                uint i [[thread_position_in_grid]]) {
-            output[i] = float4(applyLookAndGrade(input[i], float2(0.5), grade, lut, curveLUT, locals), 1.0);
+            output[i] = float4(applyLookAndGrade(input[i], float2(0.5), grade, lut, curveLUT, warpField, locals), 1.0);
         }
         """
         let library = try device.makeLibrary(source: source + "\n" + probe, options: nil)
         let lutPipeline = try device.makeComputePipelineState(function: library.makeFunction(name: "lutProbe")!)
         let stagePipeline = try device.makeComputePipelineState(function: library.makeFunction(name: "stageProbe")!)
         let neutralCurves = CurveLUTLibrary(device: device)
+        let neutralWarps = ColorWarpFieldLibrary(device: device)
 
         func run(
             _ pipeline: MTLComputePipelineState,
@@ -75,6 +77,8 @@ struct ValidateLUT {
             // Neutral curves: the look stage is what this harness measures, so
             // the curve table must not be able to move a value.
             encoder.setTexture(neutralCurves.texture(for: nil), index: 1)
+            // Neutral for the same reason.
+            encoder.setTexture(neutralWarps.texture(for: nil), index: 2)
             // `stageProbe` grades through the full pipeline, which takes the
             // masked-local-grade stack. No masks here: this measures the look.
             LocalGradeStack.empty.bind(encoder, index: 3)

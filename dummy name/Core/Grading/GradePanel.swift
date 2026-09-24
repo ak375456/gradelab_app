@@ -15,6 +15,7 @@ enum GradePanel: String, CaseIterable, Identifiable, Sendable {
     case color = "Color"
     case curves = "Curves"
     case hsl = "HSL"
+    case warper = "Warper"
     case wheels = "Wheels"
     case masks = "Masks"
     case mask = "Local"
@@ -42,6 +43,7 @@ enum GradePanel: String, CaseIterable, Identifiable, Sendable {
         case .color: "thermometer.medium"
         case .curves: "point.topleft.down.to.point.bottomright.curvepath"
         case .hsl: "slider.horizontal.3"
+        case .warper: "circle.hexagongrid"
         case .wheels: "circle.lefthalf.filled"
         case .masks: "circle.dashed.inset.filled"
         case .mask: "circle.dashed"
@@ -65,6 +67,17 @@ enum GradePanel: String, CaseIterable, Identifiable, Sendable {
             Small moves go a long way. Every curve has its own Reset, and nothing here is permanent.
             """)
         case .hsl: String(localized: "Choose a color, then change its hue, saturation, or lightness. Try reducing blue lightness for a deeper sky. Nearby colors blend smoothly.")
+        case .warper: String(localized: """
+            Grab a color and drag it somewhere else.
+
+            Unlike HSL or the curves, this holds on to two things at once: which hue a color is AND how saturated it is. So the strong orange in a shirt can go to red while the pale orange in skin stays exactly where it is.
+
+            Tap the picture with the eyedropper to land on the color you want, then drag its handle. Range decides how much of the surrounding color comes along, and the falloff is smooth, so there is no edge where the change stops.
+
+            Chroma / Luma is the same idea seen from the side: how colorful against how bright. Use it to lift dark saturated blues, or take the chroma out of highlights only.
+
+            Preserve Luminance keeps brightness where it was while the color moves. Leave it on unless you mean to change it.
+            """)
         case .wheels: String(localized: "Tint shadows, midtones, or highlights separately. Drag toward a color; farther from the center means stronger color. Try cool shadows with warm highlights.")
         case .masks: String(localized: """
             Power windows. Add an ellipse, rectangle, gradient or freehand shape, place it on the picture, then grade only that area.

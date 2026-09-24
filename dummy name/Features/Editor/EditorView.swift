@@ -27,13 +27,19 @@ struct EditorView: View {
     @State private var assetFrames: [UUID: [UIImage]] = [:]
     @State private var waveforms: [UUID: [Float]] = [:]
     @State private var audioMode = false
-    @State private var audioPicker = false
     @State private var soundEffects = false
     @State private var audioURL: URL?
     @State private var mediaItem: MediaImportSource?
+    /// The Photos picker, which is how video and stills are chosen everywhere
+    /// but Mac. Files go through `fileRequest` instead.
     @State private var mediaPicker = false
-    /// The media bin's own file browser: video, stills and audio at once.
-    @State private var binImporter = false
+    /// What the editor's one file browser was last opened for, and whether it
+    /// is open. One browser, because a second `fileImporter` anywhere in this
+    /// screen would stop the first from ever presenting — see
+    /// `sideFileImporter`, which is what keeps the font and look importers in
+    /// the tool panels working.
+    @State private var fileRequest: FileImportRequest = .bin
+    @State private var showsFileImporter = false
     /// Set just before an edit that creates a title, so the selection change it
     /// causes opens the text dock instead of closing it.
     @State private var startsTypingOnSelection = false
@@ -79,7 +85,8 @@ struct EditorView: View {
         if backgroundToolArmed { return .pinchOnly }
         let drawsOnPicture = model.selectedText != nil || model.selectedShape != nil
             || model.evaluatedMediaOverlay != nil
-            || model.isPickingCurveHue || maskMode || localMaskMode || maskedGradeMode
+            || model.isPickingCurveHue || model.isPickingWarpColor || model.isPickingMaskQualifier
+            || maskMode || localMaskMode || maskedGradeMode
         return drawsOnPicture ? .off : .full
     }
     @State private var speedTool = false
@@ -159,7 +166,7 @@ struct EditorView: View {
                                 usageCounts: model.assetUsageCounts,
                                 assetFrames: assetFrames,
                                 isEnabled: !model.isPreparingTimeline && !model.isImporting && warmup.isReady,
-                                onImport: { binImporter = true },
+                                onImport: { requestFiles(.bin) },
                                 onPlace: { model.placeAsset($0, as: $1) },
                                 onImportFiles: { urls in Task { await model.importIntoBin(urls) } })
                                 .equatable()
@@ -492,6 +499,41 @@ struct EditorView: View {
         model.renderer.setInteractiveResize(false)
     }
 
+    /// What the one file browser was asked for, which is also how its result
+    /// is routed: the bin takes everything, the others take one kind.
+    private enum FileImportRequest {
+        case bin
+        case audio
+        case media(images: Bool)
+
+        var contentTypes: [UTType] {
+            switch self {
+            case .bin: [.movie, .image, .audio]
+            case .audio: [.audio]
+            case .media(let images): images ? [.image] : [.movie]
+            }
+        }
+
+        /// Only the bin imports in bulk: the others put one thing on the
+        /// timeline and would have nowhere to put a second.
+        var allowsMultipleSelection: Bool {
+            if case .bin = self { true } else { false }
+        }
+    }
+
+    private func requestFiles(_ request: FileImportRequest) {
+        fileRequest = request
+        showsFileImporter = true
+    }
+
+    /// Video and stills come from Files on Mac and from Photos everywhere else,
+    /// which is the same split `MediaImportPicker` makes for the Home screen.
+    private func requestMedia(images: Bool, overlay: Bool) {
+        importImage = images
+        importOverlay = overlay
+        if AppPlatform.isMac { requestFiles(.media(images: images)) } else { mediaPicker = true }
+    }
+
     private var editorInputs: some View {
         editorLayout
         .overlay(alignment: .bottom) {
@@ -552,12 +594,20 @@ struct EditorView: View {
                 catch { waveforms[asset.id] = [] }
             }
         }
-        // One browser for all three kinds. What was chosen decides where it is
-        // routed, so the bin needs a single button rather than one per kind.
-        .fileImporter(isPresented: $binImporter, allowedContentTypes: [.movie, .image, .audio],
-                      allowsMultipleSelection: true) { result in
+        // One browser for the whole screen, on a branch of its own. The editor
+        // used to chain three — the bin's, audio's, and the one inside
+        // `MediaImportPicker` — and SwiftUI presents only the outermost, so
+        // Import Media and Add audio from Files opened nothing at all.
+        .sideFileImporter(isPresented: $showsFileImporter,
+                          allowedContentTypes: fileRequest.contentTypes,
+                          allowsMultipleSelection: fileRequest.allowsMultipleSelection) { result in
             switch result {
-            case .success(let urls): Task { await model.importIntoBin(urls) }
+            case .success(let urls):
+                switch fileRequest {
+                case .bin: Task { await model.importIntoBin(urls) }
+                case .audio: audioURL = urls.first
+                case .media: if let url = urls.first { mediaItem = .file(url) }
+                }
             case .failure(let error):
                 let cocoa = error as NSError
                 if cocoa.domain != NSCocoaErrorDomain || cocoa.code != NSUserCancelledError {
@@ -565,20 +615,13 @@ struct EditorView: View {
                 }
             }
         }
-        .fileImporter(isPresented: $audioPicker, allowedContentTypes: [.audio]) { result in
-            switch result {
-            case .success(let url): audioURL = url
-            case .failure(let error): model.editError = error.localizedDescription
-            }
-        }
         .task(id: audioURL) {
             guard let audioURL else { return }
             await model.addAudio(audioURL)
             self.audioURL = nil
         }
-        .modifier(MediaImportPicker(isPresented: $mediaPicker, images: importImage,
-                                    onSelection: { mediaItem = $0.first },
-                                    onFailure: { model.editError = $0.localizedDescription }))
+        .modifier(PhotoImportPicker(isPresented: $mediaPicker, images: importImage,
+                                    onSelection: { mediaItem = $0.first }))
         .task(id: mediaItem) {
             guard let mediaItem else { return }
             if importImage { await model.addImage(mediaItem) }
@@ -656,7 +699,7 @@ struct EditorView: View {
 
     private var shortcutsEnabled: Bool {
         !typingText && !model.showsExport && clipExport == nil && !savingPreset && !help
-            && !settingsSheet && !layers && !markers && !soundEffects && !audioPicker && !mediaPicker
+            && !settingsSheet && !layers && !markers && !soundEffects && !showsFileImporter && !mediaPicker
             && !clipOptions && !confirmsResetAll && !colorInfo && model.editError == nil
     }
 
@@ -665,13 +708,9 @@ struct EditorView: View {
         let canImport = ready && warmup.isReady
         let singleSelection = model.selectedClipIDs.count == 1 && model.selectedItem != nil
         return [
-            .init(.addVideo, isEnabled: canImport) {
-                importImage = false; importOverlay = false; mediaPicker = true
-            },
-            .init(.addImageOverlay, isEnabled: canImport) {
-                importImage = true; importOverlay = true; mediaPicker = true
-            },
-            .init(.addAudio, isEnabled: canImport) { audioPicker = true },
+            .init(.addVideo, isEnabled: canImport) { requestMedia(images: false, overlay: false) },
+            .init(.addImageOverlay, isEnabled: canImport) { requestMedia(images: true, overlay: true) },
+            .init(.addAudio, isEnabled: canImport) { requestFiles(.audio) },
             .init(.saveProject) {
                 model.flushGradeHistory(); onSettingsChanged(model.project, true)
             },
@@ -791,13 +830,22 @@ struct EditorView: View {
                 .onTapGesture { location in
                     let point = CGPoint(x: location.x / max(proxy.size.width, 1),
                                         y: location.y / max(proxy.size.height, 1))
-                    if model.pickCurveHue(atViewPoint: point) { CurveHaptics.add() }
+                    // One armed eyedropper at a time, and the same layer
+                    // serves both: the tap, the hint and the suspended zoom are
+                    // identical whichever tool asked for the colour.
+                    let picked = model.isPickingWarpColor
+                        ? model.pickWarpColor(atViewPoint: point)
+                        : model.pickCurveHue(atViewPoint: point)
+                    if picked { CurveHaptics.add() }
                 }
                 .overlay(alignment: .bottom) {
                     HStack(spacing: AppSpacing.small) {
                         Image(systemName: "eyedropper")
                         Text("Tap a colour in the picture")
-                        Button("Cancel") { model.isPickingCurveHue = false }
+                        Button("Cancel") {
+                            model.isPickingCurveHue = false
+                            model.isPickingWarpColor = false
+                        }
                             .font(AppTypography.caption.weight(.semibold))
                             .foregroundStyle(AppColors.accent)
                     }
@@ -809,6 +857,42 @@ struct EditorView: View {
                 }
         }
         .accessibilityLabel("Tap the picture to pick a colour")
+    }
+
+    /// The same eyedropper, aimed at the selected mask's colour qualifier.
+    ///
+    /// A second layer rather than a mode on the first: the two pickers write to
+    /// different places, and sharing one would mean deciding which panel the tap
+    /// belonged to at the moment of the tap.
+    private var qualifierPickingLayer: some View {
+        GeometryReader { proxy in
+            Color.white.opacity(0.001)
+                .contentShape(Rectangle())
+                .onTapGesture { location in
+                    let point = CGPoint(x: location.x / max(proxy.size.width, 1),
+                                        y: location.y / max(proxy.size.height, 1))
+                    guard let id = model.selectedMaskID else {
+                        model.isPickingMaskQualifier = false
+                        return
+                    }
+                    if model.pickMaskQualifier(id, atViewPoint: point) { CurveHaptics.add() }
+                }
+                .overlay(alignment: .bottom) {
+                    HStack(spacing: AppSpacing.small) {
+                        Image(systemName: "eyedropper")
+                        Text("Tap the colour to select")
+                        Button("Cancel") { model.isPickingMaskQualifier = false }
+                            .font(AppTypography.caption.weight(.semibold))
+                            .foregroundStyle(AppColors.accent)
+                    }
+                    .font(AppTypography.caption)
+                    .padding(.horizontal, AppSpacing.compact)
+                    .padding(.vertical, AppSpacing.small)
+                    .background(.black.opacity(0.7), in: Capsule())
+                    .padding(.bottom, 44)
+                }
+        }
+        .accessibilityLabel("Tap the picture to select a colour")
     }
 
     /// A media-bin drag is over the picture.
@@ -861,7 +945,8 @@ struct EditorView: View {
                     .padding(6)
                     .allowsHitTesting(false)
             }
-            if model.isPickingCurveHue { colorPickingLayer }
+            if model.isPickingCurveHue || model.isPickingWarpColor { colorPickingLayer }
+            if model.isPickingMaskQualifier { qualifierPickingLayer }
             if model.showsOriginal {
                 Text("ORIGINAL").font(.caption2.weight(.semibold)).tracking(1.5)
                     .padding(10).background(.black.opacity(0.65), in: Capsule()).padding(14)
@@ -1066,15 +1151,15 @@ struct EditorView: View {
         Button("Sound effects", systemImage: "waveform.badge.plus") {
             model.playback.pause(); soundEffects = true
         }
-        Button("Add audio from Files", systemImage: "waveform") { audioPicker = true }
+        Button("Add audio from Files", systemImage: "waveform") { requestFiles(.audio) }
         Button("Add video after selection", systemImage: "film") {
-            importImage = false; importOverlay = false; mediaPicker = true
+            requestMedia(images: false, overlay: false)
         }
         Button("Add video overlay", systemImage: "square.3.layers.3d") {
-            importImage = false; importOverlay = true; mediaPicker = true
+            requestMedia(images: false, overlay: true)
         }
         Button("Add image overlay", systemImage: "photo") {
-            importImage = true; importOverlay = true; mediaPicker = true
+            requestMedia(images: true, overlay: true)
         }
         Button("Add text", systemImage: "textformat", action: addTextAndType)
         Button("Add shape", systemImage: "square.on.circle") { openShapeTool(); model.addShape() }
@@ -1164,20 +1249,20 @@ struct EditorView: View {
     @ViewBuilder private var addTrackActions: some View {
         Section("Video") {
             Button("Video clip", systemImage: "film") {
-                importImage = false; importOverlay = false; mediaPicker = true
+                requestMedia(images: false, overlay: false)
             }
             Button("Video overlay", systemImage: "square.3.layers.3d") {
-                importImage = false; importOverlay = true; mediaPicker = true
+                requestMedia(images: false, overlay: true)
             }
             Button("Image overlay", systemImage: "photo") {
-                importImage = true; importOverlay = true; mediaPicker = true
+                requestMedia(images: true, overlay: true)
             }
         }
         Section("Audio") {
             Button("Sound effects", systemImage: "waveform.badge.plus") {
                 model.playback.pause(); soundEffects = true
             }
-            Button("Audio from Files", systemImage: "waveform") { audioPicker = true }
+            Button("Audio from Files", systemImage: "waveform") { requestFiles(.audio) }
         }
         Section("Overlays") {
             Button("Text", systemImage: "textformat", action: addTextAndType)
@@ -1595,7 +1680,7 @@ struct EditorView: View {
                 if audioMode {
                     AudioToolPanel(model: model, addSoundEffect: {
                         model.playback.pause(); soundEffects = true
-                    }, addAudio: { audioPicker = true }, showTracks: { layers = true },
+                    }, addAudio: { requestFiles(.audio) }, showTracks: { layers = true },
                         waveformUnavailable: model.selectedAudio.map { waveforms[$0.assetID]?.isEmpty == true } ?? false)
                 } else {
                     Text("Hold, then drag sideways to move · Drag vertically for a layer · Drag edges to trim")

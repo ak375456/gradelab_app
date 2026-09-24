@@ -68,6 +68,7 @@ final class LookPreviewRenderer: @unchecked Sendable {
         var uniforms = GradeUniforms(settings: settings, bypass: false)
         let curves = settings.advanced.map { context.curves.texture(for: $0.resolvedCurves) }
             ?? context.curves.texture(for: nil)
+        let warps = context.warps.texture(for: settings.advanced?.resolvedColorWarp)
 
         let descriptor = MTLTextureDescriptor.texture2DDescriptor(
             pixelFormat: .bgra8Unorm,
@@ -90,6 +91,7 @@ final class LookPreviewRenderer: @unchecked Sendable {
         encoder.setTexture(output, index: 2)
         encoder.setTexture(lut, index: 3)
         encoder.setTexture(curves, index: 6)
+        encoder.setTexture(warps, index: 12)
         encoder.setBytes(&uniforms, length: MemoryLayout<GradeUniforms>.stride, index: 0)
         // A look tile shows the look itself, not a clip's local grades, so the
         // stack is bound empty rather than left unpopulated.

@@ -182,6 +182,11 @@ struct ExportView: View {
         VStack(alignment: .leading, spacing: AppSpacing.compact) {
             AppSectionHeader("Output", subtitle: LocalizedStringKey(outputTechnicalLine))
             VStack(spacing: 16) {
+                Toggle("Use canvas size and frame rate for this export", isOn: $model.followsCanvas)
+                Text(model.followsCanvas
+                     ? "Output follows the canvas. Change its dimensions or frame rate in the Canvas tool."
+                     : "Choose a delivery size and frame rate below. The canvas layout stays the same.")
+                    .font(.caption).foregroundStyle(.secondary)
                 Picker("Format", selection: $model.configuration.container) {
                     ForEach(ExportConfiguration.Container.allCases, id: \.self) { Text($0.rawValue).tag($0) }
                 }
@@ -194,28 +199,28 @@ struct ExportView: View {
                     .font(.caption).foregroundStyle(.secondary)
                 Picker("Size", selection: $model.configuration.resolution) {
                     ForEach(ExportConfiguration.Resolution.allCases, id: \.self) { resolution in
-                        Text(optionLabel(resolution.rawValue,
+                        Text(optionLabel(resolution == .original ? "Canvas size" : resolution.rawValue,
                                          needsPro: resolutionNeedsPro(resolution))).tag(resolution)
                     }
-                }
+                }.disabled(model.followsCanvas)
                 if model.configuration.resolution == .custom {
                     Stepper("Longest edge: \(model.configuration.customLongEdge) px", value: $model.configuration.customLongEdge, in: 64...7680, step: 2)
                     TextField("Longest edge in pixels", value: $model.configuration.customLongEdge, format: .number)
                         .keyboardType(.numberPad).textFieldStyle(.roundedBorder)
                 }
-                Text("Resizing keeps the original shape. Upscaling does not add detail.")
+                Text("Resizing keeps the canvas shape. Upscaling does not add detail.")
                     .font(.caption).foregroundStyle(.secondary)
                 Picker("Frame rate", selection: $model.configuration.frameRate) {
                     ForEach(ExportConfiguration.FrameRate.allCases, id: \.self) { rate in
-                        Text(optionLabel(rate == .original ? "Project frame rate" : "\(rate.rawValue) fps",
+                        Text(optionLabel(rate == .original ? "Canvas frame rate" : "\(rate.rawValue) fps",
                                          needsPro: frameRateNeedsPro(rate))).tag(rate)
                     }
-                }
+                }.disabled(model.followsCanvas)
                 if model.configuration.frameRate != .original {
                     Text("Frames are repeated or dropped. Speed and audio timing stay unchanged; no motion interpolation.")
                         .font(.caption).foregroundStyle(.secondary)
                 }
-                Text("Edited timelines render on the project’s frame grid. Source files remain unchanged.")
+                Text("Edited timelines render on the canvas frame grid. Source files remain unchanged.")
                     .font(.caption).foregroundStyle(.secondary)
                 Picker("Quality", selection: $model.configuration.qualityPreset) {
                     ForEach(ExportConfiguration.QualityPreset.allCases, id: \.self) { Text($0.title).tag($0) }
@@ -516,9 +521,10 @@ struct ExportView: View {
     }
 
     private var outputTechnicalLine: String {
-        let size = model.project.metadata.displaySize
-        let dimensions = model.configuration.dimensions(width: Int(size.width), height: Int(size.height))
-        let frameRate = model.configuration.frameRate.value.map { "\(Int($0)) fps" } ?? model.project.metadata.frameRateLabel ?? String(localized: "Original timing")
+        let canvas = model.project.canvas
+        let dimensions = model.configuration.dimensions(width: canvas.width, height: canvas.height)
+        let frameRate = model.configuration.frameRate.value.map { "\(Int($0)) fps" }
+            ?? canvas.frameRateLabel ?? String(localized: "Unknown frame rate")
         return "\(dimensions.width) × \(dimensions.height) • \(frameRate) • \(model.configuration.codec.rawValue)"
     }
 

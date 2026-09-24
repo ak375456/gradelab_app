@@ -45,10 +45,14 @@ enum ExportMediaSettings {
 
     static func videoWriterSettings(
         source: ExportSourceInfo,
-        configuration: ExportConfiguration
+        configuration: ExportConfiguration,
+        project: VideoProject? = nil
     ) -> [String: Any] {
-        let dimensions = configuration.dimensions(width: source.encodedWidth, height: source.encodedHeight)
-        let fps = configuration.frameRate.value ?? source.nominalFrameRate
+        let dimensions = configuration.dimensions(
+            width: project?.canvas.width ?? source.encodedWidth,
+            height: project?.canvas.height ?? source.encodedHeight)
+        let fps = configuration.frameRate.value ?? project?.canvas.frameRate ?? source.nominalFrameRate
+        let colorMode = project?.colorMode ?? source.colorMode
         // HDR requires HEVC Main 10; 8-bit Main and H.264 High cannot carry it.
         var compressionProperties: [String: Any] = [:]
         // ProRes is constant-quality and intra-frame: a bitrate target, a
@@ -58,7 +62,7 @@ enum ExportMediaSettings {
             // Derived from the same two helpers the probe uses, so the profile
             // that gets written and the profile that gets tested cannot disagree.
             let profileLevel: CFString
-            if requiresMain10(colorMode: source.colorMode, configuration: configuration) {
+            if requiresMain10(colorMode: colorMode, configuration: configuration) {
                 profileLevel = kVTProfileLevel_HEVC_Main10_AutoLevel
             } else {
                 profileLevel = configuration.codec == .hevc
@@ -79,7 +83,7 @@ enum ExportMediaSettings {
             compressionProperties[AVVideoExpectedSourceFrameRateKey] = frameRate
         }
 
-        let colorProperties: [String: Any] = source.colorMode.isHDR
+        let colorProperties: [String: Any] = colorMode.isHDR
             ? [
                 AVVideoColorPrimariesKey: AVVideoColorPrimaries_ITU_R_2020,
                 AVVideoTransferFunctionKey: AVVideoTransferFunction_ITU_R_2100_HLG,
@@ -92,7 +96,7 @@ enum ExportMediaSettings {
             ]
 
         return [
-            AVVideoCodecKey: effectiveCodec(colorMode: source.colorMode, configuration: configuration).avCodec,
+            AVVideoCodecKey: effectiveCodec(colorMode: colorMode, configuration: configuration).avCodec,
             AVVideoWidthKey: dimensions.width,
             AVVideoHeightKey: dimensions.height,
             AVVideoColorPropertiesKey: colorProperties,

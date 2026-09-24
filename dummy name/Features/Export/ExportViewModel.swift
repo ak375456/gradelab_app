@@ -18,6 +18,14 @@ final class ExportViewModel: ObservableObject {
     @Published var configuration = ExportConfiguration.maximumQuality {
         didSet { if oldValue != configuration { checkCapabilities() } }
     }
+    @Published var followsCanvas: Bool {
+        didSet {
+            if followsCanvas {
+                configuration.resolution = .original
+                configuration.frameRate = .original
+            }
+        }
+    }
     private var capabilityTask: Task<Void, Never>?
 
     private var exporter: VideoExporter?
@@ -72,6 +80,7 @@ final class ExportViewModel: ObservableObject {
     init(project: GradeProject, settings: GradeSettings) {
         self.project = project
         self.settings = settings
+        followsCanvas = project.canvas.usesCanvasExportSettings
     }
 
     deinit {
@@ -255,7 +264,8 @@ final class ExportViewModel: ObservableObject {
         capabilityTask = Task { [weak self] in
             guard let self else { return }
             do { try await Task.sleep(for: .milliseconds(250)) } catch { return }
-            let result = await exporter.capabilities(for: self.asset, configuration: selection)
+            let result = await exporter.capabilities(for: self.asset, configuration: selection,
+                                                     project: self.project)
             guard !Task.isCancelled, selection == self.configuration else { return }
             self.capabilities = result
             self.isCheckingCapabilities = false

@@ -41,6 +41,13 @@ struct GradingControls<Model: GradingModel>: View {
                             }.frame(width: 58, height: 44)
                                 .foregroundStyle(model.selectedPanel == panel ? AppColors.textPrimary : AppColors.textSecondary)
                                 .background(model.selectedPanel == panel ? AppColors.surfaceRaised : .clear, in: RoundedRectangle(cornerRadius: 12))
+                                // The whole 58x44 tile takes the click. An
+                                // unselected tab's background is `.clear`,
+                                // which SwiftUI does not hit-test, so without
+                                // this only the glyph and the word themselves
+                                // answered — a pointer a pixel off either one
+                                // hit nothing at all.
+                                .contentShape(RoundedRectangle(cornerRadius: 12))
                         }.buttonStyle(.plain).accessibilityAddTraits(model.selectedPanel == panel ? .isSelected : [])
                     }
                 }.padding(.horizontal, 12)
@@ -55,6 +62,23 @@ struct GradingControls<Model: GradingModel>: View {
                     }
                     switch model.selectedPanel {
                     case .light, .color:
+                        // A Mac window has the height to show every slider in
+                        // the group at once, which is how a desktop grading
+                        // panel reads: Temperature, Tint, Saturation and
+                        // Vibrance together, not one at a time behind a chip.
+                        // Phone and iPad keep the chips — there the picture
+                        // would lose the room.
+                        if AppPlatform.isMac {
+                            ForEach(model.visibleParameters) { parameter in
+                                if let property = AnimatableProperty.light(parameter) {
+                                    GradeSlider(model: model, property: property,
+                                                title: parameter.title,
+                                                range: parameter.range, step: parameter.step,
+                                                valueFormatter: AdjustmentValueFormatters.signed(
+                                                    fractionDigits: parameter == .exposure ? 2 : 0))
+                                }
+                            }
+                        } else {
                         ScrollView(.horizontal) {
                             HStack(spacing: 8) {
                                 ForEach(model.visibleParameters) { parameter in
@@ -73,6 +97,10 @@ struct GradingControls<Model: GradingModel>: View {
                                         }
                                         .padding(.horizontal, 14).frame(height: 40)
                                         .background(selectedParameter == parameter ? AppColors.surfaceRaised : .clear, in: Capsule())
+                                        // Same reason as the panel strip: an
+                                        // unselected chip is clear, so the
+                                        // whole capsule has to be asked for.
+                                        .contentShape(Capsule())
                                     }.foregroundStyle(selectedParameter == parameter ? AppColors.textPrimary : AppColors.textSecondary)
                                 }
                             }
@@ -83,7 +111,9 @@ struct GradingControls<Model: GradingModel>: View {
                                         valueFormatter: AdjustmentValueFormatters.signed(
                                             fractionDigits: selectedParameter == .exposure ? 2 : 0))
                         }
+                        }
                     case .curves: CurvesPanel(model: model)
+                    case .warper: ColorWarperPanel(model: model)
                     case .hsl: HSLPanel(model: model)
                     case .wheels: WheelsPanel(model: model)
                     case .mask: GradeMaskPanel(model: model)

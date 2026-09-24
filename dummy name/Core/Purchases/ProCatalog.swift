@@ -171,6 +171,7 @@ enum ProFeature: String, Identifiable, Sendable {
     case exportControls
     case photoFormat
     case colorCurves
+    case colorWarper
     case filmEffects
     case gradePresets
     case scopes
@@ -188,6 +189,7 @@ enum ProFeature: String, Identifiable, Sendable {
         case .exportControls: String(localized: "Take the encoder's controls.")
         case .photoFormat: String(localized: "Deliver in any format.")
         case .colorCurves: String(localized: "Grade like a colorist.")
+        case .colorWarper: String(localized: "Move color where you want it.")
         case .filmEffects: String(localized: "Give it the texture of film.")
         case .gradePresets: String(localized: "Keep the look you built.")
         case .scopes: String(localized: "Read the picture, don't guess.")
@@ -214,6 +216,8 @@ enum ProFeature: String, Identifiable, Sendable {
             String(localized: "Export stills as HEIC or lossless PNG. Full-resolution JPEG stays free.")
         case .colorCurves:
             String(localized: "Hue vs Hue, Hue vs Sat, Hue vs Luma, Luma vs Sat, Sat vs Sat and Sat vs Luma \u{2014} the curves that target one colour without touching the rest. Master, Red, Green and Blue stay free.")
+        case .colorWarper:
+            String(localized: "The Color Warper. Grab a color by its hue and its saturation at once and drag it somewhere else \u{2014} the colors around it follow, the rest of the picture does not.")
         case .filmEffects:
             String(localized: "Bloom, glow, halation and grain. Fade and sharpening stay free.")
         case .gradePresets:
@@ -253,7 +257,22 @@ enum ProAccessPolicy {
         "Serenity.CUBE"
     ]
 
-    static func requiresPro(_ look: LUTAsset) -> Bool { !freeLookIDs.contains(look.id) }
+    /// A camera conversion is never Pro.
+    ///
+    /// Without one, Log footage cannot be viewed correctly at all — it is not a
+    /// nicer version of the picture, it is the picture. Charging for it would
+    /// put the paywall in front of the work rather than in front of delivery,
+    /// which is the same reasoning that made Apple Log and HDR export free.
+    ///
+    /// Written as a rule on `kind` rather than by adding eight ids to
+    /// `freeLookIDs`, so that list keeps meaning what it says: the free
+    /// *creative* looks. Only the bundled conversions are `.technical`; looks
+    /// discovered in the bundle and looks imported on a device are both
+    /// `.creative`, so neither can reach the free tier through this.
+    static func requiresPro(_ look: LUTAsset) -> Bool {
+        guard look.kind != .technical else { return false }
+        return !freeLookIDs.contains(look.id)
+    }
 
     // MARK: - Fonts
 
@@ -357,6 +376,12 @@ enum ProAccessPolicy {
         // Eight-band HSL and the colour wheels are free.
         if advanced.resolvedCurves.active.contains(where: { curveRequiresPro($0.type) }) {
             found.append(.colorCurves)
+        }
+        // Read through `resolvedColorWarp`, so a warp whose points have all been
+        // dragged back to where they started - or whose strength is at zero - is
+        // not gated for a picture it cannot change.
+        if advanced.resolvedColorWarp != nil {
+            found.append(.colorWarper)
         }
         let effects = advanced.resolvedEffects
         if FilmEffectParameter.all.contains(where: {

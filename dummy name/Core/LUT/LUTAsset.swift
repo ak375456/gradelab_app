@@ -134,7 +134,7 @@ extension LUTAsset {
     ]
 
     static let bundledLooks: [LUTAsset] = {
-        let builtIn = bundledCreativeLooks
+        let builtIn = bundledCreativeLooks + bundledLogConversions
         let known = Set(builtIn.map(\.resourceName)).union(technicalTransformResourceNames)
         // The resource directory is listed directly. `urls(forResourcesWithExtension:)`
         // matches the extension case-sensitively, so asking it for "cube" silently
@@ -210,6 +210,117 @@ extension LUTAsset {
             summary: String(localized: "Soft, slightly faded look with lifted blacks, muted colour and smooth highlights."),
             inputColorSpace: "Rec.709 / working SDR",
             kind: .creative
+        )
+    ]
+
+    /// Sony's own Log conversion transforms, for footage the app cannot decode
+    /// natively the way it decodes Apple Log.
+    ///
+    /// These are `.technical`, not looks, and they are a deliberate exception to
+    /// the rule the imported-looks guide states: a conversion LUT is the wrong
+    /// thing to apply to Rec.709 footage. It is the *right* thing to apply to
+    /// the footage it names, and the look stage runs before the grading tools
+    /// (see `applyLookAndGrade`), which is exactly where an input transform
+    /// belongs. So the pipeline position is already correct; what is missing is
+    /// only a stage that would pick one automatically.
+    ///
+    /// Listed explicitly rather than left to discovery because discovery labels
+    /// everything it finds as a creative look expecting Rec.709 input, which
+    /// would describe these as the opposite of what they are. Kept out of
+    /// `bundledCreativeLooks` for a harder reason: `BundledLUTTests` requires a
+    /// creative look to be 33-point and to map black to black and white to
+    /// white. A Log transform does neither — S-Log3 black sits at 0.0929, not 0
+    /// — so it would fail tests that are correct to demand that of a look.
+    ///
+    /// `origin` is `.bundled` rather than `.builtIn` so they are not preloaded
+    /// at launch: eight more looks, two of them 65-point, is not the "cheaper
+    /// than the bookkeeping" trade `preloadBundledLooks` is written for. They
+    /// load on first selection like any other bundled look.
+    static let bundledLogConversions: [LUTAsset] = [
+        LUTAsset(
+            name: "S-Log3 to LC-709",
+            filename: "SLog3_LC709.cube",
+            category: "Sony Log",
+            summary: String(localized: "Sony's neutral low-contrast conversion. The flattest starting point, with the most room left to grade."),
+            inputColorSpace: "S-Log3 / S-Gamut3.Cine",
+            kind: .technical,
+            origin: .bundled
+        ),
+        LUTAsset(
+            name: "S-Log3 to LC-709 Type A",
+            filename: "SLog3_LC709TypeA.cube",
+            category: "Sony Log",
+            summary: String(localized: "Low contrast with Sony's Type A rendering, tuned to sit closer to an ARRI Alexa."),
+            inputColorSpace: "S-Log3 / S-Gamut3.Cine",
+            kind: .technical,
+            origin: .bundled
+        ),
+        LUTAsset(
+            name: "S-Log3 to Cine 709",
+            filename: "SLog3_Cine709.cube",
+            category: "Sony Log",
+            summary: String(localized: "Sony's Cine+709 conversion: more contrast and a film-style curve, ready to watch with less grading."),
+            inputColorSpace: "S-Log3 / S-Gamut3.Cine",
+            kind: .technical,
+            origin: .bundled
+        ),
+        LUTAsset(
+            name: "S-Log3 to S-Log2 709",
+            filename: "SLog3_SLog2709.cube",
+            category: "Sony Log",
+            summary: String(localized: "Converts S-Log3 with the older S-Log2 709 rendering, for matching footage shot on both."),
+            inputColorSpace: "S-Log3 / S-Gamut3.Cine",
+            kind: .technical,
+            origin: .bundled
+        ),
+        LUTAsset(
+            name: "S-Log2 to LC-709",
+            filename: "SLog2_LC709.cube",
+            category: "Sony Log",
+            summary: String(localized: "Sony's neutral low-contrast conversion for S-Log2 footage from older Sony bodies."),
+            inputColorSpace: "S-Log2 / S-Gamut",
+            kind: .technical,
+            origin: .bundled
+        ),
+        LUTAsset(
+            name: "S-Log2 to LC-709 Type A",
+            filename: "SLog2_LC709TypeA.cube",
+            category: "Sony Log",
+            summary: String(localized: "Low contrast with Sony's Type A rendering, for S-Log2 footage."),
+            inputColorSpace: "S-Log2 / S-Gamut",
+            kind: .technical,
+            origin: .bundled
+        ),
+        LUTAsset(
+            name: "S-Log2 to Cine 709",
+            filename: "SLog2_Cine709.cube",
+            category: "Sony Log",
+            summary: String(localized: "Sony's Cine+709 conversion for S-Log2: more contrast and a film-style curve."),
+            inputColorSpace: "S-Log2 / S-Gamut",
+            kind: .technical,
+            origin: .bundled
+        ),
+        LUTAsset(
+            name: "S-Log2 to S-Log2 709",
+            filename: "SLog2_SLog2709.cube",
+            category: "Sony Log",
+            summary: String(localized: "Sony's standard S-Log2 709 rendering, the closest match to the camera's own monitoring."),
+            inputColorSpace: "S-Log2 / S-Gamut",
+            kind: .technical,
+            origin: .bundled
+        ),
+        // Shipped loose in the looks folder before this list existed, which is
+        // why its filename is the one DJI published rather than a tidy one: that
+        // string is the look's identity and is what any project already using it
+        // has saved. The display name is set here instead.
+        LUTAsset(
+            name: "DJI D-Log M to Rec.709",
+            filename: "DJI Mavic 3 D-Log M to Rec.709 V1.cube",
+            category: "DJI Log",
+            summary: String(localized: "DJI's conversion for D-Log M footage from Mavic 3 and other DJI cameras."),
+            inputColorSpace: "DJI D-Log M",
+            kind: .technical,
+            origin: .bundled
         )
     ]
 }

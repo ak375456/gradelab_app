@@ -147,7 +147,8 @@ struct ImageEditorView: View {
     /// mask window and the eyedropper hold the picture at 1x, as before.
     private var previewInteraction: PreviewInteraction {
         if backgroundToolArmed { return .pinchOnly }
-        return model.isPickingCurveHue || model.selectedPanel == .mask ? .off : .full
+        return model.isPickingCurveHue || model.isPickingWarpColor
+            || model.selectedPanel == .mask ? .off : .full
     }
 
     // MARK: - Header
@@ -227,7 +228,7 @@ struct ImageEditorView: View {
                 Color.black
                 ProgressView().frame(maxWidth: .infinity, maxHeight: .infinity)
             }
-            if model.isPickingCurveHue { colorPickingLayer }
+            if model.isPickingCurveHue || model.isPickingWarpColor { colorPickingLayer }
             if model.showsOriginal {
                 Text("ORIGINAL").font(.caption2.weight(.semibold)).tracking(1.5)
                     .padding(10).background(.black.opacity(0.65), in: Capsule()).padding(14)
@@ -286,13 +287,19 @@ struct ImageEditorView: View {
                 .onTapGesture { location in
                     let point = CGPoint(x: location.x / max(proxy.size.width, 1),
                                         y: location.y / max(proxy.size.height, 1))
-                    if model.pickCurveHue(atViewPoint: point) { CurveHaptics.add() }
+                    let picked = model.isPickingWarpColor
+                        ? model.pickWarpColor(atViewPoint: point)
+                        : model.pickCurveHue(atViewPoint: point)
+                    if picked { CurveHaptics.add() }
                 }
                 .overlay(alignment: .bottom) {
                     HStack(spacing: AppSpacing.small) {
                         Image(systemName: "eyedropper")
                         Text("Tap a colour in the picture")
-                        Button("Cancel") { model.isPickingCurveHue = false }
+                        Button("Cancel") {
+                            model.isPickingCurveHue = false
+                            model.isPickingWarpColor = false
+                        }
                             .font(AppTypography.caption.weight(.semibold))
                             .foregroundStyle(AppColors.accent)
                     }
@@ -320,7 +327,11 @@ struct ImageEditorView: View {
                 Label("Color", systemImage: "camera.filters").font(.caption.weight(.medium)).frame(minHeight: 44)
                     .foregroundStyle(model.imageTool == .color ? AppColors.accent : AppColors.textSecondary)
             }
-            Button { model.imageTool = .background; model.isPickingCurveHue = false } label: {
+            Button {
+                model.imageTool = .background
+                model.isPickingCurveHue = false
+                model.isPickingWarpColor = false
+            } label: {
                 Label("Remove BG", systemImage: "person.crop.rectangle").font(.caption.weight(.medium)).frame(minHeight: 44)
                     .foregroundStyle(model.imageTool == .background ? AppColors.accent : AppColors.textSecondary)
             }

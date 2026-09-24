@@ -18,12 +18,14 @@ struct GradeUniforms {
     float4 options; // x = bypass, y = look strength, z = active-curve mask
     float4 gradeMaskA; // centre x/y, width/height in normalised source coordinates
     float4 gradeMaskB; // rotation, feather, opacity (-1 = disabled), shape/invert flags
-    float4 reservedC, reservedD; // remaining retired legacy curve slots
+    float4 viewerAssist;  // x = assist mode, y = zebra threshold. Display only.
+    float4 offsetWheel;   // hue, colour strength, brightness. Both retired curve slots.
     float4 hsl0, hsl1, hsl2, hsl3, hsl4, hsl5, hsl6, hsl7;
     float4 shadowWheel, midtoneWheel, highlightWheel;
     float4 vignette;
     float4 effectsA;   // fade, grain, sharpen, grain seed
     float4 effectsB;   // bloom, glow, halation, spare
+    float4 colorWarp;  // Color Warper: strength, active-plane mask, preserve luminance
 };
 
 struct YUVUniforms {
@@ -93,6 +95,47 @@ inline float3 applyWhiteBalance(float3 linearRGB, float temperature, float tint)
         tint * 0.14,
         -temperature * 0.18 - tint * 0.035));
     return max(xyzToRGB * (bradfordToXYZ * (lms * gains)), 0.0);
+}
+
+// ---------------------------------------------------------------------------
+// Viewer assist: false colour and zebras
+//
+// A DISPLAY aid, not a grade. It runs at the very end of each display fragment,
+// on the pixel that is about to be shown, and nothing that writes a file passes
+// through those fragments — so an assist can never reach an exported frame.
+// That is also why it is driven from `reservedC` rather than from the grade
+// model: it belongs to the viewer, not to the clip, and must not travel with a
+// copied grade, a preset or a saved project.
+//
+// `reservedC.x` selects it (0 off, 1 false colour, 2 zebras) and `reservedC.y`
+// is the zebra threshold.
+//
+// The zone boundaries are the ones a Log shooter already reads on an ARRI or
+// Blackmagic body: green sits on 18% grey and pink on average skin, so exposing
+// with this matches exposing on set. On an HDR project the displayed value is
+// an HLG signal rather than Rec.709, so the clipping ends stay honest but the
+// middle zones do not line up with scene IRE - see the note in ViewerAssist.
+inline float3 falseColorZone(float luma) {
+    if (luma < 0.020) { return float3(0.36, 0.10, 0.56); }  // crushed black
+    if (luma < 0.100) { return float3(0.12, 0.30, 0.85); }  // deep shadow
+    if (luma < 0.380) { return float3(0.26, 0.26, 0.29); }  // shadow
+    if (luma < 0.420) { return float3(0.15, 0.80, 0.25); }  // 18% grey
+    if (luma < 0.520) { return float3(0.53, 0.53, 0.56); }  // midtone
+    if (luma < 0.580) { return float3(0.96, 0.62, 0.71); }  // skin
+    if (luma < 0.900) { return float3(0.80, 0.80, 0.82); }  // highlight
+    if (luma < 0.950) { return float3(0.98, 0.85, 0.15); }  // near clipping
+    return float3(0.95, 0.15, 0.12);                        // clipped
+}
+
+inline float3 applyViewerAssist(float3 rgb, float2 pixel, constant GradeUniforms &grade) {
+    uint mode = uint(max(grade.viewerAssist.x, 0.0) + 0.5);
+    if (mode == 0) { return rgb; }
+    float luma = saturate(luminance709(saturate(rgb)));
+    if (mode == 1) { return falseColorZone(luma); }
+    // Zebras mark what is at or above the threshold and leave everything else
+    // as the picture, so the shot stays watchable while it is switched on.
+    if (luma < grade.viewerAssist.y) { return rgb; }
+    return fract((pixel.x + pixel.y) / 12.0) < 0.5 ? float3(1.0) : float3(0.0);
 }
 
 inline float3 preserveHueLuminance(float3 color, float oldLuma, float newLuma) {
@@ -271,10 +314,145 @@ inline float3 applyColorCurves(float3 hsl,
     return hsl;
 }
 
+// ---------------------------------------------------------------------------
+// The Color Warper
+//
+// A two-dimensional deformation of colour, and the reason it is not another
+// curve: a curve maps one coordinate to one coordinate, so Hue vs Sat can say
+// "oranges get more saturated" but cannot say "the orange AT 70% saturation
+// goes to that red at 82% while the orange at 20% stays where it is". This
+// reads two coordinates of the source colour and displaces the pair.
+//
+// None of the deformation maths runs here. The authored points are solved on
+// the CPU into a small two-channel table (see ColorWarpField.swift) and this is
+// one filtered fetch per active plane - so the per-pixel cost does not depend on
+// how many points the grade carries, and dragging one point rebuilds 36 KB
+// rather than re-deriving a field for every pixel on screen.
+//
+// Two planes, stacked as blocks in one texture the way masked local grades stack
+// curve blocks:
+//
+//   block 0   hue x saturation   angle and distance on the colour wheel
+//   block 1   chroma x luma      how colourful against how bright
+//
+// Column 0 and column W-1 of the hue plane hold the same hue, because the
+// builder measures hue the short way round. Clamp-to-edge addressing is then
+// continuous across the red boundary and there is no seam - the same property
+// the curve texture's hue rows rely on.
+// ---------------------------------------------------------------------------
+
+constant uint kWarpHueSaturation = 0u;
+constant uint kWarpChromaLuma = 1u;
+constant uint kWarpBlockCount = 2u;
+constant float kWarpFieldWidth = 192.0;
+
+// Matching the two `luminance` helpers in this file. Passed in rather than
+// chosen inside the warper so one implementation serves both working spaces:
+// Rec.709-encoded on the SDR path, BT.2020 on the HDR one.
+constant float3 kRec709LumaWeights = float3(0.2126, 0.7152, 0.0722);
+constant float3 kBT2020LumaWeights = float3(0.2627, 0.6780, 0.0593);
+
+/// The displacement one plane asks for at `coordinate`, both axes 0...1.
+inline float2 warpDisplacement(texture2d<float, access::sample> field,
+                               uint block,
+                               float2 coordinate) {
+    constexpr sampler warpSampler(coord::normalized, address::clamp_to_edge, filter::linear);
+    float totalHeight = float(max(field.get_height(), 1u));
+    float rows = max(totalHeight / float(kWarpBlockCount), 1.0);
+    // Samples sit at texel centres, so input 0 belongs at 0.5/N and input 1 at
+    // (N-0.5)/N - the same half-texel remap the curve rows and the 3D look LUT
+    // both need, and for the same reason: without it an identity table shifts
+    // every colour by half a texel.
+    float u = (saturate(coordinate.x) * (kWarpFieldWidth - 1.0) + 0.5) / kWarpFieldWidth;
+    float v = (float(block) * rows + saturate(coordinate.y) * (rows - 1.0) + 0.5) / totalHeight;
+    return field.sample(warpSampler, float2(u, v)).rg;
+}
+
+/// Warps a pixel toward wherever the authored points pull it.
+///
+/// `source` is the hue and saturation captured BEFORE anything in this HSL visit
+/// changed them. That is what keeps the warper and the colour curves from
+/// fighting: moving a hue with one does not move which pixels the other then
+/// acts on, so the result does not depend on which was touched last.
+///
+/// `luma` is the caller's own luminance - Rec.709 on the SDR path, BT.2020 on
+/// the HDR one - because that is what each space's primaries call brightness,
+/// and it is the value the app's scopes plot, so the chroma/luma plane's y axis
+/// lines up with the waveform.
+inline float3 applyColorWarp(float3 hsl,
+                             float2 source,
+                             float luma,
+                             texture2d<float, access::sample> field,
+                             float4 params,
+                             float3 lumaWeights) {
+    uint active = uint(max(params.y, 0.0) + 0.5);
+    float strength = saturate(params.x);
+    if (active == 0u || strength <= 0.0) { return hsl; }
+
+    if (active & (1u << kWarpHueSaturation)) {
+        // A near-neutral pixel has no hue worth moving - it is whichever channel
+        // happened to win by a thousandth - so the plane fades out as saturation
+        // approaches zero. The same guard, at the same threshold, that the eight
+        // HSL bands and the hue-keyed curves already use.
+        float chroma = smoothstep(0.0, 0.1, source.y);
+        float2 displacement = warpDisplacement(field, kWarpHueSaturation, source) * chroma * strength;
+
+        bool preserve = params.z > 0.5;
+        float3 before = preserve ? hslToRGB(hsl) : float3(0.0);
+        float lumaBefore = preserve ? dot(before, lumaWeights) : 0.0;
+
+        hsl.x = fract(hsl.x + displacement.x + 1.0);
+        hsl.y = saturate(hsl.y + displacement.y);
+
+        // Preserve Luminance. Colours are not equally bright: carrying blue
+        // across to purple carries its brightness with it, and the picture lifts
+        // for a reason the user did not ask for. When it is on, the pixel is put
+        // back on the brightness it arrived with, through the same ratio-preserving
+        // restore the tonal controls use.
+        //
+        // Only THIS plane is corrected. On the chroma/luma plane below, changing
+        // brightness is the entire point of the control.
+        if (preserve) {
+            float3 after = hslToRGB(hsl);
+            float lumaAfter = dot(after, lumaWeights);
+            if (lumaAfter > 0.00001 && lumaBefore > 0.00001) {
+                hsl = rgbToHSL(saturate(preserveHueLuminance(after, lumaAfter, lumaBefore)));
+            }
+        }
+    }
+
+    if (active & (1u << kWarpChromaLuma)) {
+        // Keyed on how colourful and how bright the pixel is rather than on which
+        // hue it happens to be, so it reaches near-neutrals too and takes no
+        // chroma guard - "lift the dark saturated blues" has to work on a pixel
+        // the hue plane would rightly refuse to touch.
+        float2 displacement =
+            warpDisplacement(field, kWarpChromaLuma, float2(source.y, saturate(luma))) * strength;
+        hsl.y = saturate(hsl.y + displacement.x);
+        hsl.z = saturate(hsl.z + displacement.y);
+    }
+    return hsl;
+}
+
 inline float3 wheelGrade(float3 rgb, float4 wheel, float weight) {
     float3 tint = hueRGB(wheel.x);
     tint -= luminance709(tint);
     return rgb * exp2((tint * wheel.y * 0.8 + wheel.z) * weight);
+}
+
+// The offset wheel. Deliberately ADDITIVE, and deliberately unweighted, which
+// is the whole difference between it and the three tonal wheels: those are
+// multiplicative and fall off with tonal position, so they leave black alone.
+// An offset moves black exactly as far as it moves white, which is what makes
+// it the control for neutralising a cast in the toe of a Log clip.
+//
+// Applied before the tonal wheels so their weights read the offset picture -
+// otherwise lifting the blacks here would leave the shadow wheel still acting
+// on where the shadows used to be.
+inline float3 offsetGrade(float3 rgb, float4 wheel) {
+    float3 tint = hueRGB(wheel.x);
+    tint -= luminance709(tint);
+    return rgb + tint * wheel.y * 0.25 + wheel.z * 0.25;
 }
 
 // ---------------------------------------------------------------------------
@@ -344,9 +522,10 @@ constant uint kLocalPointWords = 96u; // two polygon vertices per word
 
 struct LocalGradeUniforms {
     float4 lightA;  // exposure EV, contrast, highlights, shadows
-    float4 lightB;  // whites, blacks
+    float4 lightB;  // whites, blacks, then qualifier luma min/max
     float4 color;   // temperature, tint, saturation, vibrance
-    float4 options; // z = active-curve mask, w = first curve row for this layer
+    float4 options; // x = qualifier softness, y = qualifier flags,
+                    // z = active-curve mask, w = first curve row for this layer
     float4 maskA;   // centre x/y, width/height, normalised to the source frame
     float4 maskB;   // rotation, feather, strength, packed shape/invert flags
     float4 maskC;   // primitives: corner radius. Polygons: pivot x, first vertex,
@@ -354,7 +533,27 @@ struct LocalGradeUniforms {
                     // a primitive has no pivot, so the slots are shared.
     float4 hsl0, hsl1, hsl2, hsl3, hsl4, hsl5, hsl6, hsl7;
     float4 shadowWheel, midtoneWheel, highlightWheel;
+    // Hue centre, hue half-width (turns), sat min, sat max. The rest of the key
+    // is in lightB.zw and options.xy - see LocalGradeUniforms.swift for why a
+    // local layer cannot afford a second word, and why it has no offset wheel.
+    float4 qualifier;
 };
+
+// Only the clip grade has an offset wheel; a masked layer has no word to spare
+// for one. Overloads rather than a field on both, so the shared grading template
+// compiles for each uniform type without a second copy of the maths.
+inline float4 offsetWheelFor(constant GradeUniforms &grade) { return grade.offsetWheel; }
+inline float4 offsetWheelFor(constant LocalGradeUniforms &) { return float4(0.0); }
+
+// Only the clip grade carries a Color Warper. A masked layer has no word to
+// spare for one: the whole stack travels as a single 4 KB `setBytes`, which
+// with eight layers and the shared point pool allows exactly the words
+// `LocalGradeUniforms` already uses, and the colour qualifier had to spill into
+// the last of them. Overloads rather than a field on both, so the shared
+// grading template compiles for each uniform type without a second copy of the
+// maths - the same mechanism the offset wheel uses, for the same reason.
+inline float4 colorWarpFor(constant GradeUniforms &grade) { return grade.colorWarp; }
+inline float4 colorWarpFor(constant LocalGradeUniforms &) { return float4(0.0); }
 
 struct LocalGradeStack {
     // x = live layer count, y = source aspect, z = 1 + matte layer index
@@ -506,6 +705,54 @@ inline float softShapeMaskWeight(float2 uv, float4 geometry, float4 options) {
     return inside * saturate(options.z);
 }
 
+// The colour qualifier: how much this pixel belongs to the selected colour.
+//
+// Hue, saturation and luma are keyed independently and multiplied, which is
+// what makes the three controls feel separate - widening the luma range does
+// not drag in a hue the user excluded. Hue is measured the short way round the
+// circle so a key centred on red is continuous across the 0/360 boundary
+// instead of splitting in two.
+//
+// Softness fades each edge outward rather than inward, so widening it only ever
+// ADDS partially selected pixels. Narrowing a selection by softening it would
+// be the opposite of what the control says.
+//
+// Near-neutral pixels are excluded by the saturation term on its own: a grey
+// pixel has no meaningful hue, and the same guard the HSL bands already use
+// would otherwise have to be repeated here.
+inline float qualifierWeight(float3 encodedRGB, constant LocalGradeUniforms &layer) {
+    uint flags = uint(max(layer.options.y, 0.0) + 0.5);
+    if ((flags & 1u) == 0u) { return 1.0; }
+
+    float3 hsl = rgbToHSL(saturate(encodedRGB));
+    float soft = max(layer.options.x, 0.0);
+
+    float hueDistance = abs(hsl.x - layer.qualifier.x);
+    hueDistance = min(hueDistance, 1.0 - hueDistance);
+    float hueHalf = max(layer.qualifier.y, 0.0005);
+    float hueSoft = max(soft * 0.5, 0.0005);
+    float hueWeight = 1.0 - smoothstep(hueHalf, hueHalf + hueSoft, hueDistance);
+
+    // Saturation and luma are ranges rather than centres, so each keys its two
+    // edges and takes the smaller - inside the range both read 1.
+    float satSoft = max(soft * 0.35, 0.0005);
+    float satWeight = smoothstep(layer.qualifier.z - satSoft, layer.qualifier.z + satSoft, hsl.y)
+        * (1.0 - smoothstep(layer.qualifier.w - satSoft, layer.qualifier.w + satSoft, hsl.y));
+
+    float lumaSoft = max(soft * 0.35, 0.0005);
+    float lumaWeight = smoothstep(layer.lightB.z - lumaSoft, layer.lightB.z + lumaSoft, hsl.z)
+        * (1.0 - smoothstep(layer.lightB.w - lumaSoft, layer.lightB.w + lumaSoft, hsl.z));
+
+    float weight = saturate(hueWeight * satWeight * lumaWeight);
+    return (flags & 2u) != 0u ? 1.0 - weight : weight;
+}
+
+/// True when this layer's key replaces its shape rather than narrowing it.
+inline bool qualifierIgnoresShape(constant LocalGradeUniforms &layer) {
+    uint flags = uint(max(layer.options.y, 0.0) + 0.5);
+    return (flags & 5u) == 5u;
+}
+
 inline float gradeMaskWeight(float2 uv, constant GradeUniforms &grade) {
     return softShapeMaskWeight(uv, grade.gradeMaskA, grade.gradeMaskB);
 }
@@ -531,7 +778,8 @@ inline float gradeMaskWeight(float2 uv, constant GradeUniforms &grade) {
 template <typename Grade>
 inline float3 applyGradeCore(float3 encodedRGB,
                              constant Grade &grade,
-                             texture2d<float, access::sample> curveLUT) {
+                             texture2d<float, access::sample> curveLUT,
+                             texture2d<float, access::sample> warpField) {
     float3 color = rec709ToLinear(encodedRGB);
     color = applyWhiteBalance(color, grade.color.x, grade.color.y);
     color *= exp2(grade.lightA.x);
@@ -562,6 +810,7 @@ inline float3 applyGradeCore(float3 encodedRGB,
     float vibranceScale = 1.0 + grade.color.w * (1.0 - saturate(chroma)) * 0.75;
     color = mix(float3(luma), color, max(0.0, saturationScale * vibranceScale));
 
+    color = offsetGrade(color, offsetWheelFor(grade));
     float tonalPosition = saturate(luminance709(color));
     float sw = 1.0 - smoothstep(0.02, 0.35, tonalPosition);
     float hw = smoothstep(0.35, 0.95, tonalPosition);
@@ -578,7 +827,10 @@ inline float3 applyGradeCore(float3 encodedRGB,
     // The working space here is Rec.709-encoded, so Y' uses Rec.709 luma
     // coefficients - the same ones this file's `luminance709` already carries
     // and the same ones the waveform is plotted with.
+    float2 warpSource = hsl.xy;
     hsl = applyColorCurves(hsl, luminance709(color), curveLUT, activeCurves, curveRowBase);
+    hsl = applyColorWarp(hsl, warpSource, luminance709(color), warpField,
+                         colorWarpFor(grade), kRec709LumaWeights);
     float4 bands[8] = {grade.hsl0, grade.hsl1, grade.hsl2, grade.hsl3, grade.hsl4, grade.hsl5, grade.hsl6, grade.hsl7};
     float3 delta = 0.0;
     for (int i = 0; i < 8; ++i) {
@@ -613,11 +865,12 @@ inline float3 applyGradeFinish(float3 color, float2 uv, constant GradeUniforms &
 inline float3 applyGrade(float3 encodedRGB,
                          float2 uv,
                          constant GradeUniforms &grade,
-                         texture2d<float, access::sample> curveLUT) {
+                         texture2d<float, access::sample> curveLUT,
+                         texture2d<float, access::sample> warpField) {
     if (grade.options.x > 0.5) {
         return saturate(encodedRGB);
     }
-    return applyGradeFinish(applyGradeCore(encodedRGB, grade, curveLUT), uv, grade);
+    return applyGradeFinish(applyGradeCore(encodedRGB, grade, curveLUT, warpField), uv, grade);
 }
 
 /// Every masked local grade, in list order, each mixed in through its own window.
@@ -628,14 +881,20 @@ inline float3 applyGrade(float3 encodedRGB,
 inline float3 applyLocalGrades(float3 color,
                                float2 uv,
                                constant LocalGradeStack &stack,
-                               texture2d<float, access::sample> curveLUT) {
+                               texture2d<float, access::sample> curveLUT,
+                               texture2d<float, access::sample> warpField) {
     uint count = min(uint(max(stack.header.x, 0.0) + 0.5), kMaxLocalGrades);
     if (count == 0u) { return color; }
     float aspect = max(stack.header.y, 1e-4);
     for (uint i = 0u; i < count; ++i) {
-        float weight = localMaskWeight(uv, stack.layers[i], stack.points, aspect);
+        float weight = qualifierIgnoresShape(stack.layers[i])
+            ? 1.0
+            : localMaskWeight(uv, stack.layers[i], stack.points, aspect);
+        // Keyed on the colour this layer RECEIVES, so a selection stays on the
+        // thing it was pointed at as earlier layers move it.
+        weight *= qualifierWeight(color, stack.layers[i]);
         if (weight <= 0.0005) { continue; }
-        color = mix(color, applyGradeCore(color, stack.layers[i], curveLUT), weight);
+        color = mix(color, applyGradeCore(color, stack.layers[i], curveLUT, warpField), weight);
     }
     return color;
 }
@@ -668,6 +927,7 @@ inline float3 applyLookAndGrade(float3 encodedRGB,
                                 constant GradeUniforms &grade,
                                 texture3d<float, access::sample> lut,
                                 texture2d<float, access::sample> curveLUT,
+                                texture2d<float, access::sample> warpField,
                                 constant LocalGradeStack &locals) {
     if (grade.options.x > 0.5) {
         return saturate(encodedRGB);
@@ -678,8 +938,8 @@ inline float3 applyLookAndGrade(float3 encodedRGB,
     float matte = localMatte(uv, locals);
     if (matte >= 0.0) { return float3(matte); }
     float3 original = saturate(encodedRGB);
-    float3 core = applyGradeCore(applyLUT(original, lut, grade.options.y), grade, curveLUT);
-    core = applyLocalGrades(core, uv, locals, curveLUT);
+    float3 core = applyGradeCore(applyLUT(original, lut, grade.options.y), grade, curveLUT, warpField);
+    core = applyLocalGrades(core, uv, locals, curveLUT, warpField);
     float3 graded = applyGradeFinish(core, uv, grade);
     return mix(original, graded, gradeMaskWeight(uv, grade));
 }
@@ -845,7 +1105,8 @@ inline float3 applyLUTHDR(float3 working,
 template <typename Grade>
 inline float3 applyGradeCoreHDR(float3 working,
                                 constant Grade &grade,
-                                texture2d<float, access::sample> curveLUT) {
+                                texture2d<float, access::sample> curveLUT,
+                                texture2d<float, access::sample> warpField) {
     float3 color = applyWhiteBalanceExtended(working, grade.color.x, grade.color.y);
     color *= exp2(grade.lightA.x);
 
@@ -879,6 +1140,7 @@ inline float3 applyGradeCoreHDR(float3 working,
     float vibranceScale = 1.0 + grade.color.w * (1.0 - saturate(chroma)) * 0.75;
     color = mix(float3(luma), color, max(0.0, saturationScale * vibranceScale));
 
+    color = offsetGrade(color, offsetWheelFor(grade));
     float tonalPosition = saturate(luminanceBT2020(color));
     float sw = 1.0 - smoothstep(0.02, 0.35, tonalPosition);
     float hw = smoothstep(0.35, 0.95, tonalPosition);
@@ -903,7 +1165,10 @@ inline float3 applyGradeCoreHDR(float3 working,
     float3 hsl = rgbToHSL(inGamut);
     // The shaper's working space is BT.2020, so brightness is measured with
     // BT.2020 coefficients here rather than the SDR path's Rec.709 ones.
+    float2 warpSource = hsl.xy;
     hsl = applyColorCurves(hsl, luminanceBT2020(inGamut), curveLUT, activeCurves, curveRowBase);
+    hsl = applyColorWarp(hsl, warpSource, luminanceBT2020(inGamut), warpField,
+                         colorWarpFor(grade), kBT2020LumaWeights);
     float4 bands[8] = {grade.hsl0, grade.hsl1, grade.hsl2, grade.hsl3, grade.hsl4, grade.hsl5, grade.hsl6, grade.hsl7};
     float3 delta = 0.0;
     for (int i = 0; i < 8; ++i) {
@@ -940,12 +1205,13 @@ inline float3 applyGradeFinishHDR(float3 color, float2 uv, constant GradeUniform
 inline float3 applyGradeHDR(float3 working,
                             float2 uv,
                             constant GradeUniforms &grade,
-                            texture2d<float, access::sample> curveLUT) {
+                            texture2d<float, access::sample> curveLUT,
+                            texture2d<float, access::sample> warpField) {
     if (grade.options.x > 0.5) {
         // Original comparison: untouched, and crucially not clamped.
         return working;
     }
-    return applyGradeFinishHDR(applyGradeCoreHDR(working, grade, curveLUT), uv, grade);
+    return applyGradeFinishHDR(applyGradeCoreHDR(working, grade, curveLUT, warpField), uv, grade);
 }
 
 /// Extended-range masked local grades. A mask is geometry, so it is identical to
@@ -954,14 +1220,22 @@ inline float3 applyGradeHDR(float3 working,
 inline float3 applyLocalGradesHDR(float3 color,
                                   float2 uv,
                                   constant LocalGradeStack &stack,
-                                  texture2d<float, access::sample> curveLUT) {
+                                  texture2d<float, access::sample> curveLUT,
+                                  texture2d<float, access::sample> warpField) {
     uint count = min(uint(max(stack.header.x, 0.0) + 0.5), kMaxLocalGrades);
     if (count == 0u) { return color; }
     float aspect = max(stack.header.y, 1e-4);
     for (uint i = 0u; i < count; ++i) {
-        float weight = localMaskWeight(uv, stack.layers[i], stack.points, aspect);
+        float weight = qualifierIgnoresShape(stack.layers[i])
+            ? 1.0
+            : localMaskWeight(uv, stack.layers[i], stack.points, aspect);
+        // Keyed through the shaper, not on the raw working value: the shaper is
+        // the bounded BT.2020 domain this path's curves and HSL bands already
+        // measure hue and saturation in, so a qualifier selects the same pixels
+        // the HSL controls beside it would.
+        weight *= qualifierWeight(workingToShaper(color), stack.layers[i]);
         if (weight <= 0.0005) { continue; }
-        color = mix(color, applyGradeCoreHDR(color, stack.layers[i], curveLUT), weight);
+        color = mix(color, applyGradeCoreHDR(color, stack.layers[i], curveLUT, warpField), weight);
     }
     return color;
 }
@@ -974,14 +1248,15 @@ inline float3 applyLookAndGradeHDR(float3 working,
                                    constant GradeUniforms &grade,
                                    texture3d<float, access::sample> lut,
                                    texture2d<float, access::sample> curveLUT,
+                                   texture2d<float, access::sample> warpField,
                                    constant LocalGradeStack &locals) {
     if (grade.options.x > 0.5) { return working; }
     float matte = localMatte(uv, locals);
     // Diffuse white is 1.0 in working space, so the matte reads as the same
     // greyscale it does on the SDR path rather than as a dim grey.
     if (matte >= 0.0) { return float3(matte); }
-    float3 core = applyGradeCoreHDR(applyLUTHDR(working, lut, grade.options.y), grade, curveLUT);
-    core = applyLocalGradesHDR(core, uv, locals, curveLUT);
+    float3 core = applyGradeCoreHDR(applyLUTHDR(working, lut, grade.options.y), grade, curveLUT, warpField);
+    core = applyLocalGradesHDR(core, uv, locals, curveLUT, warpField);
     float3 graded = applyGradeFinishHDR(core, uv, grade);
     return mix(working, graded, gradeMaskWeight(uv, grade));
 }
@@ -1142,6 +1417,7 @@ fragment float4 previewFragmentAppleLog(
     texture3d<float, access::sample> lutTexture [[texture(3)]],
     texture3d<float, access::sample> renderingLUT [[texture(4)]],
     texture2d<float, access::sample> curveLUT [[texture(6)]],
+    texture2d<float, access::sample> warpField [[texture(12)]],
     constant GradeUniforms &grade [[buffer(1)]],
     constant LocalGradeStack &locals [[buffer(8)]])
 {
@@ -1153,11 +1429,13 @@ fragment float4 previewFragmentAppleLog(
         // Original comparison bypasses the creative grade but NOT the input
         // transform: raw Log is not a picture, and showing it would make the
         // comparison meaningless.
-        return float4(appleLogWorkingToRec709(working, renderingLUT), 1.0);
+        return float4(applyViewerAssist(appleLogWorkingToRec709(working, renderingLUT),
+                                        in.position.xy, grade), 1.0);
     }
     working = applyLookAndGradeHDR(
-        working, in.textureCoordinate, grade, lutTexture, curveLUT, locals);
-    return float4(appleLogWorkingToRec709(working, renderingLUT), 1.0);
+        working, in.textureCoordinate, grade, lutTexture, curveLUT, warpField, locals);
+    return float4(applyViewerAssist(appleLogWorkingToRec709(working, renderingLUT),
+                                    in.position.xy, grade), 1.0);
 }
 
 // The drawable is an HLG-tagged surface with CAEDRMetadata.hlg attached, so the
@@ -1169,6 +1447,7 @@ fragment float4 previewFragmentHDR(
     texture2d<float, access::sample> sourceTexture [[texture(0)]],
     texture3d<float, access::sample> lutTexture [[texture(3)]],
     texture2d<float, access::sample> curveLUT [[texture(6)]],
+    texture2d<float, access::sample> warpField [[texture(12)]],
     constant HDRDisplayUniforms &hdr [[buffer(0)]],
     constant GradeUniforms &grade [[buffer(1)]],
     constant LocalGradeStack &locals [[buffer(8)]])
@@ -1176,12 +1455,13 @@ fragment float4 previewFragmentHDR(
     constexpr sampler videoSampler(coord::normalized, address::clamp_to_edge, filter::linear);
     float4 sample = sourceTexture.sample(videoSampler, in.textureCoordinate);
     if (grade.options.x > 0.5) {
-        return float4(saturate(sample.rgb), 1.0);   // Original: untouched signal
+        // Original: untouched signal
+        return float4(applyViewerAssist(saturate(sample.rgb), in.position.xy, grade), 1.0);
     }
     float3 working = toWorkingSpace(sample.rgb, hdr);
     working = applyLookAndGradeHDR(
-        working, in.textureCoordinate, grade, lutTexture, curveLUT, locals);
-    return float4(workingToSignal(working, hdr), 1.0);
+        working, in.textureCoordinate, grade, lutTexture, curveLUT, warpField, locals);
+    return float4(applyViewerAssist(workingToSignal(working, hdr), in.position.xy, grade), 1.0);
 }
 
 
@@ -1320,6 +1600,7 @@ kernel void compositeVideoHDR(
     texture2d<float, access::write> destination [[texture(3)]],
     texture3d<float, access::sample> lutTexture [[texture(4)]],
     texture2d<float, access::sample> curveLUT [[texture(6)]],
+    texture2d<float, access::sample> warpField [[texture(12)]],
     texture2d<float, access::sample> trackMatte [[texture(8)]],
     texture2d<float, access::sample> backgroundMatte [[texture(9)]],
     constant GradeUniforms &grade [[buffer(0)]],
@@ -1349,7 +1630,7 @@ kernel void compositeVideoHDR(
             : toWorkingSpace(partner.sample(videoSampler, uv).rgb, hdr);
         working = mix(working, next, layer.params.y);
     }
-    working = applyLookAndGradeHDR(working, uv, grade, lutTexture, curveLUT, locals);
+    working = applyLookAndGradeHDR(working, uv, grade, lutTexture, curveLUT, warpField, locals);
     float backgroundCoverage = backgroundRemovalCoverage(backgroundMatte, uv);
     working = suppressBackgroundSpill(working, backgroundCoverage, backgroundRemoval);
     float alpha = layer.params.x * backgroundCoverage
@@ -1449,6 +1730,7 @@ kernel void gradeExportHDR(
     texture2d<float, access::write> chromaOut [[texture(2)]],
     texture3d<float, access::sample> lutTexture [[texture(3)]],
     texture2d<float, access::sample> curveLUT [[texture(6)]],
+    texture2d<float, access::sample> warpField [[texture(12)]],
     constant GradeUniforms &grade [[buffer(0)]],
     constant HDRDisplayUniforms &hdr [[buffer(1)]],
     uint2 position [[thread_position_in_grid]],
@@ -1467,7 +1749,7 @@ kernel void gradeExportHDR(
             uint2 p = uint2(position.x * 2 + i, position.y * 2 + j);
             float2 uv = (float2(p) + 0.5) / lumaSize;
             float3 working = toWorkingSpace(source.sample(videoSampler, uv).rgb, hdr);
-            working = applyLookAndGradeHDR(working, uv, grade, lutTexture, curveLUT, locals);
+            working = applyLookAndGradeHDR(working, uv, grade, lutTexture, curveLUT, warpField, locals);
             float3 signal = workingToSignal(working, hdr);
             signals[j * 2 + i] = signal;
             signalSum += signal;
@@ -1640,6 +1922,7 @@ fragment float4 gradeFragmentYUV(
     texture2d<float, access::sample> chromaTexture [[texture(1)]],
     texture3d<float, access::sample> lutTexture [[texture(3)]],
     texture2d<float, access::sample> curveLUT [[texture(6)]],
+    texture2d<float, access::sample> warpField [[texture(12)]],
     constant GradeUniforms &grade [[buffer(0)]],
     constant YUVUniforms &yuv [[buffer(1)]],
     constant LocalGradeStack &locals [[buffer(8)]])
@@ -1647,7 +1930,9 @@ fragment float4 gradeFragmentYUV(
     constexpr sampler videoSampler(coord::normalized, address::clamp_to_edge, filter::linear);
     float y = lumaTexture.sample(videoSampler, in.textureCoordinate).r;
     float2 uv = chromaTexture.sample(videoSampler, in.textureCoordinate).rg;
-    return float4(applyLookAndGrade(decodeYUV(y, uv, yuv), in.textureCoordinate, grade, lutTexture, curveLUT, locals), 1.0);
+    float3 graded = applyLookAndGrade(decodeYUV(y, uv, yuv), in.textureCoordinate,
+                                      grade, lutTexture, curveLUT, warpField, locals);
+    return float4(applyViewerAssist(graded, in.position.xy, grade), 1.0);
 }
 
 fragment float4 gradeFragmentBGRA(
@@ -1655,13 +1940,16 @@ fragment float4 gradeFragmentBGRA(
     texture2d<float, access::sample> sourceTexture [[texture(0)]],
     texture3d<float, access::sample> lutTexture [[texture(3)]],
     texture2d<float, access::sample> curveLUT [[texture(6)]],
+    texture2d<float, access::sample> warpField [[texture(12)]],
     constant GradeUniforms &grade [[buffer(0)]],
     constant LocalGradeStack &locals [[buffer(8)]])
 {
     constexpr sampler videoSampler(coord::normalized, address::clamp_to_edge, filter::linear);
     float4 pixel = sourceTexture.sample(videoSampler, in.textureCoordinate);
     float3 straight = pixel.a > 0.00001 ? pixel.rgb / pixel.a : float3(0);
-    float3 graded = applyLookAndGrade(straight, in.textureCoordinate, grade, lutTexture, curveLUT, locals);
+    float3 graded = applyViewerAssist(
+        applyLookAndGrade(straight, in.textureCoordinate, grade, lutTexture, curveLUT, warpField, locals),
+        in.position.xy, grade);
     float2 cell = floor(in.position.xy / 14.0);
     float checker = fmod(cell.x + cell.y, 2.0) < 1.0 ? 0.16 : 0.24;
     return float4(mix(float3(checker), graded, pixel.a), 1.0);
@@ -1673,6 +1961,7 @@ kernel void gradeExportBGRA(
     texture2d<float, access::write> outputTexture [[texture(2)]],
     texture3d<float, access::sample> lutTexture [[texture(3)]],
     texture2d<float, access::sample> curveLUT [[texture(6)]],
+    texture2d<float, access::sample> warpField [[texture(12)]],
     constant GradeUniforms &grade [[buffer(0)]],
     constant YUVUniforms &yuv [[buffer(1)]],
     uint2 position [[thread_position_in_grid]],
@@ -1686,7 +1975,7 @@ kernel void gradeExportBGRA(
         float2(outputTexture.get_width(), outputTexture.get_height());
     float y = lumaTexture.sample(videoSampler, coordinate).r;
     float2 uv = chromaTexture.sample(videoSampler, coordinate).rg;
-    outputTexture.write(float4(applyLookAndGrade(decodeYUV(y, uv, yuv), coordinate, grade, lutTexture, curveLUT, locals), 1.0), position);
+    outputTexture.write(float4(applyLookAndGrade(decodeYUV(y, uv, yuv), coordinate, grade, lutTexture, curveLUT, warpField, locals), 1.0), position);
 }
 
 // ---------------------------------------------------------------------------
@@ -1709,6 +1998,7 @@ kernel void gradeToTextureYUV(
     texture2d<float, access::write> destination [[texture(2)]],
     texture3d<float, access::sample> lutTexture [[texture(3)]],
     texture2d<float, access::sample> curveLUT [[texture(6)]],
+    texture2d<float, access::sample> warpField [[texture(12)]],
     constant GradeUniforms &grade [[buffer(0)]],
     constant YUVUniforms &yuv [[buffer(1)]],
     uint2 position [[thread_position_in_grid]],
@@ -1719,7 +2009,7 @@ kernel void gradeToTextureYUV(
     float2 uv = (float2(position) + 0.5) / float2(destination.get_width(), destination.get_height());
     float3 rgb = decodeYUV(lumaTexture.sample(videoSampler, uv).r,
                            chromaTexture.sample(videoSampler, uv).rg, yuv);
-    destination.write(float4(applyLookAndGrade(rgb, uv, grade, lutTexture, curveLUT, locals), 1.0), position);
+    destination.write(float4(applyLookAndGrade(rgb, uv, grade, lutTexture, curveLUT, warpField, locals), 1.0), position);
 }
 
 kernel void gradeToTextureBGRA(
@@ -1727,6 +2017,7 @@ kernel void gradeToTextureBGRA(
     texture2d<float, access::write> destination [[texture(2)]],
     texture3d<float, access::sample> lutTexture [[texture(3)]],
     texture2d<float, access::sample> curveLUT [[texture(6)]],
+    texture2d<float, access::sample> warpField [[texture(12)]],
     constant GradeUniforms &grade [[buffer(0)]],
     uint2 position [[thread_position_in_grid]],
     constant LocalGradeStack &locals [[buffer(8)]])
@@ -1736,7 +2027,7 @@ kernel void gradeToTextureBGRA(
     float2 uv = (float2(position) + 0.5) / float2(destination.get_width(), destination.get_height());
     float4 pixel = source.sample(videoSampler, uv);
     float3 straight = pixel.a > 0.00001 ? pixel.rgb / pixel.a : float3(0);
-    destination.write(float4(applyLookAndGrade(straight, uv, grade, lutTexture, curveLUT, locals), pixel.a), position);
+    destination.write(float4(applyLookAndGrade(straight, uv, grade, lutTexture, curveLUT, warpField, locals), pixel.a), position);
 }
 
 kernel void gradeToTextureHDR(
@@ -1744,6 +2035,7 @@ kernel void gradeToTextureHDR(
     texture2d<float, access::write> destination [[texture(2)]],
     texture3d<float, access::sample> lutTexture [[texture(3)]],
     texture2d<float, access::sample> curveLUT [[texture(6)]],
+    texture2d<float, access::sample> warpField [[texture(12)]],
     constant GradeUniforms &grade [[buffer(0)]],
     constant HDRDisplayUniforms &hdr [[buffer(2)]],
     uint2 position [[thread_position_in_grid]],
@@ -1754,7 +2046,7 @@ kernel void gradeToTextureHDR(
     float2 uv = (float2(position) + 0.5) / float2(destination.get_width(), destination.get_height());
     float3 working = toWorkingSpace(source.sample(videoSampler, uv).rgb, hdr);
     destination.write(float4(applyLookAndGradeHDR(
-        working, uv, grade, lutTexture, curveLUT, locals), 1.0), position);
+        working, uv, grade, lutTexture, curveLUT, warpField, locals), 1.0), position);
 }
 
 // ---------------------------------------------------------------------------
@@ -1764,7 +2056,8 @@ kernel void gradeToTextureHDR(
 // Preview: draw a finished SDR frame straight to the drawable.
 fragment float4 presentFragmentSDR(
     RasterData in [[stage_in]],
-    texture2d<float, access::sample> source [[texture(0)]])
+    texture2d<float, access::sample> source [[texture(0)]],
+    constant GradeUniforms &grade [[buffer(0)]])
 {
     constexpr sampler videoSampler(coord::normalized, address::clamp_to_edge, filter::linear);
     float4 pixel = source.sample(videoSampler, in.textureCoordinate);
@@ -1772,7 +2065,7 @@ fragment float4 presentFragmentSDR(
     // fragment; it simply makes a cutout legible when no lower layer exists.
     float2 cell = floor(in.position.xy / 14.0);
     float checker = fmod(cell.x + cell.y, 2.0) < 1.0 ? 0.16 : 0.24;
-    float3 straight = saturate(pixel.rgb);
+    float3 straight = applyViewerAssist(saturate(pixel.rgb), in.position.xy, grade);
     return float4(mix(float3(checker), straight, pixel.a), 1.0);
 }
 
@@ -1781,10 +2074,12 @@ fragment float4 presentFragmentSDR(
 fragment float4 presentFragmentHDR(
     RasterData in [[stage_in]],
     texture2d<float, access::sample> source [[texture(0)]],
-    constant HDRDisplayUniforms &hdr [[buffer(0)]])
+    constant HDRDisplayUniforms &hdr [[buffer(0)]],
+    constant GradeUniforms &grade [[buffer(1)]])
 {
     constexpr sampler videoSampler(coord::normalized, address::clamp_to_edge, filter::linear);
-    return float4(workingToSignal(source.sample(videoSampler, in.textureCoordinate).rgb, hdr), 1.0);
+    float3 signal = workingToSignal(source.sample(videoSampler, in.textureCoordinate).rgb, hdr);
+    return float4(applyViewerAssist(signal, in.position.xy, grade), 1.0);
 }
 
 // ---------------------------------------------------------------------------
@@ -1816,6 +2111,7 @@ kernel void scopeSampleYUV(
     texture2d<float, access::write> analysis [[texture(2)]],
     texture3d<float, access::sample> lutTexture [[texture(3)]],
     texture2d<float, access::sample> curveLUT [[texture(6)]],
+    texture2d<float, access::sample> warpField [[texture(12)]],
     constant GradeUniforms &grade [[buffer(0)]],
     constant YUVUniforms &yuv [[buffer(1)]],
     uint2 position [[thread_position_in_grid]],
@@ -1828,7 +2124,7 @@ kernel void scopeSampleYUV(
     float2 uv = scopeCoordinate(analysis, position);
     float3 rgb = decodeYUV(lumaTexture.sample(scopeSampler, uv).r,
                            chromaTexture.sample(scopeSampler, uv).rg, yuv);
-    analysis.write(float4(applyLookAndGrade(rgb, uv, grade, lutTexture, curveLUT, locals), 1.0), position);
+    analysis.write(float4(applyLookAndGrade(rgb, uv, grade, lutTexture, curveLUT, warpField, locals), 1.0), position);
 }
 
 kernel void scopeSampleBGRA(
@@ -1836,6 +2132,7 @@ kernel void scopeSampleBGRA(
     texture2d<float, access::write> analysis [[texture(2)]],
     texture3d<float, access::sample> lutTexture [[texture(3)]],
     texture2d<float, access::sample> curveLUT [[texture(6)]],
+    texture2d<float, access::sample> warpField [[texture(12)]],
     constant GradeUniforms &grade [[buffer(0)]],
     uint2 position [[thread_position_in_grid]],
     constant LocalGradeStack &locals [[buffer(8)]])
@@ -1846,7 +2143,7 @@ kernel void scopeSampleBGRA(
     constexpr sampler scopeSampler(coord::normalized, address::clamp_to_edge, filter::nearest);
     float2 uv = scopeCoordinate(analysis, position);
     float3 rgb = sourceTexture.sample(scopeSampler, uv).rgb;
-    analysis.write(float4(applyLookAndGrade(rgb, uv, grade, lutTexture, curveLUT, locals), 1.0), position);
+    analysis.write(float4(applyLookAndGrade(rgb, uv, grade, lutTexture, curveLUT, warpField, locals), 1.0), position);
 }
 
 // HDR: the analysis texture carries the HLG SIGNAL, which is what the display
@@ -1858,6 +2155,7 @@ kernel void scopeSampleHDR(
     texture2d<float, access::write> analysis [[texture(2)]],
     texture3d<float, access::sample> lutTexture [[texture(3)]],
     texture2d<float, access::sample> curveLUT [[texture(6)]],
+    texture2d<float, access::sample> warpField [[texture(12)]],
     constant GradeUniforms &grade [[buffer(0)]],
     constant HDRDisplayUniforms &hdr [[buffer(2)]],
     uint2 position [[thread_position_in_grid]],
@@ -1874,7 +2172,7 @@ kernel void scopeSampleHDR(
         return;
     }
     float3 working = toWorkingSpace(signal, hdr);
-    working = applyLookAndGradeHDR(working, uv, grade, lutTexture, curveLUT, locals);
+    working = applyLookAndGradeHDR(working, uv, grade, lutTexture, curveLUT, warpField, locals);
     analysis.write(float4(workingToSignal(working, hdr), 1.0), position);
 }
 
@@ -1893,6 +2191,7 @@ kernel void gradeBlendedBGRA(
     texture2d<float, access::sample> partnerLuma [[texture(4)]],
     texture2d<float, access::sample> partnerChroma [[texture(5)]],
     texture2d<float, access::sample> curveLUT [[texture(6)]],
+    texture2d<float, access::sample> warpField [[texture(12)]],
     constant GradeUniforms &grade [[buffer(0)]],
     constant YUVUniforms &yuv [[buffer(1)]],
     constant float &amount [[buffer(2)]],
@@ -1910,7 +2209,7 @@ kernel void gradeBlendedBGRA(
     float3 second = decodeYUV(partnerLuma.sample(videoSampler, coordinate).r,
                               partnerChroma.sample(videoSampler, coordinate).rg, yuv);
     float3 mixed = mix(first, second, clamp(amount, 0.0, 1.0));
-    outputTexture.write(float4(applyLookAndGrade(mixed, coordinate, grade, lutTexture, curveLUT, locals), 1.0), position);
+    outputTexture.write(float4(applyLookAndGrade(mixed, coordinate, grade, lutTexture, curveLUT, warpField, locals), 1.0), position);
 }
 
 // 10-bit Rec.709 SDR export.
@@ -1930,6 +2229,7 @@ kernel void gradeExportSDR10(
     texture2d<float, access::write> chromaOut [[texture(5)]],
     texture3d<float, access::sample> lutTexture [[texture(3)]],
     texture2d<float, access::sample> curveLUT [[texture(6)]],
+    texture2d<float, access::sample> warpField [[texture(12)]],
     constant GradeUniforms &grade [[buffer(0)]],
     constant YUVUniforms &yuv [[buffer(1)]],
     uint2 position [[thread_position_in_grid]],
@@ -1949,7 +2249,7 @@ kernel void gradeExportSDR10(
             float2 uv = (float2(p) + 0.5) / lumaSize;
             float y = lumaTexture.sample(videoSampler, uv).r;
             float2 c = chromaTexture.sample(videoSampler, uv).rg;
-            float3 rgb = applyLookAndGrade(decodeYUV(y, c, yuv), uv, grade, lutTexture, curveLUT, locals);
+            float3 rgb = applyLookAndGrade(decodeYUV(y, c, yuv), uv, grade, lutTexture, curveLUT, warpField, locals);
             graded[j * 2 + i] = rgb;
             sum += rgb;
         }
@@ -1977,6 +2277,7 @@ kernel void gradeStillBGRA(
     texture2d<float, access::write> output [[texture(2)]],
     texture3d<float, access::sample> lutTexture [[texture(3)]],
     texture2d<float, access::sample> curveLUT [[texture(6)]],
+    texture2d<float, access::sample> warpField [[texture(12)]],
     constant GradeUniforms &grade [[buffer(0)]],
     uint2 p [[thread_position_in_grid]],
     constant LocalGradeStack &locals [[buffer(8)]]) {
@@ -1984,7 +2285,7 @@ kernel void gradeStillBGRA(
     float4 pixel = source.read(p);
     float2 uv = (float2(p) + 0.5) / float2(output.get_width(), output.get_height());
     float3 straight = pixel.a > 0.00001 ? pixel.rgb / pixel.a : float3(0);
-    output.write(float4(applyLookAndGrade(straight, uv, grade, lutTexture, curveLUT, locals) * pixel.a, pixel.a), p);
+    output.write(float4(applyLookAndGrade(straight, uv, grade, lutTexture, curveLUT, warpField, locals) * pixel.a, pixel.a), p);
 }
 
 /// Applies structural layer coverage after grading and spatial effects. Keeping
@@ -2383,6 +2684,7 @@ inline float4 gradedHDRTransitionSample(
     constant LayerMaskUniforms &mask,
     texture3d<float, access::sample> lutTexture,
     texture2d<float, access::sample> curveLUT,
+    texture2d<float, access::sample> warpField,
     texture2d<float, access::sample> trackMatte,
     texture2d<float, access::sample> backgroundMatte,
     constant BackgroundRemovalUniforms &backgroundRemoval,
@@ -2396,7 +2698,7 @@ inline float4 gradedHDRTransitionSample(
     constexpr sampler s(coord::normalized, address::clamp_to_edge, filter::linear);
     float3 signal = source.sample(s, uv).rgb;
     float3 working = layer.params.z > 0.5 ? sdrToWorking(signal) : toWorkingSpace(signal, hdr);
-    working = applyLookAndGradeHDR(working, uv, grade, lutTexture, curveLUT, locals);
+    working = applyLookAndGradeHDR(working, uv, grade, lutTexture, curveLUT, warpField, locals);
     // The matte is sampled at the SCREEN coordinate this sample is being drawn
     // from, not the layer's, so a wipe that reads a displaced part of the clip
     // still reads the matte where the pixel lands.
@@ -2421,6 +2723,11 @@ kernel void compositeTransitionHDR(
     texture2d<float, access::sample> incomingMatte [[texture(9)]],
     texture2d<float, access::sample> outgoingBackground [[texture(10)]],
     texture2d<float, access::sample> incomingBackground [[texture(11)]],
+    // The transition kernel is the one place two grades meet in a single
+    // dispatch, so it needs both clips' warp fields. 6/7 already pair off this
+    // way for the curve tables.
+    texture2d<float, access::sample> outgoingWarp [[texture(12)]],
+    texture2d<float, access::sample> incomingWarp [[texture(13)]],
     constant GradeUniforms &outgoingGrade [[buffer(0)]],
     constant HDRDisplayUniforms &hdr [[buffer(1)]],
     constant HDRLayerUniforms &outgoingLayer [[buffer(2)]],
@@ -2441,12 +2748,12 @@ kernel void compositeTransitionHDR(
     float p = clamp(u.progress, 0.0, 1.0), e = easeTransition(p);
     auto sampleA = [&](float2 coordinate) {
         return gradedHDRTransitionSample(outgoing, coordinate, size, outgoingGrade, hdr,
-            outgoingLayer, outgoingMask, outgoingLUT, outgoingCurve, outgoingMatte,
+            outgoingLayer, outgoingMask, outgoingLUT, outgoingCurve, outgoingWarp, outgoingMatte,
             outgoingBackground, outgoingBackgroundRemoval, outgoingLocals);
     };
     auto sampleB = [&](float2 coordinate) {
         return gradedHDRTransitionSample(incoming, coordinate, size, incomingGrade, hdr,
-            incomingLayer, incomingMask, incomingLUT, incomingCurve, incomingMatte,
+            incomingLayer, incomingMask, incomingLUT, incomingCurve, incomingWarp, incomingMatte,
             incomingBackground, incomingBackgroundRemoval, incomingLocals);
     };
     float4 a = sampleA(uv), b = sampleB(uv), mixed;
@@ -2737,6 +3044,7 @@ kernel void gradeExportAppleLogSDR10(
     texture2d<float, access::write> lumaOut [[texture(4)]],
     texture2d<float, access::write> chromaOut [[texture(5)]],
     texture2d<float, access::sample> curveLUT [[texture(6)]],
+    texture2d<float, access::sample> warpField [[texture(12)]],
     texture3d<float, access::sample> renderingLUT [[texture(7)]],
     constant GradeUniforms &grade [[buffer(0)]],
     uint2 position [[thread_position_in_grid]],
@@ -2757,7 +3065,7 @@ kernel void gradeExportAppleLogSDR10(
             float y = lumaTexture.sample(videoSampler, uv).r;
             float2 c = chromaTexture.sample(videoSampler, uv).rg;
             float3 working = appleLogToWorking(y, c);
-            working = applyLookAndGradeHDR(working, uv, grade, lutTexture, curveLUT, locals);
+            working = applyLookAndGradeHDR(working, uv, grade, lutTexture, curveLUT, warpField, locals);
             float3 rgb = appleLogWorkingToRec709(working, renderingLUT);
             rendered[j * 2 + i] = rgb;
             sum += rgb;
@@ -2876,6 +3184,7 @@ kernel void gradeStillTileBGRA(
     texture2d<float, access::write> destination [[texture(2)]],
     texture3d<float, access::sample> lutTexture [[texture(3)]],
     texture2d<float, access::sample> curveLUT [[texture(6)]],
+    texture2d<float, access::sample> warpField [[texture(12)]],
     constant GradeUniforms &grade [[buffer(0)]],
     constant float4 &tile [[buffer(1)]],
     uint2 position [[thread_position_in_grid]],
@@ -2884,7 +3193,7 @@ kernel void gradeStillTileBGRA(
     if (position.x >= destination.get_width() || position.y >= destination.get_height()) { return; }
     float2 uv = (float2(position) + tile.xy + 0.5) / tile.zw;
     float3 rgb = source.read(position).rgb;
-    destination.write(float4(applyLookAndGrade(rgb, uv, grade, lutTexture, curveLUT, locals), 1.0), position);
+    destination.write(float4(applyLookAndGrade(rgb, uv, grade, lutTexture, curveLUT, warpField, locals), 1.0), position);
 }
 
 // Apple Log layers keep camera code values until sampling. Decoding an already
@@ -2908,6 +3217,7 @@ kernel void compositeVideoAppleLog(
     texture2d<float, access::sample> partnerLuma [[texture(4)]],
     texture2d<float, access::sample> partnerChroma [[texture(5)]],
     texture2d<float, access::sample> curves [[texture(6)]],
+    texture2d<float, access::sample> warpField [[texture(12)]],
     texture2d<float, access::sample> trackMatte [[texture(8)]],
     texture2d<float, access::sample> backgroundMatte [[texture(9)]],
     constant GradeUniforms &grade [[buffer(0)]],
@@ -2926,7 +3236,7 @@ kernel void compositeVideoAppleLog(
     if (layer.params.y > 0.0) {
         working = mix(working, logLayerWorking(partnerLuma, partnerChroma, uv, layer, yuv), layer.params.y);
     }
-    working = applyLookAndGradeHDR(working, uv, grade, lut, curves, locals);
+    working = applyLookAndGradeHDR(working, uv, grade, lut, curves, warpField, locals);
     float backgroundCoverage = backgroundRemovalCoverage(backgroundMatte, uv);
     working = suppressBackgroundSpill(working, backgroundCoverage, backgroundRemoval);
     float alpha = layer.params.x * backgroundCoverage
@@ -2942,6 +3252,7 @@ kernel void compositeImageAppleLog(
     texture2d<float, access::write> destination [[texture(2)]],
     texture3d<float, access::sample> lut [[texture(3)]],
     texture2d<float, access::sample> curves [[texture(6)]],
+    texture2d<float, access::sample> warpField [[texture(12)]],
     texture2d<float, access::sample> trackMatte [[texture(8)]],
     texture2d<float, access::sample> backgroundMatte [[texture(9)]],
     constant GradeUniforms &grade [[buffer(0)]],
@@ -2960,7 +3271,7 @@ kernel void compositeImageAppleLog(
     float3 straight = layer.params.w > 0.5 && sample.a > 0.0001 ? sample.rgb / sample.a : sample.rgb;
     float backgroundCoverage = backgroundRemovalCoverage(backgroundMatte, uv);
     straight = suppressBackgroundSpill(straight, backgroundCoverage, backgroundRemoval);
-    float3 working = applyLookAndGradeHDR(sdrToWorking(straight), uv, grade, lut, curves, locals);
+    float3 working = applyLookAndGradeHDR(sdrToWorking(straight), uv, grade, lut, curves, warpField, locals);
     float alpha = sample.a * layer.params.x * backgroundCoverage
         * layerMaskWeight(uv, mask)
         * trackMatteCoverage(trackMatte, p,
@@ -3060,20 +3371,23 @@ kernel void gradeToTextureAppleLog(
     texture2d<float, access::write> destination [[texture(2)]],
     texture3d<float, access::sample> lut [[texture(3)]],
     texture2d<float, access::sample> curves [[texture(6)]],
+    texture2d<float, access::sample> warpField [[texture(12)]],
     constant GradeUniforms &grade [[buffer(0)]],
     constant LocalGradeStack &locals [[buffer(8)]], uint2 p [[thread_position_in_grid]]) {
     if (p.x >= destination.get_width() || p.y >= destination.get_height()) return;
     constexpr sampler s(coord::normalized, address::clamp_to_edge, filter::linear);
     float2 uv = (float2(p) + 0.5) / float2(destination.get_width(), destination.get_height());
     float3 working = appleLogToWorking(luma.sample(s, uv).r, chroma.sample(s, uv).rg);
-    destination.write(float4(applyLookAndGradeHDR(working, uv, grade, lut, curves, locals), 1), p);
+    destination.write(float4(applyLookAndGradeHDR(working, uv, grade, lut, curves, warpField, locals), 1), p);
 }
 
 fragment float4 presentFragmentAppleLog(
     RasterData in [[stage_in]], texture2d<float, access::sample> source [[texture(0)]],
-    texture3d<float, access::sample> renderingLUT [[texture(4)]]) {
+    texture3d<float, access::sample> renderingLUT [[texture(4)]],
+    constant GradeUniforms &grade [[buffer(0)]]) {
     constexpr sampler s(coord::normalized, address::clamp_to_edge, filter::linear);
-    return float4(appleLogWorkingToRec709(source.sample(s, in.textureCoordinate).rgb, renderingLUT), 1);
+    float3 rec709 = appleLogWorkingToRec709(source.sample(s, in.textureCoordinate).rgb, renderingLUT);
+    return float4(applyViewerAssist(rec709, in.position.xy, grade), 1);
 }
 
 kernel void encodeAppleLogFromTexture(

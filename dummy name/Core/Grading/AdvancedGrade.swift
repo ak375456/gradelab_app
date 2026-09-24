@@ -77,7 +77,12 @@ struct AdvancedGrade: Codable, Equatable, Sendable {
     /// renders - `resolvedCurves` converts it exactly.
     var curves = Array(repeating: ToneCurve(), count: 4)
     var hsl = Array(repeating: HueBand(), count: 8)
-    var wheels = Array(repeating: GradingWheel(), count: 3)
+    /// Shadows, midtones, highlights, offset.
+    ///
+    /// Four rather than three since the offset wheel. Existing projects decode
+    /// with three and read the fourth as neutral through `wheel(_:)`, which is
+    /// bounds-checked for exactly this reason.
+    var wheels = Array(repeating: GradingWheel(), count: 4)
     var vignette: Float = 0
     var vignetteMidpoint: Float = 50
     var vignetteFeather: Float = 70
@@ -95,6 +100,10 @@ struct AdvancedGrade: Codable, Equatable, Sendable {
     /// Optional so every project and preset saved before local grading masks
     /// decodes as the unchanged, full-frame grade it originally contained.
     var mask: GradeMask?
+    /// The Color Warper. Optional for the same reason every tool added after
+    /// the first release is: a project that has never opened the panel writes
+    /// nothing, and one saved before the warper existed decodes with none.
+    var colorWarp: ColorWarp?
 
     static let neutral = AdvancedGrade()
 
@@ -127,6 +136,16 @@ struct AdvancedGrade: Codable, Equatable, Sendable {
 
     var resolvedMask: GradeMask { (mask ?? .disabled).clamped }
 
+    /// The warp the pipeline applies, or nil when there is nothing to apply.
+    ///
+    /// Resolved to nil rather than to a neutral value so every consumer - the
+    /// field texture cache, the uniforms, Pro gating - can test one thing and
+    /// skip the work entirely.
+    var resolvedColorWarp: ColorWarp? {
+        guard let colorWarp, !colorWarp.isNeutral else { return nil }
+        return colorWarp
+    }
+
     func curve(_ index: Int) -> ToneCurve { curves.indices.contains(index) ? curves[index] : ToneCurve() }
     func band(_ index: Int) -> HueBand { hsl.indices.contains(index) ? hsl[index] : HueBand() }
     func wheel(_ index: Int) -> GradingWheel { wheels.indices.contains(index) ? wheels[index] : GradingWheel() }
@@ -134,6 +153,6 @@ struct AdvancedGrade: Codable, Equatable, Sendable {
     mutating func normalizeCollections() {
         curves = (0..<4).map { curve($0) }
         hsl = (0..<8).map { band($0) }
-        wheels = (0..<3).map { wheel($0) }
+        wheels = (0..<4).map { wheel($0) }
     }
 }

@@ -443,10 +443,52 @@ struct CanvasTools: View {
         ("Instagram Feed · 4:5", 1080, 1350), ("Instagram Square · 1:1", 1080, 1080),
         ("YouTube · 16:9", 1920, 1080), ("YouTube Shorts · 9:16", 1080, 1920)
     ]
+    private enum FrameRateChoice: String, CaseIterable {
+        case source, fps24, fps25, fps30, fps50, fps60
+
+        var title: String {
+            switch self {
+            case .source: String(localized: "Match source video")
+            case .fps24: "24 fps"
+            case .fps25: "25 fps"
+            case .fps30: "30 fps"
+            case .fps50: "50 fps"
+            case .fps60: "60 fps"
+            }
+        }
+
+        var framesPerSecond: Int? {
+            switch self {
+            case .source: nil
+            case .fps24: 24
+            case .fps25: 25
+            case .fps30: 30
+            case .fps50: 50
+            case .fps60: 60
+            }
+        }
+    }
+
+    private var frameRateChoice: Binding<FrameRateChoice> {
+        Binding {
+            let current = model.project.canvas.frameDuration
+            if current == model.project.primaryAsset.frameDuration { return .source }
+            return FrameRateChoice.allCases.first {
+                guard let fps = $0.framesPerSecond else { return false }
+                return current == (try? TimelineTime(value: 1, timescale: Int32(fps)))
+            } ?? .source
+        } set: { choice in
+            let duration = choice.framesPerSecond.flatMap { try? TimelineTime(value: 1, timescale: Int32($0)) }
+                ?? model.project.primaryAsset.frameDuration
+            model.setCanvasFrameDuration(duration)
+        }
+    }
+
     var body: some View {
         ScrollView {
             VStack(spacing: 12) {
-                Text("Canvas \(model.project.canvas.width) × \(model.project.canvas.height)").font(.caption).foregroundStyle(.secondary)
+                Text("Canvas \(model.project.canvas.width) × \(model.project.canvas.height) · \(model.project.canvas.frameRateLabel ?? String(localized: "Unknown frame rate"))")
+                    .font(.caption).foregroundStyle(.secondary)
                 LazyVGrid(columns: [.init(.flexible()), .init(.flexible())]) {
                     ForEach(presets.indices, id: \.self) { i in
                         Button(presets[i].0) { model.setCanvas(width: presets[i].1, height: presets[i].2) }
@@ -461,10 +503,37 @@ struct CanvasTools: View {
                     Button("Custom") { model.setCanvas(width: Int(width) ?? 0, height: Int(height) ?? 0) }.frame(height: 44)
                 }.font(.subheadline)
                 Button("Match original video") { model.setCanvas(width: model.project.metadata.displayWidth, height: model.project.metadata.displayHeight) }.font(.caption).frame(height: 44)
-                Text("Clips fit inside the canvas. Use Transform to reposition or enlarge them. Export Original preserves this canvas size.").font(.caption2).foregroundStyle(.secondary)
+                Text("Clips fit inside the canvas. Use Transform to reposition or enlarge them.")
+                    .font(.caption2).foregroundStyle(.secondary)
+                VStack(alignment: .leading, spacing: 8) {
+                    Text("FRAME RATE").font(.caption.weight(.semibold)).tracking(1.2)
+                    Picker("Canvas frame rate", selection: frameRateChoice) {
+                        ForEach(FrameRateChoice.allCases, id: \.self) { choice in
+                            Text(choice.title).tag(choice)
+                        }
+                    }
+                    .pickerStyle(.menu)
+                    Text("The timeline and preview use this frame rate. A 60 fps clip on a 30 fps canvas plays at normal speed with fewer frames.")
+                        .font(.caption2).foregroundStyle(.secondary)
+                }
+                VStack(alignment: .leading, spacing: 8) {
+                    Toggle("Export at canvas size and frame rate", isOn: Binding(
+                        get: { model.project.canvas.usesCanvasExportSettings },
+                        set: { model.setExportFollowsCanvas($0) }
+                    ))
+                    Text("When on, export uses \(model.project.canvas.width) × \(model.project.canvas.height) and \(model.project.canvas.frameRateLabel ?? String(localized: "the canvas frame rate")). Turn off to choose a different output size or frame rate in Export.")
+                        .font(.caption2).foregroundStyle(.secondary)
+                }
                 background
             }.padding(16)
-        }.disabled(model.isPreparingTimeline)
+        }
+        .onAppear {
+            width = String(model.project.canvas.width)
+            height = String(model.project.canvas.height)
+        }
+        .onChange(of: model.project.canvas.width) { _, value in width = String(value) }
+        .onChange(of: model.project.canvas.height) { _, value in height = String(value) }
+        .disabled(model.isPreparingTimeline)
     }
 
     /// The colour the canvas is filled with wherever no clip covers it.

@@ -43,6 +43,10 @@ struct SpeedPanel: View {
                                 .background(isCurrent(preset) ? AppColors.surfaceRaised : .clear, in: Capsule())
                                 .overlay(Capsule().stroke(
                                     isCurrent(preset) ? AppColors.textPrimary.opacity(0.35) : .clear, lineWidth: 1))
+                                // An unselected chip's background is clear, and
+                                // SwiftUI does not hit-test clear: without this
+                                // only the digits themselves take the click.
+                                .contentShape(Capsule())
                         }
                         .buttonStyle(.plain)
                         .foregroundStyle(isCurrent(preset) ? AppColors.textPrimary : AppColors.textSecondary)

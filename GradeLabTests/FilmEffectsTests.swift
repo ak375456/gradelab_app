@@ -239,12 +239,33 @@ final class FilmEffectsStageTests: XCTestCase {
 /// the struct at the wrong offset. This is the check that catches that.
 final class GradeUniformLayoutTests: XCTestCase {
     func testEveryFieldIsAccountedFor() {
-        // 22 SIMD4<Float> fields at 16 bytes each.
-        XCTAssertEqual(MemoryLayout<GradeUniforms>.stride, 22 * 16)
+        // 23 SIMD4<Float> fields at 16 bytes each. 22 before the Color Warper,
+        // which appended one.
+        XCTAssertEqual(MemoryLayout<GradeUniforms>.stride, 23 * 16)
         XCTAssertEqual(MemoryLayout<GradeUniforms>.stride % 16, 0, "SIMD4 alignment")
     }
 
-    func testTheEffectFieldsAreTheLastTwo() {
+    /// The Color Warper's word was appended rather than folded into a spare
+    /// slot, so every field before it keeps the offset the shader reads it at.
+    func testTheWarperFieldIsLast() {
+        var settings = GradeSettings.neutral
+        var advanced = AdvancedGrade.neutral
+        var warp = ColorWarp()
+        warp.points = [ColorWarpPoint(mode: .hueSaturation, sourceX: 0.1, sourceY: 0.6,
+                                      targetX: 0.2, targetY: 0.7)]
+        warp.strength = 50
+        advanced.colorWarp = warp
+        settings.advanced = advanced
+        var uniforms = GradeUniforms(settings: settings, bypass: false)
+        withUnsafeBytes(of: &uniforms) { raw in
+            let floats = raw.bindMemory(to: Float.self)
+            // colorWarp is field 23 of 23, so its x sits at offset 22 * 4.
+            XCTAssertEqual(floats[22 * 4], 0.5, accuracy: 0.0001,
+                           "warp strength is not where the shader reads it")
+        }
+    }
+
+    func testTheEffectFieldsComeBeforeTheWarper() {
         var settings = GradeSettings.neutral
         var advanced = AdvancedGrade.neutral
         advanced.effects = FilmEffects(fade: 100, sharpness: 0, bloom: 0,
@@ -253,7 +274,7 @@ final class GradeUniformLayoutTests: XCTestCase {
         var uniforms = GradeUniforms(settings: settings, bypass: false)
         withUnsafeBytes(of: &uniforms) { raw in
             let floats = raw.bindMemory(to: Float.self)
-            // effectsA is field 21 of 22, so its x sits at offset 20 * 4.
+            // effectsA is field 21 of 23, so its x sits at offset 20 * 4.
             XCTAssertEqual(floats[20 * 4], 1, "fade is not where the shader reads it")
         }
     }

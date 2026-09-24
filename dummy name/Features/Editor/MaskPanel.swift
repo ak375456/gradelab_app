@@ -261,6 +261,8 @@ private struct MaskInspector: View {
 
             geometryControls.disabled(model.isTrackingMask(mask.id))
 
+            qualifierControls
+
             HStack(spacing: AppSpacing.small) {
                 Button("Reset Mask Grade") { model.resetMaskGrade(mask.id) }
                     .font(AppTypography.caption.weight(.semibold))
@@ -276,6 +278,86 @@ private struct MaskInspector: View {
             }
             .buttonStyle(.plain)
         }
+    }
+
+    /// The colour qualifier: select by what a pixel is, not where it is.
+    ///
+    /// Folded into the mask inspector rather than given a tool of its own
+    /// because the two are the same idea — both decide which pixels this
+    /// layer's grade reaches — and because combining them is the point: a key
+    /// restricted to a window is how you grade one person's skin and not
+    /// everybody's.
+    @ViewBuilder
+    private var qualifierControls: some View {
+        let key = mask.qualifier ?? .skin
+        VStack(alignment: .leading, spacing: AppSpacing.compact) {
+            Toggle(isOn: Binding(
+                get: { key.isEnabled },
+                set: { model.setMaskQualifierEnabled(mask.id, $0) }
+            )) {
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("Colour Selection").font(AppTypography.caption.weight(.semibold))
+                    Text("Grade only pixels of a chosen colour.")
+                        .font(AppTypography.caption)
+                        .foregroundStyle(AppColors.textTertiary)
+                }
+            }
+            .tint(AppColors.accent)
+
+            if key.isEnabled {
+                Button {
+                    model.isPickingMaskQualifier.toggle()
+                } label: {
+                    HStack(spacing: AppSpacing.small) {
+                        Image(systemName: "eyedropper")
+                        Text(model.isPickingMaskQualifier ? "Tap the picture…" : "Pick Colour")
+                    }
+                    .font(AppTypography.caption.weight(.semibold))
+                    .frame(maxWidth: .infinity, minHeight: 44)
+                    .background(model.isPickingMaskQualifier ? AppColors.accent.opacity(0.18)
+                                                            : AppColors.surfaceRaised,
+                                in: RoundedRectangle(cornerRadius: AppCornerRadius.control))
+                    .foregroundStyle(model.isPickingMaskQualifier ? AppColors.accent
+                                                                  : AppColors.textPrimary)
+                }
+                .buttonStyle(.plain)
+
+                qualifierSlider("Hue", \.hueCenter, 0...360, "°")
+                qualifierSlider("Hue range", \.hueRange, 1...180, "°")
+                qualifierSlider("Saturation from", \.saturationMin, 0...1, "%", scale: 100)
+                qualifierSlider("Saturation to", \.saturationMax, 0...1, "%", scale: 100)
+                qualifierSlider("Luma from", \.lumaMin, 0...1, "%", scale: 100)
+                qualifierSlider("Luma to", \.lumaMax, 0...1, "%", scale: 100)
+                qualifierSlider("Softness", \.softness, 0...1, "%", scale: 100)
+
+                Toggle("Invert selection", isOn: model.maskQualifierFlagBinding(mask.id, \.isInverted))
+                    .font(AppTypography.caption)
+                    .tint(AppColors.accent)
+                Toggle("Whole frame", isOn: model.maskQualifierFlagBinding(mask.id, \.ignoresShape))
+                    .font(AppTypography.caption)
+                    .tint(AppColors.accent)
+            }
+        }
+        .padding(AppSpacing.compact)
+        .background(AppColors.surface, in: RoundedRectangle(cornerRadius: AppCornerRadius.control))
+    }
+
+    private func qualifierSlider(
+        _ title: String,
+        _ keyPath: WritableKeyPath<ColorQualifier, Double>,
+        _ range: ClosedRange<Double>,
+        _ suffix: String,
+        scale: Double = 1
+    ) -> some View {
+        let binding = model.maskQualifierBinding(mask.id, keyPath)
+        return AdjustmentSlider(
+            value: Binding(get: { Float(binding.wrappedValue * scale) },
+                           set: { binding.wrappedValue = Double($0) / scale }),
+            title: title,
+            range: Float(range.lowerBound * scale)...Float(range.upperBound * scale),
+            step: 1,
+            valueFormatter: { "\(Int($0))\(suffix)" }
+        )
     }
 
     private var neutralHint: some View {

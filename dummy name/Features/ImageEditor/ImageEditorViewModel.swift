@@ -74,6 +74,12 @@ final class ImageEditorViewModel: ObservableObject, GradingModel {
     @Published var selectedCurve: CurveType = .master
     @Published var selectedCurvePoint: UUID?
     @Published var isPickingCurveHue = false
+    /// Color Warper editor state. The warp itself lives on the grade; which
+    /// plane is showing, which handle is selected and whether the eyedropper is
+    /// armed belong to the panel.
+    @Published var selectedWarpMode: ColorWarpMode = .hueSaturation
+    @Published var selectedWarpPoint: UUID?
+    @Published var isPickingWarpColor = false
     @Published var showsOriginal = false { didSet { synchronizeRenderer() } }
     @Published var showsExport = false
     @Published var imageTool: ImageEditorTool = .color
@@ -138,6 +144,33 @@ final class ImageEditorViewModel: ObservableObject, GradingModel {
         renderer.setScopes(scopeSettings)
     }
 
+    // MARK: - Viewer assist
+
+    /// False colour and zebras. A preference like the scope settings above, and
+    /// for the same reason: it describes how someone is looking at the picture,
+    /// not anything the project contains.
+    @Published private(set) var viewerAssist = ViewerAssistSettings.load()
+
+    func setViewerAssist(_ mode: ViewerAssist) {
+        guard viewerAssist.mode != mode else { return }
+        viewerAssist.mode = mode
+        applyViewerAssist()
+    }
+
+    func setZebraThreshold(_ threshold: Double) {
+        let clamped = min(max(threshold, ViewerAssistSettings.thresholdRange.lowerBound),
+                          ViewerAssistSettings.thresholdRange.upperBound)
+        guard viewerAssist.zebraThreshold != clamped else { return }
+        viewerAssist.zebraThreshold = clamped
+        applyViewerAssist()
+    }
+
+    private func applyViewerAssist() {
+        viewerAssist.save()
+        renderer.setViewerAssist(viewerAssist)
+    }
+
+
     // MARK: - Life cycle
 
     init(project: ImageProject) throws {
@@ -160,6 +193,7 @@ final class ImageEditorViewModel: ObservableObject, GradingModel {
         renderer.setStillGeometry(imageSize: size)
         synchronizeRenderer()
         renderer.setScopes(scopeSettings)
+        renderer.setViewerAssist(viewerAssist)
         renderer.preloadLooks()
         decodePreview()
     }
@@ -467,6 +501,37 @@ final class ImageEditorViewModel: ObservableObject, GradingModel {
             })
     }
 
+
+    // MARK: - Color Warper eyedropper
+
+    /// Samples the picture under `point` and lands on the mesh handle for that
+    /// colour, placing one if there is none there yet.
+    ///
+    /// The sample is taken with the warper BYPASSED. Picking off the finished
+    /// picture would hand the warper a colour it had already moved, so the
+    /// handle would appear in the wrong place and each successive pick would
+    /// chase the last one. Everything else in the grade still applies, so this
+    /// is the colour the warper actually receives.
+    @discardableResult
+    func pickWarpColor(atViewPoint point: CGPoint) -> Bool {
+        guard isPickingWarpColor, canGrade else { return false }
+        guard let colour = renderer.sampleGradedColor(atViewPoint: point, warpBypass: true) else {
+            return false
+        }
+        let mode = selectedWarpMode
+        guard let position = ColorWarpPicker.position(of: colour, in: mode) else {
+            editError = ColorWarpPicker.neutralMessage
+            isPickingWarpColor = false
+            return false
+        }
+        beginCurveEdit(String(localized: "Pick color"))
+        let picked = addColorWarpPoint(x: position.x, y: position.y, mode: mode)
+        endCurveEdit()
+        selectedWarpPoint = picked
+        isPickingWarpColor = false
+        return true
+    }
+
     func advancedBinding<T>(_ keyPath: WritableKeyPath<AdvancedGrade, T>) -> Binding<T> {
         Binding(get: { (self.settings.advanced ?? .neutral)[keyPath: keyPath] }, set: { value in
             var advanced = self.settings.advanced ?? .neutral
@@ -487,6 +552,15 @@ final class ImageEditorViewModel: ObservableObject, GradingModel {
             selectedCurvePoint = nil
             isPickingCurveHue = false
         case .hsl: advanced.hsl = AdvancedGrade.neutral.hsl
+        case .warper:
+            // Points only. The density and the luminance choice are how this
+            // person works rather than part of the grade, so Reset leaves them.
+            if var warp = advanced.colorWarp {
+                warp.reset()
+                advanced.colorWarp = warp == ColorWarp() ? nil : warp
+            }
+            selectedWarpPoint = nil
+            isPickingWarpColor = false
         case .wheels: advanced.wheels = AdvancedGrade.neutral.wheels
         case .mask: advanced.mask = nil
         // Power windows are a timeline-clip feature, so the still editor never

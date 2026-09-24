@@ -73,11 +73,17 @@ enum AnimatableProperty: String, Codable, CaseIterable, Sendable {
     case wheelShadowsHue, wheelShadowsStrength, wheelShadowsBrightness
     case wheelMidtonesHue, wheelMidtonesStrength, wheelMidtonesBrightness
     case wheelHighlightsHue, wheelHighlightsStrength, wheelHighlightsBrightness
+    // The offset wheel moves the whole picture rather than one tonal range, so
+    // it is a fourth wheel rather than a fourth weighting of the same three.
+    case wheelOffsetHue, wheelOffsetStrength, wheelOffsetBrightness
     // Colour → Vignette.
     case gradeVignette, gradeVignetteMidpoint, gradeVignetteFeather
     // Colour → Look. The look ITSELF stays a discrete choice; only its
     // strength animates, which is what a look fade-in is.
     case gradeLookIntensity
+    // Colour → Warper. The strength only: a moving control point needs a
+    // whole-warp snapshot track, which the curve tracks are the template for.
+    case gradeColorWarpStrength
     // Colour → Effects.
     case effectFade, effectSharpen, effectBloom, effectGlow, effectHalation, effectGrain
     // Colour → Curves. One track per curve, each keyframe a WHOLE curve

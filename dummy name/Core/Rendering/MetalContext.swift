@@ -11,6 +11,8 @@ final class MetalContext: @unchecked Sendable {
     let luts: LUTLibrary
     /// Curve lookup tables, built from control points and shared the same way.
     let curves: CurveLUTLibrary
+    /// Color Warper fields, solved from control points and shared the same way.
+    let warps: ColorWarpFieldLibrary
 
     init(library suppliedLibrary: MTLLibrary? = nil) throws {
         guard let device = MTLCreateSystemDefaultDevice() else {
@@ -40,6 +42,7 @@ final class MetalContext: @unchecked Sendable {
         textureCache = cache
         luts = LUTLibrary(device: device)
         curves = CurveLUTLibrary(device: device)
+        warps = ColorWarpFieldLibrary(device: device)
 
         #if DEBUG
         print("Metal device: \(device.name)")

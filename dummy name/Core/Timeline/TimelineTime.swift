@@ -79,6 +79,14 @@ struct ProjectCanvas: Codable, Equatable, Sendable {
     // nil means unknown: never silently substitute 30 FPS for an unknown source.
     var frameDuration: TimelineTime?
     var background = RGBAColor.black
+    /// Optional so documents saved before this control keep decoding. Those
+    /// projects already exported at the canvas size and cadence by default.
+    var exportFollowsCanvas: Bool? = nil
+
+    var usesCanvasExportSettings: Bool {
+        get { exportFollowsCanvas ?? true }
+        set { exportFollowsCanvas = newValue }
+    }
 
     /// The canvas frame rate, or nil when the document does not know one.
     ///

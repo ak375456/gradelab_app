@@ -74,7 +74,20 @@ struct WheelsPanel<Model: GradingModel>: View {
 
     var body: some View {
         VStack(spacing: 18) {
-            Picker("Tonal range", selection: $selected) { Text("Shadows").tag(0); Text("Midtones").tag(1); Text("Highlights").tag(2) }.pickerStyle(.segmented)
+            // Offset sits with the three tonal wheels because it is operated the
+            // same way, but it is not a fourth tonal range: it moves the whole
+            // picture, black included. `offsetGrade` in Shaders.metal is where
+            // that difference lives.
+            //
+            // It is absent while a mask is selected, because a local layer has
+            // no offset wheel to drive — see `isEditingMaskGrade`. Offering a
+            // segment that moved the slider and changed nothing is the bug this
+            // avoids.
+            Picker("Tonal range", selection: $selected) {
+                Text("Shadows").tag(0); Text("Midtones").tag(1)
+                Text("Highlights").tag(2)
+                if !model.isEditingMaskGrade { Text("Offset").tag(3) }
+            }.pickerStyle(.segmented)
             let hue = value(.hue), strength = value(.strength)
             ZStack {
                 Circle().fill(AngularGradient(colors: (0...12).map { Color(hue: Double($0)/12, saturation: 0.9, brightness: 0.9) }, center: .center))
@@ -94,6 +107,11 @@ struct WheelsPanel<Model: GradingModel>: View {
             slider(.hue, "Hue", 0...360) { "\(Int($0))°" }
             slider(.strength, "Color strength", 0...100) { "\(Int($0))%" }
             slider(.brightness, "Brightness", -100...100, AdjustmentValueFormatters.signed())
+        }
+        // Selecting a mask while Offset is showing would leave the picker on a
+        // segment that no longer exists, which reads as no selection at all.
+        .onChange(of: model.isEditingMaskGrade) { _, editingMask in
+            if editingMask && selected == 3 { selected = 0 }
         }
     }
 

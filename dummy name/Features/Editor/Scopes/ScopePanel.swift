@@ -55,6 +55,7 @@ struct ScopePanel<Model: GradingModel>: View {
                 }
                 .clipped()
             footer
+            assist
         }
         .background(Color.black)
         .overlay(alignment: .top) { Divider().overlay(Color.white.opacity(0.08)) }
@@ -144,6 +145,55 @@ struct ScopePanel<Model: GradingModel>: View {
         }
         .padding(.horizontal, 10)
         .frame(height: 30)
+        .background(Color.black)
+    }
+
+    /// False colour and zebras.
+    ///
+    /// Beside the scopes because it answers the same question they do — is this
+    /// exposed correctly — but on the picture rather than in a trace. It is not
+    /// gated: an assist changes no pixel of the export, so like the histogram
+    /// there is nothing to gate, and it is the one tool that makes Log footage
+    /// legible to someone who has not graded it yet.
+    private var assist: some View {
+        VStack(spacing: 6) {
+            Divider().overlay(Color.white.opacity(0.08))
+            HStack(spacing: 0) {
+                ForEach(ViewerAssist.allCases) { mode in
+                    Button { model.setViewerAssist(mode) } label: {
+                        HStack(spacing: 4) {
+                            Image(systemName: mode.symbol).font(.system(size: 9))
+                            Text(mode.title)
+                                .font(.system(size: 10,
+                                              weight: model.viewerAssist.mode == mode ? .semibold : .regular))
+                        }
+                        .foregroundStyle(model.viewerAssist.mode == mode
+                                         ? AppColors.accent : AppColors.textSecondary)
+                        .frame(maxWidth: .infinity, minHeight: 28)
+                        .contentShape(Rectangle())
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityAddTraits(model.viewerAssist.mode == mode ? [.isSelected] : [])
+                }
+            }
+            // Only zebras have a threshold, so the row appears with them rather
+            // than sitting inert under the other two.
+            if model.viewerAssist.mode == .zebras {
+                HStack(spacing: 8) {
+                    Text("\(Int(model.viewerAssist.zebraThreshold))%")
+                        .font(.system(size: 9, design: .monospaced))
+                        .foregroundStyle(AppColors.textSecondary)
+                        .frame(width: 34, alignment: .leading)
+                    Slider(value: Binding(get: { model.viewerAssist.zebraThreshold },
+                                          set: { model.setZebraThreshold($0) }),
+                           in: ViewerAssistSettings.thresholdRange)
+                        .tint(AppColors.accent)
+                        .accessibilityLabel("Zebra threshold")
+                }
+                .padding(.horizontal, 10)
+                .padding(.bottom, 6)
+            }
+        }
         .background(Color.black)
     }
 }

@@ -36,6 +36,10 @@ enum GradeSlot: Hashable, Sendable {
     case effect(FilmEffectSlot)
     /// A whole-curve snapshot track.
     case curve(CurveType)
+    /// How hard the Color Warper pulls. The warp POINTS are not animated here:
+    /// a moving point needs a whole-warp snapshot track, the way a curve does,
+    /// and this is the scalar half that costs nothing to support.
+    case colorWarpStrength
 }
 
 /// The finishing effects, named so a slot can address one without carrying a
@@ -88,6 +92,7 @@ extension GradeSlot {
         case .vignetteMidpoint: String(localized: "Vignette midpoint")
         case .vignetteFeather: String(localized: "Vignette feather")
         case .lookIntensity: String(localized: "Look strength")
+        case .colorWarpStrength: String(localized: "Color Warper strength")
         case .effect(let effect): effect.title
         case .curve(let type): String(localized: "\(type.title) curve")
         }
@@ -110,6 +115,7 @@ extension GradeSlot {
         case .vignetteAmount: -100...100
         case .vignetteMidpoint, .vignetteFeather: 0...100
         case .lookIntensity: 0...100
+        case .colorWarpStrength: 0...100
         case .effect: Double(FilmEffects.range.lowerBound)...Double(FilmEffects.range.upperBound)
         // Curve keyframes carry a curve, not a number; the bound is unused and
         // is stated only so the property always has one.
@@ -124,6 +130,7 @@ extension GradeSlot {
         case .vignetteMidpoint: .number(50)
         case .vignetteFeather: .number(70)
         case .lookIntensity: .number(100)
+        case .colorWarpStrength: .number(100)
         case .curve(let type): .curve(.neutral(type))
         default: .number(0)
         }
@@ -156,6 +163,7 @@ extension GradeSlot {
         case .wheelHue, .wheelStrength, .wheelBrightness: .wheels
         case .vignetteAmount, .vignetteMidpoint, .vignetteFeather: .vignette
         case .lookIntensity: .lut
+        case .colorWarpStrength: .warper
         case .effect: .effects
         case .curve: .curves
         }
@@ -170,7 +178,8 @@ extension HueBand {
 
 extension GradingWheel {
     static var names: [String] {
-        [String(localized: "Shadows"), String(localized: "Midtones"), String(localized: "Highlights")]
+        [String(localized: "Shadows"), String(localized: "Midtones"),
+         String(localized: "Highlights"), String(localized: "Offset")]
     }
     static func name(_ index: Int) -> String {
         names.indices.contains(index) ? names[index] : String(localized: "Wheel")
@@ -233,6 +242,9 @@ extension AnimatableProperty {
         case .wheelHighlightsHue: .wheelHue(2)
         case .wheelHighlightsStrength: .wheelStrength(2)
         case .wheelHighlightsBrightness: .wheelBrightness(2)
+        case .wheelOffsetHue: .wheelHue(3)
+        case .wheelOffsetStrength: .wheelStrength(3)
+        case .wheelOffsetBrightness: .wheelBrightness(3)
 
         case .gradeVignette: .vignetteAmount
         case .gradeVignetteMidpoint: .vignetteMidpoint
@@ -245,6 +257,8 @@ extension AnimatableProperty {
         case .effectGlow: .effect(.glow)
         case .effectHalation: .effect(.halation)
         case .effectGrain: .effect(.grain)
+
+        case .gradeColorWarpStrength: .colorWarpStrength
 
         case .curveMaster: .curve(.master)
         case .curveRed: .curve(.red)
@@ -337,6 +351,9 @@ extension GradeSettings {
         // a look with no explicit strength is applied at full.
         case .lookIntensity: return Double(advanced.lutIntensity ?? 100)
         case .effect(let effect): return Double(advanced.resolvedEffects[keyPath: effect.keyPath])
+        // Same reading as the look's strength: a warp with no explicit strength
+        // is applied at full, so the control is never blank.
+        case .colorWarpStrength: return Double(advanced.colorWarp?.strength ?? 100)
         case .curve: return nil
         }
     }
@@ -372,6 +389,15 @@ extension GradeSettings {
             effects[keyPath: effect.keyPath] = clamped
             effects.clamp()
             advanced.effects = effects.isNeutral ? nil : effects
+        case .colorWarpStrength:
+            // Only written when there is a warp to apply it to. Storing a
+            // strength on its own would leave a project carrying a warper with
+            // nothing in it, which `AdvancedGrade`'s optional storage exists to
+            // avoid.
+            if var warp = advanced.colorWarp {
+                warp.strength = clamped
+                advanced.colorWarp = warp
+            }
         case .curve: break
         }
         self.advanced = advanced == .neutral ? nil : advanced
@@ -421,9 +447,12 @@ extension AdvancedGrade {
         edit(&hsl[index])
     }
 
+    /// Four, not three, since the offset wheel. The bound was missed when it was
+    /// added and every write to wheel 3 silently returned here, so the control
+    /// moved and the picture never changed.
     mutating func editWheel(_ index: Int, _ edit: (inout GradingWheel) -> Void) {
-        guard (0..<3).contains(index) else { return }
-        while wheels.count < 3 { wheels.append(GradingWheel()) }
+        guard (0..<4).contains(index) else { return }
+        while wheels.count < 4 { wheels.append(GradingWheel()) }
         edit(&wheels[index])
     }
 }

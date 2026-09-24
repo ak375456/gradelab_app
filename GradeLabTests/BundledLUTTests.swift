@@ -99,6 +99,84 @@ final class BundledLUTTests: XCTestCase {
             XCTAssertEqual(asset.inputColorSpace, "Rec.709 / working SDR")
         }
     }
+
+    // MARK: - Sony Log conversions
+
+    /// Every bundled conversion ships and loads.
+    ///
+    /// Checked through `url()` rather than against the source folder, because
+    /// what matters is that the compiled `.gclut` reached the bundle: forgetting
+    /// `Scripts/compile-luts.sh` leaves the source in place and the look absent.
+    func testEveryLogConversionIsBundledAndLoads() throws {
+        XCTAssertFalse(LUTAsset.bundledLogConversions.isEmpty)
+        for asset in LUTAsset.bundledLogConversions {
+            let url = try XCTUnwrap(asset.url(), "\(asset.filename) is not in the bundle")
+            XCTAssertEqual(asset.kind, .technical, "\(asset.filename) must not be a creative look")
+            // Loaded the way `LUTLibrary.makeTexture` loads it. A look ships
+            // compiled, so `url()` hands back the `.gclut` and the text parser
+            // would choke on it — which is the bug this assertion first caught.
+            if url.pathExtension.lowercased() == LUTBinary.fileExtension {
+                let compiled = try LUTBinary.decode(contentsOf: url)
+                XCTAssertGreaterThan(compiled.size, 1, "\(asset.filename) grid size")
+                XCTAssertEqual(
+                    compiled.samples.count,
+                    compiled.size * compiled.size * compiled.size * 3,
+                    "\(asset.filename) sample count"
+                )
+            } else {
+                let cube = try CubeLUTParser().parse(contentsOf: url)
+                guard case .threeDimensional = cube.kind else {
+                    return XCTFail("\(asset.filename) is not a 3D LUT")
+                }
+                XCTAssertEqual(cube.domainMinimum, SIMD3<Float>(repeating: 0), "\(asset.filename) domain min")
+                XCTAssertEqual(cube.domainMaximum, SIMD3<Float>(repeating: 1), "\(asset.filename) domain max")
+            }
+        }
+    }
+
+    /// They appear in the picker, and they are free.
+    ///
+    /// A conversion is how Log footage becomes viewable at all, so charging for
+    /// one would put the paywall in front of the work rather than in front of
+    /// delivery — the same decision already made for Apple Log and HDR export.
+    /// If this goes red, that monetization decision is being reversed by
+    /// accident rather than on purpose.
+    func testLogConversionsAreOfferedAndNeverPro() {
+        let listed = Set(LUTAsset.bundledLooks.map(\.id))
+        for asset in LUTAsset.bundledLogConversions {
+            XCTAssertTrue(listed.contains(asset.id), "\(asset.filename) is missing from the picker")
+            XCTAssertFalse(ProAccessPolicy.requiresPro(asset), "\(asset.filename) must not be Pro")
+        }
+    }
+
+    /// A conversion must not be preloaded at launch.
+    ///
+    /// `preloadBundledLooks` loads every `.builtIn` look up front, which is a
+    /// trade written for three small curated looks. Two of these are 65-point,
+    /// about 1.6 MB of GPU memory each, and most people will never shoot Sony
+    /// Log — so they load on first selection instead.
+    func testLogConversionsAreNotPreloaded() {
+        for asset in LUTAsset.bundledLogConversions {
+            XCTAssertFalse(asset.isBuiltIn, "\(asset.filename) would be preloaded at launch")
+        }
+    }
+
+    /// A conversion is not a look, and discovery must not find it as one.
+    ///
+    /// Discovery labels whatever it finds in the bundle as a creative look
+    /// expecting Rec.709 input. Listing these explicitly is what keeps them
+    /// described as what they are; this guards against one being added to the
+    /// folder and picked up twice, or picked up as creative.
+    func testLogConversionsAreListedOnce() {
+        let ids = LUTAsset.bundledLooks.map(\.id)
+        for asset in LUTAsset.bundledLogConversions {
+            XCTAssertEqual(ids.filter { $0 == asset.id }.count, 1, "\(asset.filename) is listed twice")
+        }
+        let creative = Set(LUTAsset.bundledCreativeLooks.map(\.id))
+        for asset in LUTAsset.bundledLogConversions {
+            XCTAssertFalse(creative.contains(asset.id), "\(asset.filename) is in the creative list")
+        }
+    }
 }
 
 /// The stored side of the look stage: selection, strength, and staying
@@ -124,11 +202,13 @@ final class LookSettingsTests: XCTestCase {
     }
 
     func testUniformsCarryStrengthWithoutChangingLayout() {
-        // 352 since finishing effects added two SIMD4s. The number is the point:
-        // Swift and Metal declare this struct separately, and a field added to
-        // one and not the other reads uniforms off by that many bytes, which
-        // shows up as a grade that is subtly wrong rather than as a crash.
-        XCTAssertEqual(MemoryLayout<GradeUniforms>.stride, 352, "Uniform layout must not drift from the shader")
+        // 368 since the Color Warper appended a SIMD4; 352 before it. The
+        // number is the point: Swift and Metal declare this struct separately,
+        // and a field added to one and not the other reads uniforms off by that
+        // many bytes, which shows up as a grade that is subtly wrong rather than
+        // as a crash. `Scripts/ValidateGrade.swift` asserts the two sides agree
+        // by asking the GPU; this is the cheap version that runs in the suite.
+        XCTAssertEqual(MemoryLayout<GradeUniforms>.stride, 368, "Uniform layout must not drift from the shader")
         var settings = GradeSettings.neutral
         var advanced = AdvancedGrade.neutral
         advanced.lut = LUTAsset.bundledCreativeLooks[1].id
@@ -225,8 +305,15 @@ final class LookSettingsTests: XCTestCase {
         )
     }
 
+    /// Looks found in the drop-in folder are named from their filename.
+    ///
+    /// Scoped to discovered looks rather than to everything that is not
+    /// built-in, which is what it used to say. The bundled Log conversions are
+    /// neither: they are listed explicitly so they can carry their own name,
+    /// category and input colour space, none of which a filename can express.
     func testImportedLookNamesComeFromTheFilename() {
-        for asset in LUTAsset.bundledLooks where !asset.isBuiltIn {
+        let listed = Set(LUTAsset.bundledLogConversions.map(\.id))
+        for asset in LUTAsset.bundledLooks where !asset.isBuiltIn && !listed.contains(asset.id) {
             XCTAssertFalse(asset.name.contains("_"), "\(asset.filename) name still has underscores")
             XCTAssertFalse(asset.name.hasSuffix(".cube"), "\(asset.filename) name kept its extension")
             XCTAssertEqual(asset.category, "Imported")
@@ -485,4 +572,5 @@ final class LookPreviewTests: XCTestCase {
         XCTAssertGreaterThan(image.size.height, 0)
         XCTAssertNotNil(image.cgImage)
     }
+
 }

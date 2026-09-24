@@ -194,13 +194,15 @@ struct ValidateCurves {
                                device const float3 *input [[buffer(1)]],
                                constant GradeUniforms &grade [[buffer(2)]],
                                texture2d<float, access::sample> curveLUT [[texture(0)]],
+                               texture2d<float, access::sample> warpField [[texture(1)]],
                                uint i [[thread_position_in_grid]]) {
-            output[i] = float4(applyGrade(input[i], float2(0.5), grade, curveLUT), 1.0);
+            output[i] = float4(applyGrade(input[i], float2(0.5), grade, curveLUT, warpField), 1.0);
         }
         """
         let library = try device.makeLibrary(source: source + "\n" + probe, options: nil)
         let pipeline = try device.makeComputePipelineState(function: library.makeFunction(name: "curveProbe")!)
         let curveLibrary = CurveLUTLibrary(device: device)
+        let warpLibrary = ColorWarpFieldLibrary(device: device)
 
         func render(_ colors: [SIMD3<Float>], _ curves: AdvancedCurves) throws -> [SIMD3<Float>] {
             var uniforms = GradeUniforms(settings: settings(curves), bypass: false)
@@ -217,6 +219,9 @@ struct ValidateCurves {
             encoder.setBuffer(inputBuffer, offset: 0, index: 1)
             encoder.setBytes(&uniforms, length: MemoryLayout<GradeUniforms>.stride, index: 2)
             encoder.setTexture(curveLibrary.texture(for: curves), index: 0)
+            // Neutral: this harness measures the curves, so the warper must not
+            // be able to move a value.
+            encoder.setTexture(warpLibrary.texture(for: nil), index: 1)
             encoder.dispatchThreads(MTLSize(width: colors.count, height: 1, depth: 1),
                                     threadsPerThreadgroup: MTLSize(width: min(colors.count, 64), height: 1, depth: 1))
             encoder.endEncoding(); command.commit(); command.waitUntilCompleted()

@@ -234,6 +234,9 @@ struct TextToolPanel: View {
     private func toggle(_ title: String, symbol: String, _ key: WritableKeyPath<TextClip, Bool>) -> some View {
         Button { model.editText { $0[keyPath: key].toggle() } } label: { Image(systemName: symbol).frame(width: 44, height: 44)
             .background(model.selectedText?[keyPath: key] == true ? Color.cyan.opacity(0.2) : .clear, in: RoundedRectangle(cornerRadius: 8))
+            // Off, the background is clear, which takes no clicks — so the
+            // whole 44x44 has to be asked for or only the glyph answers.
+            .contentShape(RoundedRectangle(cornerRadius: 8))
         }.accessibilityLabel(title).accessibilityValue(model.selectedText?[keyPath: key] == true ? "On" : "Off")
     }
     /// Display only. The tab's identity stays the English string — `section` is

@@ -25,7 +25,7 @@ final class GradeSettingsTests: XCTestCase {
         XCTAssertEqual(try JSONDecoder().decode(GradeSettings.self, from: JSONEncoder().encode(settings)), settings)
         settings.resetAll()
         XCTAssertEqual(settings, .neutral)
-        XCTAssertEqual(MemoryLayout<GradeUniforms>.stride, 352, "Uniform layout must not drift from the shader")
+        XCTAssertEqual(MemoryLayout<GradeUniforms>.stride, 368, "Uniform layout must not drift from the shader")
     }
 
     func testLegacyAdvancedGradeDecodesWithoutMask() throws {
@@ -45,7 +45,7 @@ final class GradeSettingsTests: XCTestCase {
         settings.advanced = advanced
         let uniforms = GradeUniforms(settings: settings, bypass: false)
 
-        XCTAssertEqual(MemoryLayout<GradeUniforms>.stride, 352)
+        XCTAssertEqual(MemoryLayout<GradeUniforms>.stride, 368)
         XCTAssertEqual(uniforms.gradeMaskA.x, 0.25, accuracy: 0.0001)
         XCTAssertEqual(uniforms.gradeMaskA.y, 0.75, accuracy: 0.0001)
         XCTAssertEqual(uniforms.gradeMaskA.z, 0.50, accuracy: 0.0001)

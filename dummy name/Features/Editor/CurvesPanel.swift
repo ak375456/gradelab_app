@@ -18,12 +18,9 @@ struct CurvesPanel<Model: GradingModel>: View {
     @AppStorage("curvesGuideExpanded") private var showsGuide = true
 
     private var type: CurveType { model.selectedCurve }
-    /// The curve at the playhead. Animated curves resolve to the blended shape,
-    /// so the graph shows and edits the curve the picture is actually using.
-    private var curve: AdvancedCurve { model.curves[type] }
     /// An animated curve can only be reshaped at a frame the clip occupies,
     /// which is the rule every other animated control follows.
-    private var canEditCurve: Bool {
+    private func canEdit(_ type: CurveType) -> Bool {
         AnimatableProperty.curve(type).map { model.canEditGradeValue($0) } ?? true
     }
 
@@ -32,32 +29,13 @@ struct CurvesPanel<Model: GradingModel>: View {
         // graph shapes the curve rather than scrolling the panel, so anything
         // the user has to be able to reach has to sit above it.
         VStack(spacing: AppSpacing.compact) {
-            selector
-            // Only while a Pro curve is actually selected. Someone shaping the
-            // master curve — which is free, and unlimited — should not be sold
-            // anything.
-            if ProAccessPolicy.curveRequiresPro(type) {
-                ProPanelNotice(feature: .colorCurves)
-            }
-            readout
-
-            CurveGraph(
-                curve: curve,
-                selectedPoint: model.selectedCurvePointBinding,
-                tint: tint,
-                onBegin: { model.beginCurveEdit("\(type.title) curve") },
-                onEdit: { edit in model.editCurve(type, edit) },
-                onEnd: { model.endCurveEdit() }
-            )
-            .frame(height: 178)
-            .disabled(!model.canGrade || !canEditCurve)
-
-            if let property = AnimatableProperty.curve(type) {
-                GradeKeyframeLane(model: model, property: property)
-            }
+            if AppPlatform.isMac { macCurves } else { compactCurves }
 
             VStack(alignment: .leading, spacing: AppSpacing.small) {
-                Text(type.help)
+                // Describes whichever curve the section above it is showing:
+                // on Mac that is the colour curve, since the four tone curves
+                // are all on screen at once.
+                Text(AppPlatform.isMac ? colorType.help : type.help)
                     .font(AppTypography.caption)
                     .foregroundStyle(AppColors.textTertiary)
                     .fixedSize(horizontal: false, vertical: true)
@@ -76,6 +54,87 @@ struct CurvesPanel<Model: GradingModel>: View {
         .onDisappear { model.isPickingCurveHue = false }
     }
 
+    /// Phone and iPad: one curve at a time, chosen from the strip.
+    private var compactCurves: some View {
+        VStack(spacing: AppSpacing.compact) {
+            selector
+            // Only while a Pro curve is actually selected. Someone shaping the
+            // master curve — which is free, and unlimited — should not be sold
+            // anything.
+            if ProAccessPolicy.curveRequiresPro(type) {
+                ProPanelNotice(feature: .colorCurves)
+            }
+            editor(type)
+        }
+    }
+
+    /// Mac: the four tone curves stacked, because a desktop window has the
+    /// height to show Master, R, G and B together rather than making the
+    /// colorist page between them. The six colour curves each target one thing
+    /// and are worked on one at a time, so they keep a section of their own.
+    private var macCurves: some View {
+        VStack(spacing: AppSpacing.standard) {
+            VStack(spacing: AppSpacing.standard) {
+                ForEach(CurveType.toneCurves) { tone in
+                    editor(tone, showsTitle: true, height: 150)
+                }
+            }
+            Divider().overlay(AppColors.separator)
+            VStack(spacing: AppSpacing.compact) {
+                colorSelector
+                if ProAccessPolicy.curveRequiresPro(colorType) {
+                    ProPanelNotice(feature: .colorCurves)
+                }
+                editor(colorType)
+            }
+        }
+    }
+
+    /// The colour curve the Mac section is showing. The panel's selection is
+    /// shared with the compact layout, where it can be a tone curve, so this
+    /// falls back to the first of the six.
+    private var colorType: CurveType {
+        CurveType.colorCurves.contains(type) ? type : .hueVsHue
+    }
+
+    private var colorSelector: some View {
+        ScrollView(.horizontal) {
+            HStack(spacing: AppSpacing.small) {
+                ForEach(CurveType.colorCurves) { chip($0, selected: colorType) }
+            }
+            .padding(.horizontal, 2)
+        }
+        .frame(height: 44)
+        .scrollIndicators(.hidden)
+    }
+
+    /// One curve: its numbers, its graph and its keyframe lane.
+    ///
+    /// `model.curves[type]` is the curve at the playhead — an animated curve
+    /// resolves to the blended shape, so the graph shows and edits what the
+    /// picture is actually using.
+    private func editor(_ type: CurveType, showsTitle: Bool = false,
+                        height: CGFloat = 178) -> some View {
+        VStack(spacing: AppSpacing.compact) {
+            readout(type, showsTitle: showsTitle)
+
+            CurveGraph(
+                curve: model.curves[type],
+                selectedPoint: model.selectedCurvePointBinding,
+                tint: color(for: type),
+                onBegin: { model.beginCurveEdit("\(type.title) curve") },
+                onEdit: { edit in model.editCurve(type, edit) },
+                onEnd: { model.endCurveEdit() }
+            )
+            .frame(height: height)
+            .disabled(!model.canGrade || !canEdit(type))
+
+            if let property = AnimatableProperty.curve(type) {
+                GradeKeyframeLane(model: model, property: property)
+            }
+        }
+    }
+
     // MARK: - Curve selector
 
     /// One horizontal strip for all ten curves, with a rule between the tone
@@ -89,12 +148,12 @@ struct CurvesPanel<Model: GradingModel>: View {
         ScrollViewReader { proxy in
             ScrollView(.horizontal) {
                 HStack(spacing: AppSpacing.small) {
-                    ForEach(CurveType.toneCurves) { chip($0) }
+                    ForEach(CurveType.toneCurves) { chip($0, selected: type) }
                     Rectangle()
                         .fill(AppColors.separator)
                         .frame(width: 1, height: 20)
                         .accessibilityHidden(true)
-                    ForEach(CurveType.colorCurves) { chip($0) }
+                    ForEach(CurveType.colorCurves) { chip($0, selected: type) }
                 }
                 .padding(.horizontal, 2)
             }
@@ -107,7 +166,7 @@ struct CurvesPanel<Model: GradingModel>: View {
         }
     }
 
-    private func chip(_ candidate: CurveType) -> some View {
+    private func chip(_ candidate: CurveType, selected: CurveType) -> some View {
         // Free to open and shape; the paywall is at export. The lock only says
         // which of the ten this applies to.
         let marked = ProAccessPolicy.curveRequiresPro(candidate) && !ProStore.shared.hasPro
@@ -129,20 +188,20 @@ struct CurvesPanel<Model: GradingModel>: View {
             .padding(.horizontal, AppSpacing.compact)
             .frame(height: 32)
             .background(
-                candidate == type ? AppColors.surfacePressed : AppColors.surface,
+                candidate == selected ? AppColors.surfacePressed : AppColors.surface,
                 in: Capsule())
             .overlay(
                 Capsule().strokeBorder(
-                    candidate == type ? AppColors.accent : .clear, lineWidth: 1))
+                    candidate == selected ? AppColors.accent : .clear, lineWidth: 1))
             .foregroundStyle(
-                candidate == type ? AppColors.textPrimary : AppColors.textSecondary)
+                candidate == selected ? AppColors.textPrimary : AppColors.textSecondary)
         }
         .buttonStyle(.plain)
         .frame(height: 44)
         .id(candidate)
         .accessibilityLabel(marked ? "\(candidate.title). Pro feature" : candidate.title)
         .accessibilityValue(model.curves[candidate].isFlat ? "Neutral" : "Adjusted")
-        .accessibilityAddTraits(candidate == type ? .isSelected : [])
+        .accessibilityAddTraits(candidate == selected ? .isSelected : [])
     }
 
     // MARK: - Guide
@@ -214,8 +273,17 @@ struct CurvesPanel<Model: GradingModel>: View {
 
     // MARK: - Readout and actions
 
-    private var readout: some View {
-        HStack(spacing: AppSpacing.small) {
+    private func readout(_ type: CurveType, showsTitle: Bool = false) -> some View {
+        let curve = model.curves[type]
+        let selected = selectedPoint(in: curve)
+        return HStack(spacing: AppSpacing.small) {
+            // Stacked, nothing else says which graph this is.
+            if showsTitle {
+                Text(type.title)
+                    .font(AppTypography.bodyEmphasized)
+                    .foregroundStyle(color(for: type) == AppColors.textPrimary
+                                     ? AppColors.textPrimary : color(for: type))
+            }
             if let point = selected {
                 value(type.inputLabel, type.formattedInput(point.x))
                 Text("·").foregroundStyle(AppColors.textTertiary)
@@ -293,7 +361,9 @@ struct CurvesPanel<Model: GradingModel>: View {
         .accessibilityAddTraits(isActive ? .isSelected : [])
     }
 
-    private var selected: CurvePoint? {
+    /// Point IDs are unique to a curve, so a stacked graph answers this only
+    /// for a point of its own.
+    private func selectedPoint(in curve: AdvancedCurve) -> CurvePoint? {
         model.selectedCurvePoint.flatMap { id in curve.points.first { $0.id == id } }
     }
 
@@ -303,8 +373,6 @@ struct CurvesPanel<Model: GradingModel>: View {
         if !candidate.isCyclic { model.isPickingCurveHue = false }
         CurveHaptics.select()
     }
-
-    private var tint: Color { color(for: type) }
 
     private func color(for type: CurveType) -> Color {
         switch type {

@@ -185,7 +185,8 @@ final class ScopeAnalyzer: @unchecked Sendable {
         hdr: HDRDisplayUniforms,
         intensity: Double,
         lut: MTLTexture,
-        curveLUT: MTLTexture
+        curveLUT: MTLTexture,
+        warpField: MTLTexture
     ) -> Bool {
         lock.lock()
         if inFlight { lock.unlock(); return false }
@@ -237,6 +238,7 @@ final class ScopeAnalyzer: @unchecked Sendable {
             encoder.setTexture(analysis, index: 2)
             encoder.setTexture(lut, index: 3)
             encoder.setTexture(curveLUT, index: 6)
+            encoder.setTexture(warpField, index: 12)
             encoder.setBytes(&grade, length: MemoryLayout<GradeUniforms>.stride, index: 0)
             locals.bind(encoder)
             Self.dispatch(encoder, pipeline: pipeline, width: size.width, height: size.height)
