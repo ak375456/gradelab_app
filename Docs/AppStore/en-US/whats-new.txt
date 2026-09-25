@@ -1,6 +1,6 @@
-Apple Log 2 support, and a much faster look browser.
+Color Warper is here, along with smoother editing.
 
-• Apple Log 2 — grade footage from iPhone 17 Pro. Apple Log 2 is decoded through its own Apple Wide Gamut transform rather than being treated as Apple Log, so the colour is right from the first frame, through grading and into the export.
-• Looks load far faster — the look browser used to fill in slowly on large LUT collections, and applying a high-resolution LUT could take seconds. Look previews now appear almost immediately and a look applies as soon as you tap it.
-• Fixed: the timecode above the timeline could wrap onto two lines on smaller iPhones and split a value across the break.
-• Fixed: importing a photo said "Analyzing Video".
+• Color Warper: shape colors with precise control points in Hue/Sat and Chroma/Luma modes.
+• Timeline: select two or more draggable rows and move them together.
+• Optimized previews for smoother editing.
+• Interface improvements, bug fixes, and general app optimizations.

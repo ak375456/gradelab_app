@@ -20,7 +20,7 @@ final class ProStore: ObservableObject {
     /// The two cases below partition `ProPlan.allCases` exactly, and
     /// `refreshAccess` only ever admits verified, unrevoked, un-upgraded
     /// entitlements for those IDs — so this is the whole of the question.
-    /// Callers that also care whether the check has finished read
+    /// Callers that also care whether the check has finished read5
     /// `isCheckingAccess` separately rather than having it folded in here.
     var hasPro: Bool { hasLifetime || hasSubscription }
     var hasLifetime: Bool { ownedIDs.contains(ProPlan.lifetime.id) }

@@ -1,6 +1,6 @@
-Compatibilidad con Apple Log 2 y un explorador de looks mucho más rápido.
+Llega Color Warper, con una edición más fluida.
 
-• Apple Log 2: etalona material del iPhone 17 Pro. Apple Log 2 se decodifica con su propia transformación Apple Wide Gamut en lugar de tratarse como Apple Log, así que el color es correcto desde el primer fotograma, durante el etalonaje y hasta la exportación.
-• Los looks cargan mucho más rápido: el explorador se llenaba lentamente con colecciones grandes de LUT, y aplicar una LUT de alta resolución podía tardar varios segundos. Ahora las previsualizaciones aparecen casi al instante y un look se aplica en cuanto lo tocas.
-• Corregido: el código de tiempo sobre la línea de tiempo podía pasar a dos líneas en iPhone pequeños y partir un valor.
-• Corregido: al importar una foto aparecía «Analizando vídeo».
+• Color Warper: moldea los colores con precisión en los modos Tono/Sat y Croma/Luma.
+• Línea de tiempo: selecciona dos o más filas que se puedan arrastrar y muévelas juntas.
+• Vistas previas optimizadas para editar con más fluidez.
+• Mejoras de interfaz, correcciones y optimizaciones generales.

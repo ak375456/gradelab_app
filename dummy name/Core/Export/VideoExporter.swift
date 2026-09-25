@@ -38,6 +38,16 @@ final class VideoExporter: @unchecked Sendable {
 
     private let context: MetalContext
     private let computePipeline: MTLComputePipelineState
+    /// Noise reduction, shared with the preview. Built on first use for an
+    /// export whose grade asks for it, and nil for every other export.
+    private var noiseStage: NoiseReductionStage?
+    /// The sliding window that keeps a few decoded frames either side of the
+    /// one being written. Not a second decoder: the reader already walks the
+    /// file in order, and this only changes when its frames are released.
+    private var temporalWindow: TemporalExportWindow?
+    /// What this device can hold. Applied here as well as in the preview, so
+    /// the two agree about the window on the machine they are both running on.
+    private var noiseCapability: NoiseReductionCapability?
     /// Built lazily: 8-bit SDR exports never touch these.
     private let hdrPipeline: MTLComputePipelineState?
     private let sdr10Pipeline: MTLComputePipelineState?
@@ -127,6 +137,7 @@ final class VideoExporter: @unchecked Sendable {
 
                 let pipeline = try makeMediaPipeline(
                     source: source,
+                    settings: settings,
                     configuration: configuration,
                     destinationURL: destinationURL
                 )
@@ -229,6 +240,7 @@ final class VideoExporter: @unchecked Sendable {
 
     private func makeMediaPipeline(
         source: ExportSourceInfo,
+        settings: GradeSettings,
         configuration: ExportConfiguration,
         destinationURL: URL
     ) throws -> MediaPipeline {
@@ -283,7 +295,18 @@ final class VideoExporter: @unchecked Sendable {
         } else {
             videoOutput = AVAssetReaderTrackOutput(track: source.videoTrack, outputSettings: ExportMediaSettings.videoReaderSettings(colorMode: source.colorMode))
         }
-        videoOutput.alwaysCopiesSampleData = false
+        // Normally false: the reader's own memory is handed straight to Metal
+        // and released before the next frame is asked for, which is the whole
+        // reason an export can run at 4K without a copy per frame.
+        //
+        // Temporal noise reduction changes that. It holds a few frames back so
+        // it can see either side of the one being written, and those buffers
+        // come out of the decoder's pool. If the pool is smaller than the
+        // window, holding the window would starve it and the read would never
+        // return. So when the window is in use the frames are copied out of the
+        // decoder's memory — a cost paid only by the exports that need it.
+        videoOutput.alwaysCopiesSampleData = Self.needsTemporalFrames(
+            settings: settings, source: source)
         guard reader.canAdd(videoOutput) else {
             throw GradeLabError.unsupportedExport(
                 String(localized: "The source video cannot be decoded as \(ExportMediaSettings.readerFormatDescription(colorMode: source.colorMode)) on this device.")
@@ -360,8 +383,10 @@ final class VideoExporter: @unchecked Sendable {
                 let mixed = AVAssetReaderAudioMixOutput(audioTracks: source.audioTracks.map(\.track), audioSettings: readerSettings)
                 mixed.audioMix = source.audioMix
                 // Match the preview: retimed audio keeps its pitch rather than
-                // rising and falling with the rate.
-                mixed.audioTimePitchAlgorithm = .spectral
+                // rising and falling with the rate, unless a clip asked for the
+                // tape effect. Preview and export read the same flag off the
+                // same clips, so they cannot choose differently.
+                mixed.audioTimePitchAlgorithm = Self.pitchAlgorithm(for: source.timelineClips)
                 output = mixed
                 writerSourceFormatHint = nil
             } else {
@@ -378,7 +403,7 @@ final class VideoExporter: @unchecked Sendable {
                 let usesNativePCM = readerSettings == nil
                 let track = AVAssetReaderTrackOutput(track: audioSource.track, outputSettings: readerSettings)
                 if !usesNativePCM {
-                    track.audioTimePitchAlgorithm = .spectral
+                    track.audioTimePitchAlgorithm = Self.pitchAlgorithm(for: source.timelineClips)
                 }
                 output = track
                 writerSourceFormatHint = usesNativePCM ? audioSource.sourceFormatDescription : nil
@@ -474,6 +499,7 @@ final class VideoExporter: @unchecked Sendable {
         // an edit/gap boundary even when the composition has a fixed cadence.
         let sampler = ExportFrameSampler(output: pipeline.videoOutput, range: source.videoTimeRange,
             fps: configuration.frameRate.value)
+        prepareNoiseReduction(settings: settings, source: source)
 
         while videoIsActive || audioIsActive.contains(true) {
             try session.checkCancellation()
@@ -486,6 +512,7 @@ final class VideoExporter: @unchecked Sendable {
                         sampler: sampler,
                         adaptor: pipeline.adaptor,
                         source: source,
+                        settings: settings,
                         grade: grade
                     )
                 }
@@ -567,11 +594,22 @@ final class VideoExporter: @unchecked Sendable {
         sampler: ExportFrameSampler,
         adaptor: AVAssetWriterInputPixelBufferAdaptor,
         source: ExportSourceInfo,
+        settings: GradeSettings,
         grade: FrameGrade
     ) throws -> VideoStep {
-        guard let frame = try sampler.next() else {
-            return .finished
+        // With noise reduction on, frames come through the sliding window,
+        // which holds a couple back so the engine can see either side of the
+        // one being written. Everything is still decoded exactly once.
+        let pulled: (frame: (sample: CMSampleBuffer, time: CMTime), neighbours: [NoiseFrame])?
+        if let window = temporalWindow {
+            pulled = try window.next { try sampler.next() }
+        } else if let next = try sampler.next() {
+            pulled = (next, [])
+        } else {
+            pulled = nil
         }
+        guard let pulled else { return .finished }
+        let frame = pulled.frame
         let sampleBuffer = frame.sample
         guard CMSampleBufferDataIsReady(sampleBuffer),
               let sourcePixelBuffer = CMSampleBufferGetImageBuffer(sampleBuffer) else {
@@ -583,6 +621,12 @@ final class VideoExporter: @unchecked Sendable {
         // window is measured in is the encoded frame's — the same number the
         // preview used, which is what keeps the two identical.
         let maskAspect = CGSize(width: source.encodedWidth, height: source.encodedHeight).maskAspect
+        // The grade as values, kept alongside the uniform block: noise
+        // reduction is not a per-pixel colour transform and so has no place in
+        // `GradeUniforms`, but it is authored on the same grade and has to be
+        // read from the same clip at the same time.
+        var frameSettings = settings
+        var activeClipRange: CMTimeRange?
         var grade = source.gradesBaked ? FrameGrade(settings: .neutral, bypass: true) : source.timelineClips.map { clips in
             let clip = TimelineEditing.activeClip(in: clips, at: presentationTime)
             let frameTime = try? TimelineTime(presentationTime)
@@ -595,9 +639,15 @@ final class VideoExporter: @unchecked Sendable {
             let settings = clip.map { active in
                 frameTime.map { active.effectiveGrade(at: $0) } ?? active.gradeSettings
             } ?? .neutral
+            frameSettings = settings
+            activeClipRange = clip.map {
+                CMTimeRange(start: $0.placement.timelineStart.cmTime,
+                            duration: $0.placement.duration.cmTime)
+            }
             return FrameGrade(settings: settings, masks: masks,
                               bypass: false, aspect: maskAspect)
         } ?? grade
+        if source.gradesBaked { frameSettings = .neutral }
         // The same seed the preview used for this frame, so grain lands in the
         // same places rather than being a different random field.
         grade.uniforms.setGrainSeed(presentationTime.seconds)
@@ -633,10 +683,23 @@ final class VideoExporter: @unchecked Sendable {
             throw GradeLabError.exportFailed(String(localized: "The video encoder could not allocate an output frame."))
         }
 
+        // A clip boundary is a cut, and the document already knows where they
+        // are, so a neighbour belonging to the next shot is dropped here rather
+        // than left to be discovered by comparing pictures. The range is
+        // contiguous, so dropping the nearer frame necessarily drops the
+        // further one and no gap can open in the window.
+        let neighbours = activeClipRange.map { range in
+            pulled.neighbours.filter {
+                !$0.time.isNumeric || CMTimeRangeContainsTime(range, time: $0.time)
+            }
+        } ?? pulled.neighbours
+
         try render(
             source: sourcePixelBuffer,
             destination: destination,
-            grade: grade
+            grade: grade,
+            noise: try denoise(source: sourcePixelBuffer, neighbours: neighbours,
+                               settings: frameSettings)
         )
         guard adaptor.append(destination, withPresentationTime: presentationTime) else {
             throw GradeLabError.exportFailed(String(localized: "The video encoder rejected a processed frame."))
@@ -890,7 +953,12 @@ final class VideoExporter: @unchecked Sendable {
     private lazy var effectPipelines: [String: MTLComputePipelineState] = {
         var built: [String: MTLComputePipelineState] = [:]
         for name in ["gradeToTextureYUV", "gradeToTextureHDR", "gradeToTextureAppleLog", "encodeAppleLogFromTexture", "effectWriteBGRA",
-                     "encodeSDR10FromTexture", "encodeHDRFromTexture"] {
+                     "encodeSDR10FromTexture", "encodeHDRFromTexture",
+                     // The two that grade a frame the denoiser has already put
+                     // through the input transform: one for the encoded SDR
+                     // signal, one for the extended-range working space that
+                     // HLG and both Log variants share.
+                     "gradeToTextureBGRA", "gradeToTextureWorking"] {
             // Via the specialisation helper: `gradeToTextureAppleLog` carries
             // the Log 2 function constant, so a pipeline built from a plainly
             // named copy of it is rejected by Metal.
@@ -951,10 +1019,10 @@ final class VideoExporter: @unchecked Sendable {
         encode: (MTLComputeCommandEncoder, MTLTexture) -> Void,
         encodePipeline: MTLComputePipelineState,
         encodeWidth: Int,
-        encodeHeight: Int
+        encodeHeight: Int,
+        runsEffects: Bool = true
     ) throws {
-        guard let stage = effectsStage,
-              let gradePipeline = effectPipelines[gradeKernel],
+        guard let gradePipeline = effectPipelines[gradeKernel],
               let surfaces = effectTextures(width: width, height: height),
               let command = context.commandQueue.makeCommandBuffer() else {
             throw GradeLabError.exportFailed(String(localized: "Metal could not prepare the finishing-effects pass."))
@@ -975,17 +1043,24 @@ final class VideoExporter: @unchecked Sendable {
         Self.dispatch(gradeEncoder, pipeline: gradePipeline, width: width, height: height)
         gradeEncoder.endEncoding()
 
-        guard stage.encode(source: surfaces.0, destination: surfaces.1,
-                           grade: gradeUniforms, workingSpace: workingSpace, into: command) else {
-            throw GradeLabError.exportFailed(String(localized: "The finishing-effects pass could not be encoded."))
+        // Noise reduction takes this route too, and an export with no
+        // finishing effect has nothing further to do to the graded frame.
+        var finished = surfaces.0
+        if runsEffects {
+            guard let stage = effectsStage,
+                  stage.encode(source: surfaces.0, destination: surfaces.1,
+                               grade: gradeUniforms, workingSpace: workingSpace, into: command) else {
+                throw GradeLabError.exportFailed(String(localized: "The finishing-effects pass could not be encoded."))
+            }
+            finished = surfaces.1
         }
 
         guard let encodeEncoder = command.makeComputeCommandEncoder() else {
             throw GradeLabError.exportFailed(String(localized: "Metal could not create an export command buffer."))
         }
         encodeEncoder.setComputePipelineState(encodePipeline)
-        encodeEncoder.setTexture(surfaces.1, index: 0)
-        encode(encodeEncoder, surfaces.1)
+        encodeEncoder.setTexture(finished, index: 0)
+        encode(encodeEncoder, finished)
         Self.dispatch(encodeEncoder, pipeline: encodePipeline, width: encodeWidth, height: encodeHeight)
         encodeEncoder.endEncoding()
 
@@ -998,10 +1073,196 @@ final class VideoExporter: @unchecked Sendable {
         }
     }
 
+    // MARK: - Noise reduction
+
+    /// True when any clip in this export asks for temporal noise reduction, and
+    /// so when frames have to be held past the read that produced them.
+    private static func needsTemporalFrames(settings: GradeSettings, source: ExportSourceInfo) -> Bool {
+        guard !source.gradesBaked else { return false }
+        let grades = source.timelineClips.map { $0.map(\.gradeSettings) } ?? [settings]
+        return grades.contains { $0.advanced?.resolvedNoiseReduction?.temporalIsActive == true }
+    }
+
+    /// The widest window this export will need, decided once before the first
+    /// frame.
+    ///
+    /// Once rather than per frame because the window has to be filled ahead of
+    /// the frame it serves, and a window that changed size at a clip boundary
+    /// would have to see the future to know when to start widening. Taking the
+    /// maximum over every clip costs at most two held frames on the clips that
+    /// did not need them, and each clip still uses only the neighbours its own
+    /// settings ask for.
+    private func prepareNoiseReduction(settings: GradeSettings, source: ExportSourceInfo) {
+        temporalWindow = nil
+        noiseStage = nil
+        noiseCapability = nil
+        // A baked composition has already been denoised by the compositor, one
+        // clip at a time, with each clip's own settings. Doing it again here
+        // would denoise a picture that has also been transformed, blended and
+        // composited — which is not what any of these numbers describe.
+        guard !source.gradesBaked else { return }
+        let grades = source.timelineClips.map { $0.map(\.gradeSettings) } ?? [settings]
+        let active = grades.compactMap { $0.advanced?.resolvedNoiseReduction }
+        guard !active.isEmpty else { return }
+
+        let capability = NoiseReductionCapability.resolve(
+            width: source.encodedWidth, height: source.encodedHeight)
+        noiseCapability = capability
+        noiseStage = NoiseReductionStage(
+            context: context, isLog2: source.colorMode == .appleLog2)
+        let reaches = active.map { capability.constrained($0).temporalReach }
+        let backward = reaches.map(\.backward).max() ?? 0
+        let forward = reaches.map(\.forward).max() ?? 0
+        guard backward > 0 || forward > 0 else { return }
+        temporalWindow = TemporalExportWindow(backward: backward, forward: forward)
+    }
+
+    /// Runs the engine over one source frame, or returns nil when this clip
+    /// does not ask for it.
+    ///
+    /// Export always renders at the High Quality configuration whatever the
+    /// document's Quality switch says. That switch governs how much the preview
+    /// spends to stay interactive; the finished file has no reason to spend
+    /// less, and the only thing it changes is the resolution motion is
+    /// estimated at — so the export is never a coarser version of what was on
+    /// screen, only the same result computed more carefully.
+    private func denoise(
+        source: CVPixelBuffer,
+        neighbours: [NoiseFrame],
+        settings: GradeSettings
+    ) throws -> MTLTexture? {
+        guard let stage = noiseStage,
+              let authored = settings.advanced?.resolvedNoiseReduction else { return nil }
+        var resolved = noiseCapability?.constrained(authored) ?? authored
+        resolved.quality = .high
+        guard resolved.isActive else { return nil }
+        guard let command = context.commandQueue.makeCommandBuffer() else {
+            throw GradeLabError.exportFailed(String(localized: "Metal could not create an export command buffer."))
+        }
+        command.label = "GradeLab Noise Reduction"
+        guard let result = stage.encode(
+            current: source, neighbours: neighbours, settings: resolved,
+            colorMode: activeColorMode, hdr: HDRDisplayUniforms(),
+            fallbackMatrix: "BT.709", into: command) else {
+            // Nothing to do for this frame — at the start of a clip a
+            // temporal-only setting has no neighbours yet. The frame is written
+            // through the ordinary path rather than through a pass that would
+            // return it unchanged.
+            command.commit()
+            return nil
+        }
+        command.commit()
+        command.waitUntilCompleted()
+        guard command.status == .completed else {
+            throw GradeLabError.exportFailed(
+                command.error.map { "Noise reduction failed: \($0.localizedDescription)" }
+                    ?? "Noise reduction failed.")
+        }
+        return result.texture
+    }
+
+    /// Grades a denoised frame and hands it to this export's encoder.
+    private func renderDenoisedFrame(
+        noise: MTLTexture,
+        destination destinationPixelBuffer: CVPixelBuffer,
+        destinationTextures: PixelBufferTextures,
+        isLinearSource: Bool,
+        grade: FrameGrade,
+        runsEffects: Bool
+    ) throws {
+        let workingSpace = isLinearSource || activeColorMode.isAppleLog
+        let gradeKernel = workingSpace ? "gradeToTextureWorking" : "gradeToTextureBGRA"
+        let bindSource: (MTLComputeCommandEncoder) -> Void = { $0.setTexture(noise, index: 0) }
+        var hdrUniforms = HDRDisplayUniforms()
+
+        func planes() throws -> (luma: (reference: CVMetalTexture, texture: MTLTexture),
+                                 chroma: (reference: CVMetalTexture, texture: MTLTexture)) {
+            guard let luma = context.writableTexture(from: destinationPixelBuffer, pixelFormat: .r16Unorm, plane: 0),
+                  let chroma = context.writableTexture(from: destinationPixelBuffer, pixelFormat: .rg16Unorm, plane: 1) else {
+                throw GradeLabError.exportFailed(String(localized: "Metal could not map the 10-bit encoder planes."))
+            }
+            return (luma, chroma)
+        }
+        func pipeline(_ name: String) throws -> MTLComputePipelineState {
+            guard let state = effectPipelines[name] else {
+                throw GradeLabError.rendererInitializationFailed
+            }
+            return state
+        }
+
+        if activeColorMode.isAppleLog {
+            guard let renderingLUT = context.luts.renderingTexture(
+                named: AppleLogRendering.rec709LUTResourceName) else {
+                throw GradeLabError.unsupportedExport(
+                    String(localized: "Apple's Apple Log to Rec.709 rendering LUT could not be loaded, so the export has no defined display transform.")
+                )
+            }
+            let (luma, chroma) = try planes()
+            try renderEffectedFrame(
+                gradeKernel: gradeKernel, width: noise.width, height: noise.height,
+                grade: grade, workingSpace: true, bindSource: bindSource,
+                encode: { encoder, _ in
+                    encoder.setTexture(luma.texture, index: 1)
+                    encoder.setTexture(chroma.texture, index: 2)
+                    encoder.setTexture(renderingLUT, index: 4)
+                },
+                encodePipeline: try pipeline("encodeAppleLogFromTexture"),
+                encodeWidth: chroma.texture.width, encodeHeight: chroma.texture.height,
+                runsEffects: runsEffects)
+            withExtendedLifetime(luma) {}; withExtendedLifetime(chroma) {}
+            return
+        }
+
+        if isLinearSource {
+            let (luma, chroma) = try planes()
+            try renderEffectedFrame(
+                gradeKernel: gradeKernel, width: noise.width, height: noise.height,
+                grade: grade, workingSpace: true, bindSource: bindSource,
+                encode: { encoder, _ in
+                    encoder.setTexture(luma.texture, index: 1)
+                    encoder.setTexture(chroma.texture, index: 2)
+                    encoder.setBytes(&hdrUniforms, length: MemoryLayout<HDRDisplayUniforms>.stride, index: 1)
+                },
+                encodePipeline: try pipeline("encodeHDRFromTexture"),
+                encodeWidth: chroma.texture.width, encodeHeight: chroma.texture.height,
+                runsEffects: runsEffects)
+            withExtendedLifetime(luma) {}; withExtendedLifetime(chroma) {}
+            return
+        }
+
+        if CVPixelBufferGetPixelFormatType(destinationPixelBuffer) == kCVPixelFormatType_420YpCbCr10BiPlanarVideoRange {
+            let (luma, chroma) = try planes()
+            try renderEffectedFrame(
+                gradeKernel: gradeKernel, width: noise.width, height: noise.height,
+                grade: grade, workingSpace: false, bindSource: bindSource,
+                encode: { encoder, _ in
+                    encoder.setTexture(luma.texture, index: 1)
+                    encoder.setTexture(chroma.texture, index: 2)
+                },
+                encodePipeline: try pipeline("encodeSDR10FromTexture"),
+                encodeWidth: chroma.texture.width, encodeHeight: chroma.texture.height,
+                runsEffects: runsEffects)
+            withExtendedLifetime(luma) {}; withExtendedLifetime(chroma) {}
+            return
+        }
+
+        guard case .bgra(_, let destination) = destinationTextures.storage else {
+            throw GradeLabError.exportFailed(String(localized: "The encoder frame pool did not provide BGRA surfaces."))
+        }
+        try renderEffectedFrame(
+            gradeKernel: gradeKernel, width: noise.width, height: noise.height,
+            grade: grade, workingSpace: false, bindSource: bindSource,
+            encode: { encoder, _ in encoder.setTexture(destination, index: 1) },
+            encodePipeline: try pipeline("effectWriteBGRA"),
+            encodeWidth: destination.width, encodeHeight: destination.height,
+            runsEffects: runsEffects)
+    }
+
     private func render(
         source sourcePixelBuffer: CVPixelBuffer,
         destination destinationPixelBuffer: CVPixelBuffer,
-        grade: FrameGrade
+        grade: FrameGrade,
+        noise: MTLTexture? = nil
     ) throws {
         guard let sourceTextures = PixelBufferTextures(
             pixelBuffer: sourcePixelBuffer,
@@ -1015,6 +1276,24 @@ final class VideoExporter: @unchecked Sendable {
         }
 
         let spatialEffects = FilmEffectsStage.isActive(grade.uniforms)
+
+        // A denoised frame has already been through the input transform, so it
+        // is graded from the texture the engine produced and written out by
+        // whichever encoder this export uses. One branch serves every output
+        // format, because past the input transform they differ only in how the
+        // finished frame is written.
+        if let noise {
+            var isLinearSource = false
+            if case .linearHalf = sourceTextures.storage { isLinearSource = true }
+            try renderDenoisedFrame(
+                noise: noise, destination: destinationPixelBuffer,
+                destinationTextures: destinationTextures,
+                isLinearSource: isLinearSource, grade: grade,
+                runsEffects: spatialEffects)
+            withExtendedLifetime(sourceTextures) {}
+            withExtendedLifetime(destinationTextures) {}
+            return
+        }
 
         // HDR: extended-range linear in, 10-bit HLG BT.2020 planes out, with no
         // 8-bit stage anywhere between.
@@ -1453,5 +1732,17 @@ private final class ExportSession: @unchecked Sendable {
             if reader?.status == .reading { reader?.cancelReading() }
             if writer?.status == .writing { writer?.cancelWriting() }
         }
+    }
+}
+
+extension VideoExporter {
+    /// Which time-pitch algorithm a timeline's audio should be read through.
+    ///
+    /// Preview and export both call this rather than each spelling the choice
+    /// out, because the one place a disagreement between them would show is the
+    /// finished file.
+    static func pitchAlgorithm(for clips: [VideoClip]?) -> AVAudioTimePitchAlgorithm {
+        let wantsVarispeed = clips?.contains { $0.resolvedRemap.audioBehaviour == .followWithPitch } ?? false
+        return wantsVarispeed ? .varispeed : .spectral
     }
 }

@@ -90,6 +90,9 @@ struct EditorView: View {
         return drawsOnPicture ? .off : .full
     }
     @State private var speedTool = false
+    /// One-shot: the Speed tool was opened by the ramp shortcut, so it should
+    /// come up showing the curve rather than the constant-speed slider.
+    @State private var opensSpeedRamp = false
     @State private var transitionMode = false
     @State private var settingsSheet = false
     @AppStorage("editor.frameStep") private var frameStep = 2
@@ -748,7 +751,17 @@ struct EditorView: View {
             .init(.toolMask, isEnabled: ready) { select(.mask) },
             .init(.toolMatte, isEnabled: ready) { select(.matte) },
             .init(.toolBackground, isEnabled: ready) { select(.background) },
-            .init(.toolSpeed, isEnabled: ready) { select(.speed) }
+            .init(.toolSpeed, isEnabled: ready) { select(.speed) },
+            // R opens the Speed tool already in Ramp mode, which is what a
+            // desktop editor reaching for a key wants — not the tool with a
+            // slider on it and another click to go.
+            .init(.speedRamp, isEnabled: ready && model.canChangeSpeed) {
+                select(.speed); opensSpeedRamp = true
+            },
+            .init(.resetSpeed, isEnabled: ready && model.canChangeSpeed) {
+                model.setSpeed(ClipSpeed.normal)
+                model.resetSpeedCurve()
+            }
         ]
     }
 
@@ -1649,7 +1662,7 @@ struct EditorView: View {
                 }.scrollIndicators(.visible)
             }
         }
-        else if speedTool { SpeedPanel(model: model) }
+        else if speedTool { SpeedPanel(model: model, opensRamp: $opensSpeedRamp) }
         else if maskMode { LayerMaskPanel(model: model) }
         else if matteMode { TrackMattePanel(model: model) }
         else if backgroundMode { BackgroundRemovalPanel(model: model) }

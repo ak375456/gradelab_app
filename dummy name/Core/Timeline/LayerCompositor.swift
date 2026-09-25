@@ -91,6 +91,8 @@ class LayerCompositor: NSObject, AVVideoCompositing, @unchecked Sendable {
             self.stillOrder.removeAll()
             self.pools.removeAll()
             self.opaqueFrames.removeAll()
+            self.interpolator?.purge()
+            self.supplies.removeAll()
             TextRenderer.purge()
             ShapeRenderer.purge()
         }
@@ -143,6 +145,13 @@ class LayerCompositor: NSObject, AVVideoCompositing, @unchecked Sendable {
     private var emptyMatteTexture: MTLTexture?
     private var ci: CIContext?
     private var pools: [String: CVPixelBufferPool] = [:]
+    /// Built on first use and thrown away under memory pressure, like every
+    /// other cache here. A project that never asks for optical flow never
+    /// builds its pipelines.
+    private var interpolator: RetimeInterpolator?
+    /// One per reversed clip source. Built on demand and thrown away with every
+    /// other cache; a project with no reversed clip never makes one.
+    private var supplies: [RetimeFrameSupply.Key: RetimeFrameSupply] = [:]
     private let colorSpace = CGColorSpace(name: CGColorSpace.itur_709)!
     /// Built only when the device has them; an HDR project without them refuses
     /// with a reason rather than rendering something wrong.
@@ -163,6 +172,7 @@ class LayerCompositor: NSObject, AVVideoCompositing, @unchecked Sendable {
         queue.async {
             _ = self.memoryPressure
             self.pools.removeAll(); self.hdrCanvasPair = nil; self.appleLogRenderer = nil
+            self.interpolator = nil; self.supplies.removeAll()
         }
     }
     func cancelAllPendingVideoCompositionRequests() {
@@ -290,6 +300,154 @@ class LayerCompositor: NSObject, AVVideoCompositing, @unchecked Sendable {
             throw GradeLabError.rendererInitializationFailed
         }
         return buffer
+    }
+
+    /// A pooled surface in an arbitrary format.
+    ///
+    /// `pooledBGRA` is the special case everything composited goes through.
+    /// This exists for the interpolated frame, which has to come back in the
+    /// SOURCE's own layout — 4:2:0 or 4:2:2, 8-bit or 10-bit, or the HDR path's
+    /// half-float — so that nothing downstream can tell it was made rather than
+    /// decoded.
+    private func pooledBuffer(width: Int, height: Int, format: OSType) throws -> CVPixelBuffer {
+        let key = "\(width)x\(height)x\(format)"
+        if pools[key] == nil {
+            if pools.count >= 8 { pools.removeAll() }
+            var pool: CVPixelBufferPool?
+            let attributes: [String: Any] = [
+                kCVPixelBufferWidthKey as String: width,
+                kCVPixelBufferHeightKey as String: height,
+                kCVPixelBufferPixelFormatTypeKey as String: format,
+                kCVPixelBufferMetalCompatibilityKey as String: true,
+                kCVPixelBufferIOSurfacePropertiesKey as String: [:]
+            ]
+            guard CVPixelBufferPoolCreate(nil, nil, attributes as CFDictionary, &pool) == kCVReturnSuccess else {
+                throw GradeLabError.rendererInitializationFailed
+            }
+            pools[key] = pool
+        }
+        var buffer: CVPixelBuffer?
+        guard let pool = pools[key],
+              CVPixelBufferPoolCreatePixelBuffer(nil, pool, &buffer) == kCVReturnSuccess,
+              let buffer else {
+            throw GradeLabError.rendererInitializationFailed
+        }
+        return buffer
+    }
+
+    /// The frame between two source frames, when a clip asks for optical flow.
+    ///
+    /// Returns nil for every reason there might be not to do it — the clip is
+    /// not asking, there is no partner frame, the pair sits exactly on a source
+    /// frame, the layout is one the interpolator does not take, or the estimate
+    /// failed. In all of those the caller carries on with the blend it would
+    /// have done, which is a real picture rather than a missing one.
+    ///
+    /// Called with the SAME pair frame blending uses. Optical flow is not a
+    /// different input, it is a better answer from the same one.
+    private func flowFrame(clip: VideoClip, asset: ProjectMediaAsset,
+                           source: CVPixelBuffer, partner: CVPixelBuffer,
+                           phase: Double, sourceTime: TimelineTime) -> CVPixelBuffer? {
+        guard clip.frameInterpolation == .opticalFlow, let metal,
+              let frameDuration = asset.frameDuration, frameDuration > .zero else { return nil }
+        if interpolator == nil { interpolator = RetimeInterpolator(context: metal) }
+        guard let interpolator else { return nil }
+        // The pair is identified by the two source frames themselves, snapped to
+        // the media's own frame grid, so every output frame that falls between
+        // the same two pictures asks the same question and is answered from the
+        // cache.
+        let elapsed = sourceTime.seconds - clip.sourceRange.start.seconds
+        let index = (elapsed / frameDuration.seconds).rounded(.down)
+        guard index.isFinite else { return nil }
+        let first = CMTimeAdd(clip.sourceRange.start.cmTime,
+                              CMTimeMultiplyByFloat64(frameDuration.cmTime, multiplier: index))
+        let key = RetimeInterpolator.PairKey(
+            assetID: asset.id, first: first,
+            second: CMTimeAdd(first, frameDuration.cmTime),
+            divisor: RetimeInterpolator.divisor(for: clip.resolvedRemap.opticalFlowQuality))
+        return try? interpolator.interpolated(
+            source, partner, phase: phase,
+            quality: clip.resolvedRemap.opticalFlowQuality, key: key,
+            allocate: { [weak self] width, height, format in
+                guard let self else { throw GradeLabError.rendererInitializationFailed }
+                return try self.pooledBuffer(width: width, height: height, format: format)
+            })
+    }
+
+    /// The pictures a reversed clip should be showing.
+    ///
+    /// A reversed clip's frames cannot come from the composition: an edit list
+    /// has no way to say "backwards", so what AVFoundation delivers is the shot
+    /// playing forwards. The composition is still what schedules the clip and
+    /// fixes its length — the time map's durations are unaffected by direction
+    /// — but the picture is replaced here.
+    ///
+    /// Returns the pair in source order along with the phase between them, so a
+    /// reversed clip can still be blended or interpolated exactly as a forward
+    /// one is. Nil when the clip is not reversed, or when the supply could not
+    /// produce the frame; the caller then keeps what it had, which is the last
+    /// good picture rather than a jump to the wrong one.
+    private func reversedFrames(clip: VideoClip, asset: ProjectMediaAsset,
+                                delivered: CVPixelBuffer, sourceTime: TimelineTime)
+        -> (frame: CVPixelBuffer, partner: CVPixelBuffer?, phase: Double)? {
+        guard clip.isReversed, let frameDuration = asset.frameDuration, frameDuration > .zero else { return nil }
+        let key = RetimeFrameSupply.Key(
+            assetID: asset.id,
+            start: clip.sourceRange.start.cmTime,
+            duration: clip.sourceRange.duration.cmTime,
+            format: CVPixelBufferGetPixelFormatType(delivered),
+            width: CVPixelBufferGetWidth(delivered),
+            height: CVPixelBufferGetHeight(delivered))
+        let supply: RetimeFrameSupply
+        if let existing = supplies[key] { supply = existing }
+        else {
+            // A handful at most — one per reversed clip on screen. Dropping the
+            // lot when that is exceeded is right: the ones being read are
+            // immediately rebuilt and the ones that are not were finished with.
+            if supplies.count >= 4 { supplies.removeAll() }
+            guard let made = RetimeFrameSupply(
+                url: asset.url, range: clip.sourceRange.cmTimeRange,
+                frameDuration: frameDuration.cmTime,
+                pixelFormat: key.format, width: key.width, height: key.height) else { return nil }
+            supplies[key] = made
+            supply = made
+        }
+        // The partner is only fetched when something will use it. On a reversed
+        // clip it sits one frame in the direction already travelled, so asking
+        // for it while merely sampling drags the decode window back and forth
+        // across its own edge once per frame.
+        guard let pair = supply.pair(at: sourceTime.cmTime,
+                                     needsPartner: clip.smoothsMotion) else { return nil }
+        return (pair.first, pair.second, pair.phase)
+    }
+
+    /// The frame a retimed clip should show, and its partner, whichever
+    /// direction it is playing.
+    ///
+    /// One answer for both cases, so no caller has to ask "is this reversed"
+    /// before it asks "what is the picture". A forward clip takes the frame the
+    /// composition delivered and the partner track that has always accompanied
+    /// it; a reversed one takes both from its own supply. The phase is measured
+    /// the same way either way, because it is a property of where the moment
+    /// falls between two source frames and not of the direction of travel.
+    private func retimedPair(clip: VideoClip, asset: ProjectMediaAsset,
+                             delivered: CVPixelBuffer, sourceTime: TimelineTime,
+                             request: AVAsynchronousVideoCompositionRequest,
+                             instruction: LayerInstruction)
+        -> (frame: CVPixelBuffer, partner: CVPixelBuffer?, phase: Double) {
+        if let reversed = reversedFrames(clip: clip, asset: asset,
+                                         delivered: delivered, sourceTime: sourceTime) {
+            return reversed
+        }
+        guard clip.smoothsMotion,
+              let partnerID = instruction.blendTrackIDs[clip.id],
+              let partner = request.sourceFrame(byTrackID: partnerID),
+              let frameDuration = asset.frameDuration else {
+            return (delivered, nil, 0)
+        }
+        return (delivered, partner, ClipSpeed.framePhase(
+            sourceTime: sourceTime, sourceStart: clip.sourceRange.start,
+            frameDuration: frameDuration))
     }
 
     /// Cuts structural alpha only after the clip's grade and spatial effects
@@ -866,20 +1024,28 @@ class LayerCompositor: NSObject, AVVideoCompositing, @unchecked Sendable {
                     // Without it each source frame is simply held, which is the
                     // stepping that makes slow motion judder on footage that was
                     // not shot at a high frame rate.
-                    source = frame
-                    if clip.smoothsMotion,
-                       let partnerID = instruction.blendTrackIDs[clip.id],
-                       let partner = request.sourceFrame(byTrackID: partnerID),
-                       let frameDuration = asset.frameDuration,
-                       let compositionTime = try? TimelineTime(request.compositionTime),
+                    var decoded = frame
+                    if let compositionTime = try? TimelineTime(request.compositionTime),
                        let sourceTime = try? clip.sourceTime(at: compositionTime) {
-                        blendPartner = partner
-                        blendAmount = ClipSpeed.framePhase(
-                            sourceTime: sourceTime,
-                            sourceStart: clip.sourceRange.start,
-                            frameDuration: frameDuration
-                        )
+                        let pair = retimedPair(clip: clip, asset: asset, delivered: frame,
+                                               sourceTime: sourceTime, request: request,
+                                               instruction: instruction)
+                        decoded = pair.frame
+                        if clip.smoothsMotion, let partner = pair.partner {
+                            // Optical flow replaces the pair with a single made
+                            // frame, so everything after this — grading, masks,
+                            // the cutout — sees an ordinary decoded picture.
+                            if let interpolated = flowFrame(clip: clip, asset: asset,
+                                                            source: pair.frame, partner: partner,
+                                                            phase: pair.phase, sourceTime: sourceTime) {
+                                decoded = interpolated
+                            } else {
+                                blendPartner = partner
+                                blendAmount = pair.phase
+                            }
+                        }
                     }
+                    source = decoded
                     transform = Self.transform(clip.transform, metadata: metadata, canvas: bounds.size)
                 }
                 let masks = (try? TimelineTime(request.compositionTime))
@@ -1020,17 +1186,25 @@ class LayerCompositor: NSObject, AVVideoCompositing, @unchecked Sendable {
                   let metadata = asset.videoMetadata else {
                 throw TimelineError.invalid(String(localized: "A transition source frame is unavailable."))
             }
-            source = frame
-            if clip.smoothsMotion,
-               let partnerID = instruction.blendTrackIDs[clip.id],
-               let partner = request.sourceFrame(byTrackID: partnerID),
-               let frameDuration = asset.frameDuration,
-               let compositionTime = try? TimelineTime(request.compositionTime),
+            var decoded = frame
+            if let compositionTime = try? TimelineTime(request.compositionTime),
                let sourceTime = try? clip.sourceTime(at: compositionTime) {
-                blendPartner = partner
-                blendAmount = ClipSpeed.framePhase(sourceTime: sourceTime,
-                    sourceStart: clip.sourceRange.start, frameDuration: frameDuration)
+                let pair = retimedPair(clip: clip, asset: asset, delivered: frame,
+                                       sourceTime: sourceTime, request: request,
+                                       instruction: instruction)
+                decoded = pair.frame
+                if clip.smoothsMotion, let partner = pair.partner {
+                    if let interpolated = flowFrame(clip: clip, asset: asset, source: pair.frame,
+                                                    partner: partner, phase: pair.phase,
+                                                    sourceTime: sourceTime) {
+                        decoded = interpolated
+                    } else {
+                        blendPartner = partner
+                        blendAmount = pair.phase
+                    }
+                }
             }
+            source = decoded
             transform = Self.transform(clip.transform, metadata: metadata, canvas: bounds.size)
         }
         let masks = (try? TimelineTime(request.compositionTime))
@@ -1399,22 +1573,44 @@ class LayerCompositor: NSObject, AVVideoCompositing, @unchecked Sendable {
                 // path gets AVFoundation's conversion for free; this one has to
                 // do it, which is what `sourceIsSDR` selects in the kernel.
                 let sourceIsSDR = metadata.transferFunction != "HLG"
-                var partnerTexture = texture
+                var sourceTexture = texture.texture
+                var partnerTexture = texture.texture
                 var blendAmount = 0.0
-                if clip.smoothsMotion,
-                   let partnerID = instruction.blendTrackIDs[clip.id],
-                   let partnerFrame = request.sourceFrame(byTrackID: partnerID),
-                   let partner = metal.packedTexture(from: partnerFrame, pixelFormat: .rgba16Float),
-                   let frameDuration = asset.frameDuration,
-                   let compositionTime = try? TimelineTime(request.compositionTime),
+                if let compositionTime = try? TimelineTime(request.compositionTime),
                    let sourceTime = try? clip.sourceTime(at: compositionTime) {
-                    retained.append(partner)
-                    partnerTexture = partner
-                    blendAmount = ClipSpeed.framePhase(
-                        sourceTime: sourceTime,
-                        sourceStart: clip.sourceRange.start,
-                        frameDuration: frameDuration
-                    )
+                    let pair = retimedPair(clip: clip, asset: asset, delivered: frame,
+                                           sourceTime: sourceTime, request: request,
+                                           instruction: instruction)
+                    // A reversed clip's picture comes from its own supply, so
+                    // the texture the composition produced is replaced before
+                    // anything is blended into it.
+                    if pair.frame !== frame,
+                       let made = metal.packedTexture(from: pair.frame, pixelFormat: .rgba16Float) {
+                        retained.append(made)
+                        sourceTexture = made.texture
+                        partnerTexture = made.texture
+                    }
+                    let partnerFrame = pair.partner
+                    let phase = pair.phase
+                    if clip.smoothsMotion, let partnerFrame {
+                    // The interpolated frame comes back as another half-float
+                    // surface in the same working space, so the kernel below is
+                    // handed one frame and no blend rather than two and a mix.
+                    // Nothing about the HDR transfer or the reference white
+                    // changes: this is the same picture, at a different moment.
+                    if let interpolated = flowFrame(clip: clip, asset: asset, source: pair.frame,
+                                                    partner: partnerFrame, phase: phase,
+                                                    sourceTime: sourceTime),
+                       let made = metal.packedTexture(from: interpolated, pixelFormat: .rgba16Float) {
+                        retained.append(made)
+                        sourceTexture = made.texture
+                        partnerTexture = made.texture
+                    } else if let partner = metal.packedTexture(from: partnerFrame, pixelFormat: .rgba16Float) {
+                        retained.append(partner)
+                        partnerTexture = partner.texture
+                        blendAmount = phase
+                    }
+                    }
                 }
                 var program = GradeProgram(
                     settings: clip.gradeSettings,
@@ -1436,8 +1632,8 @@ class LayerCompositor: NSObject, AVVideoCompositing, @unchecked Sendable {
                 let warpField = metal.warps.texture(for: program.warp)
                 let locals = program.locals
                 try compose(videoPipeline) { encoder in
-                    encoder.setTexture(texture.texture, index: 0)
-                    encoder.setTexture(partnerTexture.texture, index: 1)
+                    encoder.setTexture(sourceTexture, index: 0)
+                    encoder.setTexture(partnerTexture, index: 1)
                     encoder.setTexture(lut, index: 4)
                     encoder.setTexture(curveLUT, index: 6)
                     encoder.setTexture(warpField, index: 12)
@@ -1855,17 +2051,50 @@ extension LayerCompositor {
             if profile == nil, metadata.transferFunction == "HLG" {
                 throw GradeLabError.unsupportedExport(String(localized: "HLG video cannot be interpreted as Rec.709 in an Apple Log timeline."))
             }
+            var sourceLuma = luma, sourceChroma = chroma
             var partnerLuma = luma, partnerChroma = chroma
             var amount = 0.0
-            if clip.smoothsMotion, let partnerID = instruction.blendTrackIDs[clip.id],
-               let partnerFrame = request.sourceFrame(byTrackID: partnerID),
-               let partner = PixelBufferTextures(pixelBuffer: partnerFrame, context: metal),
-               case .biPlanar(_, let y, _, let c) = partner.storage,
-               let frameDuration = asset.frameDuration {
-                retained.append(partner)
-                partnerLuma = y; partnerChroma = c
-                amount = ClipSpeed.framePhase(sourceTime: try clip.sourceTime(at: time),
-                    sourceStart: clip.sourceRange.start, frameDuration: frameDuration)
+            do {
+                let sourceTime = try clip.sourceTime(at: time)
+                let pair = retimedPair(clip: clip, asset: asset, delivered: frame,
+                                       sourceTime: sourceTime, request: request,
+                                       instruction: instruction)
+                // A reversed Log clip is held to the same layout rule as a
+                // decoded one: full-range 10-bit 4:2:2 or nothing. The supply
+                // is asked for exactly the format the composition delivered, so
+                // this only refuses a frame that genuinely came back wrong.
+                if pair.frame !== frame,
+                   CVPixelBufferGetPixelFormatType(pair.frame) == kCVPixelFormatType_422YpCbCr10BiPlanarFullRange,
+                   let made = PixelBufferTextures(pixelBuffer: pair.frame, context: metal),
+                   case .biPlanar(_, let y, _, let c) = made.storage {
+                    retained.append(made)
+                    sourceLuma = y; sourceChroma = c
+                    partnerLuma = y; partnerChroma = c
+                }
+                let phase = pair.phase
+                if clip.smoothsMotion, let partnerFrame = pair.partner {
+                // The interpolated frame is written back as full-range 10-bit
+                // 4:2:2 — the one layout this path accepts — so the Log
+                // transform below it is unchanged and untouched. A frame that
+                // came back in any other shape is refused rather than decoded
+                // through the wrong transform, which is the same rule the
+                // decoded frame above is held to.
+                if let interpolated = flowFrame(clip: clip, asset: asset, source: pair.frame,
+                                                partner: partnerFrame, phase: phase,
+                                                sourceTime: sourceTime),
+                   CVPixelBufferGetPixelFormatType(interpolated) == kCVPixelFormatType_422YpCbCr10BiPlanarFullRange,
+                   let made = PixelBufferTextures(pixelBuffer: interpolated, context: metal),
+                   case .biPlanar(_, let y, _, let c) = made.storage {
+                    retained.append(made)
+                    sourceLuma = y; sourceChroma = c
+                    partnerLuma = y; partnerChroma = c
+                } else if let partner = PixelBufferTextures(pixelBuffer: partnerFrame, context: metal),
+                          case .biPlanar(_, let y, _, let c) = partner.storage {
+                    retained.append(partner)
+                    partnerLuma = y; partnerChroma = c
+                    amount = phase
+                }
+                }
             }
             var layer = HDRLayerUniforms(transform: Self.transform(clip.transform, metadata: metadata, canvas: size),
                 sourceSize: sourceSize, canvasSize: size, opacity: clip.opacity,
@@ -1877,7 +2106,7 @@ extension LayerCompositor {
             var yuv = YUVUniforms.make(for: frame, fallbackMatrix: metadata.yCbCrMatrix)
             try renderer.encode(AppleLogSpecialization.key("compositeVideoAppleLog", isLog2: isLog2),
                                 into: command, width: width, height: height) { encoder in
-                encoder.setTexture(luma, index: 0); encoder.setTexture(chroma, index: 1)
+                encoder.setTexture(sourceLuma, index: 0); encoder.setTexture(sourceChroma, index: 1)
                 encoder.setTexture(destination, index: 2)
                 encoder.setTexture(metal.luts.texture(for: program.lookIdentifier), index: 3)
                 encoder.setTexture(partnerLuma, index: 4); encoder.setTexture(partnerChroma, index: 5)

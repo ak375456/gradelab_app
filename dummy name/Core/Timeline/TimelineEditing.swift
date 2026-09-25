@@ -402,7 +402,7 @@ enum TimelineEditing {
         // left half covers twice as much source as it does timeline. Splitting
         // with the raw timeline durations produced a source range that ran past
         // the end of the media.
-        let leftSource = try ClipSpeed.sourceDuration(timelineDuration: leftDuration, speed: original.speed)
+        let leftSource = try original.sourceDuration(forTimelineDuration: leftDuration)
         // Derived by subtraction rather than converted again, so the two halves
         // always account for exactly the original source range with nothing lost
         // or duplicated at the seam.
@@ -412,16 +412,38 @@ enum TimelineEditing {
         }
 
         var left = original, right = original
-        left.sourceRange.duration = leftSource
-        left.placement.duration = try ClipSpeed.timelineDuration(sourceDuration: leftSource, speed: original.speed)
+        // A ramped clip's curve is cut at the same source frame the picture is,
+        // and a reversed one takes its two halves from opposite ends of the
+        // source — the first half of a backwards clip is the LAST of the media.
+        if original.isRamped || original.isReversed {
+            let (leading, trailing) = original.resolvedRemap.split(
+                atSourceOffset: leftSource, sourceDuration: original.sourceRange.duration)
+            if original.isReversed {
+                left.sourceRange = .init(start: try original.sourceRange.start.adding(leftSource),
+                                         duration: rightSource)
+                left.timeRemap = trailing
+                right.sourceRange = .init(start: original.sourceRange.start, duration: leftSource)
+                right.timeRemap = leading
+            } else {
+                left.sourceRange.duration = leftSource
+                left.timeRemap = leading
+                right.sourceRange = .init(start: try original.sourceRange.start.adding(leftSource),
+                                          duration: rightSource)
+                right.timeRemap = trailing
+            }
+        } else {
+            left.sourceRange.duration = leftSource
+            right.sourceRange = .init(start: try original.sourceRange.start.adding(leftSource),
+                                      duration: rightSource)
+        }
+        left.placement.duration = try left.timelineDuration(forSourceDuration: left.sourceRange.duration)
         // The right half starts where the left one actually ends, so rounding in
         // the conversion can never open a gap or an overlap between them.
         let seam = try original.placement.timelineStart.adding(left.placement.duration)
         right.placement = .init(
             id: UUID(), trackID: original.placement.trackID, timelineStart: seam,
-            duration: try ClipSpeed.timelineDuration(sourceDuration: rightSource, speed: original.speed)
+            duration: try right.timelineDuration(forSourceDuration: right.sourceRange.duration)
         )
-        right.sourceRange = .init(start: try original.sourceRange.start.adding(leftSource), duration: rightSource)
         // Same rule as text: keep the whole curve on both halves and move the window.
         right.shiftAnimationWindow(by: left.placement.duration)
         // An audio fade belongs to the edge it was drawn on, so each half keeps
@@ -526,8 +548,17 @@ enum TimelineEditing {
             // that distance at the clip's speed, which for a retimed clip is not
             // the same number.
             let delta = try boundary.subtracting(clip.placement.timelineStart)
-            let sourceDelta = try ClipSpeed.sourceDuration(timelineDuration: delta, speed: clip.speed)
-            clip.sourceRange.start = try clip.sourceRange.start.adding(sourceDelta)
+            let sourceDelta = try clip.sourceDuration(forTimelineDuration: delta)
+            // The curve is measured from the clip's first frame, so moving that
+            // frame moves the whole curve with it. A reversed clip hides source
+            // off the far end instead, and its curve is untouched.
+            if clip.isRamped, !clip.isReversed, sourceDelta > .zero {
+                clip.timeRemap = clip.resolvedRemap.trimmedHead(
+                    bySource: sourceDelta, sourceDuration: clip.sourceRange.duration)
+            }
+            if !clip.isReversed {
+                clip.sourceRange.start = try clip.sourceRange.start.adding(sourceDelta)
+            }
             clip.placement.timelineStart = boundary
             clip.placement.duration = try end.subtracting(boundary)
             // Head trims hide animation rather than discarding it; extending restores it.
@@ -535,15 +566,13 @@ enum TimelineEditing {
         } else {
             clip.placement.duration = try boundary.subtracting(clip.placement.timelineStart)
         }
-        clip.sourceRange.duration = try ClipSpeed.sourceDuration(
-            timelineDuration: clip.placement.duration, speed: clip.speed
-        )
+        clip.sourceRange.duration = try clip.sourceDuration(
+            forTimelineDuration: clip.placement.duration)
         // Re-derive from the stored source so the document invariant
-        // (timeline duration == source duration / speed) holds exactly rather
-        // than approximately after the conversion rounds.
-        clip.placement.duration = try ClipSpeed.timelineDuration(
-            sourceDuration: clip.sourceRange.duration, speed: clip.speed
-        )
+        // (timeline duration is what the time map makes of the source range)
+        // holds exactly rather than approximately after the conversion rounds.
+        clip.placement.duration = try clip.timelineDuration(
+            forSourceDuration: clip.sourceRange.duration)
         guard clip.placement.duration >= minimum else { throw TimelineError.invalid(String(localized: "Keep at least one frame in the clip.")) }
         try replace(id, with: [clip], in: &project)
     }
@@ -558,44 +587,279 @@ enum TimelineEditing {
         to speed: Double,
         in project: inout VideoProject
     ) throws {
-        var clip = try editable(id, in: project)
-        let resolved = ClipSpeed.clamped(speed)
-        guard resolved != clip.speed else { return }
+        try retime(id, in: &project) { clip in
+            let resolved = ClipSpeed.clamped(speed)
+            guard resolved != clip.speed || clip.isRamped else { return false }
+            // Setting one rate is also how the ramp is left behind, which is
+            // what a user dragging the plain Speed slider means by it.
+            if clip.timeRemap != nil {
+                clip.timeRemap?.resetCurve()
+                clip.timeRemap?.constantSpeed = resolved
+            } else {
+                clip.speed = resolved
+            }
+            return true
+        }
+    }
 
-        let newDuration = try ClipSpeed.timelineDuration(
-            sourceDuration: clip.sourceRange.duration, speed: resolved
-        )
+    /// Replaces a clip's whole retiming.
+    ///
+    /// Every ramp edit funnels through here, so the duration, the keyframes and
+    /// the ripple are worked out in exactly one place. A panel that added a
+    /// point and recomputed the length itself would be a second implementation
+    /// of the thing this file exists to own.
+    static func setTimeRemap(
+        _ id: UUID,
+        to remap: TimeRemap,
+        in project: inout VideoProject
+    ) throws {
+        try retime(id, in: &project) { clip in
+            guard clip.resolvedRemap != remap else { return false }
+            clip.timeRemap = remap
+            // The old boolean would otherwise keep answering for a clip that now
+            // has a real frame-interpolation setting.
+            clip.blendsRetimedFrames = nil
+            return true
+        }
+    }
+
+    /// Edits a clip's retiming in place. `edit` reports whether it changed anything.
+    static func editTimeRemap(
+        _ id: UUID,
+        in project: inout VideoProject,
+        _ edit: (inout TimeRemap) -> Void
+    ) throws {
+        let clip = try editable(id, in: project)
+        var remap = clip.resolvedRemap
+        edit(&remap)
+        try setTimeRemap(id, to: remap, in: &project)
+    }
+
+    // MARK: - Ramp operations
+    //
+    // Each of these is one undoable action and nothing more: they describe the
+    // change and leave the length, the keyframes and the ripple to `retime`.
+
+    /// Adds a speed point at a timeline position, carrying the speed already in
+    /// force there.
+    ///
+    /// Deliberately does NOT change the shape of the curve: dropping a point on
+    /// a ramp and letting go should leave the picture exactly as it was, with
+    /// something to drag. Inventing a new speed at the moment of the tap is the
+    /// behaviour that makes a curve editor feel like it is fighting you.
+    @discardableResult
+    static func addSpeedPoint(_ id: UUID, atTimeline time: TimelineTime,
+                              in project: inout VideoProject) throws -> UUID? {
+        let clip = try editable(id, in: project)
+        let local = min(clip.placement.duration,
+                        max(.zero, try time.subtracting(clip.placement.timelineStart)))
+        let sourceOffset = clip.timeMap.sourceOffset(atTimelineOffset: local)
+        var remap = clip.resolvedRemap
+        if remap.points.contains(where: { $0.sourceOffset == sourceOffset }) { return nil }
+        let point = SpeedPoint(sourceOffset: sourceOffset,
+                               speed: clip.timeMap.speed(atTimelineOffset: local),
+                               interpolation: .easeInOut)
+        // A ramp needs two points to be a ramp. The first one added to a clip at
+        // a single rate brings an anchor at the head with it, so the very next
+        // drag produces a transition rather than silently restating the constant.
+        if remap.points.isEmpty, sourceOffset > .zero {
+            remap.points.append(SpeedPoint(sourceOffset: .zero, speed: remap.constantSpeed,
+                                           interpolation: .easeInOut))
+        }
+        remap.points.append(point)
+        remap.points.sort { $0.sourceOffset < $1.sourceOffset }
+        try setTimeRemap(id, to: remap, in: &project)
+        return point.id
+    }
+
+    static func removeSpeedPoint(_ id: UUID, point: UUID, in project: inout VideoProject) throws {
+        try editTimeRemap(id, in: &project) { $0.removePoint(point) }
+    }
+
+    /// Moves a point along the clip and changes its rate in one edit, which is
+    /// what a single drag in the curve editor is.
+    static func moveSpeedPoint(_ id: UUID, point: UUID, toTimeline time: TimelineTime?,
+                               speed: Double?, in project: inout VideoProject) throws {
+        let clip = try editable(id, in: project)
+        var remap = clip.resolvedRemap
+        guard let index = remap.points.firstIndex(where: { $0.id == point }) else { return }
+        if let time {
+            let local = min(clip.placement.duration,
+                            max(.zero, try time.subtracting(clip.placement.timelineStart)))
+            remap.points[index].sourceOffset = clip.timeMap.sourceOffset(atTimelineOffset: local)
+        }
+        if let speed { remap.points[index].speed = ClipSpeed.clamped(speed) }
+        try setTimeRemap(id, to: remap, in: &project)
+    }
+
+    static func setSpeedPointInterpolation(_ id: UUID, point: UUID, to interpolation: SpeedInterpolation,
+                                           in project: inout VideoProject) throws {
+        try editTimeRemap(id, in: &project) { remap in
+            guard let index = remap.points.firstIndex(where: { $0.id == point }) else { return }
+            remap.points[index].interpolation = interpolation
+        }
+    }
+
+    static func setSpeedPointHandles(_ id: UUID, point: UUID, outgoing: BezierHandle?,
+                                     incoming: BezierHandle?, in project: inout VideoProject) throws {
+        try editTimeRemap(id, in: &project) { remap in
+            guard let index = remap.points.firstIndex(where: { $0.id == point }) else { return }
+            if let outgoing { remap.points[index].outgoingHandle = outgoing.clamped }
+            if let incoming { remap.points[index].incomingHandle = incoming.clamped }
+            remap.points[index].interpolation = .bezier
+        }
+    }
+
+    static func resetSpeedCurve(_ id: UUID, in project: inout VideoProject) throws {
+        try editTimeRemap(id, in: &project) { $0.resetCurve() }
+    }
+
+    static func applySpeedPreset(_ id: UUID, preset: TimeRemap.Preset,
+                                 in project: inout VideoProject) throws {
+        let clip = try editable(id, in: project)
+        var remap = clip.resolvedRemap
+        // A preset is nothing but a set of ordinary points. Nothing records that
+        // one was applied, and every point it left behind is as editable as one
+        // placed by hand.
+        remap.points = preset.points(sourceDuration: clip.sourceRange.duration)
+        try setTimeRemap(id, to: remap, in: &project)
+    }
+
+    static func setReversed(_ id: UUID, _ reversed: Bool, in project: inout VideoProject) throws {
+        try editTimeRemap(id, in: &project) { $0.reverses = reversed }
+    }
+
+    static func setFrameInterpolation(_ id: UUID, to mode: FrameInterpolation,
+                                      in project: inout VideoProject) throws {
+        try editTimeRemap(id, in: &project) { $0.frameInterpolation = mode }
+    }
+
+    static func setOpticalFlowQuality(_ id: UUID, to quality: OpticalFlowQuality,
+                                      in project: inout VideoProject) throws {
+        try editTimeRemap(id, in: &project) { $0.opticalFlowQuality = quality }
+    }
+
+    static func setRetimedAudioBehaviour(_ id: UUID, to behaviour: RetimedAudioBehaviour,
+                                         in project: inout VideoProject) throws {
+        try editTimeRemap(id, in: &project) { $0.audioBehaviour = behaviour }
+    }
+
+    /// Holds the frame under the playhead for a given length of timeline.
+    ///
+    /// The width of the hold is one frame of the media it came from, taken from
+    /// the asset rather than from the canvas: a 24 fps clip on a 30 fps timeline
+    /// holds one of ITS frames, and using the canvas cadence would consume a
+    /// fraction of a frame more or less than the picture being held.
+    @discardableResult
+    static func freezeFrame(_ id: UUID, atTimeline time: TimelineTime, duration: TimelineTime,
+                            in project: inout VideoProject) throws -> UUID? {
+        guard duration > .zero else { return nil }
+        let clip = try editable(id, in: project)
+        guard let frameDuration = project.assets.first(where: { $0.id == clip.assetID })?.frameDuration
+                ?? project.canvas.frameDuration, frameDuration > .zero else {
+            throw TimelineError.invalid(String(localized: "A freeze needs the source's frame rate, and this media does not report one."))
+        }
+        let local = min(clip.placement.duration,
+                        max(.zero, try time.subtracting(clip.placement.timelineStart)))
+        var offset = clip.timeMap.sourceOffset(atTimelineOffset: local)
+        // A hold at the very end would run past the source range. Backing it up
+        // by one frame holds the last frame, which is what was asked for.
+        if try offset.adding(frameDuration) > clip.sourceRange.duration {
+            offset = max(.zero, try clip.sourceRange.duration.subtracting(frameDuration))
+        }
+        var remap = clip.resolvedRemap
+        guard remap.freeze(atSourceOffset: offset,
+                           sourceDuration: clip.sourceRange.duration) == nil else { return nil }
+        let freeze = FreezeSegment(sourceOffset: offset, duration: duration,
+                                   sourceWidth: frameDuration)
+        remap.freezes.append(freeze)
+        try setTimeRemap(id, to: remap, in: &project)
+        return freeze.id
+    }
+
+    static func setFreezeDuration(_ id: UUID, freeze: UUID, to duration: TimelineTime,
+                                  in project: inout VideoProject) throws {
+        let floor = (try? TimelineTime.seconds(FreezeSegment.minimumDuration)) ?? .zero
+        try editTimeRemap(id, in: &project) { remap in
+            guard let index = remap.freezes.firstIndex(where: { $0.id == freeze }) else { return }
+            remap.freezes[index].duration = max(floor, duration)
+        }
+    }
+
+    static func removeFreeze(_ id: UUID, freeze: UUID, in project: inout VideoProject) throws {
+        try editTimeRemap(id, in: &project) { remap in
+            remap.freezes.removeAll { $0.id == freeze }
+        }
+    }
+
+    // MARK: - The one retiming transaction
+
+    /// Applies a retiming change and settles everything that follows from it.
+    ///
+    /// Four things always happen together, and separating them is how a clip
+    /// ends up a different length from the frames inside it:
+    ///
+    /// 1. the clip's timeline duration is re-derived from its new time map;
+    /// 2. keyframes are moved so they stay on the pictures they were authored
+    ///    against;
+    /// 3. the rest of the track ripples by the change in length;
+    /// 4. the whole thing is validated before it is allowed to land.
+    private static func retime(
+        _ id: UUID,
+        in project: inout VideoProject,
+        _ change: (inout VideoClip) throws -> Bool
+    ) throws {
+        var clip = try editable(id, in: project)
+        let before = clip
+        guard try change(&clip) else { return }
+
+        let newDuration = try clip.timelineDuration(forSourceDuration: clip.sourceRange.duration)
         guard newDuration > .zero else {
             throw TimelineError.invalid(String(localized: "That speed would leave the clip with no duration."))
         }
-        let previousDuration = clip.placement.duration
+        let previousDuration = before.placement.duration
         let shift = try newDuration.subtracting(previousDuration)
 
-        // Keyframe times are clip-local timeline coordinates, so they scale with
-        // the clip rather than staying at absolute offsets that would fall
-        // outside it.
+        // Keyframe times are clip-local timeline coordinates, so they have to
+        // move when the clip is retimed or they would describe the wrong frames
+        // — and a clip that got shorter would push half its animation past its
+        // own end.
+        //
+        // A single rate is still scaled by a single factor, exactly as it always
+        // was, so no existing project's animation moves by even a tick. A ramp
+        // has no single factor, so each keyframe goes out through the old map
+        // and back in through the new one, which lands it on the same picture.
         if previousDuration > .zero {
-            let factor = newDuration.seconds / previousDuration.seconds
-            if let animation = clip.animation, !animation.isEmpty {
-                clip.animation = animation.retimed(by: factor)
-            }
-            // Mask geometry keyframes are clip-local times too, and they live on
-            // the mask rather than on the clip, so they need the same scaling.
-            if let masks = clip.maskedGrades, masks.contains(where: \.isAnimated) {
-                clip.maskedGrades = masks.map { $0.retimed(by: factor) }
+            let wasRamped = before.isRamped || before.isReversed
+            let isRamped = clip.isRamped || clip.isReversed
+            if wasRamped || isRamped {
+                let old = before.timeMap, new = clip.timeMap
+                let remap: (TimelineTime) -> TimelineTime = { time in
+                    new.timelineOffset(atSourceOffset: old.sourceOffset(atTimelineOffset: time))
+                }
+                if let animation = clip.animation, !animation.isEmpty {
+                    clip.animation = animation.retimed(through: remap)
+                }
+                if let masks = clip.maskedGrades, masks.contains(where: \.isAnimated) {
+                    clip.maskedGrades = masks.map { $0.retimed(through: remap) }
+                }
+            } else {
+                let factor = newDuration.seconds / previousDuration.seconds
+                if let animation = clip.animation, !animation.isEmpty {
+                    clip.animation = animation.retimed(by: factor)
+                }
+                if let masks = clip.maskedGrades, masks.contains(where: \.isAnimated) {
+                    clip.maskedGrades = masks.map { $0.retimed(by: factor) }
+                }
             }
         }
-        clip.speed = resolved
         clip.placement.duration = newDuration
 
         // Read the clips to ripple from the timeline as it stands NOW, before the
         // clip is lengthened. Reading them afterwards means asking `clips(in:)`
         // to validate a timeline in which the longer clip already sits on top of
         // its neighbour, and it refuses that ("Clips on the same track cannot
-        // overlap") before the ripple that would resolve it can run. Slowing a
-        // clip with anything after it on the track was rejected for that reason
-        // alone; a clip at the end of the track had nothing to overlap, so it
-        // worked, which is what made the failure look arbitrary.
+        // overlap") before the ripple that would resolve it can run.
         let following = try clips(in: project)
             .filter { $0.placement.trackID == clip.placement.trackID
                 && $0.id != clip.id

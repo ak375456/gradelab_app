@@ -100,6 +100,18 @@ actor ProjectStore {
             .appendingPathExtension(fileExtension.isEmpty ? "mov" : fileExtension)
     }
 
+    /// Where a file already copied into `Imports` lives now.
+    ///
+    /// Stored references keep a file NAME rather than a path, for the same
+    /// reason `relocateManagedFiles` exists: iOS moves the app's data container
+    /// whenever a new build is installed, and an absolute URL written before the
+    /// move points at a container that is gone. A name plus this is stable
+    /// across that.
+    func importedFileURL(named fileName: String) -> URL {
+        rootURL.appendingPathComponent("Imports", isDirectory: true)
+            .appendingPathComponent(fileName)
+    }
+
     func thumbnailURL(for projectID: UUID) throws -> URL {
         let thumbnails = rootURL.appendingPathComponent("Thumbnails", isDirectory: true)
         try fileManager.createDirectory(at: thumbnails, withIntermediateDirectories: true)

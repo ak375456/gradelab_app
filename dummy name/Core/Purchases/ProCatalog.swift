@@ -46,9 +46,9 @@ enum ProConfiguration {
     ///
     /// There is no timer and no date arithmetic. Moving a rung is two changes
     /// made together — `currentPhase` below, and the lifetime product's price
-    /// in App Store Connect. **Ship the build first.** App Store Connect applies
-    /// a price within hours while review takes about a day, and in between the
-    /// app would be charging one price while describing another.
+    /// in App Store Connect. StoreKit's current price remains the source of
+    /// truth for the purchase button; percentage claims are suppressed whenever
+    /// the storefront price and this phase do not match.
     enum LaunchPhase: String, CaseIterable, Sendable {
         case founding, earlyAdopter, launch, growth, standard
 
@@ -99,7 +99,7 @@ enum ProConfiguration {
     }
 
     /// Where the ladder stands today. See `LaunchPhase` before changing it.
-    static let currentPhase: LaunchPhase = .earlyAdopter
+    static let currentPhase: LaunchPhase = .growth
     /// What Lifetime is worth at its settled price, and the only number any
     /// saving is ever measured against.
     static let standardLifetimeUSD: Decimal = 34.99
@@ -172,6 +172,7 @@ enum ProFeature: String, Identifiable, Sendable {
     case photoFormat
     case colorCurves
     case colorWarper
+    case noiseReduction
     case filmEffects
     case gradePresets
     case scopes
@@ -190,6 +191,7 @@ enum ProFeature: String, Identifiable, Sendable {
         case .photoFormat: String(localized: "Deliver in any format.")
         case .colorCurves: String(localized: "Grade like a colorist.")
         case .colorWarper: String(localized: "Move color where you want it.")
+        case .noiseReduction: String(localized: "Rescue the shot you thought you lost.")
         case .filmEffects: String(localized: "Give it the texture of film.")
         case .gradePresets: String(localized: "Keep the look you built.")
         case .scopes: String(localized: "Read the picture, don't guess.")
@@ -218,6 +220,8 @@ enum ProFeature: String, Identifiable, Sendable {
             String(localized: "Hue vs Hue, Hue vs Sat, Hue vs Luma, Luma vs Sat, Sat vs Sat and Sat vs Luma \u{2014} the curves that target one colour without touching the rest. Master, Red, Green and Blue stay free.")
         case .colorWarper:
             String(localized: "The Color Warper. Grab a color by its hue and its saturation at once and drag it somewhere else \u{2014} the colors around it follow, the rest of the picture does not.")
+        case .noiseReduction:
+            String(localized: "Motion-compensated temporal noise reduction, plus edge-aware spatial cleanup. Built for low light, high ISO and lifted Log \u{2014} it finds the same detail across several frames and keeps it while the noise averages away.")
         case .filmEffects:
             String(localized: "Bloom, glow, halation and grain. Fade and sharpening stay free.")
         case .gradePresets:
@@ -382,6 +386,12 @@ enum ProAccessPolicy {
         // not gated for a picture it cannot change.
         if advanced.resolvedColorWarp != nil {
             found.append(.colorWarper)
+        }
+        // Read through `resolvedNoiseReduction`, so a module that is switched
+        // on with every strength at zero is not gated for a picture it cannot
+        // change.
+        if advanced.resolvedNoiseReduction != nil {
+            found.append(.noiseReduction)
         }
         let effects = advanced.resolvedEffects
         if FilmEffectParameter.all.contains(where: {

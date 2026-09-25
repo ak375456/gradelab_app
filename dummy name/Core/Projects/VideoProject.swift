@@ -122,9 +122,14 @@ struct VideoProject: Codable, Identifiable, Equatable, Sendable {
             let editedAudio = clip.embeddedAudio.map { $0 != EmbeddedAudio() } ?? sourceHasAudio
             // Frame blending needs two source frames at once, which only the
             // custom compositor can supply.
+            // A ramp, a reverse, a freeze or any frame interpolation needs the
+            // custom compositor: the flat path hands AVFoundation one scaled
+            // edit and cannot express a varying rate, and frame blending and
+            // optical flow both need two source frames at once.
             return !clip.placement.isEnabled || clip.transform != VisualTransform() || clip.opacity != 1 ||
                 clip.blendMode != .normal || clip.resolvedLayerMask.isEnabled ||
-                clip.resolvedBackgroundRemoval != nil || editedAudio || clip.smoothsMotion
+                clip.resolvedBackgroundRemoval != nil || editedAudio || clip.smoothsMotion ||
+                clip.isRamped || clip.isReversed
         }
     }
 
@@ -280,14 +285,15 @@ struct VideoProject: Codable, Identifiable, Equatable, Sendable {
                 case .text, .shape: sourceRange = nil
                 }
                 if let sourceRange {
-                    // A clip occupies `sourceRange.duration / speed` of timeline.
-                    // At the default speed of 1 this is the equality it has
-                    // always been; a retimed clip covers the same frames over a
-                    // different span, and the two must never disagree.
+                    // A clip occupies whatever its time map makes of its source
+                    // range. At the default speed of 1 this is the equality it
+                    // has always been; a retimed or ramped clip covers the same
+                    // frames over a different span, and the two must never
+                    // disagree.
                     let expectedDuration: TimelineTime
                     if case .video(let clip) = item, clip.isRetimed {
-                        expectedDuration = (try? ClipSpeed.timelineDuration(
-                            sourceDuration: sourceRange.duration, speed: clip.speed)) ?? sourceRange.duration
+                        expectedDuration = (try? clip.timelineDuration(
+                            forSourceDuration: sourceRange.duration)) ?? sourceRange.duration
                     } else {
                         expectedDuration = sourceRange.duration
                     }

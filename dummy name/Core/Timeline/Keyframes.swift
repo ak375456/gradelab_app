@@ -420,6 +420,21 @@ struct AnimationTrack: Codable, Equatable, Sendable {
         })
     }
 
+    /// Moves every keyframe time through an arbitrary remapping.
+    ///
+    /// `retimed(by:)` is the special case of this where the remapping is a
+    /// multiplication, and it stays because a constant speed change is exactly
+    /// that. A ramp is not: a keyframe two thirds of the way through a clip
+    /// that slows down in the middle does not belong two thirds of the way
+    /// through the new length, it belongs on the same picture it was on.
+    func retimed(through remap: (TimelineTime) -> TimelineTime) -> AnimationTrack {
+        AnimationTrack(property: property, keyframes: keyframes.map { keyframe in
+            var moved = keyframe
+            moved.time = remap(keyframe.time)
+            return moved
+        })
+    }
+
     init(property: AnimatableProperty, keyframes: [Keyframe] = []) {
         self.property = property
         self.keyframes = keyframes
@@ -551,6 +566,15 @@ struct ClipAnimation: Codable, Equatable, Sendable {
             startOffset.cmTime, multiplier: factor)) {
             copy.startOffset = offset
         }
+        return copy
+    }
+
+    /// Moves every track and the animation window through an arbitrary
+    /// remapping, for a speed change that is not a single factor.
+    func retimed(through remap: (TimelineTime) -> TimelineTime) -> ClipAnimation {
+        var copy = self
+        copy.tracks = tracks.map { $0.retimed(through: remap) }
+        copy.startOffset = remap(startOffset)
         return copy
     }
 

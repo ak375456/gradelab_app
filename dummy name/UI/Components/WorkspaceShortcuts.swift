@@ -56,6 +56,7 @@ struct WorkspaceShortcut: Identifiable {
         case toggleSnapping, compareOriginal, zoomInTimeline, zoomOutTimeline, toggleMediaBin
         case toolTimeline, toolText, toolShape, toolAudio, toolColor
         case toolTransform, toolMask, toolMatte, toolBackground, toolSpeed
+        case speedRamp, resetSpeed
 
         var id: String { rawValue }
 
@@ -138,6 +139,15 @@ struct WorkspaceShortcut: Identifiable {
                 (String(localized: "Remove Background Tool"), "9", .command, .tools, .videoEditor)
             case .toolSpeed:
                 (String(localized: "Speed Tool"), "0", .command, .tools, .videoEditor)
+
+            // Ramping is reached without a modifier because it is the one speed
+            // action a desktop editor does over and over. Both keys were free:
+            // the letters already spoken for are N (snapping), M (marker) and B
+            // and K (blade), and none of them is R.
+            case .speedRamp:
+                (String(localized: "Speed Ramp"), "r", [], .editing, .videoEditor)
+            case .resetSpeed:
+                (String(localized: "Reset Speed"), "r", .shift, .editing, .videoEditor)
             }
         }
 

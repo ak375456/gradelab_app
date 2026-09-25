@@ -33,9 +33,64 @@ final class MetalVideoRenderer: NSObject, MTKViewDelegate, @unchecked Sendable {
     /// Spatial finishing effects. Built on first use and released when nothing
     /// needs them, so a project with no effects pays nothing for them.
     private lazy var effectsStage: FilmEffectsStage? = FilmEffectsStage(context: context)
+    /// Noise reduction. Built on first use, like the effects stage, and
+    /// released with it — at 4K its surfaces are the largest allocation in the
+    /// app, and a project that never switches it on must not pay for them.
+    private lazy var noiseStage: NoiseReductionStage? =
+        NoiseReductionStage(context: context, isLog2: colorMode == .appleLog2)
+    /// Where the frames either side of the one on screen come from. Nil until
+    /// the editor supplies one, which it does only for a project whose grade
+    /// asks for temporal reduction.
+    private var temporalFrames: TemporalFrameCache?
+    /// What this device can run, so a five-frame window authored on a Mac
+    /// renders as the widest window a phone can hold rather than failing.
+    private var noiseCapability: NoiseReductionCapability?
+    /// What the last draw actually managed, for the panel to report.
+    private var noiseStatus = NoiseReductionStatus.inactive
+    /// Called when that changes, so the panel stops saying "spatial only" the
+    /// moment the neighbours land.
+    var onNoiseStatusChanged: (@Sendable () -> Void)?
+
+    /// Hands the renderer its source of neighbouring frames, or nil to stop
+    /// decoding them. Also releases the engine's surfaces when nothing needs
+    /// them, which is the point at which the memory actually comes back.
+    func setTemporalFrames(_ cache: TemporalFrameCache?, capability: NoiseReductionCapability?) {
+        stateLock.lock()
+        let previous = temporalFrames
+        temporalFrames = cache
+        noiseCapability = capability
+        revision &+= 1
+        stateLock.unlock()
+        if previous !== cache { previous?.invalidate() }
+        cache?.onFramesReady = { [weak self] in
+            guard let self else { return }
+            // A neighbour landing is a reason to draw the same frame again, and
+            // the only one: the picture has not changed, the grade has not
+            // changed, and without this the frame stays as it was drawn before
+            // the temporal window was ready.
+            self.stateLock.lock(); self.revision &+= 1; self.stateLock.unlock()
+        }
+    }
+
+    /// What noise reduction is doing right now. Reported rather than assumed:
+    /// a temporal setting that is quietly running spatially because the frames
+    /// are still decoding must not be presented as the finished result.
+    var noiseReductionStatus: NoiseReductionStatus {
+        stateLock.lock(); defer { stateLock.unlock() }; return noiseStatus
+    }
+
+    private func updateNoiseStatus(_ status: NoiseReductionStatus) {
+        stateLock.lock()
+        guard noiseStatus != status else { stateLock.unlock(); return }
+        noiseStatus = status
+        let notify = onNoiseStatusChanged
+        stateLock.unlock()
+        notify?()
+    }
     private lazy var gradeToTexture: [String: MTLComputePipelineState] = {
         var built: [String: MTLComputePipelineState] = [:]
-        for name in ["gradeToTextureYUV", "gradeToTextureBGRA", "gradeToTextureHDR", "gradeToTextureAppleLog"] {
+        for name in ["gradeToTextureYUV", "gradeToTextureBGRA", "gradeToTextureHDR",
+                     "gradeToTextureAppleLog", "gradeToTextureWorking"] {
             // Through the specialisation helper even for Apple Log: the Apple
             // Log kernel references the Log 2 function constant, and Metal
             // refuses to build a pipeline from a function that carries one
@@ -131,6 +186,7 @@ final class MetalVideoRenderer: NSObject, MTKViewDelegate, @unchecked Sendable {
     /// Returns the finished frame, or nil to fall back to the direct path.
     private func effectedFrame(
         textures: PixelBufferTextures,
+        noise: MTLTexture?,
         size: (width: Int, height: Int),
         grade: inout GradeUniforms,
         locals: LocalGradeStack,
@@ -141,28 +197,40 @@ final class MetalVideoRenderer: NSObject, MTKViewDelegate, @unchecked Sendable {
         warpField: MTLTexture?,
         command: MTLCommandBuffer
     ) -> MTLTexture? {
-        guard let stage = effectsStage,
-              let surfaces = effectSurfaces(width: size.width, height: size.height) else { return nil }
+        guard let surfaces = effectSurfaces(width: size.width, height: size.height) else { return nil }
+        let extendedRange = colorMode.isHDR || (colorMode.isAppleLog && !composited)
         let name: String
-        switch textures.storage {
-        case .biPlanar: name = colorMode.isAppleLog && !composited
-            ? AppleLogSpecialization.key("gradeToTextureAppleLog", isLog2: colorMode == .appleLog2)
-            : "gradeToTextureYUV"
-        case .bgra: name = "gradeToTextureBGRA"
-        case .linearHalf: name = "gradeToTextureHDR"
+        if noise != nil {
+            // A denoised frame has already been through the input transform, so
+            // it is graded from where it is rather than decoded a second time.
+            // One kernel serves HLG and both Log variants, because past their
+            // input transforms all three are the same working space.
+            name = extendedRange ? "gradeToTextureWorking" : "gradeToTextureBGRA"
+        } else {
+            switch textures.storage {
+            case .biPlanar: name = colorMode.isAppleLog && !composited
+                ? AppleLogSpecialization.key("gradeToTextureAppleLog", isLog2: colorMode == .appleLog2)
+                : "gradeToTextureYUV"
+            case .bgra: name = "gradeToTextureBGRA"
+            case .linearHalf: name = "gradeToTextureHDR"
+            }
         }
         guard let pipeline = gradeToTexture[name],
               let encoder = command.makeComputeCommandEncoder() else { return nil }
         encoder.setComputePipelineState(pipeline)
-        switch textures.storage {
-        case .biPlanar(_, let luma, _, let chroma):
-            encoder.setTexture(luma, index: 0); encoder.setTexture(chroma, index: 1)
-            encoder.setBytes(&yuv, length: MemoryLayout<YUVUniforms>.stride, index: 1)
-        case .bgra(_, let texture):
-            encoder.setTexture(texture, index: 0)
-        case .linearHalf(_, let texture):
-            encoder.setTexture(texture, index: 0)
-            encoder.setBytes(&hdr, length: MemoryLayout<HDRDisplayUniforms>.stride, index: 2)
+        if let noise {
+            encoder.setTexture(noise, index: 0)
+        } else {
+            switch textures.storage {
+            case .biPlanar(_, let luma, _, let chroma):
+                encoder.setTexture(luma, index: 0); encoder.setTexture(chroma, index: 1)
+                encoder.setBytes(&yuv, length: MemoryLayout<YUVUniforms>.stride, index: 1)
+            case .bgra(_, let texture):
+                encoder.setTexture(texture, index: 0)
+            case .linearHalf(_, let texture):
+                encoder.setTexture(texture, index: 0)
+                encoder.setBytes(&hdr, length: MemoryLayout<HDRDisplayUniforms>.stride, index: 2)
+            }
         }
         encoder.setTexture(surfaces.0, index: 2)
         encoder.setTexture(lut, index: 3)
@@ -178,13 +246,105 @@ final class MetalVideoRenderer: NSObject, MTKViewDelegate, @unchecked Sendable {
                 height: max(1, min(pipeline.maxTotalThreadsPerThreadgroup / threadWidth, size.height)),
                 depth: 1))
         encoder.endEncoding()
+        // Noise reduction alone takes this route too, and with no finishing
+        // effect switched on there is nothing left to do to the graded frame.
+        guard FilmEffectsStage.isActive(grade) else { return surfaces.0 }
         stateLock.lock(); let isStill = stillEffectSize != nil; stateLock.unlock()
-        guard stage.encode(source: surfaces.0, destination: surfaces.1, grade: grade,
-                           workingSpace: colorMode.isHDR || (colorMode.isAppleLog && !composited),
+        guard let stage = effectsStage,
+              stage.encode(source: surfaces.0, destination: surfaces.1, grade: grade,
+                           workingSpace: extendedRange,
                            blurLongEdge: isStill ? StillEffectGeometry.blurLongEdge : nil,
                            into: command) else { return nil }
         return surfaces.1
     }
+    /// Runs the denoising engine over the frame about to be drawn, or returns
+    /// nil when there is nothing for it to do.
+    ///
+    /// The neighbouring frames are taken from whatever the cache already has
+    /// and the rest are asked for. Nothing here waits: a frame drawn before its
+    /// neighbours arrive is denoised spatially and repainted when they land,
+    /// which is what makes dragging the playhead feel like dragging the
+    /// playhead rather than like waiting for a decoder.
+    private func encodeNoiseReduction(
+        pixelBuffer: CVPixelBuffer,
+        grade: GradeSettings,
+        bypassing: Bool,
+        activeClip: VideoClip?,
+        into command: MTLCommandBuffer
+    ) -> MTLTexture? {
+        guard !bypassing, let authored = grade.advanced?.resolvedNoiseReduction else {
+            updateNoiseStatus(.inactive); return nil
+        }
+        stateLock.lock()
+        let capability = noiseCapability
+        let cache = temporalFrames
+        stateLock.unlock()
+        let settings = capability?.constrained(authored) ?? authored
+        guard settings.isActive, let stage = noiseStage else {
+            updateNoiseStatus(.inactive); return nil
+        }
+
+        let reach = settings.temporalReach
+        var neighbours: [NoiseFrame] = []
+        // True when the frame being drawn is not the size the neighbours arrive
+        // at, so there is nothing the temporal stage could combine.
+        //
+        // This is what reduced-quality playback looks like from here: the
+        // preview renders through a video composition that drops to 1080p or
+        // 960p while the transport is running, while the neighbour reader
+        // renders the track at its own size. Tested before anything is asked
+        // for, rather than left to the size filter inside the engine, because
+        // the wasted work is the decoding — a second decoder pulling 4K frames
+        // that could never be used, against the player already decoding the
+        // same file, on a phone. Reported so the panel can say so: silently
+        // doing half the job is what made the sliders look broken.
+        var previewIsReduced = false
+        if reach.backward > 0 || reach.forward > 0, let cache {
+            previewIsReduced = cache.frameSize.width != CVPixelBufferGetWidth(pixelBuffer)
+                || cache.frameSize.height != CVPixelBufferGetHeight(pixelBuffer)
+            // Nothing here can use the frames it is holding, so it does not hold
+            // them. Cheap when they are already gone, which is every draw after
+            // the first.
+            if previewIsReduced { cache.suspend() }
+        }
+        if reach.backward > 0 || reach.forward > 0, !previewIsReduced, let cache {
+            let time = frameProvider.presentationTime
+            // A clip boundary is a cut the document already knows about, so it
+            // is enforced here rather than left to be discovered by comparing
+            // pictures. Frames from the clip on the other side of an edit are
+            // never offered to the engine at all.
+            let limit = activeClip.map {
+                CMTimeRange(start: $0.placement.timelineStart.cmTime,
+                            duration: $0.placement.duration.cmTime)
+            }
+            neighbours = cache.neighbours(
+                at: time, backward: reach.backward, forward: reach.forward, limit: limit)
+            cache.prefetch(at: time, backward: reach.backward, forward: reach.forward)
+        }
+
+        guard let result = stage.encode(
+            current: pixelBuffer, neighbours: neighbours, settings: settings,
+            colorMode: colorMode, hdr: HDRDisplayUniforms(),
+            fallbackMatrix: fallbackMatrix, into: command) else {
+            // Still active, just not yet able to do the temporal half — at the
+            // start of a clip, or for the moment after the playhead moved. The
+            // status has to say that rather than "off", which is what the panel
+            // would otherwise report while the decode catches up.
+            updateNoiseStatus(.init(
+                isActive: true, wantsTemporal: settings.temporalIsActive,
+                temporalRan: false, neighbours: 0,
+                reduced: capability?.reduces(authored) ?? false,
+                previewIsReduced: previewIsReduced))
+            return nil
+        }
+        updateNoiseStatus(.init(
+            isActive: true, wantsTemporal: settings.temporalIsActive,
+            temporalRan: result.temporalRan, neighbours: result.temporalNeighbours,
+            reduced: capability?.reduces(authored) ?? false,
+            previewIsReduced: previewIsReduced))
+        return result.texture
+    }
+
     let colorMode: ProjectColorMode
     /// Last headroom seen during draw. iOS posts no notification when headroom
     /// changes, so it is re-read every frame rather than cached across frames.
@@ -570,6 +730,14 @@ final class MetalVideoRenderer: NSObject, MTKViewDelegate, @unchecked Sendable {
         effectsStage?.releaseResources()
     }
 
+    /// Frees the denoising surfaces. Much the largest thing the app allocates
+    /// at 4K, so this happens the moment the module is switched off rather than
+    /// when the editor closes.
+    private func releaseNoiseSurfacesIfIdle(_ active: Bool) {
+        guard !active else { return }
+        noiseStage?.releaseResources()
+    }
+
     /// Forces the next draw to repaint, used when a look finishes loading.
     func invalidate() {
         stateLock.lock(); revision &+= 1; stateLock.unlock()
@@ -618,8 +786,15 @@ final class MetalVideoRenderer: NSObject, MTKViewDelegate, @unchecked Sendable {
         maskedGrades = masks
         bypassGrade = bypass
         let active = settings.advanced?.resolvedEffects.needsStage ?? false
+        // Any clip, not just the selected one. These are the largest surfaces
+        // in the app, and freeing them every time the selection moved to a clip
+        // without noise reduction would mean reallocating hundreds of megabytes
+        // on the way back.
+        let denoising = settings.advanced?.resolvedNoiseReduction != nil
+            || (sequenceClips?.contains { $0.gradeSettings.advanced?.resolvedNoiseReduction != nil } ?? false)
         stateLock.unlock()
         releaseEffectSurfacesIfIdle(active)
+        releaseNoiseSurfacesIfIdle(denoising)
     }
 
     /// The area of the preview around the canvas.
@@ -718,9 +893,10 @@ final class MetalVideoRenderer: NSObject, MTKViewDelegate, @unchecked Sendable {
                 : (activeClip.map { clip in
                     frameTime.map { clip.evaluatedMaskedGrades(at: $0) } ?? clip.resolvedMaskedGrades
                 } ?? [])
+            let bypassing = bypassGrade || composited
             var program = GradeProgram(
                 settings: frameGrade, masks: frameMasks,
-                bypass: bypassGrade || composited,
+                bypass: bypassing,
                 aspect: encodedMaskAspect, matte: maskMatte)
             program.setGrainSeed(frameProvider.presentationTime.seconds)
             var grade = program.uniforms
@@ -767,20 +943,37 @@ final class MetalVideoRenderer: NSObject, MTKViewDelegate, @unchecked Sendable {
             var hdrUniforms = HDRDisplayUniforms()
             var isHDRDraw = false
 
+            // Noise reduction, between the input transform and the grade.
+            //
+            // Before the grade because noise is a property of the signal the
+            // camera produced, and lifting a Log shadow two stops before
+            // denoising it means denoising a picture whose noise has already
+            // been stretched. Skipped entirely under Show Original: comparing a
+            // noisy frame against a clean one is the whole point of holding the
+            // picture, so the comparison has to include this.
+            let noiseTexture = encodeNoiseReduction(
+                pixelBuffer: pixelBuffer, grade: frameGrade, bypassing: bypassing,
+                activeClip: activeClip, into: commandBuffer)
+
+            // The denoised frame lives in a texture, so the grade has to read it
+            // from one — which is the same two-pass route a finishing effect
+            // already takes.
             let wantsEffects = FilmEffectsStage.isActive(grade) && !resizing
+            let wantsTexturePass = wantsEffects || noiseTexture != nil
             stateLock.lock(); let stillSize = stillEffectSize; stateLock.unlock()
             // A still renders its effects in the picture's own geometry; video
             // keeps rendering them at the drawable, exactly as it always has.
             let effectSize = stillSize ?? view.drawableSize
-            let effected: MTLTexture? = wantsEffects
+            let effected: MTLTexture? = wantsTexturePass
                 ? effectedFrame(
                     textures: textures,
+                    noise: noiseTexture,
                     size: (max(1, Int(effectSize.width)), max(1, Int(effectSize.height))),
                     grade: &grade, locals: locals, yuv: &yuv, hdr: &hdrUniforms,
                     lut: lutTexture, curveLUT: curveTexture, warpField: warpTexture,
                     command: commandBuffer)
                 : nil
-            if wantsEffects, effected == nil { return }
+            if wantsTexturePass, effected == nil { return }
             guard let encoder = commandBuffer.makeRenderCommandEncoder(descriptor: renderPass) else { return }
 
             // A spatial effect needs the graded frame as something it can read

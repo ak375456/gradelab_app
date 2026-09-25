@@ -3425,3 +3425,337 @@ kernel void encodeAppleLogFromTexture(
 
 // HLG BT.2020 10-bit export from a finished frame, which arrives in working
 // space and goes through the same display transform the preview uses.
+
+// ---------------------------------------------------------------------------
+// Shot Match analysis
+//
+// One job: put every source family into ONE space so two pictures can be
+// compared as pictures.
+//
+// The space is Rec.709-encoded RGB on Rec.709 primaries, 0...1 — the picture as
+// a viewer sees it. A 10-bit HLG clip, an Apple Log clip, an 8-bit Rec.709 clip
+// and an imported JPEG all arrive here as the same kind of number, which is the
+// only footing on which "this shot is warmer than that one" is a statement
+// about grading rather than about encoding. Comparing S-Log code values against
+// Rec.709 code values would report a flat, desaturated, green-biased reference
+// that is nothing but the transfer function.
+//
+// These write the picture WITH its grade applied, through the same
+// `applyLookAndGrade` the preview uses, for the same reason the scopes do: a
+// reference shot is a GRADED shot, and the thing to match is what is on screen.
+//
+// Nothing here ever touches a delivered frame. The output goes to a small
+// rgba32Float texture the CPU reads and throws away. So the highlight handling
+// below normalises a measurement, never a picture: an HDR frame's headroom is
+// counted into the alpha channel rather than being compressed away, which is
+// what stops the solver from reading a specular highlight as a blown one and
+// "rescuing" a highlight that was never in trouble.
+// ---------------------------------------------------------------------------
+
+// BT.2020 -> Rec.709 for linear light, D65 throughout (ITU-R BT.2087). The
+// inverse of `kRec709ToBT2020` above; both are written out so neither is a
+// matrix inversion performed at runtime on values that are already known.
+constant float3x3 kBT2020ToRec709 = float3x3(
+    float3( 1.660491, -0.124550, -0.018151),
+    float3(-0.587641,  1.132900, -0.100579),
+    float3(-0.072850, -0.008349,  1.118730));
+
+// Working space (linear BT.2020, diffuse white at 1.0) -> the analysis space.
+//
+// Alpha carries the headroom flag: 1 when this pixel was above diffuse white
+// before the encode clamped it. Averaged over the frame on the CPU, that is the
+// share of the picture living in HDR headroom, which the solver needs in order
+// to tell "this is an HDR highlight" from "this is clipped".
+inline float4 workingToAnalysis(float3 working) {
+    float headroom = maxChannel(working) > 1.0 ? 1.0 : 0.0;
+    float3 rec709 = max(kBT2020ToRec709 * working, 0.0);
+    return float4(saturate(linearToRec709(rec709)), headroom);
+}
+
+kernel void shotMatchSampleYUV(
+    texture2d<float, access::sample> lumaTexture [[texture(0)]],
+    texture2d<float, access::sample> chromaTexture [[texture(1)]],
+    texture2d<float, access::write> analysis [[texture(2)]],
+    texture3d<float, access::sample> lutTexture [[texture(3)]],
+    texture2d<float, access::sample> curveLUT [[texture(6)]],
+    texture2d<float, access::sample> warpField [[texture(12)]],
+    constant GradeUniforms &grade [[buffer(0)]],
+    constant YUVUniforms &yuv [[buffer(1)]],
+    uint2 position [[thread_position_in_grid]],
+    constant LocalGradeStack &locals [[buffer(8)]])
+{
+    if (position.x >= analysis.get_width() || position.y >= analysis.get_height()) { return; }
+    // Point sampling, not linear. A bilinear fetch between two pixels invents a
+    // colour that is in neither of them, and an average of a red and a green
+    // pixel reads as a desaturated yellow the scene never contained - which
+    // would quietly pull every saturation measurement toward grey.
+    constexpr sampler analysisSampler(coord::normalized, address::clamp_to_edge, filter::nearest);
+    float2 uv = (float2(position) + 0.5) / float2(analysis.get_width(), analysis.get_height());
+    float3 rgb = decodeYUV(lumaTexture.sample(analysisSampler, uv).r,
+                           chromaTexture.sample(analysisSampler, uv).rg, yuv);
+    float3 graded = applyLookAndGrade(rgb, uv, grade, lutTexture, curveLUT, warpField, locals);
+    analysis.write(float4(saturate(graded), 0.0), position);
+}
+
+kernel void shotMatchSampleBGRA(
+    texture2d<float, access::sample> sourceTexture [[texture(0)]],
+    texture2d<float, access::write> analysis [[texture(2)]],
+    texture3d<float, access::sample> lutTexture [[texture(3)]],
+    texture2d<float, access::sample> curveLUT [[texture(6)]],
+    texture2d<float, access::sample> warpField [[texture(12)]],
+    constant GradeUniforms &grade [[buffer(0)]],
+    uint2 position [[thread_position_in_grid]],
+    constant LocalGradeStack &locals [[buffer(8)]])
+{
+    if (position.x >= analysis.get_width() || position.y >= analysis.get_height()) { return; }
+    constexpr sampler analysisSampler(coord::normalized, address::clamp_to_edge, filter::nearest);
+    float2 uv = (float2(position) + 0.5) / float2(analysis.get_width(), analysis.get_height());
+    float4 pixel = sourceTexture.sample(analysisSampler, uv);
+    float3 straight = pixel.a > 0.00001 ? pixel.rgb / pixel.a : float3(0.0);
+    float3 graded = applyLookAndGrade(straight, uv, grade, lutTexture, curveLUT, warpField, locals);
+    // A transparent pixel is not part of the picture, so it is marked for the
+    // CPU to drop rather than measured as black - a title card's empty corner
+    // would otherwise be read as a crushed shadow.
+    analysis.write(float4(saturate(graded), pixel.a < 0.5 ? -1.0 : 0.0), position);
+}
+
+kernel void shotMatchSampleHDR(
+    texture2d<float, access::sample> sourceTexture [[texture(0)]],
+    texture2d<float, access::write> analysis [[texture(2)]],
+    texture3d<float, access::sample> lutTexture [[texture(3)]],
+    texture2d<float, access::sample> curveLUT [[texture(6)]],
+    texture2d<float, access::sample> warpField [[texture(12)]],
+    constant GradeUniforms &grade [[buffer(0)]],
+    constant HDRDisplayUniforms &hdr [[buffer(2)]],
+    uint2 position [[thread_position_in_grid]],
+    constant LocalGradeStack &locals [[buffer(8)]])
+{
+    if (position.x >= analysis.get_width() || position.y >= analysis.get_height()) { return; }
+    constexpr sampler analysisSampler(coord::normalized, address::clamp_to_edge, filter::nearest);
+    float2 uv = (float2(position) + 0.5) / float2(analysis.get_width(), analysis.get_height());
+    float3 working = toWorkingSpace(sourceTexture.sample(analysisSampler, uv).rgb, hdr);
+    working = applyLookAndGradeHDR(working, uv, grade, lutTexture, curveLUT, warpField, locals);
+    analysis.write(workingToAnalysis(working), position);
+}
+
+kernel void shotMatchSampleAppleLog(
+    texture2d<float, access::sample> luma [[texture(0)]],
+    texture2d<float, access::sample> chroma [[texture(1)]],
+    texture2d<float, access::write> analysis [[texture(2)]],
+    texture3d<float, access::sample> lut [[texture(3)]],
+    texture3d<float, access::sample> renderingLUT [[texture(4)]],
+    texture2d<float, access::sample> curves [[texture(6)]],
+    texture2d<float, access::sample> warpField [[texture(12)]],
+    constant GradeUniforms &grade [[buffer(0)]],
+    constant LocalGradeStack &locals [[buffer(8)]],
+    uint2 position [[thread_position_in_grid]])
+{
+    if (position.x >= analysis.get_width() || position.y >= analysis.get_height()) { return; }
+    constexpr sampler analysisSampler(coord::normalized, address::clamp_to_edge, filter::nearest);
+    float2 uv = (float2(position) + 0.5) / float2(analysis.get_width(), analysis.get_height());
+    float3 working = appleLogToWorking(luma.sample(analysisSampler, uv).r,
+                                       chroma.sample(analysisSampler, uv).rg);
+    working = applyLookAndGradeHDR(working, uv, grade, lut, curves, warpField, locals);
+    // Through Apple's own rendering LUT, which is the transform the preview
+    // uses. Analysing the Log code values instead would measure the camera's
+    // encoding rather than the picture, and would report every Log clip as flat
+    // and green whatever grade was on it.
+    float headroom = maxChannel(working) > 1.0 ? 1.0 : 0.0;
+    analysis.write(float4(saturate(appleLogWorkingToRec709(working, renderingLUT)), headroom),
+                   position);
+}
+
+// ---------------------------------------------------------------------------
+// Noise Reduction: into and out of the working planes
+//
+// The denoising engine itself lives in NoiseReductionShaders.metal and works on
+// a luma plane and a chroma plane, knowing nothing about colour. These are the
+// two ends of it, and they are here rather than there so that every transform
+// they use — the YUV matrix, the HLG and Apple Log input transforms, the
+// shaper — is the same one the grading path uses, from the same source.
+//
+// WHERE THIS SITS. Noise reduction runs after the input transform and before
+// the creative grade. That is the only defensible place for it: noise is a
+// property of the signal the camera produced, so it has to be removed in terms
+// of that signal, and it has to be removed before a grade lifts the shadows it
+// is hiding in. Placing it after the grade would mean denoising a picture whose
+// noise had already been stretched, clipped and had a look applied to it.
+//
+// WHAT THE PLANES ARE. A luminance/colour-difference pair built on the working
+// primaries — Rec.709 for the SDR path, BT.2020 for the extended-range one —
+// so luma and chroma can be filtered independently, which is the whole point.
+// The matrix is exactly invertible, so a frame with every strength at zero
+// round-trips to itself.
+//
+// For the extended-range paths the signal is put through the shaper first. In
+// linear light the amplitude of sensor noise follows the signal, so a single
+// threshold would be far too loose in the highlights and far too tight in the
+// blacks; the shaper compresses the range enough that one measured noise floor
+// describes the whole picture. It is the same invertible shaper the curve and
+// HSL stages already use, not a new one.
+// ---------------------------------------------------------------------------
+
+struct NoisePlaneUniforms {
+    /// xyz the working primaries' luma weights, w 1 for extended-range input.
+    float4 luma;
+    /// x how much colour cleaning was asked for, 0...1. The rest is reserved so
+    /// this matches the head of `NoiseUniforms`.
+    float4 geometry;
+};
+
+inline float3 noiseToPlanes(float3 rgb, constant NoisePlaneUniforms &u) {
+    float3 signal = u.luma.w > 0.5 ? workingToShaper(rgb) : rgb;
+    float3 w = u.luma.xyz;
+    float y = dot(signal, w);
+    return float3(y,
+                  (signal.b - y) / (2.0 * (1.0 - w.b)),
+                  (signal.r - y) / (2.0 * (1.0 - w.r)));
+}
+
+inline float3 noiseFromPlanes(float3 ycc, constant NoisePlaneUniforms &u) {
+    float3 w = u.luma.xyz;
+    float r = ycc.x + ycc.z * 2.0 * (1.0 - w.r);
+    float b = ycc.x + ycc.y * 2.0 * (1.0 - w.b);
+    float g = (ycc.x - w.r * r - w.b * b) / w.g;
+    float3 signal = float3(r, g, b);
+    return u.luma.w > 0.5 ? shaperToWorking(signal) : signal;
+}
+
+inline void writeNoisePlanes(float3 rgb, constant NoisePlaneUniforms &u,
+                             texture2d<float, access::write> lumaOut,
+                             texture2d<float, access::write> chromaOut,
+                             uint2 position) {
+    float3 ycc = noiseToPlanes(rgb, u);
+    lumaOut.write(float4(ycc.x, 0.0, 0.0, 0.0), position);
+    chromaOut.write(float4(ycc.y, ycc.z, 0.0, 0.0), position);
+}
+
+kernel void nrPrepareYUV(
+    texture2d<float, access::sample> lumaTexture [[texture(0)]],
+    texture2d<float, access::sample> chromaTexture [[texture(1)]],
+    texture2d<float, access::write> lumaOut [[texture(2)]],
+    texture2d<float, access::write> chromaOut [[texture(3)]],
+    constant NoisePlaneUniforms &u [[buffer(0)]],
+    constant YUVUniforms &yuv [[buffer(1)]],
+    uint2 position [[thread_position_in_grid]])
+{
+    if (position.x >= lumaOut.get_width() || position.y >= lumaOut.get_height()) { return; }
+    constexpr sampler videoSampler(coord::normalized, address::clamp_to_edge, filter::linear);
+    float2 uv = (float2(position) + 0.5) / float2(lumaOut.get_width(), lumaOut.get_height());
+    float3 rgb = decodeYUV(lumaTexture.sample(videoSampler, uv).r,
+                           chromaTexture.sample(videoSampler, uv).rg, yuv);
+    writeNoisePlanes(rgb, u, lumaOut, chromaOut, position);
+}
+
+kernel void nrPrepareBGRA(
+    texture2d<float, access::sample> source [[texture(0)]],
+    texture2d<float, access::write> lumaOut [[texture(2)]],
+    texture2d<float, access::write> chromaOut [[texture(3)]],
+    constant NoisePlaneUniforms &u [[buffer(0)]],
+    uint2 position [[thread_position_in_grid]])
+{
+    if (position.x >= lumaOut.get_width() || position.y >= lumaOut.get_height()) { return; }
+    constexpr sampler videoSampler(coord::normalized, address::clamp_to_edge, filter::linear);
+    float2 uv = (float2(position) + 0.5) / float2(lumaOut.get_width(), lumaOut.get_height());
+    float4 pixel = source.sample(videoSampler, uv);
+    float3 straight = pixel.a > 0.00001 ? pixel.rgb / pixel.a : float3(0.0);
+    writeNoisePlanes(straight, u, lumaOut, chromaOut, position);
+}
+
+kernel void nrPrepareHDR(
+    texture2d<float, access::sample> source [[texture(0)]],
+    texture2d<float, access::write> lumaOut [[texture(2)]],
+    texture2d<float, access::write> chromaOut [[texture(3)]],
+    constant NoisePlaneUniforms &u [[buffer(0)]],
+    constant HDRDisplayUniforms &hdr [[buffer(2)]],
+    uint2 position [[thread_position_in_grid]])
+{
+    if (position.x >= lumaOut.get_width() || position.y >= lumaOut.get_height()) { return; }
+    constexpr sampler videoSampler(coord::normalized, address::clamp_to_edge, filter::linear);
+    float2 uv = (float2(position) + 0.5) / float2(lumaOut.get_width(), lumaOut.get_height());
+    float3 working = toWorkingSpace(source.sample(videoSampler, uv).rgb, hdr);
+    writeNoisePlanes(working, u, lumaOut, chromaOut, position);
+}
+
+kernel void nrPrepareAppleLog(
+    texture2d<float, access::sample> lumaTexture [[texture(0)]],
+    texture2d<float, access::sample> chromaTexture [[texture(1)]],
+    texture2d<float, access::write> lumaOut [[texture(2)]],
+    texture2d<float, access::write> chromaOut [[texture(3)]],
+    constant NoisePlaneUniforms &u [[buffer(0)]],
+    uint2 position [[thread_position_in_grid]])
+{
+    if (position.x >= lumaOut.get_width() || position.y >= lumaOut.get_height()) { return; }
+    constexpr sampler videoSampler(coord::normalized, address::clamp_to_edge, filter::linear);
+    float2 uv = (float2(position) + 0.5) / float2(lumaOut.get_width(), lumaOut.get_height());
+    float3 working = appleLogToWorking(lumaTexture.sample(videoSampler, uv).r,
+                                       chromaTexture.sample(videoSampler, uv).rg);
+    writeNoisePlanes(working, u, lumaOut, chromaOut, position);
+}
+
+/// The denoised planes, back to the representation the grade expects.
+///
+/// Chroma is applied as a DIFFERENCE rather than substituted. The chroma stages
+/// work on a half-resolution plane, which is right — colour noise is
+/// low-frequency and a 4:2:0 source has no more colour resolution than that
+/// anyway — but substituting the result would also throw away the full-
+/// resolution colour a 4:4:4 source really does carry. Adding back only what
+/// the filtering changed keeps that detail exactly, and means chroma strengths
+/// of zero leave the colour bit-identical.
+kernel void nrReconstruct(
+    texture2d<float, access::sample> luma [[texture(0)]],
+    texture2d<float, access::sample> chromaFull [[texture(1)]],
+    texture2d<float, access::sample> chromaOriginal [[texture(2)]],
+    texture2d<float, access::sample> chromaDenoised [[texture(3)]],
+    texture2d<float, access::write> destination [[texture(4)]],
+    constant NoisePlaneUniforms &u [[buffer(0)]],
+    uint2 position [[thread_position_in_grid]])
+{
+    if (position.x >= destination.get_width() || position.y >= destination.get_height()) { return; }
+    constexpr sampler s(coord::normalized, address::clamp_to_edge, filter::linear);
+    float2 uv = (float2(position) + 0.5) / float2(destination.get_width(), destination.get_height());
+    float y = luma.sample(s, uv).r;
+    float2 chroma = chromaFull.sample(s, uv).rg;
+    if (!is_null_texture(chromaDenoised)) {
+        float2 before = chromaOriginal.sample(s, uv).rg;
+        float2 after = chromaDenoised.sample(s, uv).rg;
+        // Everything the half-resolution plane could see, cleaned.
+        //
+        // What is left over — the difference between the full-resolution colour
+        // and what survives a trip through half resolution — is colour detail
+        // finer than two pixels. In a 4:4:4 source that is real and must be
+        // kept; in a 4:2:0 source it is an artefact of the upsample and is
+        // where the last of the speckle hides. Rather than guess which, it is
+        // faded out by how much colour cleaning was asked for: at zero the
+        // colour is untouched to the bit, and at full strength fine chroma
+        // structure is exactly what the control said to remove.
+        float2 fine = chroma - before;
+        chroma = after + fine * (1.0 - saturate(u.geometry.x));
+    }
+    destination.write(float4(noiseFromPlanes(float3(y, chroma), u), 1.0), position);
+}
+
+/// Grades a frame that is ALREADY in the extended-range working space.
+///
+/// `gradeToTextureHDR` cannot serve here because it starts by applying the
+/// input transform, and a denoised frame has been through that already. The
+/// same kernel serves HLG and both Apple Log variants, because after their
+/// respective input transforms all three are the same working space — which is
+/// the arrangement the Apple Log path was built on in the first place.
+kernel void gradeToTextureWorking(
+    texture2d<float, access::sample> source [[texture(0)]],
+    texture2d<float, access::write> destination [[texture(2)]],
+    texture3d<float, access::sample> lutTexture [[texture(3)]],
+    texture2d<float, access::sample> curveLUT [[texture(6)]],
+    texture2d<float, access::sample> warpField [[texture(12)]],
+    constant GradeUniforms &grade [[buffer(0)]],
+    uint2 position [[thread_position_in_grid]],
+    constant LocalGradeStack &locals [[buffer(8)]])
+{
+    if (position.x >= destination.get_width() || position.y >= destination.get_height()) { return; }
+    constexpr sampler videoSampler(coord::normalized, address::clamp_to_edge, filter::linear);
+    float2 uv = (float2(position) + 0.5) / float2(destination.get_width(), destination.get_height());
+    float3 working = source.sample(videoSampler, uv).rgb;
+    destination.write(float4(applyLookAndGradeHDR(
+        working, uv, grade, lutTexture, curveLUT, warpField, locals), 1.0), position);
+}

@@ -172,9 +172,14 @@ final class VideoPlaybackController: ObservableObject {
         isPreviewReduced = false
         item.videoComposition = sequence.source.videoComposition
         item.audioMix = sequence.source.audioMix
-        // Retimed audio keeps its pitch. Scaling the track alone shifts pitch
-        // with rate, which is not what anyone wants from a speed control.
-        item.audioTimePitchAlgorithm = .spectral
+        // Retimed audio keeps its pitch unless a clip asked for the opposite.
+        // Scaling the track alone shifts pitch with rate, which is not what
+        // anyone wants from a speed control — but it is occasionally exactly
+        // what someone does want, and `varispeed` is the tape effect that
+        // gives it.
+        item.audioTimePitchAlgorithm = sequence.clips.contains {
+            $0.resolvedRemap.audioBehaviour == .followWithPitch
+        } ? .varispeed : .spectral
         item.add(output)
         minimumTime = 0
         duration = sequence.source.duration.seconds

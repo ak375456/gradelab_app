@@ -1,6 +1,6 @@
-Unterstützung für Apple Log 2 und ein deutlich schnellerer Look-Browser.
+Neu: Color Warper und flüssigeres Bearbeiten.
 
-• Apple Log 2 — grade Material vom iPhone 17 Pro. Apple Log 2 wird über seine eigene Apple-Wide-Gamut-Transformation dekodiert statt wie Apple Log behandelt zu werden. So stimmt die Farbe vom ersten Frame an, durch das Grading hindurch bis in den Export.
-• Looks laden deutlich schneller — der Look-Browser füllte sich bei großen LUT-Sammlungen bisher nur langsam, und das Anwenden eines hochauflösenden LUTs konnte Sekunden dauern. Look-Vorschauen erscheinen jetzt fast sofort, und ein Look wird angewendet, sobald du ihn antippst.
-• Behoben: Der Timecode über der Timeline konnte auf kleineren iPhones auf zwei Zeilen umbrechen und einen Wert am Umbruch trennen.
-• Behoben: Beim Importieren eines Fotos stand „Video wird analysiert“.
+• Color Warper: Farben in den Modi Farbton/Sättigung und Chroma/Luma gezielt formen.
+• Timeline: Zwei oder mehr verschiebbare Zeilen auswählen und gemeinsam ziehen.
+• Optimierte Vorschau für flüssigeres Bearbeiten.
+• Verbesserungen der Oberfläche, Fehlerbehebungen und allgemeine App-Optimierungen.

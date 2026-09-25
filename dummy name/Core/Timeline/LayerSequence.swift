@@ -120,7 +120,32 @@ extension SequenceComposition {
             // scaling it to the clip's timeline duration is what actually makes
             // it play faster or slower. Preview and export share this
             // composition, so they cannot disagree about the rate.
-            if clip.isRetimed {
+            //
+            // A ramp is the same operation applied piece by piece. The pieces
+            // come from the clip's own time map, which is also what the grade,
+            // the masks and the tracking read, so the picture AVFoundation
+            // schedules and the frame the rest of the app thinks is there are
+            // the same frame.
+            let rampSegments = clip.isRamped
+                ? clip.timeMap.retimeSegments()
+                : []
+            if !rampSegments.isEmpty {
+                // Transition handles sit outside the clip's own source range and
+                // therefore outside the curve. They keep the rate of the piece
+                // they adjoin, which is the rate the picture is actually moving
+                // at where the dissolve begins.
+                var pieces: [RetimeSegment] = []
+                if sourceLead > .zero, let first = rampSegments.first {
+                    pieces.append(RetimeSegment(sourceOffset: .zero, sourceDuration: sourceLead,
+                                                timelineDuration: lead > .zero ? lead : first.timelineDuration))
+                }
+                pieces.append(contentsOf: rampSegments)
+                if sourceTail > .zero, let last = rampSegments.last {
+                    pieces.append(RetimeSegment(sourceOffset: .zero, sourceDuration: sourceTail,
+                                                timelineDuration: tail > .zero ? tail : last.timelineDuration))
+                }
+                TimeMap.applySegments(pieces, to: video, startingAt: extendedTimelineStart.cmTime)
+            } else if clip.isRetimed {
                 video.scaleTimeRange(
                     CMTimeRange(start: extendedTimelineStart.cmTime,
                                 duration: extendedSourceDuration.cmTime),
@@ -164,7 +189,15 @@ extension SequenceComposition {
                     // video composition down with it. The tail needs no filling:
                     // with no partner frame the compositor uses the source frame
                     // unblended, which is what the last frame should be anyway.
-                    if clip.isRetimed {
+                    // Scaled by exactly the same pieces as the picture, so the
+                    // partner never drifts away from the frame it is supposed to
+                    // be one frame ahead of. A ramp that scaled the two
+                    // differently would blend frames that are seconds apart at
+                    // the fast end of the curve.
+                    if !rampSegments.isEmpty {
+                        TimeMap.applySegments(rampSegments, to: partner,
+                                              startingAt: clip.placement.timelineStart.cmTime)
+                    } else if clip.isRetimed {
                         partner.scaleTimeRange(
                             CMTimeRange(start: clip.placement.timelineStart.cmTime,
                                         duration: clip.sourceRange.duration.cmTime),
@@ -173,7 +206,17 @@ extension SequenceComposition {
                     blendIDs[clip.id] = partner.trackID
                 }
             }
-            if clip.embeddedAudio != nil {
+            // A reversed clip has no audio. Reversing samples is not something
+            // an edit list can express any more than reversing pictures is, and
+            // the honest options are silence or a rendered file. Silence is
+            // chosen, and the panel says so — the alternative is audio that
+            // plays forwards under a picture that does not, which is worse than
+            // nothing and much harder to notice.
+            //
+            // The muting is here rather than on the document so that turning
+            // Reverse off brings the sound back exactly as it was.
+            if clip.embeddedAudio != nil, !clip.isReversed,
+               clip.resolvedRemap.audioBehaviour != .mute {
                 for original in source.audioTracks {
                     let range = CMTimeRangeGetIntersection(clip.sourceRange.cmTimeRange, otherRange: original.timeRange)
                     guard range.duration > .zero else { continue }
@@ -181,7 +224,18 @@ extension SequenceComposition {
                     let offset = CMTimeSubtract(range.start, clip.sourceRange.start.cmTime)
                     let insertedAt = CMTimeAdd(clip.placement.timelineStart.cmTime, offset)
                     try track.insertTimeRange(range, of: original.track, at: insertedAt)
-                    if clip.isRetimed {
+                    // Audio follows the same map the picture does, piece for
+                    // piece, so a ramp cannot leave the two drifting apart. The
+                    // window is the intersection that was actually inserted,
+                    // which is not always the whole clip.
+                    let audioSegments = clip.isRamped
+                        ? clip.timeMap.retimeSegments(clippedToSource: CMTimeRange(
+                            start: CMTimeSubtract(range.start, clip.sourceRange.start.cmTime),
+                            duration: range.duration))
+                        : []
+                    if !audioSegments.isEmpty {
+                        TimeMap.applySegments(audioSegments, to: track, startingAt: insertedAt)
+                    } else if clip.isRetimed {
                         // The same conversion the picture uses. A raw float
                         // multiply lands on a nanosecond timescale and can round
                         // a few ticks PAST the video it was cut from, pushing the

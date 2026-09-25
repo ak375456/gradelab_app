@@ -61,6 +61,7 @@ struct HomeView: View {
         .onChange(of: scenePhase) { _, phase in
             if phase != .active { grade.persist() }
         }
+        .task { await store.loadProducts() }
     }
 
     /// Opening the panel is what counts as finding it: the invitation on the
@@ -97,7 +98,8 @@ struct HomeView: View {
                             Text("Unlock GradeLab Pro")
                                 .font(AppTypography.bodyEmphasized)
                                 .foregroundStyle(AppColors.textPrimary)
-                            if ProConfiguration.isPromotionalPricing {
+                            if let lifetime = store.product(for: .lifetime),
+                               store.showsDiscount(lifetime) {
                                 Text("SAVE \(ProConfiguration.lifetimeDiscountPercent)%")
                                     .font(.system(size: 10, weight: .bold)).tracking(0.6)
                                     .foregroundStyle(.black)

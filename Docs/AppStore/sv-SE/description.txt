@@ -1,0 +1,81 @@
+Gör vardagens foton och videor till filmiska berättelser. GradeLab är en färggraderingsapp för iPhone och iPad med LUT-filter, vintagelooks, professionella färgverktyg och videoredigering på ett ställe.
+
+Välj en look, justera styrkan och gör den till din egen. Från varma porträtt och stämningsfulla reseklipp till mjuka filmtoner och retrostil: styr ljus, färg och känsla i hela bilden eller bara en del av den.
+
+FILMISKA LUT:ER OCH VINTAGEFILTER
+
+- Utforska filmiska LUT:er med liveförhandsvisning på dina egna foton och videor.
+- Prova looks som Warm Cinema, Teal Orange och Soft Film samt en samling filminspirerade LUT:er.
+- Justera styrkan för ett diskret resultat eller en tydlig filmisk stil.
+- Importera egna .cube-LUT:er och använd dem som inbyggda looks.
+- Spara din färggradering som en förinställning för andra foton och videor.
+
+PROFESSIONELL FÄRGGRADERING
+
+- Exponering, kontrast, högdagrar, skuggor, vitt och svart.
+- Temperatur, färgton, mättnad och lyster.
+- HSL med åtta färgband för kontroll över enskilda färger.
+- Färghjul för skuggor, mellantoner och högdagrar.
+- Color Warper: forma färger i lägena Hue/Sat och Chroma/Luma.
+- Master-, röd-, grön- och blåkurvor.
+- Kurvor för nyans, mättnad och luminans.
+- Fade, skärpa och vinjettering.
+- Jämför före och efter medan du redigerar.
+
+MASKER OCH LOKAL FÄRGGRADERING
+
+- Gradera en del av bilden i stället för hela bilden.
+- Ellips-, rektangel-, tonings- och frihandsmasker.
+- Mjuka upp kanter, justera styrkan eller invertera en mask.
+- Lägg flera masker på ett klipp, var och en med egen gradering.
+- Låt en mask följa ett motiv i rörelse, framåt eller bakåt.
+- Använd samma masker på foton.
+
+FÄRGGRADERING MED NYCKELBILDER
+
+- Animera graderingen så att en look växer fram eller tonas bort under ett klipp.
+- Sätt nyckelbilder för exponering, kontrast, temperatur, mättnad, HSL, färghjul, vinjett, kurvor, filmeffekter och lookens styrka.
+- Justera nyckelbilder manuellt, även rörelse från maskspårning.
+
+ÖVERGÅNGAR
+
+- 45 övergångar: toningar, wipes, glidningar, zoom, oskärpa, whip pan, film burn, glitch, prisma, sidvändning och mer.
+- Ställ in varje övergångs längd på tidslinjen.
+
+FILMEFFEKTER
+
+- Filmkorn, bloom, glow och halation för en analog känsla.
+
+PROFESSIONELLA SCOPES
+
+- Histogram, vågform, RGB-parad och vektorskop för exakt färggradering.
+
+APPLE LOG, HDR OCH PRORES
+
+- Gradera material i Apple Log och Apple Log 2 samt HLG HDR-video.
+- Apple Log 2 från iPhone 17 Pro får en egen omvandling för brett färgomfång, inte Apple Logs.
+- Exportera ProRes 422 och ProRes 422 HQ på kompatibla enheter.
+- Exportera i 4K eller källans upplösning med valfri bildfrekvens och bithastighet.
+
+REDIGERA VIDEO OCH FOTO
+
+- Trimma och dela klipp, ändra hastighet och lägg till titlar och ljud.
+- Gradera foton med samma färgverktyg som videor.
+- Exportera foton som JPEG i full upplösning, HEIC eller förlustfri PNG.
+- Inga vattenstämplar på dina exporter.
+
+TEXT, LAGER OCH RÖRELSE
+
+- Lägg till titlar med medföljande typsnitt eller egna importerade TTF-filer.
+- Lägg över lager med blandningslägen.
+- Maska ett lager med ellips, rektangel eller delningslinje så att spåret under syns.
+- Mjuka upp eller invertera en lagermask och animera den som en wipe.
+- Animera text, transformeringar och färggradering med nyckelbilder.
+
+Oavsett om du graderar en resevlogg, en kortfilm eller ett porträtt hjälper GradeLab dig att skapa en stil som känns helt din egen.
+
+Tillgången till funktioner och format beror på ditt källmaterial och din enhet. Vissa funktioner kräver en prenumeration eller ett engångsköp.
+
+Integritetspolicy: https://ak375456.github.io/gradelab/privacy.html
+Användarvillkor (EULA): https://www.apple.com/legal/internet-services/itunes/dev/stdeula/
+Appvillkor: https://ak375456.github.io/gradelab/terms.html

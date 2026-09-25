@@ -9,11 +9,17 @@ import Foundation
 /// disagree, and a clip whose duration does not match its speed would play the
 /// wrong content.
 enum ClipSpeed {
-    /// Deliberately symmetric in log10: 0.1× and 10× are the same distance from
-    /// 1× on the slider, which puts normal speed exactly in the middle of the
-    /// track. An asymmetric range would leave the centre at some arbitrary rate.
-    static let minimum = 0.1
-    static let maximum = 10.0
+    /// Deliberately symmetric in log10: 0.0625× and 16× are the same distance
+    /// from 1× on the slider, which puts normal speed exactly in the middle of
+    /// the track. An asymmetric range would leave the centre at some arbitrary
+    /// rate.
+    ///
+    /// Widened from 0.1…10 when ramping arrived. Widening is backwards
+    /// compatible in a way narrowing is not: every rate an older project can
+    /// hold is still inside this range, so nothing is silently re-clamped on
+    /// open.
+    static let minimum = 0.0625
+    static let maximum = 16.0
     static let normal = 1.0
 
     /// Slider position for a speed, and back. log10 rather than a linear ramp:
@@ -73,7 +79,17 @@ enum ClipSpeed {
     }
 
     /// Presets offered in the UI. 1× is included so returning to normal is one tap.
-    static let presets: [Double] = [0.1, 0.25, 0.5, 1, 2, 5, 10]
+    static let presets: [Double] = [0.1, 0.25, 0.5, 1, 2, 4, 8, 16]
+
+    /// The same rate as a percentage, which is how a ramp is read: 100% is
+    /// normal, below is slow motion, above is fast.
+    static func percentLabel(_ speed: Double) -> String {
+        let percent = clamped(speed) * 100
+        if percent < 10 {
+            return String(format: String(localized: "%.1f%%"), locale: .current, percent)
+        }
+        return String(format: String(localized: "%.0f%%"), locale: .current, percent.rounded())
+    }
 
     static func label(_ speed: Double) -> String {
         let rounded = (speed * 100).rounded() / 100

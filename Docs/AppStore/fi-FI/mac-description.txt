@@ -1,0 +1,72 @@
+Muuta arjen kuvat ja videot elokuvallisiksi tarinoiksi. GradeLab on Macin värimäärittelyeditori, jossa LUT-suotimet, vintage-tyylit, ammattitason värityökalut ja videoeditointi ovat samassa sovelluksessa.
+
+Valitse tyyli, säädä sen voimakkuutta ja tee siitä omasi. Lämpimistä muotokuvista tunnelmallisiin matkavideoihin ja pehmeistä filmisävyistä retroilmeeseen: hallitse jokaisen editin valoa, väriä ja tunnelmaa koko kuvassa tai vain valitulla alueella.
+
+MACILLE SUUNNITELTU
+
+- Tuo media Finderista ja järjestä leikkeet, kuvat ja äänet aikajanalle.
+- Käytä pikanäppäimiä toistoon, leikkaamiseen, työkaluihin ja vientiin.
+- Siirrä, skaalaa ja kierrä kuvia sekä tasoja suoraan esikatselussa.
+
+ELOKUVALLISET LUTIT JA VINTAGE-SUOTIMET
+
+- Selaa elokuvallisia LUTeja ja esikatsele niitä omissa kuvissasi ja videoissasi.
+- Kokeile Warm Cinema-, Teal Orange- ja Soft Film -tyylejä sekä muita filmihenkisiä LUTeja.
+- Säädä tyylin voimakkuus hienovaraisesta näyttävään.
+- Tuo omat .cube-LUT-tiedostosi ja käytä niitä sisäänrakennettujen tyylien tapaan.
+- Tallenna värimäärittely esiasetukseksi ja käytä sitä muissa kuvissa ja videoissa.
+
+AMMATTITASON VÄRIMÄÄRITTELY
+
+- Valotus, kontrasti, huippuvalot, varjot, valkoiset ja mustat.
+- Värilämpötila, sävy, kylläisyys ja eloisuus.
+- Kahdeksan värialueen HSL yksittäisten värien muokkaamiseen.
+- Varjojen, keskisävyjen ja huippuvalojen väripyörät.
+- Color Warper: muokkaa värejä sävy/kylläisyys- ja kroma/luma-tiloissa.
+- Yleis-, punainen, vihreä ja sininen käyrä sekä sävyn, kylläisyyden ja luminanssin käyrät.
+- Häivytys, terävöitys ja vinjetointi.
+- Vertaa alkuperäistä ja muokattua kuvaa editoinnin aikana.
+
+MASKIT JA PAIKALLINEN VÄRIMÄÄRITTELY
+
+- Muokkaa vain osaa kuvasta koko ruudun sijaan.
+- Ellipsi-, suorakulmio-, liukuväri- ja vapaapiirtomaskit.
+- Pehmennä reunaa, säädä voimakkuutta tai käännä maski.
+- Käytä samassa leikkeessä useita maskeja, joilla on omat värisäätönsä.
+- Seuraa liikkuvaa kohdetta maskilla eteen- tai taaksepäin.
+- Käytä samoja maskeja myös valokuvissa.
+
+SIIRTYMÄT JA FILMITEHOSTEET
+
+- 45 siirtymää: häivytyksiä, pyyhkäisyjä, liukuja, zoomauksia, sumennushäivytys, whip pan, film burn, glitch, prisma, sivunkääntö ja paljon muuta.
+- Säädä jokaisen siirtymän kesto aikajanalla.
+- Filmirae, bloom, glow ja halation analogiseen ilmeeseen.
+
+AMMATTITASON MITTARIT
+
+- Histogrammi, aaltomuoto, RGB-paradi ja vektoriskooppi tarkkaan värimäärittelyyn.
+
+APPLE LOG, HDR JA PRORES
+
+- Muokkaa Apple Log- ja Apple Log 2 -materiaalia sekä HLG HDR -videota.
+- iPhone 17 Pron Apple Log 2 käyttää omaa laajan väriavaruuden muunnostaan.
+- Vie ProRes 422- ja ProRes 422 HQ -tiedostoja yhteensopivilla laitteilla.
+- Vie 4K-resoluutiolla tai lähteen tarkkuudella ja valitse kuvataajuus sekä bittinopeus.
+
+VIDEO, KUVAT, TEKSTI JA TASOT
+
+- Rajaa ja jaa leikkeitä, muuta toistonopeutta sekä lisää otsikoita ja ääntä.
+- Värimäärittele valokuvat samoilla työkaluilla kuin videot.
+- Vie valokuvat täyden tarkkuuden JPEG-, HEIC- tai häviöttömässä PNG-muodossa.
+- Lisää otsikoita mukana tulevilla fonteilla tai omilla TTF-fonteillasi.
+- Kerrosta tasoja sekoitustiloilla ja maskaa taso ellipsillä, suorakulmiolla tai jakoviivalla.
+- Animoi tekstiä, muunnoksia, maskeja ja värimäärittelyä avainkuvilla.
+- Vienneissä ei ole vesileimoja.
+
+Olipa projektisi matkavlogi, lyhytelokuva tai yksi muotokuva, GradeLab auttaa sinua luomaan oman tunnistettavan tyylisi.
+
+Ominaisuuksien ja tiedostomuotojen saatavuus riippuu lähdemateriaalista ja laitteesta. Osa ominaisuuksista vaatii tilauksen tai kertamaksun.
+
+Tietosuojakäytäntö: https://ak375456.github.io/gradelab/privacy.html
+Käyttöehdot (EULA): https://www.apple.com/legal/internet-services/itunes/dev/stdeula/
+Sovelluksen ehdot: https://ak375456.github.io/gradelab/terms.html

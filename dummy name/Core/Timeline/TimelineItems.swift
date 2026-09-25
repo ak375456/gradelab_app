@@ -166,16 +166,67 @@ struct VideoClip: TimelineClip {
     /// Source-local alpha cutout. Generated Vision masks are cached separately;
     /// only this small authored description belongs in project JSON.
     var backgroundRemoval: BackgroundRemovalSettings? = nil
+    /// The Shot Match that produced part of this clip's grade, if one did.
+    ///
+    /// Deliberately NOT inside `gradeSettings`, and for the opposite reason to
+    /// `maskedGrades`. A match's *result* is already in the grade — that is the
+    /// whole design, and it is what makes the values editable — so what is left
+    /// here is the provenance: which reference, which components, how strong,
+    /// and the grade that was underneath. None of that is colour, so none of it
+    /// belongs in a description of colour that Copy Grade and Save as Preset
+    /// carry to other clips: the values travel because they are in the grade,
+    /// and the record of where they came from stays with the clip that was
+    /// matched.
+    ///
+    /// Optional so every project written before Shot Match decodes as the
+    /// unchanged clip it was.
+    var shotMatch: ShotMatchSettings? = nil
     // Follows this video's source range and placement until explicitly separated.
     var embeddedAudio: EmbeddedAudio?
     /// Optional so projects saved before keyframes existed still decode unchanged.
     var animation: ClipAnimation? = nil
     /// Optional so projects saved before speed existed still decode unchanged.
     /// Read through `speed`, never directly.
+    ///
+    /// Still the store for a clip at ONE rate, which is the overwhelmingly
+    /// common case and the only thing older documents can hold. A clip that has
+    /// been ramped carries `timeRemap` instead and this is left alone.
     var playbackSpeed: Double? = nil
     /// Blend adjacent source frames instead of holding each one. Optional for
     /// the same backwards-compatible reason.
+    ///
+    /// Superseded by `TimeRemap.frameInterpolation`, and kept as the store for
+    /// clips that have never been ramped so no project has to be rewritten.
     var blendsRetimedFrames: Bool? = nil
+    /// Speed ramping: a curve, freezes, reverse, and how in-between frames are
+    /// made. Optional so every project written before ramping decodes as the
+    /// unchanged clip it was.
+    ///
+    /// When present it is authoritative and `playbackSpeed` is not read.
+    var timeRemap: TimeRemap? = nil
+
+    /// This clip's retiming, however it is stored.
+    ///
+    /// The one place the two representations are reconciled. Everything else
+    /// reads this rather than testing which field is set, so a clip that has
+    /// been ramped and a clip that has only ever had a speed behave identically
+    /// everywhere except where the difference is the point.
+    var resolvedRemap: TimeRemap {
+        if let timeRemap { return timeRemap }
+        var remap = TimeRemap()
+        remap.constantSpeed = ClipSpeed.clamped(playbackSpeed ?? ClipSpeed.normal)
+        remap.frameInterpolation = (blendsRetimedFrames ?? false) ? .blending : .sampling
+        return remap
+    }
+
+    /// The authoritative conversion between this clip's timeline and its source.
+    ///
+    /// Memoised, because the compositor asks one question of it per frame and a
+    /// ramped clip's table is expensive to build. A constant rate costs nothing
+    /// at all — it is two points and no integration.
+    var timeMap: TimeMap {
+        TimeMap.cached(remap: resolvedRemap, sourceDuration: sourceRange.duration)
+    }
 
     /// Whether this clip's retiming should cross-dissolve between source frames
     /// rather than stepping between them.
@@ -184,18 +235,52 @@ struct VideoClip: TimelineClip {
     /// output frame lands exactly on a source frame and there is nothing to
     /// blend, so the flag is ignored rather than costing a pointless pass.
     var smoothsMotion: Bool {
-        get { (blendsRetimedFrames ?? false) && isRetimed }
-        set { blendsRetimedFrames = newValue }
+        get { resolvedRemap.frameInterpolation != .sampling && isRetimed }
+        set {
+            if timeRemap != nil { timeRemap?.frameInterpolation = newValue ? .blending : .sampling }
+            else { blendsRetimedFrames = newValue }
+        }
+    }
+
+    /// How in-between frames are produced. Writing this promotes the clip to a
+    /// `TimeRemap`, because the old boolean cannot express optical flow.
+    var frameInterpolation: FrameInterpolation {
+        get { resolvedRemap.frameInterpolation }
+        set {
+            var remap = resolvedRemap
+            remap.frameInterpolation = newValue
+            timeRemap = remap
+            blendsRetimedFrames = nil
+        }
     }
 
     /// Playback rate. 1 is normal; above 1 plays faster and occupies less
-    /// timeline. `placement.duration` is always `sourceRange.duration / speed`.
+    /// timeline.
+    ///
+    /// For a ramped clip there is no single rate, so this reports the **average**
+    /// — the one number that still satisfies `placement.duration ==
+    /// sourceRange.duration / speed` — and the setter collapses the ramp's
+    /// constant rate rather than the curve. Anything that needs the real rate at
+    /// a moment asks `timeMap.speed(atTimelineOffset:)`.
     var speed: Double {
-        get { ClipSpeed.clamped(playbackSpeed ?? ClipSpeed.normal) }
-        set { playbackSpeed = ClipSpeed.clamped(newValue) }
+        get {
+            guard let timeRemap else { return ClipSpeed.clamped(playbackSpeed ?? ClipSpeed.normal) }
+            guard timeRemap.isRamped else { return ClipSpeed.clamped(timeRemap.constantSpeed) }
+            let map = timeMap
+            let timeline = map.timelineDuration.seconds
+            guard timeline > 0 else { return ClipSpeed.normal }
+            return ClipSpeed.clamped(map.sourceDuration.seconds / timeline)
+        }
+        set {
+            if timeRemap != nil { timeRemap?.constantSpeed = ClipSpeed.clamped(newValue) }
+            else { playbackSpeed = ClipSpeed.clamped(newValue) }
+        }
     }
 
-    var isRetimed: Bool { speed != ClipSpeed.normal }
+    var isRetimed: Bool { resolvedRemap.isRetimed }
+    /// The speed varies within the clip, as opposed to one rate over all of it.
+    var isRamped: Bool { resolvedRemap.isRamped }
+    var isReversed: Bool { resolvedRemap.reverses }
     var resolvedLayerMask: LayerMask { (layerMask ?? .disabled).clamped }
     var resolvedMaskedGrades: [MaskedGradeLayer] { maskedGrades ?? [] }
     var resolvedBackgroundRemoval: BackgroundRemovalSettings? {
@@ -222,21 +307,66 @@ struct VideoClip: TimelineClip {
         return maskedGrades.evaluated(atLocal: local)
     }
 
+    /// The source distance consumed by the first `duration` of this clip's
+    /// timeline, and the inverse.
+    ///
+    /// A clip at one rate deliberately keeps going through `ClipSpeed`, which
+    /// is exact arithmetic on the rate rather than a lookup in a sampled table.
+    /// Only a ramp — where there is no single rate to divide by — pays for the
+    /// table. That is what keeps every existing project's edit points landing
+    /// on exactly the ticks they did before ramping existed.
+    func sourceDuration(forTimelineDuration duration: TimelineTime) throws -> TimelineTime {
+        guard isRamped || isReversed else {
+            return try ClipSpeed.sourceDuration(timelineDuration: duration, speed: speed)
+        }
+        return timeMap.sourceDuration(forTimelineDuration: duration)
+    }
+
+    func timelineDuration(forSourceDuration duration: TimelineTime) throws -> TimelineTime {
+        guard isRamped || isReversed else {
+            return try ClipSpeed.timelineDuration(sourceDuration: duration, speed: speed)
+        }
+        return timeMap.timelineDuration(forSourceDuration: duration)
+    }
+
     /// Maps a timeline position to the source frame shown there.
     ///
-    /// Speed scales the elapsed distance into the source: at 2×, one second of
-    /// timeline consumes two seconds of source. Without this the preview would
-    /// show the wrong frame for every retimed clip while the composition played
-    /// the right one.
+    /// **This is the app's one answer to "which picture belongs here".** It goes
+    /// through `TimeMap`, so a constant rate, a ramp, a freeze and a reversed
+    /// clip are all the same question with the same machinery behind it — which
+    /// is what keeps the viewer, the grade, a tracked mask, a thumbnail and the
+    /// export agreeing about a frame.
     func sourceTime(at timelineTime: TimelineTime) throws -> TimelineTime {
         let relative = try timelineTime.subtracting(placement.timelineStart)
         let clamped = min(placement.duration, max(.zero, relative))
-        let scaled = try TimelineTime(CMTimeConvertScale(
-            CMTimeMultiplyByFloat64(clamped.cmTime, multiplier: speed),
-            timescale: sourceRange.duration.cmTime.timescale,
-            method: .roundHalfAwayFromZero
-        ))
-        return try sourceRange.start.adding(min(sourceRange.duration, scaled))
+        let offset = timeMap.sourceOffset(atTimelineOffset: clamped)
+        return try sourceRange.start.adding(min(sourceRange.duration, offset))
+    }
+
+    /// The inverse: where on the timeline a source position is shown.
+    ///
+    /// Needed by everything that starts from the picture rather than from the
+    /// clock — mask tracking and lasso tracking both analyse source frames and
+    /// have to say where each one lands.
+    func timelineTime(atSource sourceTime: TimelineTime) throws -> TimelineTime {
+        let relative = try sourceTime.subtracting(sourceRange.start)
+        let clamped = min(sourceRange.duration, max(.zero, relative))
+        let offset = timeMap.timelineOffset(atSourceOffset: clamped)
+        return try placement.timelineStart.adding(min(placement.duration, offset))
+    }
+
+    /// Clip-local timeline offset for a source position, measured from the
+    /// clip's first frame. What the tracking requests actually want.
+    func localTime(atSource sourceTime: TimelineTime) throws -> TimelineTime {
+        let relative = try sourceTime.subtracting(sourceRange.start)
+        let clamped = min(sourceRange.duration, max(.zero, relative))
+        return timeMap.timelineOffset(atSourceOffset: clamped)
+    }
+
+    /// The playback rate actually in force at a timeline position, for readouts.
+    func speed(at timelineTime: TimelineTime) -> Double {
+        guard let relative = try? timelineTime.subtracting(placement.timelineStart) else { return speed }
+        return timeMap.speed(atTimelineOffset: min(placement.duration, max(.zero, relative)))
     }
 }
 

@@ -1,0 +1,1 @@
+färggradering,videoredigering,fotoredigering,LUT,filmlook,color warper,HDR,ProRes,masker,filter

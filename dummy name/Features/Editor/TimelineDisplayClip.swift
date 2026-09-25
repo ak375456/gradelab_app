@@ -16,6 +16,13 @@ struct TimelineDisplayClip: Identifiable {
     let isMuted: Bool
     let embeddedAudio: EmbeddedAudio?
     let speed: Double
+    /// The clip's own conversion between timeline and source, so the filmstrip
+    /// and the waveform show the frame that is actually there rather than one
+    /// worked out by dividing by an average rate.
+    let timeMap: TimeMap?
+    /// The speed varies within the clip, which the clip's chip says.
+    let isRamped: Bool
+    let isReversed: Bool
     /// Fade lengths as they will actually be heard, so the timeline draws the
     /// same thing the mix applies.
     let fade: (rise: Double, fall: Double)
@@ -27,13 +34,16 @@ struct TimelineDisplayClip: Identifiable {
             assetID = c.assetID; sourceRange = c.sourceRange; isAudio = false; isText = false; isShape = false
             isMuted = c.embeddedAudio?.isMuted ?? false; embeddedAudio = c.embeddedAudio
             speed = c.speed
+            timeMap = c.isRamped || c.isReversed ? c.timeMap : nil
+            isRamped = c.isRamped
+            isReversed = c.isReversed
             fade = c.embeddedAudio.map {
                 AudioFade.resolved(duration: c.placement.duration.seconds, fadeIn: $0.fadeIn, fadeOut: $0.fadeOut)
             } ?? (0, 0)
         case .audio(let c):
             assetID = c.assetID; sourceRange = c.sourceRange; isAudio = true; isText = false; isShape = false
             isMuted = c.isMuted; embeddedAudio = nil
-            speed = 1
+            speed = 1; timeMap = nil; isRamped = false; isReversed = false
             fade = AudioFade.resolved(duration: c.placement.duration.seconds,
                                       fadeIn: c.fadeIn, fadeOut: c.fadeOut)
         case .text(let c):
@@ -41,11 +51,13 @@ struct TimelineDisplayClip: Identifiable {
             isAudio = false; isText = true; isShape = false
             title = c.text.isEmpty ? "Text" : c.text.replacingOccurrences(of: "\n", with: " ")
             isMuted = false; embeddedAudio = nil; speed = 1; fade = (0, 0)
+            timeMap = nil; isRamped = false; isReversed = false
         case .shape(let c):
             assetID = c.id; sourceRange = .init(start: .zero, duration: c.placement.duration)
             isAudio = false; isText = false; isShape = true
             title = c.kind.title
             isMuted = false; embeddedAudio = nil; speed = 1; fade = (0, 0)
+            timeMap = nil; isRamped = false; isReversed = false
         }
     }
 }

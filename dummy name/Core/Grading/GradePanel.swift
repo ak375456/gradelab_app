@@ -1,6 +1,6 @@
 import Foundation
 
-/// The eight tools of the Color tab.
+/// The tools of the Color tab.
 ///
 /// Lifted out of `EditorViewModel` so the still-image editor names the same
 /// panels rather than declaring a parallel list that could drift from it.
@@ -16,7 +16,9 @@ enum GradePanel: String, CaseIterable, Identifiable, Sendable {
     case curves = "Curves"
     case hsl = "HSL"
     case warper = "Warper"
+    case noise = "Noise"
     case wheels = "Wheels"
+    case match = "Match"
     case masks = "Masks"
     case mask = "Local"
     case vignette = "Vignette"
@@ -44,7 +46,9 @@ enum GradePanel: String, CaseIterable, Identifiable, Sendable {
         case .curves: "point.topleft.down.to.point.bottomright.curvepath"
         case .hsl: "slider.horizontal.3"
         case .warper: "circle.hexagongrid"
+        case .noise: "camera.aperture"
         case .wheels: "circle.lefthalf.filled"
+        case .match: "rectangle.on.rectangle.angled"
         case .masks: "circle.dashed.inset.filled"
         case .mask: "circle.dashed"
         case .vignette: "camera.metering.center.weighted"
@@ -78,7 +82,31 @@ enum GradePanel: String, CaseIterable, Identifiable, Sendable {
 
             Preserve Luminance keeps brightness where it was while the color moves. Leave it on unless you mean to change it.
             """)
+        case .noise: String(localized: """
+            Two noise reducers, and they do different jobs.
+
+            Temporal looks at the frames either side of this one. Where the same scene point is visible in several of them, the noise is different each time and the picture is not \u{2014} so averaging them removes the noise and leaves the detail. It is by far the better of the two, and it is why this starts with motion: every neighbouring frame is aligned to this one first, and any part of it that does not line up is thrown away rather than smeared across the shot.
+
+            Spatial works inside the single frame, along edges rather than across them. Use it to finish what the temporal pass could not \u{2014} the first frame of a shot, a fast movement, anything that only appears once.
+
+            Luma and Chroma are separate everywhere. Colour noise takes far more cleaning than luminance noise before anything shows, so it is usually right to push Chroma well past Luma.
+
+            Detail Recovery is not sharpening. It measures what the reduction removed and puts back only the part too large to have been noise.
+
+            Hold the picture to compare, and zoom in while you tune \u{2014} noise reduction is judged at 100%, not fitted to the screen.
+            """)
         case .wheels: String(localized: "Tint shadows, midtones, or highlights separately. Drag toward a color; farther from the center means stronger color. Try cool shadows with warm highlights.")
+        case .match: String(localized: """
+            Bring this shot closer to another one.
+
+            Pick a reference \u{2014} another clip on the timeline, or an image you import \u{2014} and GradeLab measures both pictures and works out the grade that moves this one toward it. Exposure, white balance, contrast, saturation and the tint of the shadows, midtones and highlights.
+
+            What it writes are ordinary values in the tools beside this one. Open Light after a match and Exposure will have moved; open Wheels and the shadows will have a tint. Every one of them is still yours to drag, and Reset puts back exactly the grade you had before.
+
+            Shot matches two shots meant to cut together. Look carries the style of a film still across without relighting your scene. Strength moves the whole result between nothing and everything, and the component switches decide what it is allowed to touch at all.
+
+            It is a starting point, not an answer. A reference from a different world will say so.
+            """)
         case .masks: String(localized: """
             Power windows. Add an ellipse, rectangle, gradient or freehand shape, place it on the picture, then grade only that area.
 

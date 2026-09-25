@@ -1,6 +1,6 @@
-Supporto per Apple Log 2 e un browser dei look molto più veloce.
+Arriva Color Warper, con un editing più fluido.
 
-• Apple Log 2: fai il grading delle riprese di iPhone 17 Pro. Apple Log 2 viene decodificato con la propria trasformazione Apple Wide Gamut invece di essere trattato come Apple Log, così il colore è corretto dal primo fotogramma, durante il grading e fino all'esportazione.
-• I look si caricano molto più in fretta: il browser si riempiva lentamente con grandi collezioni di LUT e applicare una LUT ad alta risoluzione poteva richiedere secondi. Ora le anteprime compaiono quasi subito e un look si applica appena lo tocchi.
-• Corretto: il timecode sopra la timeline poteva andare a capo su due righe sugli iPhone più piccoli, spezzando un valore.
-• Corretto: importando una foto compariva «Analisi del video».
+• Color Warper: modella i colori con precisione nelle modalità Tonalità/Sat e Croma/Luma.
+• Timeline: seleziona due o più righe trascinabili e spostale insieme.
+• Anteprime ottimizzate per un editing più fluido.
+• Migliorie all’interfaccia, correzioni e ottimizzazioni generali.

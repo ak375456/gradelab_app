@@ -163,10 +163,26 @@ extension GradingModel {
         canPasteGrade && settings.hasCreativeChangeIgnoringMask
     }
 
-    /// Masked local grades are a timeline-clip feature: a still has one picture
-    /// and no clip to hang windows on. The still editor therefore never shows
-    /// the Masks tool rather than showing an empty one.
-    var availablePanels: [GradePanel] { GradePanel.allCases.filter { $0 != .masks } }
+    /// Masked local grades and Shot Match are both timeline-clip features: a
+    /// still has one picture, no clip to hang windows on, and no other shot to
+    /// match to. The still editor therefore never shows either tool rather than
+    /// showing an empty one.
+    ///
+    /// Matching a photograph to a reference image is a perfectly sensible thing
+    /// to want and the engine would serve it unchanged — it takes pixels and
+    /// returns values. What is missing is the document side: a still project has
+    /// nowhere to record which reference was used or what grade was underneath,
+    /// which is what makes a match non-destructive. Offering the tool without
+    /// that would offer a match that could not be undone.
+    ///
+    /// Noise reduction is absent for a plainer reason than either of those: its
+    /// better half looks at the frames either side of this one, and a
+    /// photograph has none. Offering the panel with the temporal section dead
+    /// would be offering the spatial half of a tool under the name of the whole
+    /// one.
+    var availablePanels: [GradePanel] {
+        GradePanel.allCases.filter { $0 != .masks && $0 != .match && $0 != .noise }
+    }
     var editingMaskName: String? { nil }
 
     /// Bindings for the mutable UI state the shared panels drive.

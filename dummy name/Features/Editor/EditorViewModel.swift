@@ -40,6 +40,19 @@ final class EditorViewModel: ObservableObject, GradingModel {
     private var pendingBackgroundPreviewTime: TimelineTime?
     private var backgroundPreviewAnalysisID: UUID?
     private var layerState: LayerRenderState?
+    /// The composition currently on the player, so noise reduction can read
+    /// neighbouring frames from exactly the asset the playhead is timed
+    /// against. Nil until the first sequence is built.
+    private var sequenceSource: ExportSourceInfo?
+    private var temporalFrameCache: TemporalFrameCache?
+    private var temporalFrameCacheToken: ObjectIdentifier?
+    /// The widest temporal window this device can hold for this project.
+    @Published private(set) var noiseCapability: NoiseReductionCapability?
+    /// The last measurement Auto made, for the panel to report.
+    @Published private(set) var noiseProfile: NoiseProfile?
+    @Published private(set) var isMeasuringNoise = false
+    /// What the renderer actually managed on the last frame it drew.
+    @Published private(set) var noiseStatus = NoiseReductionStatus.inactive
     private var audioRouting = TimelineAudioMix()
     private var forceLayerPreview = false
     private var historyLabel = "Color"
@@ -151,6 +164,47 @@ final class EditorViewModel: ObservableObject, GradingModel {
         didSet { synchronizeRenderer() }
     }
     @Published var showsExport = false
+
+    // MARK: - Shot Match
+    //
+    // The RESULT of a match lives on the clip, in its ordinary grade — see
+    // `ShotMatchEditing.swift` for why. What is here is only the panel: which
+    // reference is chosen, which components are allowed, what stage the
+    // analysis has reached. None of it is persisted, because all of it is
+    // recoverable from the clip's own `shotMatch` record.
+    @Published var shotMatchState = ShotMatchUIState()
+    var shotMatchTask: Task<Void, Never>?
+    /// Built on first use and released when the panel closes. A project that
+    /// never opens Match pays nothing for it, and one that does keeps its
+    /// pipelines and its cached reference measurement for as long as it is
+    /// working — which is what makes matching a run of clips against one
+    /// reference analyse that reference once.
+    private var shotMatchEngineStorage: ShotMatchEngine?
+
+    func shotMatchEngine() -> ShotMatchEngine? {
+        if let shotMatchEngineStorage { return shotMatchEngineStorage }
+        // Apple Log has no alternative display transform, so the rendering LUT
+        // is prepared here rather than being looked up per frame. A project that
+        // is not Apple Log passes nil and never reaches the code that needs it.
+        let renderingLUT = project.colorMode.isAppleLog
+            ? renderer.metalContext.luts.prepareRenderingLUT(
+                named: AppleLogRendering.rec709LUTResourceName)
+            : nil
+        shotMatchEngineStorage = ShotMatchEngine(
+            context: renderer.metalContext, appleLogRenderingLUT: renderingLUT)
+        return shotMatchEngineStorage
+    }
+
+    /// Drops the engine and everything it has measured. Called when the Match
+    /// panel closes and when the editor goes away.
+    func releaseShotMatchEngine() {
+        shotMatchTask?.cancel()
+        shotMatchTask = nil
+        let engine = shotMatchEngineStorage
+        shotMatchEngineStorage = nil
+        shotMatchState.progress = nil
+        Task { await engine?.invalidate() }
+    }
 
     private var playbackObservation: AnyCancellable?
 
@@ -271,6 +325,17 @@ final class EditorViewModel: ObservableObject, GradingModel {
         renderer.setViewerAssist(viewerAssist)
         renderer.onDisplayStateChanged = { [weak self] in
             Task { @MainActor in self?.displayStateID &+= 1 }
+        }
+        renderer.onNoiseStatusChanged = { [weak self] in
+            Task { @MainActor in
+                guard let self else { return }
+                var status = self.renderer.noiseReductionStatus
+                // The renderer reports what it did; whether it was asked at all
+                // is decided here, because only this side knows the project
+                // went to the layer compositor instead.
+                status.unavailableInComposite = self.noiseStatus.unavailableInComposite
+                self.noiseStatus = status
+            }
         }
         renderer.preloadLooks()
         rebuildSequence()
@@ -1816,6 +1881,45 @@ final class EditorViewModel: ObservableObject, GradingModel {
         historyLabel = "Color"
     }
 
+    /// A document write from a control that is being dragged.
+    ///
+    /// The path `globalSettings` already takes for every colour slider — write
+    /// the project, refresh the preview, and let the pending history flush turn
+    /// the whole gesture into one undo entry — made available to a continuous
+    /// control that lives in another file. `project` and `gradeBaseline` are
+    /// `private(set)` on purpose, so this is the door rather than a widening of
+    /// their access.
+    ///
+    /// - Returns: whether anything actually changed.
+    @discardableResult
+    func applyCoalescedGradeEdit(label: String, _ edit: (inout VideoProject) -> Bool) -> Bool {
+        let before = project
+        var updated = project
+        guard edit(&updated) else { return false }
+        if gradeBaseline == nil { gradeBaseline = before }
+        updated.updatedAt = .now
+        project = updated
+        synchronizeRenderer()
+        scheduleGradeHistoryFlush(label: label)
+        return true
+    }
+
+    /// Closes the open coalesced edit a moment after the last write, under a
+    /// name of the caller's choosing.
+    ///
+    /// The same mechanism the colour sliders use, lifted out so a continuous
+    /// control outside this file — Match Strength — can produce one undo entry
+    /// per gesture rather than one per frame of the drag, and can have that
+    /// entry say what it was.
+    func scheduleGradeHistoryFlush(label: String) {
+        historyLabel = label
+        gradeTask?.cancel()
+        gradeTask = Task { [weak self] in
+            do { try await Task.sleep(for: .milliseconds(650)) } catch { return }
+            self?.flushGradeHistory()
+        }
+    }
+
     /// Renaming a layer changes nothing the compositor reads, so it must not tear down and
     /// rebuild the player the way a structural edit does.
     func renameTrack(_ id: UUID, to proposed: String) {
@@ -1999,6 +2103,42 @@ final class EditorViewModel: ObservableObject, GradingModel {
         }
     }
 
+    /// The door every ramp edit comes through.
+    ///
+    /// Exactly what `setSpeed` does, made available to the ramp editing that
+    /// lives in `SpeedRampEditing.swift`: write the project now so the timeline
+    /// and the curve move under the finger, and defer the two expensive parts —
+    /// the undo entry and the composition rebuild — until the gesture settles.
+    /// `project`, `gradeBaseline` and the debounce task are all private on
+    /// purpose, so this is the door rather than a widening of their access.
+    ///
+    /// - Parameter live: true while a drag is in flight. One drag becomes one
+    ///   undo entry, not one per frame of it.
+    @discardableResult
+    func applyRetimingEdit(label: String, live: Bool,
+                           _ edit: (inout VideoProject) throws -> Void) -> Bool {
+        guard let _ = selectedClipID, canChangeSpeed else { return false }
+        do {
+            var candidate = project
+            try edit(&candidate)
+            try TimelineTransitionEditing.reconcile(in: &candidate)
+            guard candidate.timeline != project.timeline else { return false }
+            if gradeBaseline == nil { gradeBaseline = project; historyLabel = label }
+            project = candidate
+            project.updatedAt = .now
+            speedTask?.cancel()
+            guard live else { settleSpeedEdit(); return true }
+            speedTask = Task { [weak self] in
+                do { try await Task.sleep(for: .milliseconds(320)) } catch { return }
+                self?.settleSpeedEdit()
+            }
+            return true
+        } catch {
+            editError = error.localizedDescription
+            return false
+        }
+    }
+
     /// Applies any speed change still waiting on the debounce.
     ///
     /// The model updates on every slider tick but the composition rebuild is
@@ -2171,6 +2311,7 @@ final class EditorViewModel: ObservableObject, GradingModel {
                 let sequence = try await forceLayers ? SequenceComposition.buildLayers(project: snapshot, forExport: false) : SequenceComposition.build(project: snapshot, forExport: false)
                 guard !Task.isCancelled, let self else { return }
                 self.layerState = sequence.layerState
+                self.sequenceSource = sequence.source
                 self.audioRouting = sequence.audioRouting
                 self.layerState?.update(self.project, bypass: self.showsOriginal,
                                         inspectingMatteOn: self.inspectedMatteTargetID,
@@ -2202,6 +2343,9 @@ final class EditorViewModel: ObservableObject, GradingModel {
                     self.rebuildSequence(at: time)
                 } else {
                     self.playback.clearSequence()
+                    self.sequenceSource = nil
+                    self.temporalFrameCache = nil
+                    self.renderer.setTemporalFrames(nil, capability: self.noiseCapability)
                     self.isPreparingTimeline = false
                 }
                 self.editError = error.localizedDescription
@@ -2794,12 +2938,22 @@ final class EditorViewModel: ObservableObject, GradingModel {
             advanced.vignette = 0; advanced.vignetteMidpoint = 50; advanced.vignetteFeather = 70
         case .effects:
             advanced.effects = nil
+        case .noise:
+            advanced.noiseReduction = nil
         case .lut:
             advanced.lut = nil; advanced.lutIntensity = nil
         case .masks:
             // Returns the selected mask's own grade to neutral and keeps its
             // geometry. Deleting the window is a separate, explicit action.
             if let id = selectedMaskID { resetMaskGrade(id) }
+            return
+        case .match:
+            // Removes the match and restores the grade that was underneath it,
+            // which is the same thing the panel's own button does. It does NOT
+            // clear the chosen reference: the reset is of a result, and having
+            // to find the reference again to try different components would be
+            // the tool forgetting what it was pointed at.
+            resetShotMatch()
             return
         }
         settings.advanced = advanced == .neutral ? nil : advanced
@@ -2835,9 +2989,12 @@ final class EditorViewModel: ObservableObject, GradingModel {
         guard selectedMaskID != id else { return }
         flushGradeHistory()
         selectedMaskID = id
-        // Vignette, Effects, the Look and the legacy Local window have no local
-        // equivalent, so they are not offered while a mask is selected. Leaving
-        // the tab on one of them would show controls that silently did nothing.
+        // Vignette, Effects, the Look, Noise and the legacy Local window have no
+        // local equivalent, so they are not offered while a mask is selected.
+        // Leaving the tab on one of them would show controls that silently did
+        // nothing. Noise reduction is the clearest case: it restores the source
+        // signal before any grade runs, so confining it to a window would mean
+        // denoising part of a frame and leaving the rest, with a seam between.
         if !availablePanels.contains(selectedPanel) { selectedPanel = .light }
         // A matte belongs to the mask being worked on.
         if id == nil { maskMatteID = nil } else if maskMatteID != nil { maskMatteID = id }
@@ -3129,5 +3286,144 @@ final class EditorViewModel: ObservableObject, GradingModel {
             bypass: showsOriginal || !colorSupport.allowsGrading
         )
         renderer.setMaskMatte(maskMatte)
+        synchronizeNoiseReduction()
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Noise Reduction
+//
+// The engine itself lives in Core and is shared with the exporter. What belongs
+// here is only the editor's half of it: deciding when the neighbouring frames
+// need decoding at all, telling the panel what the renderer actually managed,
+// and running the one-off measurement behind Auto.
+// ---------------------------------------------------------------------------
+
+extension EditorViewModel {
+
+    /// Starts or stops the supply of neighbouring frames, and keeps the
+    /// device's ceiling up to date.
+    ///
+    /// Called from `synchronizeRenderer`, so it follows every grade change, and
+    /// it is cheap when nothing has changed: a project with no noise reduction
+    /// reaches the first guard and returns.
+    func synchronizeNoiseReduction() {
+        let settings = project.timeline.tracks
+            .flatMap(\.items)
+            .compactMap { item -> NoiseReduction? in
+                guard case .video(let clip) = item else { return nil }
+                return clip.gradeSettings.advanced?.resolvedNoiseReduction
+            }
+        let wantsTemporal = settings.contains { $0.temporalIsActive }
+        // The layer compositor grades inside the composition, one transformed
+        // and blended layer at a time, and the engine is not wired into it. A
+        // project that needs the compositor therefore renders and exports
+        // without noise reduction — consistently, in both — and the panel says
+        // so rather than leaving someone to wonder why the sliders do nothing.
+        let direct = layerState == nil
+        if !settings.isEmpty {
+            noiseStatus.unavailableInComposite = !direct
+        } else if noiseStatus.unavailableInComposite {
+            noiseStatus.unavailableInComposite = false
+        }
+        guard wantsTemporal, direct, let source = sequenceSource else {
+            if temporalFrameCache != nil {
+                temporalFrameCache = nil
+                renderer.setTemporalFrames(nil, capability: noiseCapability)
+            }
+            return
+        }
+        let capability = NoiseReductionCapability.resolve(
+            width: source.encodedWidth, height: source.encodedHeight)
+        if noiseCapability != capability { noiseCapability = capability }
+        guard capability.supportsTemporal else {
+            temporalFrameCache = nil
+            renderer.setTemporalFrames(nil, capability: capability)
+            return
+        }
+        // One cache per composition. Rebuilt when the composition is, which is
+        // what keeps its timestamps and the playhead's describing the same
+        // thing.
+        if temporalFrameCache == nil || temporalFrameCacheToken != ObjectIdentifier(source.asset) {
+            temporalFrameCacheToken = ObjectIdentifier(source.asset)
+            let cache = TemporalFrameCache(
+                asset: source.asset, track: source.videoTrack,
+                // The SOURCE's cadence when it is known, because the ring's
+                // spacing is the rate the frames were shot at and this
+                // arithmetic counts frames in it. The canvas rate is the
+                // fallback, and for a single-clip project the two are the same
+                // number anyway.
+                frameDuration: Self.temporalFrameDuration(for: source, project: project),
+                // The composition's own render size, which is what a paused
+                // preview draws. The renderer compares it with the frame in
+                // hand and stands the temporal stage down when they differ,
+                // rather than decoding frames of the wrong size.
+                frameSize: (source.encodedWidth, source.encodedHeight),
+                // The player's own output settings, so a neighbour is decoded
+                // into exactly the surface the frame on screen arrived in.
+                outputSettings: VideoPlaybackController.outputSettings(for: source.colorMode))
+            temporalFrameCache = cache
+            renderer.setTemporalFrames(cache, capability: capability)
+        } else {
+            renderer.setTemporalFrames(temporalFrameCache, capability: capability)
+        }
+    }
+
+    /// The frame spacing the neighbour ring should count in.
+    static func temporalFrameDuration(for source: ExportSourceInfo, project: VideoProject) -> CMTime {
+        if let rate = source.nominalFrameRate, rate > 1, rate < 1000 {
+            return CMTime(seconds: 1 / rate, preferredTimescale: 600)
+        }
+        return project.canvas.frameDuration?.cmTime ?? CMTime(value: 1, timescale: 30)
+    }
+
+    /// Measures the frame on screen and writes a suggested starting point.
+    ///
+    /// The measurement runs off the main actor and takes a moment on a 4K
+    /// frame. The result is written through the ordinary grade path, so it is a
+    /// single undo entry and every value it writes stays editable — which is
+    /// what makes this a suggestion rather than a mode.
+    func measureNoiseAndSuggest() {
+        guard canGrade, !isMeasuringNoise else { return }
+        guard let frame = playback.frameProvider.latestFrame else {
+            editError = String(localized: "There is no decoded frame to measure yet.")
+            return
+        }
+        // Refused rather than answered on a reduced frame. The preview renders
+        // smaller while the transport is running, and the first thing a
+        // downscale does is average noise away — so measuring then reports a
+        // clean picture of a noisy one and suggests a setting far too weak for
+        // the footage. A measurement that is quietly wrong is worse than one
+        // that asks for a pause.
+        if let source = sequenceSource,
+           CVPixelBufferGetWidth(frame) != source.encodedWidth
+            || CVPixelBufferGetHeight(frame) != source.encodedHeight {
+            editError = String(localized: "Pause the preview before measuring. While it plays the picture is rendered smaller, and a smaller picture carries less noise than the real one.")
+            return
+        }
+        let mode = project.colorMode
+        let capability = noiseCapability
+            ?? NoiseReductionCapability.resolve(
+                width: CVPixelBufferGetWidth(frame), height: CVPixelBufferGetHeight(frame))
+        isMeasuringNoise = true
+        let context = renderer.metalContext
+        Task { [weak self] in
+            let profile = await Task.detached(priority: .userInitiated) { () -> NoiseProfile? in
+                guard let stage = NoiseReductionStage(
+                    context: context, isLog2: mode == .appleLog2) else { return nil }
+                defer { stage.releaseResources() }
+                return stage.measure(pixelBuffer: frame, colorMode: mode)
+            }.value
+            guard let self else { return }
+            self.isMeasuringNoise = false
+            guard let profile else {
+                self.editError = String(localized: "The frame could not be measured on this device.")
+                return
+            }
+            self.noiseProfile = profile
+            self.noiseCapability = capability
+            self.editNoiseReduction { $0 = profile.suggestion(for: $0, capability: capability) }
+            self.flushGradeHistory()
+        }
     }
 }

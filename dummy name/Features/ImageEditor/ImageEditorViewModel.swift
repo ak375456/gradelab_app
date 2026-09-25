@@ -563,9 +563,13 @@ final class ImageEditorViewModel: ObservableObject, GradingModel {
             isPickingWarpColor = false
         case .wheels: advanced.wheels = AdvancedGrade.neutral.wheels
         case .mask: advanced.mask = nil
-        // Power windows are a timeline-clip feature, so the still editor never
-        // shows the Masks tool and can never be asked to reset it.
-        case .masks: return
+        // Power windows and Shot Match are both timeline-clip features, so the
+        // still editor never shows either tool and can never be asked to reset
+        // one. See `availablePanels`.
+        // Noise reduction is a video tool: temporal reduction has no other
+        // frames to look at in a photograph, and a still already has its own
+        // route from file to picture. See `availablePanels`.
+        case .masks, .match, .noise: return
         case .vignette:
             advanced.vignette = 0; advanced.vignetteMidpoint = 50; advanced.vignetteFeather = 70
         case .effects: advanced.effects = nil

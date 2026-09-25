@@ -512,6 +512,14 @@ extension MaskedGradeLayer {
         copy.animation = animation.retimed(by: factor)
         return copy
     }
+
+    /// The same, through an arbitrary remapping rather than a single factor.
+    func retimed(through remap: (TimelineTime) -> TimelineTime) -> MaskedGradeLayer {
+        guard let animation, !animation.isEmpty else { return self }
+        var copy = self
+        copy.animation = animation.retimed(through: remap)
+        return copy
+    }
 }
 
 // MARK: - Collection helpers

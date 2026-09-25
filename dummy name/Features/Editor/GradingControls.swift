@@ -114,8 +114,18 @@ struct GradingControls<Model: GradingModel>: View {
                         }
                     case .curves: CurvesPanel(model: model)
                     case .warper: ColorWarperPanel(model: model)
+                    case .noise: NoiseReductionPanel(model: model)
                     case .hsl: HSLPanel(model: model)
                     case .wheels: WheelsPanel(model: model)
+                    case .match:
+                        // A match needs a timeline to pick a reference clip from
+                        // and a clip to write its record onto, neither of which a
+                        // photograph has. `availablePanels` already keeps the tool
+                        // out of the still editor, so this is the belt to that
+                        // brace rather than a case anyone reaches.
+                        if let editor = model as? EditorViewModel {
+                            ShotMatchPanel(model: editor)
+                        }
                     case .mask: GradeMaskPanel(model: model)
                     case .masks:
                         if let editor = model as? EditorViewModel {

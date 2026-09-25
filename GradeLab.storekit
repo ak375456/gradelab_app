@@ -3,7 +3,7 @@
   "nonRenewingSubscriptions": [],
   "products": [
     {
-      "displayPrice": "4.99",
+      "displayPrice": "14.99",
       "familyShareable": false,
       "internalID": "6741001",
       "localizations": [
@@ -31,10 +31,15 @@
           "description": "Un solo acquisto. Tutte le funzioni Pro.",
           "displayName": "Pro a vita",
           "locale": "it_IT"
+        },
+        {
+          "description": "Kertaostos. Kaikki Pro-ominaisuudet.",
+          "displayName": "Elinikäinen Pro",
+          "locale": "fi_FI"
         }
       ],
       "productID": "com.aftab.gradelab.pro.lifetime",
-      "referenceName": "Lifetime Pro (Founding)",
+      "referenceName": "Lifetime Pro (Growth)",
       "type": "NonConsumable"
     }
   ],
@@ -50,7 +55,12 @@
   "subscriptionGroups": [
     {
       "id": "21489103",
-      "localizations": [],
+      "localizations": [
+        {
+          "displayName": "GradeLab Pro",
+          "locale": "fi_FI"
+        }
+      ],
       "name": "GradeLab Pro",
       "subscriptions": [
         {
@@ -86,6 +96,11 @@
               "description": "Tutte le funzioni Pro, ogni settimana.",
               "displayName": "Settimanale",
               "locale": "it_IT"
+            },
+            {
+              "description": "Pro-ominaisuudet, laskutus viikoittain.",
+              "displayName": "Viikoittain",
+              "locale": "fi_FI"
             }
           ],
           "productID": "com.aftab.gradelab.pro.weekly",
@@ -127,6 +142,11 @@
               "description": "Tutte le funzioni Pro, ogni mese.",
               "displayName": "Mensile",
               "locale": "it_IT"
+            },
+            {
+              "description": "Pro-ominaisuudet, laskutus kuukausittain.",
+              "displayName": "Kuukausittain",
+              "locale": "fi_FI"
             }
           ],
           "productID": "com.aftab.gradelab.pro.monthly",
@@ -168,6 +188,11 @@
               "description": "Tutte le funzioni Pro, ogni anno.",
               "displayName": "Annuale",
               "locale": "it_IT"
+            },
+            {
+              "description": "Pro-ominaisuudet, laskutus vuosittain.",
+              "displayName": "Vuosittain",
+              "locale": "fi_FI"
             }
           ],
           "productID": "com.aftab.gradelab.pro.yearly",

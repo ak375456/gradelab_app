@@ -38,11 +38,33 @@ struct TimelineSourceMapping {
     /// The asset's own decoded range, which thumbnails and envelopes index into.
     var assetStart: Double
     var assetDuration: Double
+    /// Set only for a ramped or reversed clip. A single rate is exact
+    /// arithmetic and needs no table; a curve cannot be divided by one number.
+    var map: TimeMap? = nil
+    /// Where the clip's visible left edge sits in its own timeline, which a
+    /// head trim moves. The map is indexed from the clip's start, so a drag of
+    /// the left handle has to be added back in.
+    var trimOffset: Double = 0
+    /// The clip's source range start, before the in-flight trim. `sourceStart`
+    /// already has the trim folded in, which is right for the linear case and
+    /// wrong for a map that is indexed from the clip's own origin.
+    var clipSourceStart: Double = 0
 
     /// Position within the decoded asset, 0...1, `offset` points right of the
     /// clip's left edge.
+    ///
+    /// A ramped clip goes through its time map, which is the same conversion the
+    /// compositor uses — so the thumbnail under a column is the frame that will
+    /// actually be shown there, and the waveform stretches and compresses with
+    /// the audio rather than staying put while the sound moves.
     func fraction(atOffset offset: Double, pixelsPerSecond: Double) -> Double {
-        let sourceTime = sourceStart + (offset / max(0.0001, pixelsPerSecond)) * speed
+        let elapsed = offset / max(0.0001, pixelsPerSecond)
+        let sourceTime: Double
+        if let map, let local = try? TimelineTime.seconds(max(0, elapsed + trimOffset)) {
+            sourceTime = clipSourceStart + map.sourceOffset(atTimelineOffset: local).seconds
+        } else {
+            sourceTime = sourceStart + elapsed * speed
+        }
         let fraction = (sourceTime - assetStart) / max(0.001, assetDuration)
         return min(1, max(0, fraction))
     }
@@ -415,6 +437,18 @@ struct TimelineClipRenderer {
                      maximumRight: picture.maxX - 5)
         }
 
+        // Speed chip, under the name. A retimed clip is the one thing about a
+        // clip that cannot be seen by looking at it — the filmstrip shows the
+        // same frames either way — so it is the one thing that has to be said.
+        // Drawn whatever the name and duration preferences are, for that
+        // reason: those two hide furniture, and this is information.
+        if let speedLabel = Self.speedLabel(for: presentation.clip),
+           picture.height >= 44, chipLeft < picture.maxX - 12 {
+            drawChip(text: speedLabel, icon: nil, attributes: Self.durationAttributes,
+                     origin: CGPoint(x: chipLeft, y: picture.minY + 28),
+                     maximumRight: picture.maxX - 5)
+        }
+
         // Duration chip, diagonally opposite so the two never collide.
         guard presentation.showsDuration else { return }
         let duration = TimecodeFormatter.string(from: presentation.duration)
@@ -426,6 +460,19 @@ struct TimelineClipRenderer {
                      origin: CGPoint(x: right - chipWidth, y: picture.maxY - size.height - 9),
                      maximumRight: right)
         }
+    }
+
+    /// What a clip's retiming should say on its chip, or nil when there is
+    /// nothing to say.
+    ///
+    /// A ramp has no single number, so it says so rather than printing an
+    /// average that is true of no moment in the clip.
+    static func speedLabel(for clip: TimelineDisplayClip) -> String? {
+        var parts: [String] = []
+        if clip.isReversed { parts.append(String(localized: "Reverse")) }
+        if clip.isRamped { parts.append(String(localized: "Ramp")) }
+        else if clip.speed != ClipSpeed.normal { parts.append(ClipSpeed.label(clip.speed)) }
+        return parts.isEmpty ? nil : parts.joined(separator: " · ")
     }
 
     /// A dark translucent pill behind short text, so a name stays readable

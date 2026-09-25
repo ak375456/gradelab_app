@@ -1,0 +1,1 @@
+Color Warper Macille: muokkaa värejä tarkasti sävy/kylläisyys- ja kroma/luma-tiloissa.

@@ -33,7 +33,8 @@ final class ClipSpeedTests: XCTestCase {
     func testSpeedIsClampedToAUsableRange() {
         XCTAssertEqual(ClipSpeed.clamped(100), ClipSpeed.maximum)
         XCTAssertEqual(ClipSpeed.clamped(0.001), ClipSpeed.minimum)
-        XCTAssertEqual(ClipSpeed.clamped(10), 10, "10x must be reachable")
+        XCTAssertEqual(ClipSpeed.clamped(16), 16, "1600% must be reachable")
+        XCTAssertEqual(ClipSpeed.clamped(10), 10, "10x must still be reachable")
         XCTAssertEqual(ClipSpeed.clamped(0), 1, "zero would mean infinite duration")
         XCTAssertEqual(ClipSpeed.clamped(-2), 1)
         XCTAssertEqual(ClipSpeed.clamped(.nan), 1)
@@ -190,11 +191,21 @@ final class ClipSpeedTests: XCTestCase {
 /// track and 0.5×/2× are equidistant from it; a linear slider would compress
 /// everything below 1× into the first fifth and make slow motion unusable.
 final class SpeedSliderMappingTests: XCTestCase {
-    func testTheRangeReachesTenTimes() {
-        XCTAssertEqual(ClipSpeed.maximum, 10)
-        XCTAssertEqual(ClipSpeed.minimum, 0.1)
-        XCTAssertEqual(ClipSpeed.clamped(25), 10, "above the range clamps to the maximum")
-        XCTAssertEqual(ClipSpeed.clamped(0.01), 0.1)
+    /// Widened from 0.1…10 when ramping arrived, so 1600% is reachable. Kept
+    /// symmetric in log10 rather than simply raising the ceiling: an asymmetric
+    /// range would move 1× off the centre of the slider.
+    func testTheRangeReachesSixteenTimes() {
+        XCTAssertEqual(ClipSpeed.maximum, 16)
+        XCTAssertEqual(ClipSpeed.minimum, 0.0625)
+        XCTAssertEqual(ClipSpeed.clamped(25), 16, "above the range clamps to the maximum")
+        XCTAssertEqual(ClipSpeed.clamped(0.01), 0.0625)
+    }
+
+    /// Widening must never re-clamp a rate an older project could already hold.
+    func testEveryRateAnOlderProjectCouldHoldIsStillExact() {
+        for speed in [0.1, 0.25, 0.5, 1, 2, 5, 10] {
+            XCTAssertEqual(ClipSpeed.clamped(speed), speed, accuracy: 1e-12, "\(speed)")
+        }
     }
 
     /// The reason for log10 rather than a linear ramp: 1× must sit in the middle
@@ -207,9 +218,9 @@ final class SpeedSliderMappingTests: XCTestCase {
         XCTAssertEqual(ClipSpeed.sliderPosition(for: 1), 0, accuracy: 1e-9)
     }
 
-    func testTenthAndTenTimesAreEquidistantFromNormal() {
-        XCTAssertEqual(abs(ClipSpeed.sliderPosition(for: 0.1)),
-                       abs(ClipSpeed.sliderPosition(for: 10)), accuracy: 1e-9)
+    func testTheEndsOfTheRangeAreEquidistantFromNormal() {
+        XCTAssertEqual(abs(ClipSpeed.sliderPosition(for: ClipSpeed.minimum)),
+                       abs(ClipSpeed.sliderPosition(for: ClipSpeed.maximum)), accuracy: 1e-9)
     }
 
     func testTheSliderEndsMatchTheSupportedRange() {
@@ -220,7 +231,7 @@ final class SpeedSliderMappingTests: XCTestCase {
     }
 
     func testTheMappingRoundTrips() {
-        for speed in [0.1, 0.25, 0.5, 1, 1.5, 2, 5, 7.5, 10] {
+        for speed in [0.0625, 0.1, 0.25, 0.5, 1, 1.5, 2, 5, 7.5, 10, 16] {
             XCTAssertEqual(ClipSpeed.speed(atSliderPosition: ClipSpeed.sliderPosition(for: speed)),
                            speed, accuracy: 1e-9, "\(speed)")
         }
@@ -246,6 +257,7 @@ final class SpeedSliderMappingTests: XCTestCase {
     }
 
     func testLabelsAtTheNewRange() {
+        XCTAssertEqual(ClipSpeed.label(16), "16×")
         XCTAssertEqual(ClipSpeed.label(10), "10×")
         XCTAssertEqual(ClipSpeed.label(0.1), "0.1×")
         XCTAssertEqual(ClipSpeed.label(1), "1×")

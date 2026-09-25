@@ -647,7 +647,10 @@ final class TimelineCanvas: UIView, UIScrollViewDelegate, UIGestureRecognizerDel
             sourceStart: clip.sourceRange.start.seconds + trimOffset * clip.speed,
             speed: clip.speed,
             assetStart: assetRange?.start.seconds ?? 0,
-            assetDuration: assetRange?.duration.seconds ?? max(0.001, clip.sourceRange.duration.seconds))
+            assetDuration: assetRange?.duration.seconds ?? max(0.001, clip.sourceRange.duration.seconds),
+            map: clip.timeMap,
+            trimOffset: trimOffset,
+            clipSourceStart: clip.sourceRange.start.seconds)
         presentation.thumbnails = clip.isAudio ? [] : (assetFrames[clip.assetID] ?? [])
         if clip.isAudio || clip.embeddedAudio != nil {
             presentation.waveform = waveformCache.waveform(for: clip.assetID, peaks: waveforms[clip.assetID] ?? [])

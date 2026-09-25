@@ -630,10 +630,10 @@ final class ProAccessPolicyTests: XCTestCase {
     /// the paywall quietly drops its percentage and strikethrough — correct,
     /// but silent — so the rung is pinned in a test instead.
     func testTheLadderRungMatchesThePrices() {
-        XCTAssertEqual(ProConfiguration.currentPhase, .earlyAdopter)
-        XCTAssertEqual(ProConfiguration.currentPhase.lifetimeUSD, 4.99)
+        XCTAssertEqual(ProConfiguration.currentPhase, .growth)
+        XCTAssertEqual(ProConfiguration.currentPhase.lifetimeUSD, 14.99)
         XCTAssertEqual(ProConfiguration.standardLifetimeUSD, 34.99)
-        XCTAssertEqual(ProConfiguration.lifetimeDiscountPercent, 86)
+        XCTAssertEqual(ProConfiguration.lifetimeDiscountPercent, 57)
     }
 
     /// The ladder only ever goes up, and it ends where the standard price is.
@@ -741,14 +741,14 @@ final class ProAccessPolicyTests: XCTestCase {
     /// Connect applies a price in hours and review takes a day, and an older
     /// build stays installed indefinitely. Whenever the two disagree the claim
     /// has to disappear rather than be printed against the wrong number — which
-    /// is what kept "94% OFF" off the paywall when Lifetime went to $4.99.
+    /// is what keeps an outdated percentage off the paywall after a price change.
     func testThePercentageIsUSDAndCurrentRungOnly() {
-        XCTAssertTrue(ProConfiguration.canStateDiscount(price: 4.99, currency: "USD"))
-        XCTAssertFalse(ProConfiguration.canStateDiscount(price: 4.99, currency: "EUR"),
+        XCTAssertTrue(ProConfiguration.canStateDiscount(price: 14.99, currency: "USD"))
+        XCTAssertFalse(ProConfiguration.canStateDiscount(price: 14.99, currency: "EUR"),
                        "the standard price is only known in dollars")
-        XCTAssertFalse(ProConfiguration.canStateDiscount(price: 1.99, currency: "USD"),
+        XCTAssertFalse(ProConfiguration.canStateDiscount(price: 4.99, currency: "USD"),
                        "a price from the previous rung must not carry this rung's percentage")
-        XCTAssertFalse(ProConfiguration.canStateDiscount(price: 9.99, currency: "USD"),
+        XCTAssertFalse(ProConfiguration.canStateDiscount(price: 34.99, currency: "USD"),
                        "the claim must stop the moment App Store Connect raises the price")
     }
 

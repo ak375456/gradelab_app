@@ -20,11 +20,15 @@ struct BackgroundLassoTrackRequest: Sendable {
         return (try? localTime(source: sourceAnchor)) ?? visibleStart
     }
 
+    /// Where a source frame lands in the clip's own animation coordinates.
+    ///
+    /// Through the clip's time map, not through a division by one rate: a
+    /// tracked mask is keyed to the PICTURE, so on a ramped clip the frame that
+    /// was analysed has to come back at the moment it is actually shown. A flat
+    /// `1 / speed` was right only while every clip had a single rate.
     func localTime(source: CMTime) throws -> TimelineTime {
-        let elapsed = CMTimeMultiplyByFloat64(
-            CMTimeSubtract(source, clip.sourceRange.start.cmTime), multiplier: 1 / clip.speed)
-        return try TimelineTime(CMTimeAdd(visibleStart.cmTime, CMTimeConvertScale(
-            elapsed, timescale: TimelineTime.projectTimescale, method: .roundHalfAwayFromZero)))
+        let offset = try clip.localTime(atSource: TimelineTime(source))
+        return try visibleStart.adding(offset)
     }
 
     func localTime(source: TimelineTime) throws -> TimelineTime {

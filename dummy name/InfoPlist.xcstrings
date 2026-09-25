@@ -23,6 +23,12 @@
             "value" : "GradeLab"
           }
         },
+        "fi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "GradeLab"
+          }
+        },
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
@@ -30,6 +36,12 @@
           }
         },
         "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "GradeLab"
+          }
+        },
+        "sv" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "GradeLab"
@@ -71,6 +83,12 @@
             "value" : "GradeLab necesita permiso para guardar tu vídeo o tu foto etalonada en Fotos."
           }
         },
+        "fi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "GradeLab tarvitsee luvan tallentaa värimääritelty video tai kuva Kuvat-appiin."
+          }
+        },
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
@@ -81,6 +99,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "GradeLab ha bisogno dell'autorizzazione per salvare in Foto il tuo video o la tua foto con il grading applicato."
+          }
+        },
+        "sv" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "GradeLab behöver tillstånd för att spara din gradade video eller bild till Bilder."
           }
         }
       }

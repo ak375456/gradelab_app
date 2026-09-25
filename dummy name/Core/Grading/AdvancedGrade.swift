@@ -104,6 +104,19 @@ struct AdvancedGrade: Codable, Equatable, Sendable {
     /// the first release is: a project that has never opened the panel writes
     /// nothing, and one saved before the warper existed decodes with none.
     var colorWarp: ColorWarp?
+    /// Noise reduction. Optional for the same reason, and with one consequence
+    /// worth naming: every existing project decodes with noise reduction off,
+    /// which is what makes this change nothing about any picture anyone has
+    /// already graded.
+    ///
+    /// It lives on the grade rather than on the clip, unlike background removal
+    /// and Shot Match, because the question those two answer is "what is this
+    /// particular piece of footage" — a drawn cutout, a named reference — while
+    /// this one is a set of values that can sensibly be copied to another shot
+    /// from the same camera at the same ISO. That also means it inherits
+    /// persistence, undo coalescing, copy/paste, presets and the keyframe
+    /// engine without a line of code in any of them.
+    var noiseReduction: NoiseReduction?
 
     static let neutral = AdvancedGrade()
 
@@ -135,6 +148,18 @@ struct AdvancedGrade: Codable, Equatable, Sendable {
     }
 
     var resolvedMask: GradeMask { (mask ?? .disabled).clamped }
+
+    /// The noise reduction the pipeline applies, or nil when there is nothing
+    /// to apply.
+    ///
+    /// Resolved to nil rather than to a neutral value for the same reason the
+    /// warp is: every consumer — the render paths, the neighbour decoding, the
+    /// Pro gate — tests one thing and skips the work entirely.
+    var resolvedNoiseReduction: NoiseReduction? {
+        guard let noiseReduction else { return nil }
+        let clamped = noiseReduction.clamped
+        return clamped.isActive ? clamped : nil
+    }
 
     /// The warp the pipeline applies, or nil when there is nothing to apply.
     ///

@@ -207,12 +207,43 @@ struct Timeline: Codable, Equatable, Sendable {
 
     @discardableResult
     mutating func setGrade(_ settings: GradeSettings, for clipID: UUID) -> Bool {
+        editVideoClip(clipID) { clip in
+            guard clip.gradeSettings != settings else { return false }
+            clip.gradeSettings = settings
+            return true
+        }
+    }
+
+    /// A grade and the Shot Match that produced part of it, written together.
+    ///
+    /// One mutation rather than two, because they are one fact. A grade applied
+    /// without its match record would leave the panel describing a match the
+    /// clip no longer has; a record written without its grade would describe one
+    /// the clip never got. Undo restores both or neither for the same reason.
+    @discardableResult
+    mutating func setShotMatch(
+        _ match: ShotMatchSettings?, grade: GradeSettings, for clipID: UUID
+    ) -> Bool {
+        editVideoClip(clipID) { clip in
+            guard clip.gradeSettings != grade || clip.shotMatch != match else { return false }
+            clip.gradeSettings = grade
+            clip.shotMatch = match
+            return true
+        }
+    }
+
+    /// Finds an unlocked video clip and lets `edit` change it, reporting whether
+    /// anything moved. Written once so a new per-clip mutation cannot forget the
+    /// locked-track and locked-clip checks the existing ones make.
+    @discardableResult
+    private mutating func editVideoClip(
+        _ clipID: UUID, _ edit: (inout VideoClip) -> Bool
+    ) -> Bool {
         for trackIndex in tracks.indices where !tracks[trackIndex].isLocked {
             for itemIndex in tracks[trackIndex].items.indices {
                 guard case .video(var clip) = tracks[trackIndex].items[itemIndex],
                       clip.id == clipID, !clip.placement.isLocked else { continue }
-                guard clip.gradeSettings != settings else { return false }
-                clip.gradeSettings = settings
+                guard edit(&clip) else { return false }
                 tracks[trackIndex].items[itemIndex] = .video(clip)
                 return true
             }

@@ -1,0 +1,6 @@
+Color Warper on täällä, ja editointi on entistä sujuvampaa.
+
+• Muokkaa värejä Color Warperin sävy/kylläisyys- ja kroma/luma-tiloissa.
+• Siirrä useita valittuja aikajanan rivejä yhdessä.
+• Sujuvammat esikatselut.
+• Käyttöliittymän parannuksia, virheenkorjauksia ja yleisiä optimointeja.
