@@ -1,1 +1,1 @@
-GradeLab arriva su Mac: raccoglitore, scorciatoie da tastiera, trascinamento dal Finder e tutti gli strumenti di grading in una finestra.
+Rampa di velocità su Mac: trascina i punti in un grande editor di curva, digita valori esatti e il flusso ottico crea i fotogrammi intermedi.

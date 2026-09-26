@@ -18,6 +18,7 @@
 
 /* Begin PBXFileReference section */
 		A10000000000000000000001 /* GradeLabTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = GradeLabTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		A1000000000000000000000C /* GradeLab.storekit */ = {isa = PBXFileReference; lastKnownFileType = text; path = GradeLab.storekit; sourceTree = "<group>"; };
 		FC7AE018304B611E009620D4 /* GradeLab.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = GradeLab.app; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
@@ -56,6 +57,7 @@
 		FC7AE00F304B611E009620D4 = {
 			isa = PBXGroup;
 			children = (
+				A1000000000000000000000C /* GradeLab.storekit */,
 				FC7AE01A304B611E009620D4 /* GradeLab */,
 				A10000000000000000000002 /* GradeLabTests */,
 				FC7AE019304B611E009620D4 /* Products */,

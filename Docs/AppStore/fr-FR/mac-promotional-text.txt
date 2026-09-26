@@ -1,1 +1,1 @@
-GradeLab arrive sur Mac : chutier, raccourcis clavier, glisser-déposer depuis le Finder et tous les outils d'étalonnage dans une seule fenêtre.
+La rampe de vitesse sur Mac : posez des points sur un grand éditeur de courbe, saisissez des valeurs exactes, et le flux optique fait les images intermédiaires.

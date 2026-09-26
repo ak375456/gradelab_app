@@ -1,1 +1,1 @@
-Meet Color Warper: reshape colors in Hue/Sat and Chroma/Luma modes with precise, intuitive control points.
+Speed ramping arrives: shape a speed curve on any clip, and let Optical Flow build the in-between frames so slow motion stays sharp.

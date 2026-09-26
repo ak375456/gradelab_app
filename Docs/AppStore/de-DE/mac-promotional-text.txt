@@ -1,1 +1,1 @@
-GradeLab kommt auf den Mac: Medienablage, Tastaturkurzbefehle, Drag & Drop aus dem Finder und alle Grading-Werkzeuge in einem Fenster.
+Tempo-Ramping auf dem Mac: Tempopunkte im großen Kurveneditor ziehen, exakte Werte tippen, und der Optische Fluss erzeugt die Frames dazwischen.

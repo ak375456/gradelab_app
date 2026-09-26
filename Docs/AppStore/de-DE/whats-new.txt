@@ -1,6 +1,9 @@
-Neu: Color Warper und flüssigeres Bearbeiten.
+Neu: Tempo-Ramping und Optischer Fluss.
 
-• Color Warper: Farben in den Modi Farbton/Sättigung und Chroma/Luma gezielt formen.
+• Tempo: ein konstantes Tempo halten oder eine Kurve bauen. Setze Tempopunkte überall im Clip und forme die Ramp mit Eases und Bezier-Griffen.
+• Optischer Fluss: Neue Frames werden zwischen den echten erzeugt, damit Zeitlupe scharf bleibt statt zu ruckeln. Frame-Überblendung und Frame-Abtastung sind ebenfalls dabei.
+• Standbild und Rückwärts: Halte einen Frame so lange du willst, oder spiele einen Clip rückwärts ab.
+• Presets: Montage, Hero, Bullet, Jump Cut, Flash in und Flash out – jedes zeigt die Kurve, die es erzeugt, und bleibt danach voll bearbeitbar.
 • Timeline: Zwei oder mehr verschiebbare Zeilen auswählen und gemeinsam ziehen.
 • Optimierte Vorschau für flüssigeres Bearbeiten.
 • Verbesserungen der Oberfläche, Fehlerbehebungen und allgemeine App-Optimierungen.

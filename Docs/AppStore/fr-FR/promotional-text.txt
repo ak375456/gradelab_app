@@ -1,1 +1,1 @@
-Découvrez Color Warper : modelez les couleurs en modes Teinte/Sat et Chroma/Luma grâce à des points de contrôle précis.
+La rampe de vitesse arrive : modelez une courbe de vitesse sur n’importe quel plan, et le flux optique crée les images intermédiaires pour un ralenti net.

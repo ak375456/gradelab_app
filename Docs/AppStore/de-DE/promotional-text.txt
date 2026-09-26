@@ -1,1 +1,1 @@
-Neu: Color Warper. Forme Farben in den Modi Farbton/Sättigung und Chroma/Luma mit präzisen Kontrollpunkten.
+Neu: Tempo-Ramping. Forme eine Tempokurve auf jedem Clip, und der Optische Fluss erzeugt die Frames dazwischen – Zeitlupe bleibt scharf.

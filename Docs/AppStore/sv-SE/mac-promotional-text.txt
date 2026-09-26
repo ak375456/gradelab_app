@@ -1,0 +1,1 @@
+Hastighetsramp på Mac: dra hastighetspunkter i en stor kurvredigerare, skriv exakta värden och låt optiskt flöde skapa bildrutorna emellan.

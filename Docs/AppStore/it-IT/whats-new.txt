@@ -1,6 +1,9 @@
-Arriva Color Warper, con un editing più fluido.
+Arrivano la rampa di velocità e il flusso ottico.
 
-• Color Warper: modella i colori con precisione nelle modalità Tonalità/Sat e Croma/Luma.
+• Velocità: mantieni una velocità costante o costruisci una curva. Posiziona punti di velocità ovunque sul clip e modella la rampa con easing e maniglie Bézier.
+• Flusso ottico: nuovi fotogrammi vengono generati tra quelli reali, così il rallentatore resta nitido invece di scattare. Ci sono anche fusione e campionamento dei fotogrammi.
+• Fermo immagine e riproduzione inversa: blocca un fotogramma quanto vuoi, oppure riproduci un clip all’indietro.
+• Preset: Montaggio, Piano eroe, Bullet, Jump cut, Entrata rapida e Uscita rapida, ognuno mostra la curva che creerà. Restano tutti completamente modificabili.
 • Timeline: seleziona due o più righe trascinabili e spostale insieme.
 • Anteprime ottimizzate per un editing più fluido.
 • Migliorie all’interfaccia, correzioni e ottimizzazioni generali.

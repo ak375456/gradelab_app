@@ -1,6 +1,9 @@
-Color Warper on täällä, ja editointi on entistä sujuvampaa.
+Nopeusramppi ja optinen virtaus ovat täällä.
 
-• Muokkaa värejä Color Warperin sävy/kylläisyys- ja kroma/luma-tiloissa.
-• Siirrä useita valittuja aikajanan rivejä yhdessä.
+• Nopeus: pidä vakionopeus tai rakenna käyrä. Lisää nopeuspisteitä mihin tahansa kohtaan klippiä ja muotoile ramppi pehmennyksillä ja Bézier-kahvoilla.
+• Optinen virtaus: uudet kuvat luodaan oikeiden väliin, jolloin hidastus pysyy terävänä eikä nyki. Mukana myös kuvien sekoitus ja kuvanäytteistys.
+• Pysäytyskuva ja käänteinen toisto: pysäytä kuva niin pitkäksi aikaa kuin haluat tai toista klippi takaperin.
+• Esiasetukset: Montage, Hero, Bullet, Jump cut, Nopea sisääntulo ja Nopea ulostulo – jokainen näyttää luomansa käyrän, ja kaikkia voi muokata vapaasti jälkeenpäin.
+• Aikajana: valitse kaksi tai useampi siirrettävä rivi ja siirrä ne yhdessä.
 • Sujuvammat esikatselut.
 • Käyttöliittymän parannuksia, virheenkorjauksia ja yleisiä optimointeja.

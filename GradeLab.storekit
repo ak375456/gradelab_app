@@ -55,12 +55,7 @@
   "subscriptionGroups": [
     {
       "id": "21489103",
-      "localizations": [
-        {
-          "displayName": "GradeLab Pro",
-          "locale": "fi_FI"
-        }
-      ],
+      "localizations": [],
       "name": "GradeLab Pro",
       "subscriptions": [
         {

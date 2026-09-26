@@ -78,6 +78,14 @@ struct BeforeAfterSlider: View {
             )
         }
         .aspectRatio(aspect, contentMode: .fit)
+        // Touches belong to the card and nothing outside it.
+        //
+        // `layer` scales its image up by `zoom` to crop in on the subject, and
+        // `scaleEffect` enlarges a view's touch region along with its drawing —
+        // `clipped()` only trims what is painted. That left the enlarged image
+        // claiming a band of the sheet above the card, which is exactly where
+        // the paywall's close button sits, so the close button received nothing.
+        .contentShape(Rectangle())
         .accessibilityElement()
         .accessibilityLabel("Before and after grading comparison")
         .accessibilityValue("\(Int(split * 100))% showing the ungraded image")

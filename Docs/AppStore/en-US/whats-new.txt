@@ -1,6 +1,9 @@
-Color Warper is here, along with smoother editing.
+Speed ramping and optical flow are here.
 
-• Color Warper: shape colors with precise control points in Hue/Sat and Chroma/Luma modes.
+• Speed: hold a constant rate, or build a curve. Place speed points anywhere on a clip and shape the ramp with eases and Bezier handles.
+• Optical Flow: new frames are generated between the real ones, so slow motion stays sharp instead of stuttering. Frame Blending and Frame Sampling are there too.
+• Freeze Frame and Reverse: hold a frame for as long as you want, or play a clip backwards.
+• Presets: Montage, Hero, Bullet, Jump cut, Flash in and Flash out, each showing the curve it will make. Every one stays fully editable afterwards.
 • Timeline: select two or more draggable rows and move them together.
 • Optimized previews for smoother editing.
 • Interface improvements, bug fixes, and general app optimizations.

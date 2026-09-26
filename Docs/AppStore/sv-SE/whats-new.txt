@@ -1,0 +1,9 @@
+Hastighetsramp och optiskt flöde är här.
+
+• Hastighet: håll en konstant hastighet eller bygg en kurva. Placera hastighetspunkter var som helst i klippet och forma rampen med mjuka övergångar och Bézier-handtag.
+• Optiskt flöde: nya bildrutor skapas mellan de verkliga, så att slow motion förblir skarp i stället för hackig. Bildblandning och bildsampling finns också.
+• Frysbild och baklänges: håll kvar en bildruta så länge du vill, eller spela klippet baklänges.
+• Förinställningar: Montage, Hero, Bullet, Jump cut, Snabb ingång och Snabb utgång – var och en visar kurvan den skapar, och alla går att redigera fritt efteråt.
+• Tidslinje: markera två eller flera flyttbara rader och dra dem tillsammans.
+• Optimerade förhandsvisningar för smidigare redigering.
+• Förbättringar av gränssnittet, buggfixar och allmänna optimeringar.
