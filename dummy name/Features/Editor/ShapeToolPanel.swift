@@ -65,6 +65,7 @@ struct ShapeToolPanel: View {
                     if clip.kind.usesInnerRadius { animated(.shapeInnerRadius, 0.05...0.95) }
                 case "Transform":
                     keyframeHeader
+                    CanvasAlignmentRow(model: model)
                     animated(.positionX, -1...2)
                     animated(.positionY, -1...2)
                     animated(.scale, 0.05...6)
@@ -79,8 +80,15 @@ struct ShapeToolPanel: View {
                     Picker("Blend", selection: binding(\.blendMode)) {
                         ForEach(VisualBlendMode.allCases, id: \.self) { Text($0.rawValue.capitalized).tag($0) }
                     }
-                    Text("Drag the shape in the preview. Pinch to resize; turn with two fingers to rotate.")
-                        .font(.caption).foregroundStyle(.secondary)
+                    // Written out twice rather than as a ternary inside `Text`:
+                    // only a plain literal is reliably extracted for translation.
+                    if model.selectedShapeCount > 1 {
+                        Text("Position moves every selected shape together, so they keep their spacing.")
+                            .font(.caption).foregroundStyle(.secondary)
+                    } else {
+                        Text("Drag the shape in the preview. Pinch to resize; turn with two fingers to rotate.")
+                            .font(.caption).foregroundStyle(.secondary)
+                    }
                 default:
                     tabs(["Fill", "Gradient", "Stroke", "Shadow", "Glow"], selection: $appearance)
                     keyframeHeader

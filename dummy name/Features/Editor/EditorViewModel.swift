@@ -1119,6 +1119,12 @@ final class EditorViewModel: ObservableObject, GradingModel {
     var selectionContainsOnlyText: Bool {
         !selectedItems.isEmpty && selectedItems.allSatisfy { if case .text = $0 { true } else { false } }
     }
+    /// Whether the selected layers edit through one path, and so can be dragged
+    /// on the canvas as a block. Titles and shapes have separate edit paths, so a
+    /// selection holding both is shown but not moved together.
+    var selectionMovesAsAGroup: Bool {
+        selectedClipIDs.count > 1 && (selectionContainsOnlyText || selectionContainsOnlyShapes)
+    }
     var selectedShapeCount: Int {
         selectedItems.reduce(into: 0) { count, item in if case .shape = item { count += 1 } }
     }
@@ -1726,6 +1732,15 @@ final class EditorViewModel: ObservableObject, GradingModel {
             setMaskKeyframeValue(id, property, value, immediate: immediate); return
         }
         guard let selection = animationSelection else { return }
+        // Position is WHERE a layer sits, so writing one value to several layers
+        // would pile them all on the same spot - four lines of a title collapsing
+        // into one the moment Position Y moved. Every other property means the
+        // same thing on each layer ("make these all 40pt") and stays absolute.
+        if movesSelectionTogether(property), case .number(let target) = value,
+           let current = animatableValue(property)?.number {
+            offsetSelection(property, by: target-current, label: property.title, immediate: immediate)
+            return
+        }
         let animated = selection.animation?.track(property) != nil
         if animated && animationTime == nil {
             editError = String(localized: "Move the playhead inside the clip to change an animated value.")
@@ -1733,6 +1748,87 @@ final class EditorViewModel: ObservableObject, GradingModel {
         }
         if animated { playback.pause() }
         applyAnimation(.setValue(property, value, atLocal: animationTime), label: property.title, immediate: immediate)
+    }
+
+    /// Whether a change to this property has to move the selection as a block
+    /// rather than write the same number to every layer in it.
+    private func movesSelectionTogether(_ property: AnimatableProperty) -> Bool {
+        selectedClipIDs.count > 1 && (property == .positionX || property == .positionY)
+    }
+
+    /// Moves every selected layer by the same amount, so each keeps its own
+    /// place. The group drag on the canvas, a position slider with more than one
+    /// layer selected, and `alignSelection` all write through here.
+    func offsetSelection(_ property: AnimatableProperty, by delta: Double, label: String, immediate: Bool = false) {
+        guard canEditSelection, delta != 0 else { return }
+        if animationSelection?.animation?.track(property) != nil {
+            guard animationTime != nil else {
+                editError = String(localized: "Move the playhead inside the clip to change an animated value.")
+                return
+            }
+            playback.pause()
+        }
+        applyAnimation(.offsetValue(property, by: delta, atComposition: playheadTime),
+                       label: label, immediate: immediate)
+    }
+
+    /// The size drawn layers are authored against - the same reduced preview
+    /// surface the canvas handles and the compositor measure in.
+    var previewCanvasSize: CGSize {
+        SequenceComposition.previewRenderSize(width: project.canvas.width, height: project.canvas.height)
+    }
+
+    /// Every selected drawn layer as canvas geometry, evaluated at the playhead,
+    /// so the outlines and the alignment controls measure the same shapes.
+    func selectedOverlays(canvas: CGSize) -> [CanvasOverlay] {
+        let time = playheadTime
+        return selectedItems.compactMap { item in
+            switch item {
+            case .text(let clip): CanvasOverlay(clip.evaluated(at: time), canvas: canvas)
+            case .shape(let clip): CanvasOverlay(clip.evaluated(at: time), canvas: canvas)
+            case .video(let clip):
+                isOverlayTrack(clip.placement.trackID) ? displaySize(of: clip).map {
+                    CanvasOverlay(clip.evaluated(at: time), displaySize: $0, canvas: canvas)
+                } : nil
+            case .audio: nil
+            }
+        }
+    }
+
+    /// Alignment moves everything it measures, so it needs one edit path for the
+    /// whole selection - the same condition a group drag has. A mixed selection
+    /// would otherwise measure four layers and move one.
+    var canAlignSelection: Bool {
+        canEditSelection && (selectedClipIDs.count == 1 || selectionMovesAsAGroup)
+    }
+
+    /// Places the selection against the canvas as ONE block.
+    ///
+    /// Every selected layer moves by the same amount, so a four-line title keeps
+    /// its spacing and its ragged edges. Centring each line on its own instead
+    /// would be identical for one layer and would stack all four vertically.
+    func alignSelection(_ alignment: CanvasAlignment) {
+        guard canAlignSelection else { return }
+        let canvas = previewCanvasSize
+        var union: CGRect?
+        for overlay in selectedOverlays(canvas: canvas) {
+            let bounds = overlay.screenBounds(canvas: canvas)
+            union = union.map { $0.union(bounds) } ?? bounds
+        }
+        guard let union, canvas.width > 0, canvas.height > 0 else { return }
+        // `positionX`/`positionY` are the LAST translation in the placement
+        // matrix, so screen bounds follow them one for one whatever the anchor,
+        // scale and rotation are. That makes the offset an exact solve.
+        let delta: Double = switch alignment {
+        case .left: Double(-union.minX)/Double(canvas.width)
+        case .centerHorizontally: Double(canvas.width/2-union.midX)/Double(canvas.width)
+        case .right: Double(canvas.width-union.maxX)/Double(canvas.width)
+        case .top: Double(-union.minY)/Double(canvas.height)
+        case .centerVertically: Double(canvas.height/2-union.midY)/Double(canvas.height)
+        case .bottom: Double(canvas.height-union.maxY)/Double(canvas.height)
+        }
+        offsetSelection(alignment.isHorizontal ? .positionX : .positionY,
+                        by: delta, label: alignment.title, immediate: true)
     }
 
     /// Evaluated value at the playhead: what a control should show and start editing from.
@@ -1858,6 +1954,104 @@ final class EditorViewModel: ObservableObject, GradingModel {
 
     /// Timeline positions of the selected clip's keyframes, for the timeline indicators.
     var selectedClipKeyframeTimes: [Double] { animationSelection?.keyframeSeconds ?? [] }
+
+    // MARK: - Text animation presets
+    //
+    // Presets are authored state, not keyframes. Nothing here writes to
+    // `ClipAnimation`, and `removeAllAnimation` still clears only the manual
+    // keyframes — the two features stay separable, which is the whole point of
+    // keeping a preset a preset.
+
+    /// What the Animation panel shows. Defaults for a title that has never been
+    /// animated, so the panel never has to unwrap.
+    var textAnimationSettings: TextAnimationSettings { selectedText?.textAnimation ?? .init() }
+
+    /// True when the selected title carries any preset, for the tab's dot.
+    var hasTextAnimation: Bool { selectedText?.textAnimation?.isEmpty == false }
+
+    /// One write path, so every animation control is an ordinary undo step and a
+    /// slider drag coalesces into one entry exactly as the grading sliders do.
+    func editTextAnimation(_ label: String, immediate: Bool = true,
+                           _ edit: @escaping (inout TextAnimationSettings) -> Void) {
+        editText(label, immediate: immediate) { clip in
+            var settings = clip.textAnimation ?? .init()
+            edit(&settings)
+            clip.textAnimation = settings.isEmpty ? nil : settings
+        }
+    }
+
+    func setTextAnimation(_ preset: TextAnimationPreset?, for slot: TextAnimationSlot) {
+        editTextAnimation(String(localized: "Text Animation")) { $0.setPreset(preset, for: slot) }
+        if preset != nil { previewTextAnimation(slot) }
+    }
+
+    func setTextAnimationDuration(_ seconds: Double, for slot: TextAnimationSlot, immediate: Bool = false) {
+        guard let time = try? TimelineTime.seconds(seconds) else { return }
+        editTextAnimation(String(localized: "Animation Duration"), immediate: immediate) {
+            $0.setDuration(time, for: slot)
+        }
+    }
+
+    func setTextAnimationStrength(_ strength: Double, immediate: Bool = false) {
+        editTextAnimation(String(localized: "Animation Strength"), immediate: immediate) {
+            $0.strength = min(max(strength, 0), 1)
+        }
+    }
+
+    func setTextAnimationLoopSpeed(_ speed: Double, immediate: Bool = false) {
+        editTextAnimation(String(localized: "Animation Speed"), immediate: immediate) {
+            $0.loopSpeed = min(max(speed, 0.25), 3)
+        }
+    }
+
+    /// Clears the three preset slots and nothing else. Manual keyframes on
+    /// position, scale, colour and the rest survive untouched.
+    func removeAllTextAnimation() {
+        editText(String(localized: "Remove Text Animation"), immediate: true) { $0.textAnimation = nil }
+    }
+
+    /// The longest an In or Out may be on this title: never more than the clip.
+    var textAnimationDurationLimit: Double {
+        guard let clip = selectedText else { return TextAnimationSettings.maximumDuration }
+        return max(TextAnimationSettings.minimumDuration,
+                   min(TextAnimationSettings.maximumDuration, clip.placement.duration.seconds))
+    }
+
+    /// Plays the part of the title the user is actually tuning, so picking a
+    /// preset or nudging its duration shows the result without hunting for the
+    /// right frame first.
+    func previewTextAnimation(_ slot: TextAnimationSlot) {
+        guard let clip = selectedText, !isPreparingTimeline else { return }
+        let settings = clip.textAnimation ?? .init()
+        let duration = clip.placement.duration.seconds
+        let start = clip.placement.timelineStart.seconds
+        let window = TextAnimator.windows(settings, duration: duration)
+        let from: Double, to: Double
+        switch slot {
+        case .incoming:
+            from = start
+            to = start + max(window.incoming, 0.25)
+        case .outgoing:
+            to = start + duration
+            from = max(start, to - max(window.outgoing, 0.25))
+        case .loop:
+            // Start where the loop actually takes over, and run a couple of its
+            // own cycles rather than a fixed wall-clock slice.
+            from = min(start + window.incoming, start + duration)
+            to = min(from + 4 / max(settings.loopSpeed, 0.25), start + duration)
+        }
+        textAnimationPreview?.cancel()
+        playback.pause()
+        playback.seekPrecisely(to: from)
+        textAnimationPreview = Task { @MainActor [weak self] in
+            guard let self else { return }
+            self.playback.play()
+            try? await Task.sleep(for: .seconds(max(0.25, to-from)))
+            guard !Task.isCancelled else { return }
+            self.playback.pause()
+            self.playback.seekPrecisely(to: to)
+        }
+    }
 
     func setTextDuration(_ seconds: Double) {
         guard let clip = selectedText else { return }
@@ -2254,27 +2448,40 @@ final class EditorViewModel: ObservableObject, GradingModel {
     func undo() {
         flushGradeHistory()
         guard let snapshot = history.undo() else { return }
-        project = snapshot; project.updatedAt = .now
-        if selectedTransitionID.flatMap({ id in project.timeline.transitions.first { $0.id == id } }) == nil {
-            selectedTransitionID = nil
-        }
-        if selectedItem == nil { selectedClipID = project.timeline.items.first?.id }
-        selectedClipIDs = Set(selectedClipID.map { [$0] } ?? [])
-        selectedTrackID = selectedItem?.placement.trackID
-        rebuildSequence()
+        restore(snapshot)
     }
     func redo() {
         flushGradeHistory()
         guard let snapshot = history.redo() else { return }
+        restore(snapshot)
+    }
+
+    /// Adopts a history snapshot and carries the selection over to it.
+    ///
+    /// The whole selection survives, minus whatever the snapshot no longer
+    /// contains. Rebuilding it from the primary clip alone - which is what this
+    /// used to do - silently threw away the other layers immediately after a
+    /// group edit, so the undo of a change to four titles left one selected.
+    private func restore(_ snapshot: VideoProject) {
         project = snapshot; project.updatedAt = .now
         if selectedTransitionID.flatMap({ id in project.timeline.transitions.first { $0.id == id } }) == nil {
             selectedTransitionID = nil
         }
-        if selectedItem == nil { selectedClipID = project.timeline.items.first?.id }
-        selectedClipIDs = Set(selectedClipID.map { [$0] } ?? [])
+        let surviving = Set(project.timeline.items.lazy.map(\.id).filter(selectedClipIDs.contains))
+        if selectedItem == nil {
+            // A stable timeline order chooses the replacement, never a Set's.
+            selectedClipID = project.timeline.items.first { surviving.contains($0.id) }?.id
+                ?? project.timeline.items.first?.id
+        }
+        selectedClipIDs = surviving.isEmpty ? Set(selectedClipID.map { [$0] } ?? []) : surviving
         selectedTrackID = selectedItem?.placement.trackID
         rebuildSequence()
     }
+
+    /// The auto-stop for an animation preview. Cancelled whenever another
+    /// preview starts, so tapping through the tiles does not leave a queue of
+    /// pauses fighting each other.
+    private var textAnimationPreview: Task<Void, Never>?
 
     private var previewSuspendedForExport = false
 

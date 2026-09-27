@@ -447,6 +447,11 @@ struct TextClip: TimelineClip {
     var trackMatte: TrackMatteConfiguration? = nil
     /// Optional so projects saved before keyframes existed still decode unchanged.
     var animation: ClipAnimation? = nil
+    /// One-tap In/Out/Loop animation. Independent of `animation` above: presets
+    /// contribute relative offsets on top of whatever the manual keyframes
+    /// evaluate to, and neither one can overwrite the other. Nil in every
+    /// project saved before this existed, which renders exactly as it did.
+    var textAnimation: TextAnimationSettings? = nil
 }
 
 /// Fill gradient across the glyph ink box. Angle 0 sweeps left to right; 90 sweeps bottom to top.

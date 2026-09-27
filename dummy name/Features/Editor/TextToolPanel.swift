@@ -7,6 +7,7 @@ struct TextToolPanel: View {
     // Owned by EditorView so a redraw of this panel cannot bounce the user back to Style.
     @Binding var section: String
     @Binding var appearance: String
+    @Binding var animationSlot: TextAnimationSlot
     @State private var fonts = false
     @State private var importer = false
     @State private var fontError: String?
@@ -14,7 +15,7 @@ struct TextToolPanel: View {
     @State private var selectedKeyframe: TimelineTime?
     @State private var keyframeHelp = false
     @State private var confirmsRemoveAll = false
-    private let sections = ["Style", "Font", "Format", "Transform", "Appearance"]
+    private let sections = ["Style", "Font", "Format", "Transform", "Animation", "Appearance"]
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
             if model.selectedTextCount > 1 {
@@ -30,7 +31,7 @@ struct TextToolPanel: View {
                         .background(.white.opacity(0.06), in: RoundedRectangle(cornerRadius: 10))
                 }.accessibilityLabel("Edit text")
             }
-            tabs(sections, selection: $section)
+            tabs(sections, selection: $section, badged: model.hasTextAnimation ? ["Animation"] : [])
             if let clip = model.selectedText {
                 switch section {
                 case "Style":
@@ -99,9 +100,12 @@ struct TextToolPanel: View {
                     animated(.characterSpacing, -20...100)
                     animated(.lineSpacing, 0...300)
                     animated(.layoutWidth, 0.05...1.5)
+                case "Animation":
+                    TextAnimationPanel(model: model, slot: $animationSlot)
                 case "Transform":
                     keyframeHeader
                     number(String(localized: "Duration (s)"), Binding(get: { model.selectedText?.placement.duration.seconds ?? 3 }, set: model.setTextDuration), 0.1...600, reset: 3)
+                    CanvasAlignmentRow(model: model)
                     animated(.positionX, -1...2)
                     animated(.positionY, -1...2)
                     animated(.scale, 0.05...6)
@@ -114,7 +118,15 @@ struct TextToolPanel: View {
                     number(String(localized: "Anchor Y"), value(\.transform.anchorY), 0...1, reset: 0.5)
                     animated(.opacity, 0...1)
                     Picker("Blend", selection: binding(\.blendMode)) { ForEach(VisualBlendMode.allCases, id: \.self) { Text($0.rawValue.capitalized).tag($0) } }
-                    Text("Drag text in the preview. Pinch to resize; turn with two fingers to rotate.").font(.caption).foregroundStyle(.secondary)
+                    // Written out twice rather than as a ternary inside `Text`:
+                    // only a plain literal is reliably extracted for translation.
+                    if model.selectedTextCount > 1 {
+                        Text("Position moves every selected title together, so they keep their spacing.")
+                            .font(.caption).foregroundStyle(.secondary)
+                    } else {
+                        Text("Drag text in the preview. Pinch to resize; turn with two fingers to rotate.")
+                            .font(.caption).foregroundStyle(.secondary)
+                    }
                 default:
                     tabs(["Fill", "Gradient", "Stroke", "Background", "Shadow", "Glow", "Curve"], selection: $appearance)
                     keyframeHeader
@@ -248,14 +260,23 @@ struct TextToolPanel: View {
         case "Font": String(localized: "Font")
         case "Format": String(localized: "Format")
         case "Transform": String(localized: "Transform")
+        case "Animation": String(localized: "Animation")
         case "Appearance": String(localized: "Appearance")
         default: value
         }
     }
-    private func tabs(_ values: [String], selection: Binding<String>) -> some View {
+    /// `badged` marks a tab that has something set behind it - one dot, rather
+    /// than another icon on the timeline.
+    private func tabs(_ values: [String], selection: Binding<String>, badged: Set<String> = []) -> some View {
         ScrollView(.horizontal) { HStack(spacing: 16) { ForEach(values, id: \.self) { v in
-            Button(Self.tabLabel(v)) { selection.wrappedValue = v }.font(.caption.weight(.medium)).frame(minHeight: 36)
-                .foregroundStyle(selection.wrappedValue == v ? Color.cyan : .secondary)
+            Button { selection.wrappedValue = v } label: {
+                HStack(spacing: 3) {
+                    Text(Self.tabLabel(v))
+                    if badged.contains(v) { Circle().fill(Color.cyan).frame(width: 4, height: 4) }
+                }
+            }
+            .font(.caption.weight(.medium)).frame(minHeight: 36)
+            .foregroundStyle(selection.wrappedValue == v ? Color.cyan : .secondary)
         } } }.scrollIndicators(.hidden)
     }
     private func color(_ title: String, _ key: WritableKeyPath<TextClip, RGBAColor>) -> some View { ColorPicker(title, selection: colorBinding(binding(key)), supportsOpacity: true).font(.caption).frame(minHeight: 44) }
@@ -274,7 +295,30 @@ private struct FontMenu: View {
     let choose: (String?) -> Void
     @Environment(\.dismiss) private var dismiss
     @State private var query = ""
-    @State private var entries: [FontRegistry.Entry] = []
+    @State private var choices: [FontChoice] = []
+    @State private var isLoading = true
+
+    /// A row's search text and Pro status, worked out once when the list loads.
+    /// Both used to be recomputed for every row on every keystroke - the Pro
+    /// check against 35 prefixes, the selection check by creating a `CTFont` -
+    /// which is what made typing in the search field stall.
+    private struct FontChoice: Identifiable {
+        let id: String
+        let family: String
+        let name: String
+        let searchKey: String
+        let requiresPro: Bool
+    }
+
+    /// Resolved once per redraw rather than once per row.
+    private var selectedFamily: String? { selected.map { FontRegistry.shared.familyName($0) } }
+
+    private var matches: [FontChoice] {
+        guard !query.isEmpty else { return choices }
+        let needle = Self.searchKey(query)
+        return choices.filter { $0.searchKey.contains(needle) }
+    }
+
     var body: some View {
         VStack(spacing: 10) {
             HStack(spacing: 8) {
@@ -285,24 +329,49 @@ private struct FontMenu: View {
             }
             .padding(.horizontal, 12).frame(height: 42)
             .background(.black.opacity(0.28), in: RoundedRectangle(cornerRadius: 9))
-            ScrollView {
-                LazyVStack(spacing: 4) {
-                    fontRow(name: String(localized: "System"), fontName: nil, needsPro: false, isSelected: selected == nil)
-                    ForEach(entries.filter { query.isEmpty || $0.name.localizedCaseInsensitiveContains(query) || $0.family.localizedCaseInsensitiveContains(query) }) { font in
-                    // Every face stays choosable: the point is to see the title
-                    // set in it. The badge says which ones need Pro to export.
-                    let needsPro = !ProStore.shared.hasPro
-                        && ProAccessPolicy.fontRequiresPro(family: font.family)
-                        fontRow(name: font.name, fontName: font.id, needsPro: needsPro,
-                                isSelected: selected != nil && FontRegistry.shared.familyName(selected) == font.family)
+            if isLoading {
+                Spacer()
+                ProgressView().accessibilityLabel("Loading fonts")
+                Spacer()
+            } else {
+                ScrollView {
+                    let family = selectedFamily
+                    LazyVStack(spacing: 4) {
+                        fontRow(name: String(localized: "System"), fontName: nil, needsPro: false, isSelected: selected == nil)
+                        // Every face stays choosable: the point is to see the title
+                        // set in it. The badge says which ones need Pro to export.
+                        ForEach(matches) { font in
+                            fontRow(name: font.name, fontName: font.id, needsPro: font.requiresPro,
+                                    isSelected: family == font.family)
+                        }
                     }
                 }
             }
         }
         .padding(12).frame(width: 330, height: 440)
         .background(AppColors.surface)
-        .task { entries = FontRegistry.shared.entries() }
+        .task { await load() }
         .preferredColorScheme(.dark)
+    }
+
+    /// CoreText enumerates every installed face to build this list. Off the main
+    /// actor, so opening the menu cannot freeze the editor behind it.
+    private func load() async {
+        guard isLoading else { return }
+        let entries = await Task.detached(priority: .userInitiated) { FontRegistry.shared.entries() }.value
+        let hasPro = ProStore.shared.hasPro
+        choices = entries.map { entry in
+            FontChoice(id: entry.id, family: entry.family, name: entry.name,
+                       searchKey: Self.searchKey(entry.name + " " + entry.family),
+                       requiresPro: !hasPro && ProAccessPolicy.fontRequiresPro(family: entry.family))
+        }
+        isLoading = false
+    }
+
+    /// Case- and accent-insensitive, matching what `localizedCaseInsensitiveContains`
+    /// did per row, but folded once instead of once per comparison.
+    private static func searchKey(_ value: String) -> String {
+        value.folding(options: [.caseInsensitive, .diacriticInsensitive], locale: .current)
     }
 
     private func fontRow(name: String, fontName: String?, needsPro: Bool, isSelected: Bool) -> some View {

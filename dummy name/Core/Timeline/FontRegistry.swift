@@ -6,7 +6,7 @@ import CoreText
 /// User imports are copied into Application Support before registration.
 final class FontRegistry: @unchecked Sendable {
     static let shared = FontRegistry()
-    struct Entry: Identifiable { let id: String; let family: String; let name: String }
+    struct Entry: Identifiable, Sendable { let id: String; let family: String; let name: String }
     private let lock = NSLock()
     private var loaded = false
     private var registered = Set<URL>()
@@ -14,6 +14,19 @@ final class FontRegistry: @unchecked Sendable {
     /// one bundled with the app. Needed because the two are indistinguishable
     /// once CoreText has registered them, and only the imported ones are Pro.
     private var importedNames = Set<String>()
+    /// The one-face-per-family list, which is stable until a font is
+    /// registered. Building it walks every face CoreText knows about - several
+    /// hundred on an iPad - so recomputing it per keystroke of the font search,
+    /// and again on every tap of the next/previous arrows, is what made the
+    /// Font panel hang.
+    private var cachedEntries: [Entry]?
+    /// Bumped by every registration, so a list built outside the lock can tell
+    /// whether a font arrived while it was working.
+    private var registrations = 0
+    /// PostScript name to family. `familyName` is called from view bodies - the
+    /// Font panel's button, the selected row in the font list - and each miss
+    /// instantiates a `CTFont` just to read one string off it.
+    private var familyNames: [String: String] = [:]
     private var directory: URL {
         FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0].appendingPathComponent("GradeLab/Fonts", isDirectory: true)
     }
@@ -34,6 +47,11 @@ final class FontRegistry: @unchecked Sendable {
     private func registerUnlocked(_ url: URL, imported: Bool = false) {
         guard registered.insert(url).inserted else { return }
         CTFontManagerRegisterFontsForURL(url as CFURL, .process, nil)
+        // A new face means a new family list. Always called under the lock.
+        cachedEntries = nil; registrations += 1
+        // A name resolved before this face was registered resolved to a
+        // fallback family, so those answers are dropped too.
+        familyNames.removeAll()
         guard imported else { return }
         let descriptors = CTFontManagerCreateFontDescriptorsFromURL(url as CFURL) as? [CTFontDescriptor] ?? []
         for descriptor in descriptors {
@@ -52,22 +70,52 @@ final class FontRegistry: @unchecked Sendable {
         lock.lock(); defer { lock.unlock() }
         return importedNames.contains(name)
     }
+    /// Safe to call off the main thread, and worth doing: the first build is the
+    /// slow one and everything after it is served from the cache.
     func entries() -> [Entry] {
         prepare()
+        lock.lock()
+        if let cachedEntries { lock.unlock(); return cachedEntries }
+        let generation = registrations
+        lock.unlock()
+        // Built OUTSIDE the lock. It walks every installed face, and a main-thread
+        // `prepare()` or `isImported()` must not have to queue behind it.
+        let computed = availableFamilies()
+        lock.lock(); defer { lock.unlock() }
+        // A font registered while this was building leaves the new list already
+        // stale, so it is returned but not kept; the next call rebuilds.
+        if registrations == generation { cachedEntries = computed }
+        return computed
+    }
+    /// One basic face per family, not a separate row for every weight and style.
+    ///
+    /// Every face is ranked ONCE. Ranking inside a sort comparator, as this used
+    /// to, asked CoreText for the same face's traits over and over.
+    private func availableFamilies() -> [Entry] {
         let collection = CTFontCollectionCreateFromAvailableFonts(nil)
         let descriptors = CTFontCollectionCreateMatchingFontDescriptors(collection) as? [CTFontDescriptor] ?? []
-        let faces: [Entry] = descriptors.compactMap { descriptor in
-            guard let name = CTFontDescriptorCopyAttribute(descriptor, kCTFontNameAttribute) as? String, !name.hasPrefix(".") else { return nil }
-            return Entry(id: name, family: CTFontDescriptorCopyAttribute(descriptor, kCTFontFamilyNameAttribute) as? String ?? name,
-                name: CTFontDescriptorCopyAttribute(descriptor, kCTFontDisplayNameAttribute) as? String ?? name)
+        var basic: [String: (rank: Double, name: String)] = [:]
+        for descriptor in descriptors {
+            guard let name = CTFontDescriptorCopyAttribute(descriptor, kCTFontNameAttribute) as? String,
+                  !name.hasPrefix(".") else { continue }
+            let family = CTFontDescriptorCopyAttribute(descriptor, kCTFontFamilyNameAttribute) as? String ?? name
+            let rank = basicRank(descriptor, name: name)
+            if let held = basic[family], (held.rank, held.name) <= (rank, name) { continue }
+            basic[family] = (rank, name)
         }
-        // One basic face per family, not a separate row for every weight/style.
-        return Dictionary(grouping: faces, by: \.family).values.compactMap { family in
-            family.sorted { a, b in
-                let ar = basicRank(a.id), br = basicRank(b.id)
-                return ar == br ? a.id < b.id : ar < br
-            }.first.map { Entry(id: $0.id, family: $0.family, name: $0.family) }
-        }.sorted { $0.name.localizedStandardCompare($1.name) == .orderedAscending }
+        return basic.map { Entry(id: $0.value.name, family: $0.key, name: $0.key) }
+            .sorted { $0.name.localizedStandardCompare($1.name) == .orderedAscending }
+    }
+    /// Ranks a face without instantiating the font. The descriptor already
+    /// carries the traits dictionary, and creating a `CTFont` for every installed
+    /// face just to read two numbers out of it is the expensive half of the list.
+    private func basicRank(_ descriptor: CTFontDescriptor, name: String) -> Double {
+        guard let traits = CTFontDescriptorCopyAttribute(descriptor, kCTFontTraitsAttribute) as? NSDictionary else {
+            return basicRank(name)
+        }
+        let symbolic = CTFontSymbolicTraits(rawValue: traits[kCTFontSymbolicTrait] as? UInt32 ?? 0)
+        let weight = traits[kCTFontWeightTrait] as? Double ?? 0
+        return (symbolic.contains(.italicTrait) ? 10 : 0) + (symbolic.contains(.boldTrait) ? 10 : 0) + abs(weight)
     }
     private func basicRank(_ name: String) -> Double {
         let font = CTFontCreateWithName(name as CFString, 32, nil)
@@ -77,7 +125,12 @@ final class FontRegistry: @unchecked Sendable {
     }
     func familyName(_ name: String?) -> String {
         guard let name else { return "System" }
-        return CTFontCopyFamilyName(CTFontCreateWithName(name as CFString, 32, nil)) as String
+        lock.lock()
+        if let cached = familyNames[name] { lock.unlock(); return cached }
+        lock.unlock()
+        let family = CTFontCopyFamilyName(CTFontCreateWithName(name as CFString, 32, nil)) as String
+        lock.lock(); familyNames[name] = family; lock.unlock()
+        return family
     }
     func baseFont(_ name: String?, size: Double) -> CTFont {
         prepare()

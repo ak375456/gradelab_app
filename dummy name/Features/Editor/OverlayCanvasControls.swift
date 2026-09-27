@@ -104,6 +104,23 @@ struct CanvasOverlay: Identifiable {
         }
     }
 
+    /// The selection frame's four corners in VIEW coordinates: the canvas fitted
+    /// into the preview and centred in it. Top-left, top-right, bottom-right,
+    /// bottom-left, which is the order the handles are placed by.
+    func corners(canvas: CGSize, fit: CGFloat, offset: CGPoint) -> [CGPoint] {
+        let placement = placement(canvas: canvas)
+        return [CGPoint(x: frame.minX, y: frame.minY), CGPoint(x: frame.maxX, y: frame.minY),
+                CGPoint(x: frame.maxX, y: frame.maxY), CGPoint(x: frame.minX, y: frame.maxY)].map { point in
+            let placed = point.applying(placement)
+            return CGPoint(x: offset.x+placed.x*fit, y: offset.y+(canvas.height-placed.y)*fit)
+        }
+    }
+
+    /// Whether this layer is on screen at a timeline position, in seconds.
+    func isVisible(at seconds: Double) -> Bool {
+        seconds >= range.start.seconds && seconds < ((try? range.end.seconds) ?? 0)
+    }
+
     /// Axis-aligned screen-space bounds in canvas units, origin at top-left.
     func screenBounds(canvas: CGSize) -> CGRect {
         let transform = placement(canvas: canvas)
@@ -121,20 +138,140 @@ struct CanvasOverlay: Identifiable {
     }
 }
 
+/// Where a block of drawn layers is placed against the canvas edges.
+enum CanvasAlignment: String, CaseIterable, Identifiable {
+    case left, centerHorizontally, right, top, centerVertically, bottom
+    var id: String { rawValue }
+    var isHorizontal: Bool { self == .left || self == .centerHorizontally || self == .right }
+    var symbol: String {
+        switch self {
+        case .left: "align.horizontal.left"
+        case .centerHorizontally: "align.horizontal.center"
+        case .right: "align.horizontal.right"
+        case .top: "align.vertical.top"
+        case .centerVertically: "align.vertical.center"
+        case .bottom: "align.vertical.bottom"
+        }
+    }
+    var title: String {
+        switch self {
+        case .left: String(localized: "Align left")
+        case .centerHorizontally: String(localized: "Center horizontally")
+        case .right: String(localized: "Align right")
+        case .top: String(localized: "Align top")
+        case .centerVertically: String(localized: "Center vertically")
+        case .bottom: String(localized: "Align bottom")
+        }
+    }
+}
+
+/// The six canvas placements, for the Transform section of a drawn layer's panel.
+struct CanvasAlignmentRow: View {
+    @ObservedObject var model: EditorViewModel
+    var body: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            HStack(spacing: 6) {
+                // German runs a third longer here; the label shrinks rather than
+                // wrapping the row onto two lines.
+                Text("Align to canvas").font(.caption).lineLimit(1).minimumScaleFactor(0.75)
+                Spacer(minLength: 4)
+                if model.selectedClipIDs.count > 1 {
+                    Text("As one block").font(.caption2).foregroundStyle(.secondary).lineLimit(1)
+                }
+            }
+            HStack(spacing: 4) {
+                ForEach(CanvasAlignment.allCases) { alignment in
+                    Button { model.alignSelection(alignment) } label: {
+                        Image(systemName: alignment.symbol)
+                            .frame(maxWidth: .infinity, minHeight: 44)
+                            .background(.white.opacity(0.07), in: RoundedRectangle(cornerRadius: 8))
+                            .contentShape(RoundedRectangle(cornerRadius: 8))
+                    }
+                    .accessibilityLabel(alignment.title)
+                }
+            }.font(.system(size: 14, weight: .medium)).disabled(!model.canAlignSelection)
+        }
+    }
+}
+
+/// The magnet that lines drawn layers up with each other and with the canvas.
+///
+/// Pure geometry, deliberately not a method on the view: a lone layer and a
+/// whole selection both magnet through it, and it is tested directly rather
+/// than through a gesture.
+enum CanvasMagnet {
+    /// Freeform placement with a magnet: edges, thirds and centre.
+    static let positionStops: [Double] = [0, 1.0/3, 0.5, 2.0/3, 1]
+    static let positionTolerance = 0.012
+
+    /// Lines the moving rect's left/centre/right and top/centre/bottom up with
+    /// the same anchors on every other rect, and reports the nudge that lands it
+    /// on the nearest one. Bounds include scale and rotation, matching the
+    /// outlines users line up by eye. Normalized, ready to add to a position.
+    static func pull(bounds moving: CGRect, canvas: CGSize,
+                     screenScale: CGFloat, others: [CGRect])
+        -> (dx: Double, dy: Double, xGuide: Double?, yGuide: Double?) {
+        let xAnchors = [moving.minX, moving.midX, moving.maxX]
+        let yAnchors = [moving.minY, moving.midY, moving.maxY]
+        let tolerance = 12 / max(screenScale, 0.001)
+        var bestX: (distance: CGFloat, delta: CGFloat, guide: CGFloat)?
+        var bestY: (distance: CGFloat, delta: CGFloat, guide: CGFloat)?
+        for bounds in others {
+            for source in xAnchors {
+                for target in [bounds.minX, bounds.midX, bounds.maxX] {
+                    let delta = target-source, distance = abs(delta)
+                    if distance <= tolerance && (bestX == nil || distance < bestX!.distance) {
+                        bestX = (distance, delta, target)
+                    }
+                }
+            }
+            for source in yAnchors {
+                for target in [bounds.minY, bounds.midY, bounds.maxY] {
+                    let delta = target-source, distance = abs(delta)
+                    if distance <= tolerance && (bestY == nil || distance < bestY!.distance) {
+                        bestY = (distance, delta, target)
+                    }
+                }
+            }
+        }
+        guard canvas.width > 0, canvas.height > 0 else { return (0, 0, nil, nil) }
+        return (
+            Double(bestX?.delta ?? 0) / Double(canvas.width),
+            Double(bestY?.delta ?? 0) / Double(canvas.height),
+            bestX.map { Double($0.guide / canvas.width) },
+            bestY.map { Double($0.guide / canvas.height) }
+        )
+    }
+
+    /// Returns the magnetised value and, when held, the stop it locked onto.
+    static func snap(_ value: Double, to stops: [Double], tolerance: Double) -> (value: Double, stop: Double?) {
+        guard let nearest = stops.min(by: { abs($0-value) < abs($1-value) }),
+              abs(nearest-value) <= tolerance else { return (value, nil) }
+        return (nearest, nearest)
+    }
+}
+
 /// Canvas-space hit geometry follows the same layout/transform as export.
 struct OverlayCanvasControls: View {
     @ObservedObject var model: EditorViewModel
     let editContent: () -> Void
     @State private var origin: VisualTransform?
+    /// How far a group drag has already been applied, normalized. The gesture
+    /// writes the DIFFERENCE each time, because a group has no single transform
+    /// to measure an absolute translation against.
+    @State private var groupOrigin: CGPoint?
+    /// The selection's outer bounds in canvas units when a group drag began -
+    /// the rect the magnet measures, held still so it cannot drift as the
+    /// layers move under it.
+    @State private var groupBounds: CGRect?
     @State private var initialScale: Double?
     @State private var initialRotation: Double?
     /// Normalized guide positions currently held by the magnet, drawn while dragging.
     @State private var guides: (x: Double?, y: Double?) = (nil, nil)
     @State private var rotationGuide: Double?
 
-    // Freeform placement with a magnet: edges, thirds and centre.
-    private static let positionStops: [Double] = [0, 1.0/3, 0.5, 2.0/3, 1]
-    private static let positionTolerance = 0.012
+    private static let positionStops = CanvasMagnet.positionStops
+    private static let positionTolerance = CanvasMagnet.positionTolerance
     /// Multiples of 45 near the current value, so snapping works past a full turn too.
     private func stops(around value: Double) -> [Double] {
         let base = (value/45).rounded()
@@ -154,29 +291,17 @@ struct OverlayCanvasControls: View {
             )
             // Geometry uses the EVALUATED layer so the selection frame sits on what
             // you can actually see while animation is driving it.
-            if let overlay = selection(canvas: canvas), model.canEditSelection,
-               model.selectedClipIDs.count == 1,
-               model.timelineTime >= overlay.range.start.seconds,
-               model.timelineTime < ((try? overlay.range.end.seconds) ?? 0) {
+            if model.selectedClipIDs.count > 1 {
+                groupSelection(canvas: canvas, view: view.size)
+            } else if let overlay = selection(canvas: canvas), model.canEditSelection,
+               overlay.isVisible(at: model.timelineTime) {
                 let fit = min(view.size.width/canvas.width, view.size.height/canvas.height)
                 let offset = CGPoint(x: (view.size.width-canvas.width*fit)/2,
                                      y: (view.size.height-canvas.height*fit)/2)
-                let placement = overlay.placement(canvas: canvas)
-                let frame = overlay.frame
-                let corners = [CGPoint(x: frame.minX, y: frame.minY), CGPoint(x: frame.maxX, y: frame.minY),
-                               CGPoint(x: frame.maxX, y: frame.maxY), CGPoint(x: frame.minX, y: frame.maxY)].map { point in
-                    let p = point.applying(placement)
-                    return CGPoint(x: offset.x+p.x*fit, y: offset.y+(canvas.height-p.y)*fit)
-                }
+                let corners = overlay.corners(canvas: canvas, fit: fit, offset: offset)
                 let outline = Path { path in path.addLines(corners); path.closeSubpath() }
-                if let x = guides.x {
-                    Path { $0.move(to: CGPoint(x: offset.x+x*canvas.width*fit, y: offset.y)); $0.addLine(to: CGPoint(x: offset.x+x*canvas.width*fit, y: offset.y+canvas.height*fit)) }
-                        .stroke(.yellow.opacity(0.9), lineWidth: 1).allowsHitTesting(false)
-                }
-                if let y = guides.y {
-                    Path { $0.move(to: CGPoint(x: offset.x, y: offset.y+y*canvas.height*fit)); $0.addLine(to: CGPoint(x: offset.x+canvas.width*fit, y: offset.y+y*canvas.height*fit)) }
-                        .stroke(.yellow.opacity(0.9), lineWidth: 1).allowsHitTesting(false)
-                }
+                if let x = guides.x { guide(x: x, canvas: canvas, fit: fit, offset: offset) }
+                if let y = guides.y { guide(y: y, canvas: canvas, fit: fit, offset: offset) }
                 outline.fill(.white.opacity(0.001)).contentShape(outline)
                     .overlay(outline.stroke(rotationGuide != nil ? .yellow : .cyan, style: StrokeStyle(lineWidth: 1, dash: [4, 3])))
                     .gesture(DragGesture(minimumDistance: 2).onChanged { value in
@@ -188,7 +313,7 @@ struct OverlayCanvasControls: View {
                         let rawX = origin.positionX+value.translation.width/(canvas.width*fit)
                         let rawY = origin.positionY+value.translation.height/(canvas.height*fit)
                         let aligned = align(overlay: overlay, x: rawX, y: rawY, canvas: canvas,
-                                            screenScale: fit, others: peers(canvas: canvas, excluding: overlay.id))
+                                            screenScale: fit, others: peers(canvas: canvas, excluding: [overlay.id]))
                         let x = aligned.xGuide == nil
                             ? snap(rawX, to: Self.positionStops, tolerance: Self.positionTolerance)
                             : (aligned.x, aligned.xGuide)
@@ -242,6 +367,95 @@ struct OverlayCanvasControls: View {
         }.coordinateSpace(name: "overlayCanvas")
     }
 
+    /// Outlines for a multiple selection, and one drag that moves them together.
+    ///
+    /// No corner handles: scaling or rotating a group needs a shared pivot the
+    /// document has no place to keep, and the panel's own controls already reach
+    /// every selected layer. Moving is the thing that was missing - before this,
+    /// selecting four titles showed nothing at all on the canvas.
+    @ViewBuilder private func groupSelection(canvas: CGSize, view: CGSize) -> some View {
+        let fit = min(view.width/canvas.width, view.height/canvas.height)
+        let offset = CGPoint(x: (view.width-canvas.width*fit)/2, y: (view.height-canvas.height*fit)/2)
+        let overlays = model.selectedOverlays(canvas: canvas).filter { $0.isVisible(at: model.timelineTime) }
+        if !overlays.isEmpty {
+            let outlines = Path { path in
+                for overlay in overlays {
+                    path.addLines(overlay.corners(canvas: canvas, fit: fit, offset: offset))
+                    path.closeSubpath()
+                }
+            }
+            if let x = guides.x { guide(x: x, canvas: canvas, fit: fit, offset: offset) }
+            if let y = guides.y { guide(y: y, canvas: canvas, fit: fit, offset: offset) }
+            let drawn = outlines.fill(.white.opacity(0.001))
+                .overlay(outlines.stroke(.cyan, style: StrokeStyle(lineWidth: 1, dash: [4, 3])))
+            // A mixed selection - titles and shapes together - has no shared edit
+            // path, so it is shown but not draggable rather than silently ignoring
+            // the drag.
+            if model.selectionMovesAsAGroup, model.canEditSelection {
+                drawn.contentShape(outlines)
+                    .gesture(DragGesture(minimumDistance: 2).onChanged { value in
+                        if groupOrigin == nil {
+                            groupOrigin = .zero
+                            groupBounds = overlays.dropFirst().reduce(overlays[0].screenBounds(canvas: canvas)) {
+                                $0.union($1.screenBounds(canvas: canvas))
+                            }
+                            model.playback.pause()
+                        }
+                        guard let applied = groupOrigin, let base = groupBounds else { return }
+                        let rawX = value.translation.width/(canvas.width*fit)
+                        let rawY = value.translation.height/(canvas.height*fit)
+                        // The block magnets by its own outer edges and centre,
+                        // exactly as a lone layer does by its frame: onto the
+                        // layers it is NOT dragging first, and onto the canvas
+                        // thirds and centre when none of those is near.
+                        let proposed = base.offsetBy(dx: rawX*canvas.width, dy: rawY*canvas.height)
+                        let pull = magnet(bounds: proposed, canvas: canvas, screenScale: fit,
+                                          others: peers(canvas: canvas, excluding: model.selectedClipIDs))
+                        var x = rawX + pull.dx, y = rawY + pull.dy
+                        var xGuide = pull.xGuide, yGuide = pull.yGuide
+                        if xGuide == nil {
+                            // A lone layer snaps its anchor to the stops; a block
+                            // has no single anchor, so its centre stands in.
+                            let centre = Double(proposed.midX)/Double(canvas.width)
+                            let stop = snap(centre, to: Self.positionStops, tolerance: Self.positionTolerance)
+                            x += stop.value-centre; xGuide = stop.stop
+                        }
+                        if yGuide == nil {
+                            let centre = Double(proposed.midY)/Double(canvas.height)
+                            let stop = snap(centre, to: Self.positionStops, tolerance: Self.positionTolerance)
+                            y += stop.value-centre; yGuide = stop.stop
+                        }
+                        report(x: xGuide, y: yGuide)
+                        model.offsetSelection(.positionX, by: x-applied.x,
+                                              label: AnimatableProperty.positionX.title)
+                        model.offsetSelection(.positionY, by: y-applied.y,
+                                              label: AnimatableProperty.positionY.title)
+                        groupOrigin = CGPoint(x: x, y: y)
+                    }.onEnded { _ in
+                        groupOrigin = nil; groupBounds = nil; guides = (nil, nil)
+                        model.flushGradeHistory()
+                    })
+                    .accessibilityLabel("Selected layers. Drag to move them together.")
+            } else {
+                drawn.allowsHitTesting(false)
+            }
+        }
+    }
+
+    /// A magnet guide across the canvas, at a normalized position.
+    private func guide(x: Double, canvas: CGSize, fit: CGFloat, offset: CGPoint) -> some View {
+        Path {
+            $0.move(to: CGPoint(x: offset.x+x*canvas.width*fit, y: offset.y))
+            $0.addLine(to: CGPoint(x: offset.x+x*canvas.width*fit, y: offset.y+canvas.height*fit))
+        }.stroke(.yellow.opacity(0.9), lineWidth: 1).allowsHitTesting(false)
+    }
+    private func guide(y: Double, canvas: CGSize, fit: CGFloat, offset: CGPoint) -> some View {
+        Path {
+            $0.move(to: CGPoint(x: offset.x, y: offset.y+y*canvas.height*fit))
+            $0.addLine(to: CGPoint(x: offset.x+canvas.width*fit, y: offset.y+y*canvas.height*fit))
+        }.stroke(.yellow.opacity(0.9), lineWidth: 1).allowsHitTesting(false)
+    }
+
     /// Whichever drawn layer is selected, evaluated at the playhead.
     private func selection(canvas: CGSize) -> CanvasOverlay? {
         if let clip = model.evaluatedText { return CanvasOverlay(clip, canvas: canvas) }
@@ -255,58 +469,32 @@ struct OverlayCanvasControls: View {
     /// Every other drawn layer visible at this frame. A title lines up on a
     /// shape's edge and a shape on a title's, which is the whole point of
     /// measuring both against one description.
-    private func peers(canvas: CGSize, excluding id: UUID) -> [CanvasOverlay] {
-        model.visibleEvaluatedTexts.filter { $0.id != id }.map { CanvasOverlay($0, canvas: canvas) }
-            + model.visibleEvaluatedShapes.filter { $0.id != id }.map { CanvasOverlay($0, canvas: canvas) }
-            + model.visibleEvaluatedMediaOverlays.filter { $0.id != id }.compactMap { clip in
+    private func peers(canvas: CGSize, excluding ids: Set<UUID>) -> [CanvasOverlay] {
+        model.visibleEvaluatedTexts.filter { !ids.contains($0.id) }.map { CanvasOverlay($0, canvas: canvas) }
+            + model.visibleEvaluatedShapes.filter { !ids.contains($0.id) }.map { CanvasOverlay($0, canvas: canvas) }
+            + model.visibleEvaluatedMediaOverlays.filter { !ids.contains($0.id) }.compactMap { clip in
                 model.displaySize(of: clip).map { CanvasOverlay(clip, displaySize: $0, canvas: canvas) }
             }
     }
 
-    /// Returns the magnetised value and, when held, the stop it locked onto.
     private func snap(_ value: Double, to stops: [Double], tolerance: Double) -> (value: Double, stop: Double?) {
-        guard let nearest = stops.min(by: { abs($0-value) < abs($1-value) }), abs(nearest-value) <= tolerance else { return (value, nil) }
-        return (nearest, nearest)
+        CanvasMagnet.snap(value, to: stops, tolerance: tolerance)
     }
 
-    /// Aligns the moving layer's left/centre/right and top/centre/bottom to the
-    /// same anchors on every other drawn layer visible at this frame. Bounds
-    /// include scale and rotation, matching the selection outlines users line up
-    /// by eye.
+    /// One layer's magnet: its own frame measured against the others.
     private func align(overlay: CanvasOverlay, x: Double, y: Double, canvas: CGSize,
                        screenScale: CGFloat, others: [CanvasOverlay])
         -> (x: Double, y: Double, xGuide: Double?, yGuide: Double?) {
-        let moving = overlay.moved(x: x, y: y).screenBounds(canvas: canvas)
-        let xAnchors = [moving.minX, moving.midX, moving.maxX]
-        let yAnchors = [moving.minY, moving.midY, moving.maxY]
-        let tolerance = 12 / max(screenScale, 0.001)
-        var bestX: (distance: CGFloat, delta: CGFloat, guide: CGFloat)?
-        var bestY: (distance: CGFloat, delta: CGFloat, guide: CGFloat)?
-        for other in others {
-            let bounds = other.screenBounds(canvas: canvas)
-            for source in xAnchors {
-                for target in [bounds.minX, bounds.midX, bounds.maxX] {
-                    let delta = target-source, distance = abs(delta)
-                    if distance <= tolerance && (bestX == nil || distance < bestX!.distance) {
-                        bestX = (distance, delta, target)
-                    }
-                }
-            }
-            for source in yAnchors {
-                for target in [bounds.minY, bounds.midY, bounds.maxY] {
-                    let delta = target-source, distance = abs(delta)
-                    if distance <= tolerance && (bestY == nil || distance < bestY!.distance) {
-                        bestY = (distance, delta, target)
-                    }
-                }
-            }
-        }
-        return (
-            x + Double(bestX?.delta ?? 0) / Double(canvas.width),
-            y + Double(bestY?.delta ?? 0) / Double(canvas.height),
-            bestX.map { Double($0.guide / canvas.width) },
-            bestY.map { Double($0.guide / canvas.height) }
-        )
+        let pull = magnet(bounds: overlay.moved(x: x, y: y).screenBounds(canvas: canvas),
+                          canvas: canvas, screenScale: screenScale, others: others)
+        return (x + pull.dx, y + pull.dy, pull.xGuide, pull.yGuide)
+    }
+
+    private func magnet(bounds moving: CGRect, canvas: CGSize,
+                        screenScale: CGFloat, others: [CanvasOverlay])
+        -> (dx: Double, dy: Double, xGuide: Double?, yGuide: Double?) {
+        CanvasMagnet.pull(bounds: moving, canvas: canvas, screenScale: screenScale,
+                          others: others.map { $0.screenBounds(canvas: canvas) })
     }
 
     private func report(x: Double?, y: Double?) {

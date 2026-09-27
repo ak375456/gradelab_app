@@ -684,11 +684,14 @@ class LayerCompositor: NSObject, AVVideoCompositing, @unchecked Sendable {
         let placed: CIImage
         switch item {
         case .text(let authored):
-            let clip = time.map { authored.evaluated(at: $0) } ?? authored
+            // Resolved, so an animated title animates the MATTE too: a
+            // typewriter reveals the layer below it letter by letter, with no
+            // matte-specific animation code anywhere.
+            let resolved = authored.resolved(at: time)
             // The real rendered title: glyph anti-aliasing, stroke, background,
             // shadow and glow all carry their own alpha, and all of it is
             // coverage. Nothing is thresholded into a hard mask.
-            guard let image = TextRenderer.image(clip, canvas: canvas, authoredCanvas: authoredCanvas) else { return nil }
+            guard let image = TextRenderer.image(resolved, canvas: canvas, authoredCanvas: authoredCanvas) else { return nil }
             placed = image
         case .shape(let authored):
             let clip = time.map { authored.evaluated(at: $0) } ?? authored
@@ -955,9 +958,9 @@ class LayerCompositor: NSObject, AVVideoCompositing, @unchecked Sendable {
                 let drawn: (image: CIImage, blend: VisualBlendMode)?
                 switch item {
                 case .text(let authored):
-                    let clip = time.map { authored.evaluated(at: $0) } ?? authored
-                    drawn = TextRenderer.image(clip, canvas: bounds.size, authoredCanvas: authoredCanvas)
-                        .map { ($0, clip.blendMode) }
+                    let resolved = authored.resolved(at: time)
+                    drawn = TextRenderer.image(resolved, canvas: bounds.size, authoredCanvas: authoredCanvas)
+                        .map { ($0, resolved.clip.blendMode) }
                 case .shape(let authored):
                     let clip = time.map { authored.evaluated(at: $0) } ?? authored
                     drawn = ShapeRenderer.image(clip, canvas: bounds.size, authoredCanvas: authoredCanvas)
@@ -1380,9 +1383,9 @@ class LayerCompositor: NSObject, AVVideoCompositing, @unchecked Sendable {
                 let drawn: CIImage?
                 switch item {
                 case .text(let authored):
-                    let clip = time.map { authored.evaluated(at: $0) } ?? authored
-                    try Self.requireNormalBlend(clip.blendMode)
-                    drawn = TextRenderer.image(clip, canvas: canvasSize, authoredCanvas: authoredCanvas)
+                    let resolved = authored.resolved(at: time)
+                    try Self.requireNormalBlend(resolved.clip.blendMode)
+                    drawn = TextRenderer.image(resolved, canvas: canvasSize, authoredCanvas: authoredCanvas)
                 case .shape(let authored):
                     let clip = time.map { authored.evaluated(at: $0) } ?? authored
                     try Self.requireNormalBlend(clip.blendMode)
@@ -2153,9 +2156,9 @@ extension LayerCompositor {
                 let drawn: (image: CIImage, blend: VisualBlendMode)?
                 switch item {
                 case .text(let authored):
-                    let clip = authored.evaluated(at: time)
-                    drawn = TextRenderer.image(clip, canvas: size, authoredCanvas: authoredCanvas)
-                        .map { ($0, clip.blendMode) }
+                    let resolved = authored.resolved(at: time)
+                    drawn = TextRenderer.image(resolved, canvas: size, authoredCanvas: authoredCanvas)
+                        .map { ($0, resolved.clip.blendMode) }
                 case .shape(let authored):
                     let clip = authored.evaluated(at: time)
                     drawn = ShapeRenderer.image(clip, canvas: size, authoredCanvas: authoredCanvas)

@@ -20,6 +20,7 @@ struct EditorView: View {
     @State private var shapeSection = "Shape"
     @State private var shapeAppearance = "Fill"
     @State private var typingText = false
+    @State private var textAnimationSlot: TextAnimationSlot = .incoming
     @FocusState private var textFocused: Bool
     @State private var keyboardOverlap: CGFloat = 0
     @State private var clipOptions = false
@@ -558,11 +559,28 @@ struct EditorView: View {
         // landscape, where the keyboard is most of the window.
         .ignoresSafeArea(.keyboard, edges: .bottom)
         .numericEntryHost()
+        // Tracked ONLY while the text dock is up, because the dock's padding is
+        // the only thing that reads it.
+        //
+        // Without that guard this republished on every keyboard frame change
+        // from anywhere in the editor, and each write rebuilt the whole body -
+        // preview, timeline, filmstrips and inspector. The font search field is
+        // the one other place that raises a keyboard here, and raising it
+        // installs the `.keyboard` toolbar below, which is itself a frame
+        // change; the rebuild then re-evaluated that toolbar. A keyboard also
+        // changes frame on nearly every keystroke as the candidate bar comes
+        // and goes, so searching for a font rebuilt the editor per character.
+        // That is what froze the app, and why making the font list cheap did
+        // not help on its own.
         .onReceive(NotificationCenter.default.publisher(for: UIResponder.keyboardWillChangeFrameNotification)) { note in
-            guard let frame = note.userInfo?[UIResponder.keyboardFrameEndUserInfoKey] as? CGRect else { return }
-            keyboardOverlap = Self.keyboardOverlap(ofScreenFrame: frame)
+            guard typingText, let frame = note.userInfo?[UIResponder.keyboardFrameEndUserInfoKey] as? CGRect else { return }
+            let overlap = Self.keyboardOverlap(ofScreenFrame: frame)
+            guard overlap != keyboardOverlap else { return }
+            keyboardOverlap = overlap
         }
-        .onReceive(NotificationCenter.default.publisher(for: UIResponder.keyboardWillHideNotification)) { _ in keyboardOverlap = 0 }
+        .onReceive(NotificationCenter.default.publisher(for: UIResponder.keyboardWillHideNotification)) { _ in
+            if keyboardOverlap != 0 { keyboardOverlap = 0 }
+        }
         .toolbar { ToolbarItemGroup(placement: .keyboard) {
             if !typingText { Spacer(); Button("Done") { UIApplication.shared.sendAction(#selector(UIResponder.resignFirstResponder), to: nil, from: nil, for: nil) } }
         } }
@@ -1139,6 +1157,19 @@ struct EditorView: View {
             }
             .accessibilityLabel("Add transition at playhead")
             .disabled(!model.canUseTransitions || !warmup.isReady)
+            // Delete belongs beside the other editing commands rather than in
+            // the inspector below, which is where it used to be: the inspector
+            // changes with the tool, and deleting a clip does not.
+            Button(role: .destructive) { model.deleteClip() } label: {
+                Image(systemName: "trash")
+                    // A pointer can hit 40x36; a finger needs 44, and iPad is a
+                    // finger even when its window is desktop-sized.
+                    .frame(width: AppPlatform.isMac ? 40 : 44,
+                           height: AppPlatform.isMac ? 36 : 44)
+            }
+            .accessibilityLabel(model.selectedClipIDs.count > 1
+                                ? "Delete \(model.selectedClipIDs.count) clips" : "Delete clip")
+            .disabled(model.selectedClipID == nil || !model.canEditSelection)
         }
         .font(.system(size: 14, weight: .medium))
         .foregroundStyle(AppColors.textSecondary)
@@ -1624,7 +1655,8 @@ struct EditorView: View {
                 ScrollView {
                     if case .text = model.selectedItem {
                         TextToolPanel(model: model, editContent: { model.selectClip(id: model.selectedClipID); typingText = true },
-                                      section: $textSection, appearance: $textAppearance).id(model.selectedClipID)
+                                      section: $textSection, appearance: $textAppearance,
+                                      animationSlot: $textAnimationSlot).id(model.selectedClipID)
                             .disabled(!model.canEditSelection)
                     } else {
                         Text("Add a title or select a text clip in the timeline to edit it.")
@@ -1677,9 +1709,14 @@ struct EditorView: View {
                             .accessibilityLabel("Paste").disabled(model.clipboard == nil)
                         // Split lives in the timeline's own toolbar, beside
                         // Snap and the zoom. A second scissors a few points
-                        // below it was the same command twice.
-                        Button(role: .destructive) { model.deleteClip() } label: { Image(systemName: "trash").frame(width: 44, height: 44) }
-                            .accessibilityLabel(model.selectedAudio == nil ? "Delete clip and close gaps" : "Delete audio clip").disabled(!model.canEditSelection)
+                        // below it was the same command twice. Delete now sits
+                        // in that same toolbar wherever there is room for it,
+                        // so it is only repeated here on a phone, where the
+                        // toolbar folds into a menu instead.
+                        if !AppPlatform.usesDesktopWorkspace {
+                            Button(role: .destructive) { model.deleteClip() } label: { Image(systemName: "trash").frame(width: 44, height: 44) }
+                                .accessibilityLabel(model.selectedAudio == nil ? "Delete clip and close gaps" : "Delete audio clip").disabled(!model.canEditSelection)
+                        }
                         Button { model.toggleMarker() } label: { Image(systemName: "bookmark").frame(width: 44, height: 44) }
                             .accessibilityLabel("Add or remove marker at playhead")
                             .contextMenu { Button("Show / delete markers") { markers = true } }

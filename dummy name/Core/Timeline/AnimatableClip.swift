@@ -88,6 +88,14 @@ extension AnimatableClip {
         (animation ?? ClipAnimation()).localTime(for: composition, clipStart: placement.timelineStart)
     }
 
+    /// Clip-local time only when the playhead is actually inside the clip, which
+    /// is the question "may an animated value be written here?" really asks.
+    func localTimeInside(_ composition: TimelineTime) -> TimelineTime? {
+        guard let end = try? placement.range.end,
+              composition >= placement.timelineStart, composition < end else { return nil }
+        return localTime(for: composition)
+    }
+
     /// The clip's head moved on the timeline while its CONTENT stayed put — a head trim or
     /// the right side of a split. Shifting the window keeps every keyframe: nothing outside
     /// the visible range is discarded, so extending the trim again restores it, and both
@@ -111,6 +119,11 @@ extension AnimatableClip {
 enum AnimationEdit {
     case toggleKeyframe(AnimatableProperty, atLocal: TimelineTime)
     case setValue(AnimatableProperty, KeyframeValue, atLocal: TimelineTime?)
+    /// Moves a number by a relative amount. Carries a COMPOSITION time, not a
+    /// clip-local one, because the clips in a multiple selection start at
+    /// different points and each has to resolve its own local time - one shared
+    /// local time would land on the wrong frame of every clip but the first.
+    case offsetValue(AnimatableProperty, by: Double, atComposition: TimelineTime)
     case removeKeyframe(AnimatableProperty, atLocal: TimelineTime)
     case removeAnimation(AnimatableProperty, atLocal: TimelineTime?)
     case resetProperty(AnimatableProperty)
@@ -186,6 +199,22 @@ extension AnimatableClip {
         self.animation = animation.isEmpty ? nil : animation
     }
 
+    /// Adds `delta` to a number, leaving every other layer's own value intact.
+    ///
+    /// Unanimated: shifts the base value. Animated: writes a keyframe at this
+    /// frame, seeded from what is on screen. A property animated on a clip the
+    /// playhead is outside of is left alone - there is no frame to write to.
+    mutating func offsetValue(_ property: AnimatableProperty, by delta: Double, atComposition composition: TimelineTime) {
+        guard animation?.track(property) != nil else {
+            guard let current = baseValue(of: property)?.number else { return }
+            setBaseValue(.number(current + delta), of: property)
+            return
+        }
+        guard let local = localTimeInside(composition),
+              let current = evaluatedValue(of: property, atLocal: local)?.number else { return }
+        setValue(.number(current + delta), of: property, atLocal: local)
+    }
+
     /// The single write rule.
     /// Unanimated: change the base value, creating no animation.
     /// Animated: update the keyframe on this frame, or insert one here.
@@ -249,6 +278,8 @@ extension AnimatableClip {
         switch edit {
         case .toggleKeyframe(let property, let local): toggleKeyframe(property, atLocal: local)
         case .setValue(let property, let value, let local): setValue(value, of: property, atLocal: local)
+        case .offsetValue(let property, let delta, let composition):
+            offsetValue(property, by: delta, atComposition: composition)
         case .removeKeyframe(let property, let local): removeKeyframe(property, atLocal: local)
         case .removeAnimation(let property, let local): removeAnimation(of: property, atLocal: local)
         case .resetProperty(let property): resetProperty(property)
