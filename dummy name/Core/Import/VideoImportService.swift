@@ -15,6 +15,8 @@ enum VideoImportError: LocalizedError, Equatable, Sendable {
     case unsupportedSelection
     case itemUnavailable
     case unableToStoreVideo
+    /// The copy finished without an error but did not produce the whole file.
+    case incompleteCopy(copied: Int64, expected: Int64)
     /// Out of space, with the numbers. A 4K ProRes clip is several gigabytes, so
     /// this is the ordinary failure for large footage rather than an exotic one,
     /// and it deserves to say what it needs instead of "couldn't copy".
@@ -28,6 +30,12 @@ enum VideoImportError: LocalizedError, Equatable, Sendable {
             String(localized: "The selected video is no longer available.")
         case .unableToStoreVideo:
             String(localized: "GradeLab couldn’t copy the selected video into its project storage.")
+        case .incompleteCopy(let copied, let expected):
+            String(localized: """
+            GradeLab could only read \(ByteCountFormatter.string(fromByteCount: copied, countStyle: .file)) of this \(ByteCountFormatter.string(fromByteCount: expected, countStyle: .file)) video.
+
+            If it is stored in iCloud Drive, open it once in the Files app so it downloads in full, then import it again.
+            """)
         case .insufficientStorage(let needed, let available):
             String(localized: """
             This video needs \(ByteCountFormatter.string(fromByteCount: needed, countStyle: .file)) of free space, but only \(ByteCountFormatter.string(fromByteCount: available, countStyle: .file)) is available.
@@ -85,9 +93,13 @@ actor VideoImportService {
         let destination = try await projectStore.sourceImportURL(
             fileExtension: Self.fileExtension(sourceExtension: url.pathExtension, contentType: contentType))
         do {
-            try FileStreamCopier.copy(from: url, to: destination, fileManager: fileManager)
+            try Self.copyCoordinated(from: url, to: destination, fileManager: fileManager)
         } catch is CancellationError {
             throw CancellationError()
+        } catch let error as VideoImportError {
+            // Already says what went wrong - an incomplete read in particular
+            // must not be flattened into the generic "couldn't copy".
+            throw error
         } catch {
             if VideoImportError.isOutOfSpace(error) {
                 throw VideoImportError.insufficientStorage(
@@ -172,6 +184,35 @@ actor VideoImportService {
             originalFilename: transferredFile.originalFilename,
             contentType: contentType
         )
+    }
+
+    /// Copies the picked file through a file coordinator.
+    ///
+    /// A `fileImporter` hands back a URL that may be an iCloud Drive item the
+    /// device has not materialised. Reading such a placeholder with a plain
+    /// `InputStream` opens successfully and reports EOF immediately, so the
+    /// copy "succeeds" and writes an empty file - which then fails much later,
+    /// as `AVAsset.isPlayable == false`, and is reported as an unsupported
+    /// format. The Files app plays the same clip because tapping it downloads
+    /// it first, which is exactly the step this was missing.
+    ///
+    /// A coordinated read triggers that download and blocks until the file is
+    /// local, so the copy sees real bytes. `FileStreamCopier` then checks the
+    /// byte count, because a short read must never pass for a finished import.
+    private static func copyCoordinated(from url: URL, to destination: URL,
+                                        fileManager: FileManager) throws {
+        var coordinationError: NSError?
+        var thrown: Error?
+        NSFileCoordinator().coordinate(readingItemAt: url, options: [], error: &coordinationError) { readable in
+            do {
+                try FileStreamCopier.copy(from: readable, to: destination,
+                                          expecting: fileSize(of: readable), fileManager: fileManager)
+            } catch {
+                thrown = error
+            }
+        }
+        if let thrown { throw thrown }
+        if let coordinationError { throw coordinationError }
     }
 
     static func fileSize(of url: URL) -> Int64 {
@@ -303,7 +344,10 @@ private enum FileStreamCopier {
         try copy(from: sourceURL, to: destinationURL, fileManager: fileManager)
     }
 
-    static func copy(from sourceURL: URL, to destinationURL: URL, fileManager: FileManager) throws {
+    /// `expectedSize` is checked against what was actually read. Passing nil
+    /// skips the check, for a source whose size is not known up front.
+    static func copy(from sourceURL: URL, to destinationURL: URL,
+                     expecting expectedSize: Int64? = nil, fileManager: FileManager) throws {
         try Task.checkCancellation()
 
         guard !fileManager.fileExists(atPath: destinationURL.path) else {
@@ -334,6 +378,7 @@ private enum FileStreamCopier {
             outputStream.close()
         }
 
+        var copiedBytes: Int64 = 0
         var buffer = [UInt8](repeating: 0, count: 1_048_576)
         while true {
             try Task.checkCancellation()
@@ -359,6 +404,13 @@ private enum FileStreamCopier {
                 }
                 bytesWritten += writeCount
             }
+            copiedBytes += Int64(bytesRead)
+        }
+
+        // A zero-byte or truncated read is not an error the streams report, so
+        // it has to be caught here or it ships as a corrupt import.
+        if let expectedSize, expectedSize > 0, copiedBytes < expectedSize {
+            throw VideoImportError.incompleteCopy(copied: copiedBytes, expected: expectedSize)
         }
 
         copySucceeded = true

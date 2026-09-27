@@ -26330,6 +26330,46 @@
         }
       }
     },
+    "GradeLab could only read %@ of this %@ video.\n\nIf it is stored in iCloud Drive, open it once in the Files app so it downloads in full, then import it again." : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "GradeLab konnte nur %@ dieses %@ großen Videos lesen.\n\nWenn es in iCloud Drive liegt, öffne es einmal in der Dateien-App, damit es vollständig geladen wird, und importiere es dann erneut."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "GradeLab solo pudo leer %@ de este vídeo de %@.\n\nSi está en iCloud Drive, ábrelo una vez en la app Archivos para que se descargue por completo y vuelve a importarlo."
+          }
+        },
+        "fi" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "GradeLab pystyi lukemaan vain %@ tästä %@ kokoisesta videosta.\n\nJos se on iCloud Drivessa, avaa se kerran Tiedostot-apissa, jotta se latautuu kokonaan, ja tuo se sitten uudelleen."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "GradeLab n’a pu lire que %@ de cette vidéo de %@.\n\nSi elle se trouve dans iCloud Drive, ouvrez-la une fois dans l’app Fichiers pour qu’elle se télécharge entièrement, puis réimportez-la."
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "GradeLab ha potuto leggere solo %@ di questo video da %@.\n\nSe si trova su iCloud Drive, aprilo una volta nell’app File per scaricarlo del tutto, poi importalo di nuovo."
+          }
+        },
+        "sv" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "GradeLab kunde bara läsa %@ av den här videon på %@.\n\nOm den ligger i iCloud Drive öppnar du den en gång i appen Filer så att den laddas ner helt, och importerar den sedan igen."
+          }
+        }
+      }
+    },
     "GradeLab couldn’t copy the selected video into its project storage." : {
       "localizations" : {
         "de" : {
@@ -61008,6 +61048,46 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Mediet för det här klippet saknas."
+          }
+        }
+      }
+    },
+    "This device can’t decode %@. Re-export the clip as HEVC and try again." : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Dieses Gerät kann %@ nicht dekodieren. Exportiere den Clip erneut als HEVC und versuche es noch einmal."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Este dispositivo no puede decodificar %@. Vuelve a exportar el clip como HEVC e inténtalo de nuevo."
+          }
+        },
+        "fi" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "Tämä laite ei pysty purkamaan muotoa %@. Vie leike uudelleen HEVC-muodossa ja yritä uudelleen."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Cet appareil ne peut pas décoder %@. Réexportez le clip en HEVC, puis réessayez."
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Questo dispositivo non può decodificare %@. Esporta di nuovo il clip in HEVC e riprova."
+          }
+        },
+        "sv" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Den här enheten kan inte avkoda %@. Exportera om klippet som HEVC och försök igen."
           }
         }
       }

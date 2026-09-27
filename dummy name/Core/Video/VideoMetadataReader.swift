@@ -10,7 +10,11 @@ struct VideoMetadataReader: Sendable {
             async let playableValue = asset.load(.isPlayable)
             async let protectedValue = asset.load(.hasProtectedContent)
             let duration = try await asset.load(.duration)
-            guard try await playableValue else { throw GradeLabError.unsupportedVideo }
+            if try await !playableValue {
+                guard await Self.decodesAFrame(asset) else {
+                    throw await Self.undecodableError(for: asset)
+                }
+            }
             guard try await !protectedValue else { throw GradeLabError.protectedVideo }
             let videoTracks = try await asset.loadTracks(withMediaType: .video)
             let audioTracks = try await asset.loadTracks(withMediaType: .audio)
@@ -94,6 +98,77 @@ struct VideoMetadataReader: Sendable {
             #endif
             throw GradeLabError.unableToReadMetadata
         }
+    }
+
+    /// Whether the device can really decode this, as opposed to whether
+    /// `isPlayable` is willing to promise it.
+    ///
+    /// `isPlayable` is a conservative capability answer, not a decode attempt:
+    /// it weighs what the file DECLARES against a table of supported profiles
+    /// and levels. Premiere's MainConcept encoder stamps Level 6.0 on a
+    /// vertical 4K H.264 export whose content would fit 5.1, past the 5.2 that
+    /// table allows - so `isPlayable` says no while VideoToolbox, which checks
+    /// the stream's actual constraints, decodes it happily. That is the whole
+    /// discrepancy behind a clip that plays in the Files app and would not
+    /// import here: QuickLook simply plays it and never asks.
+    ///
+    /// So the flag is demoted to a hint. When it says no, decode a frame and
+    /// believe the result. A file that yields one will grade and export, since
+    /// this is the same VideoToolbox path both of those run on.
+    private static func decodesAFrame(_ asset: AVURLAsset) async -> Bool {
+        let generator = AVAssetImageGenerator(asset: asset)
+        generator.maximumSize = CGSize(width: 320, height: 320)
+        generator.requestedTimeToleranceBefore = .positiveInfinity
+        generator.requestedTimeToleranceAfter = .positiveInfinity
+        return (try? await generator.image(at: .zero)) != nil
+    }
+
+    /// Names what the decoder actually refused, instead of "not supported".
+    ///
+    /// Reached only once a real decode has failed too, so this is a genuine
+    /// refusal rather than a pessimistic flag. It still does not guess at WHICH
+    /// limit was hit - the codec, level and coded size are reported as facts
+    /// and the remedy left general, because the level a file declares has
+    /// already proved a poor predictor of what the device will accept.
+    ///
+    /// Container parsing does not depend on decoder support, so the track and
+    /// its format description are still readable. Every step is best effort all
+    /// the same: anything missing falls back to the plain `unsupportedVideo`
+    /// message rather than reporting a guess.
+    private static func undecodableError(for asset: AVURLAsset) async -> GradeLabError {
+        guard let track = try? await asset.loadTracks(withMediaType: .video).first,
+              let description = try? await track.load(.formatDescriptions).first,
+              let size = try? await track.load(.naturalSize) else {
+            return .unsupportedVideo
+        }
+
+        let fourCC = fourCCString(CMFormatDescriptionGetMediaSubType(description))
+        let dimensions = CMVideoFormatDescriptionGetDimensions(description)
+        let width = dimensions.width > 0 ? Int(dimensions.width) : Int(abs(size.width).rounded())
+        let height = dimensions.height > 0 ? Int(dimensions.height) : Int(abs(size.height).rounded())
+
+        var format = codecLabel(for: fourCC)
+        if let level = h264Level(from: description, fourCC: fourCC) { format += " Level \(level)" }
+        if width > 0, height > 0 { format += " \u{00B7} \(width) \u{00D7} \(height)" }
+        return .undecodableVideo(format: format)
+    }
+
+    /// `level_idc` out of the `avcC` record, named the way the spec names it.
+    ///
+    /// The record is `[version, profile_idc, profile_compatibility, level_idc]`.
+    /// Level 1b is the one value that is not simply the number over ten: it
+    /// shares `level_idc` 11 with Level 1.1 and is told apart by
+    /// `constraint_set3_flag`, bit 4 of the compatibility byte.
+    private static func h264Level(from description: CMFormatDescription, fourCC: String) -> String? {
+        guard ["avc1", "avc3"].contains(fourCC.lowercased()) else { return nil }
+        let extensions = CMFormatDescriptionGetExtensions(description) as NSDictionary?
+        let atoms = extensions?[kCMFormatDescriptionExtension_SampleDescriptionExtensionAtoms] as? NSDictionary
+        guard let record = atoms?["avcC"] as? Data, record.count > 3 else { return nil }
+        let compatibility = record[record.startIndex + 2]
+        let idc = Int(record[record.startIndex + 3])
+        guard idc > 0 else { return nil }
+        if idc == 11, compatibility & 0x10 != 0 { return "1b" }
+        return "\(idc / 10).\(idc % 10)"
     }
 
     private static func extensionString(_ extensions: NSDictionary?, key: CFString) -> String? {

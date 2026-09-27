@@ -2,6 +2,7 @@ import Foundation
 
 enum GradeLabError: LocalizedError, Equatable, Sendable {
     case unsupportedVideo
+    case undecodableVideo(format: String)
     case protectedVideo
     case unableToReadMetadata
     case missingVideoTrack
@@ -25,6 +26,8 @@ enum GradeLabError: LocalizedError, Equatable, Sendable {
         switch self {
         case .unsupportedVideo:
             String(localized: "This video format is not supported.")
+        case .undecodableVideo(let format):
+            String(localized: "This device can’t decode \(format). Re-export the clip as HEVC and try again.")
         case .protectedVideo:
             String(localized: "Protected videos can’t be graded.")
         case .unableToReadMetadata:
