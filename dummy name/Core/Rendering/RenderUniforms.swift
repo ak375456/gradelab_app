@@ -134,7 +134,7 @@ struct GradeUniforms: Sendable {
         let mask = advanced.resolvedMask
         gradeMaskA = SIMD4(mask.centerX / 100, mask.centerY / 100,
                            mask.width / 100, mask.height / 100)
-        let flags: Float = (mask.shape == .rectangle ? 1 : 0) + (mask.isInverted ? 4 : 0)
+        let flags = mask.shape.shaderCode + (mask.isInverted ? 4 : 0)
         gradeMaskB = SIMD4(mask.rotation * .pi / 180, mask.feather / 100,
                            mask.isEnabled ? mask.opacity / 100 : -1, flags)
         // Retired curve slots, reused rather than widening the struct: the

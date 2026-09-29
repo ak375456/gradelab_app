@@ -176,11 +176,15 @@ enum ShotMatchForwardModel {
         let shadowMask = 1 - ShotMatchColor.smoothstep(0.08, 0.50, luma)
         let highlightMask = ShotMatchColor.smoothstep(0.32, 1.0, luma)
         let blackMask = 1 - ShotMatchColor.smoothstep(0.0, 0.18, luma)
-        let whiteMask = ShotMatchColor.smoothstep(0.62, 1.0, luma)
+        // Keep this byte-for-byte equivalent to applyGradeCore: Whites begins
+        // in the upper visible range, rather than above the levels most Log
+        // footage ever reaches, and has enough travel to act as a white-point
+        // control instead of an imperceptible specular trim.
+        let whiteMask = ShotMatchColor.smoothstep(0.25, 1.0, luma)
         let delta = transform.shadows * shadowMask * max(luma, 0.035) * 0.75
             + transform.highlights * highlightMask * max(luma, 0.08) * 0.65
             + transform.blacks * blackMask * 0.045
-            + transform.whites * whiteMask * 0.085
+            + transform.whites * whiteMask * 0.25
         let adjusted = max(luma + delta, 0)
         // `preserveHueLuminance`: the correction is a change of brightness, so
         // it scales the colour rather than being added to it, and the hue and

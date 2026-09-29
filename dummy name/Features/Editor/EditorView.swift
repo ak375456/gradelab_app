@@ -800,9 +800,10 @@ struct EditorView: View {
             Text(model.project.displayName).font(.caption.weight(.medium)).lineLimit(1).truncationMode(.middle)
                 .frame(maxWidth: .infinity, alignment: .leading)
             Spacer(minLength: 0)
-            // Mac only. On a touch iPad a keyboard menu is a button that
-            // explains keys the device has no way to press.
-            if AppPlatform.isMac {
+            // iPad receives these commands from a Bluetooth/Magic Keyboard or
+            // from a Mac through Universal Control, so the live key owners must
+            // exist there too — not just in the Catalyst hierarchy.
+            if AppPlatform.supportsWorkspaceShortcuts {
                 WorkspaceShortcutMenu(shortcuts: workspaceShortcuts, isEnabled: shortcutsEnabled)
             }
             Button(action: model.undo) { Image(systemName: "arrow.uturn.backward").frame(width: 36, height: 44) }

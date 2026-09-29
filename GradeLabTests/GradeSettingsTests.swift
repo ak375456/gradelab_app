@@ -57,6 +57,17 @@ final class GradeSettingsTests: XCTestCase {
         XCTAssertEqual(GradeUniforms(settings: .neutral, bypass: false).gradeMaskB.z, -1)
     }
 
+    func testGradientMaskUsesTheShaderGradientShapeCode() {
+        var settings = GradeSettings.neutral
+        var advanced = AdvancedGrade.neutral
+        advanced.mask = GradeMask(isEnabled: true, shape: .linear,
+                                  isInverted: true)
+        settings.advanced = advanced
+
+        XCTAssertEqual(GradeUniforms(settings: settings, bypass: false).gradeMaskB.w, 6,
+                       "gradient shape 2 + inverted flag 4")
+    }
+
     func testMaskAloneDoesNotCountAsAVisibleCreativeChange() {
         var settings = GradeSettings.neutral
         var advanced = AdvancedGrade.neutral

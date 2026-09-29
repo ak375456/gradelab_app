@@ -648,8 +648,9 @@ struct EditorSettings: View {
                 } header: { Text("Sliders") }
                   footer: { Text("A double tap on an animated property resets its value at the playhead. Use Reset in the property's Animation menu to clear its keyframes as well.") }
 
-                // Mac only, matching where the shortcuts themselves live.
-                if AppPlatform.isMac {
+                // The same list applies to a paired iPad keyboard and to a Mac
+                // keyboard routed to iPad through Universal Control.
+                if AppPlatform.supportsWorkspaceShortcuts {
                     Section {
                         NavigationLink {
                             WorkspaceShortcutList()

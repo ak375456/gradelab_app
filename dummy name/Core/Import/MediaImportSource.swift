@@ -23,6 +23,14 @@ enum AppPlatform {
     static var usesDesktopWorkspace: Bool {
         isMac || UIDevice.current.userInterfaceIdiom == .pad
     }
+
+    /// Hardware-keyboard commands are useful on Mac and iPad. An iPad receives
+    /// the same key events from a paired Bluetooth/Magic Keyboard and from a
+    /// Mac keyboard routed through Universal Control, so this must not be gated
+    /// by `isMac` even though pointer-sized desktop chrome still is.
+    static var supportsWorkspaceShortcuts: Bool {
+        isMac || UIDevice.current.userInterfaceIdiom == .pad
+    }
 }
 
 /// Both sources enter the same validation and project-creation pipeline.

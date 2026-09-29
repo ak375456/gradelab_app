@@ -114,7 +114,7 @@ enum GradePanel: String, CaseIterable, Identifiable, Sendable {
 
             Add as many as the shot needs: a face, a sky, a foreground. They apply in the order they are listed.
             """)
-        case .mask: String(localized: "Local color limits this clip's creative grade to an ellipse or rectangle; it does not make the layer transparent. For separate graded areas that each carry their own colour, use Masks. Use the Mask tool beside Transform when you want to reveal clips underneath.")
+        case .mask: String(localized: "Local color limits this clip's creative grade to an ellipse, rectangle or gradient; it does not make the layer transparent. For separate graded areas that each carry their own colour, use Masks. Use the Mask tool beside Transform when you want to reveal clips underneath.")
         case .vignette: String(localized: "Darken the edges to draw attention inward, or brighten them for a softer look. Midpoint controls how far inward it reaches; feather softens the transition.")
         case .effects: String(localized: "Finishing effects. Fade lifts the blacks toward a matte print. Sharpen adds edge detail. Bloom, glow and halation spread light out of bright areas — halation is the red halo film gets. Grain is strongest through the midtones, as film is.")
         case .lut: String(localized: "Pick a creative look, then set its strength. The look is applied first and every other tool adjusts the result, so you can still fine-tune exposure and color afterwards.")

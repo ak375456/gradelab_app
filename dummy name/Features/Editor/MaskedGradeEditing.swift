@@ -381,14 +381,14 @@ extension EditorViewModel {
     // MARK: - Freehand drawing
 
     /// Adds a vertex to the mask being drawn, in frame-normalised coordinates.
-    func appendMaskPoint(_ id: UUID, _ point: MaskPoint) {
+    func appendMaskPoint(_ id: UUID, _ point: MaskPoint, immediate: Bool = true) {
         guard let layer = maskedGrades.first(where: { $0.id == id }),
               layer.geometry.shape == .freehand else { return }
         guard layer.geometry.points.count < MaskGeometry.maximumPoints else {
             editError = String(localized: "A freehand mask can hold \(MaskGeometry.maximumPoints) points.")
             return
         }
-        updateMask(id, label: "Draw Mask", immediate: true) { mask in
+        updateMask(id, label: "Draw Mask", immediate: immediate) { mask in
             mask.geometry.points.append(point.clamped)
             // The pivot follows the shape while it is being drawn, and the
             // position is pinned to it, so the path starts untranslated and

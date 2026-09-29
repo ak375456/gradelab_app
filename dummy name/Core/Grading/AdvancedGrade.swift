@@ -31,12 +31,24 @@ struct GradingWheel: Codable, Equatable, Sendable {
 enum GradeMaskShape: String, Codable, CaseIterable, Identifiable, Sendable {
     case ellipse
     case rectangle
+    /// A graduated filter: full effect on one side, fading across its parallel
+    /// guide lines to no effect on the other.
+    case linear
 
     var id: String { rawValue }
     var title: String {
         switch self {
         case .ellipse: String(localized: "Ellipse")
         case .rectangle: String(localized: "Rectangle")
+        case .linear: String(localized: "Gradient")
+        }
+    }
+
+    var shaderCode: Float {
+        switch self {
+        case .ellipse: 0
+        case .rectangle: 1
+        case .linear: 2
         }
     }
 }

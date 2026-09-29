@@ -261,7 +261,9 @@ private struct GradeMaskPanel<Model: GradingModel>: View {
             }
 
             HStack {
-                Text("Drag the shape on the picture to position it.")
+                Text(model.gradeMask.shape == .linear
+                     ? "Drag the gradient on the picture; Rotation changes its direction."
+                     : "Drag the shape on the picture to position it.")
                     .font(.caption2)
                     .foregroundStyle(AppColors.textSecondary)
                 Spacer(minLength: 8)
@@ -283,16 +285,21 @@ private struct GradeMaskPanel<Model: GradingModel>: View {
                 KeyframeSectionHeader(model: editor, help: $keyframeHelp,
                                       confirmsRemoveAll: $confirmsRemoveAll)
                 ForEach(localMaskProperties, id: \.0) { property, range, scale, suffix in
-                    KeyframePropertyRow(model: editor, property: property, range: range,
-                                        activeProperty: $activeProperty,
-                                        selectedKeyframe: $selectedKeyframe,
-                                        displayScale: scale, suffix: suffix)
+                    if model.gradeMask.shape != .linear
+                        || (property != .localMaskWidth && property != .localMaskHeight) {
+                        KeyframePropertyRow(model: editor, property: property, range: range,
+                                            activeProperty: $activeProperty,
+                                            selectedKeyframe: $selectedKeyframe,
+                                            displayScale: scale, suffix: suffix)
+                    }
                 }
             } else {
                 maskAdjustment("Position X", \.centerX, 0...100, 50)
                 maskAdjustment("Position Y", \.centerY, 0...100, 50)
-                maskAdjustment("Width", \.width, 1...200, 60)
-                maskAdjustment("Height", \.height, 1...200, 40)
+                if model.gradeMask.shape != .linear {
+                    maskAdjustment("Width", \.width, 1...200, 60)
+                    maskAdjustment("Height", \.height, 1...200, 40)
+                }
                 maskAdjustment("Rotation", \.rotation, -180...180, 0, suffix: "°")
                 maskAdjustment("Feather", \.feather, 0...100, 25)
                 maskAdjustment("Opacity", \.opacity, 0...100, 100)
@@ -335,7 +342,7 @@ private struct GradeMaskPanel<Model: GradingModel>: View {
 }
 
 /// An editing-only guide over the picture. The mask stays visible while it is
-/// off so choosing Ellipse or Rectangle never appears to do nothing. It is not
+/// off so choosing a shape never appears to do nothing. It is not
 /// rendered into scopes or exports.
 struct GradeMaskOverlay<Model: GradingModel>: View {
     @ObservedObject var model: Model
@@ -357,8 +364,10 @@ struct GradeMaskOverlay<Model: GradingModel>: View {
                 y: picture.minY + picture.height * CGFloat(mask.centerY / 100)
             )
             let maskSize = CGSize(
-                width: max(12, picture.width * CGFloat(mask.width / 100)),
-                height: max(12, picture.height * CGFloat(mask.height / 100))
+                width: mask.shape == .linear ? picture.width * 1.6
+                                             : max(12, picture.width * CGFloat(mask.width / 100)),
+                height: mask.shape == .linear ? picture.height * 1.6
+                                              : max(12, picture.height * CGFloat(mask.height / 100))
             )
 
             ZStack {
@@ -381,7 +390,8 @@ struct GradeMaskOverlay<Model: GradingModel>: View {
                 }
                 .allowsHitTesting(false)
 
-                maskGuide(shape: mask.shape, enabled: mask.isEnabled)
+                maskGuide(shape: mask.shape, enabled: mask.isEnabled,
+                          featherSpacing: picture.width * CGFloat(mask.feather / 100) * 0.25)
                     .frame(width: maskSize.width, height: maskSize.height)
                     .rotationEffect(.degrees(Double(mask.rotation)))
                     .contentShape(Rectangle())
@@ -397,15 +407,26 @@ struct GradeMaskOverlay<Model: GradingModel>: View {
     }
 
     @ViewBuilder
-    private func maskGuide(shape: GradeMaskShape, enabled: Bool) -> some View {
+    private func maskGuide(shape: GradeMaskShape, enabled: Bool,
+                           featherSpacing: CGFloat) -> some View {
         let color = enabled ? AppColors.accent : AppColors.textSecondary
         ZStack {
             if shape == .ellipse {
                 Ellipse().stroke(.black.opacity(0.8), lineWidth: 5)
                 Ellipse().stroke(color, style: StrokeStyle(lineWidth: 2, dash: [7, 5]))
-            } else {
+            } else if shape == .rectangle {
                 Rectangle().stroke(.black.opacity(0.8), lineWidth: 5)
                 Rectangle().stroke(color, style: StrokeStyle(lineWidth: 2, dash: [7, 5]))
+            } else {
+                // Three parallel lines are the familiar graduated-filter
+                // affordance: the centre is the 50% boundary and the outer
+                // lines show the feathered transition.
+                ForEach([-1.0, 0.0, 1.0], id: \.self) { offset in
+                    Rectangle()
+                        .fill(offset == 0 ? color : color.opacity(0.48))
+                        .frame(width: offset == 0 ? 2 : 1)
+                        .offset(x: CGFloat(offset) * featherSpacing)
+                }
             }
             Circle()
                 .fill(color)

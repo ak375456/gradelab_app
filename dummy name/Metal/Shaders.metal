@@ -788,11 +788,17 @@ inline float3 applyGradeCore(float3 encodedRGB,
     float shadowMask = 1.0 - smoothstep(0.08, 0.50, luma);
     float highlightMask = smoothstep(0.32, 1.0, luma);
     float blackMask = 1.0 - smoothstep(0.0, 0.18, luma);
-    float whiteMask = smoothstep(0.62, 1.0, luma);
+    // Whites is a white-point control, not a specular-only control. Starting
+    // at 0.62 in linear light meant a pixel had to be above roughly 81% in the
+    // visible Rec.709 signal before it participated at all. Flat and Log
+    // pictures commonly never reach that level, so the slider appeared dead.
+    // Begin at 0.25 linear (about 54% encoded), but ease in slowly enough that
+    // middle grey remains fixed.
+    float whiteMask = smoothstep(0.25, 1.0, luma);
     float tonalDelta = grade.lightA.w * shadowMask * max(luma, 0.035) * 0.75
         + grade.lightA.z * highlightMask * max(luma, 0.08) * 0.65
         + grade.lightB.y * blackMask * 0.045
-        + grade.lightB.x * whiteMask * 0.085;
+        + grade.lightB.x * whiteMask * 0.25;
     float adjustedLuma = max(luma + tonalDelta, 0.0);
     color = luma > 0.00001
         ? preserveHueLuminance(color, luma, adjustedLuma)
@@ -1117,11 +1123,13 @@ inline float3 applyGradeCoreHDR(float3 working,
     float shadowMask = 1.0 - smoothstep(0.08, 0.50, luma);
     float highlightMask = smoothstep(0.32, 1.0, luma);
     float blackMask = 1.0 - smoothstep(0.0, 0.18, luma);
-    float whiteMask = smoothstep(0.62, 1.0, luma);
+    // Match the SDR white-point response above. Working values above diffuse
+    // white naturally stay fully selected rather than being clipped first.
+    float whiteMask = smoothstep(0.25, 1.0, luma);
     float tonalDelta = grade.lightA.w * shadowMask * max(luma, 0.035) * 0.75
         + grade.lightA.z * highlightMask * max(luma, 0.08) * 0.65
         + grade.lightB.y * blackMask * 0.045
-        + grade.lightB.x * whiteMask * 0.085;
+        + grade.lightB.x * whiteMask * 0.25;
     float adjustedLuma = max(luma + tonalDelta, 0.0);
     color = luma > 0.00001
         ? preserveHueLuminance(color, luma, adjustedLuma)

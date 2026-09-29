@@ -174,7 +174,7 @@ struct ImageEditorView: View {
                 .lineLimit(1).truncationMode(.middle)
                 .frame(maxWidth: .infinity, alignment: .leading)
             Spacer(minLength: 0)
-            if AppPlatform.isMac {
+            if AppPlatform.supportsWorkspaceShortcuts {
                 WorkspaceShortcutMenu(shortcuts: workspaceShortcuts,
                     isEnabled: !model.showsExport && !savingPreset && !infoSheet && !help
                         && !confirmsResetAll && model.editError == nil)

@@ -243,7 +243,8 @@ extension View {
 }
 
 /// The keyboard icon in an editor header: a menu listing what is available
-/// right now, plus the buttons that actually own the key equivalents.
+/// right now, plus the buttons that actually own the key equivalents on Mac and
+/// iPad hardware keyboards (including Universal Control).
 ///
 /// The equivalents deliberately do **not** live on the menu's own buttons.
 /// SwiftUI builds menu content lazily, so nothing inside it is registered with

@@ -30,6 +30,13 @@ struct MaskOverlay: View {
     @State private var active: Handle?
     @State private var start: MaskGeometry?
     @State private var startPoint: CGPoint?
+    /// Last vertex sampled while a freehand stroke is in flight. The old
+    /// implementation put a zero-distance drag and a tap recogniser on the
+    /// same view; the drag won, so the tap that was supposed to add a point
+    /// never arrived. Freehand input now lives in the drag recogniser itself,
+    /// which also lets a person trace a shape instead of having to tap every
+    /// vertex individually.
+    @State private var lastDrawLocation: CGPoint?
 
     /// How close a finger has to be to grab a handle. A comfortable target
     /// without making the whole shape un-draggable on a small preview.
@@ -59,7 +66,19 @@ struct MaskOverlay: View {
                     .contentShape(Rectangle())
                     .allowsHitTesting(model.selectedMaskID.map { !model.isTrackingMask($0) } ?? true)
                     .gesture(dragGesture(in: picture))
-                    .onTapGesture { location in handleTap(location, in: picture) }
+
+                if model.isDrawingMask,
+                   model.displayedSelectedMask?.geometry.shape == .freehand {
+                    Text("Tap points or drag around the subject")
+                        .font(.caption2.weight(.semibold))
+                        .foregroundStyle(.white)
+                        .padding(.horizontal, 10)
+                        .padding(.vertical, 6)
+                        .background(.black.opacity(0.72), in: Capsule())
+                        .position(x: picture.midX, y: picture.minY + 20)
+                        .allowsHitTesting(false)
+                        .accessibilityHidden(true)
+                }
             }
         }
         .accessibilityElement(children: .ignore)
@@ -304,6 +323,11 @@ struct MaskOverlay: View {
     }
 
     private func handlePositions(_ geometry: MaskGeometry, _ picture: CGRect) -> [(handle: Handle, point: CGPoint, filled: Bool)] {
+        // An empty freehand mask used to show a blue centre handle. It looked
+        // actionable, but there was no polygon for that handle to move. During
+        // drawing the vertices are the interaction, so keep the misleading
+        // handle out of the way until the path is finished.
+        if geometry.shape == .freehand, model.isDrawingMask { return [] }
         var handles: [(Handle, CGPoint, Bool)] = [(.move, toView(.zero, geometry, picture), true)]
         let half = halfSize(geometry, picture)
         let soft = softness(geometry, picture)
@@ -331,6 +355,10 @@ struct MaskOverlay: View {
         DragGesture(minimumDistance: 0)
             .onChanged { value in
                 guard let mask = model.displayedSelectedMask else { return }
+                if model.isDrawingMask, mask.geometry.shape == .freehand {
+                    appendDrawPointIfNeeded(value.location, to: mask, in: picture)
+                    return
+                }
                 if active == nil {
                     active = hitTest(value.startLocation, mask.geometry, picture)
                     start = mask.geometry
@@ -340,13 +368,48 @@ struct MaskOverlay: View {
                 apply(active, from: start, at: value.location, picture: picture, mask: mask, committing: false)
             }
             .onEnded { value in
+                if let mask = model.displayedSelectedMask,
+                   model.isDrawingMask, mask.geometry.shape == .freehand {
+                    appendDrawPointIfNeeded(value.location, to: mask, in: picture, force: true)
+                    lastDrawLocation = nil
+                    model.flushGradeHistory()
+                    return
+                }
                 if let active, let start, let mask = model.displayedSelectedMask {
                     apply(active, from: start, at: value.location, picture: picture, mask: mask, committing: true)
+                }
+                // Treat a zero-distance drag as the tap it really is. This is
+                // also how an existing freehand vertex is removed after the
+                // competing tap recogniser was eliminated.
+                if hypot(value.translation.width, value.translation.height) < 5 {
+                    handleTap(value.location, in: picture)
                 }
                 active = nil; start = nil; startPoint = nil
                 // One gesture, one undo entry.
                 model.flushGradeHistory()
             }
+    }
+
+    private func appendDrawPointIfNeeded(
+        _ location: CGPoint,
+        to mask: MaskedGradeLayer,
+        in picture: CGRect,
+        force: Bool = false
+    ) {
+        guard picture.contains(location) else { return }
+        if let lastDrawLocation {
+            let distance = hypot(location.x - lastDrawLocation.x,
+                                 location.y - lastDrawLocation.y)
+            // A modest view-space spacing keeps a traced edge smooth without
+            // exhausting the fixed-size GPU point pool on one short stroke.
+            let spacing = max(8, min(picture.width, picture.height) / 55)
+            guard force || distance >= spacing else { return }
+            // Do not append the same endpoint twice when a drag's final changed
+            // event and ended event report the same location.
+            if force, distance < 2 { return }
+        }
+        model.appendMaskPoint(mask.id, normalized(location, picture), immediate: false)
+        lastDrawLocation = location
     }
 
     /// The nearest handle within reach, or the whole shape. Returns nil when the

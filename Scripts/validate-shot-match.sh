@@ -9,7 +9,8 @@ import subprocess, sys
 root = Path('dummy name/Core')
 build = Path(sys.argv[1])
 files = [root / 'AppError.swift']
-for folder in ['ShotMatch', 'Grading', 'Timeline', 'LUT', 'Export', 'Rendering', 'Video', 'BackgroundRemoval']:
+for folder in ['ShotMatch', 'Grading', 'Timeline', 'LUT', 'Export', 'Rendering', 'Video',
+               'BackgroundRemoval', 'Retiming', 'NoiseReduction']:
     files += sorted((root / folder).glob('*.swift'))
 # The same exclusions the other harnesses use: anything that needs UIKit, a
 # decoded frame or a live render surface is not what is under test here.

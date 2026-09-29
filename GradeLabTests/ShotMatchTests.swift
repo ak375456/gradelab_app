@@ -341,6 +341,30 @@ final class ShotMatchTests: XCTestCase {
                           "a flattened picture uses measurably less of the range")
     }
 
+    /// Whites used to begin so high in linear light, and move so little, that
+    /// the control did nothing on a flat or Log-looking picture. It should
+    /// visibly move an upper-tone pixel while leaving photographic middle grey
+    /// alone; Highlights is the broader control for the range between them.
+    func testWhitesIsVisibleOnFlatFootageWithoutMovingMiddleGrey() {
+        var positive = ShotMatchTransform.neutral
+        positive.whites = 1
+        var negative = ShotMatchTransform.neutral
+        negative.whites = -1
+
+        let middle = SIMD3<Float>(repeating: 0.18)
+        let flatWhite = SIMD3<Float>(repeating: 0.45)
+        let raisedMiddle = ShotMatchForwardModel.applyTonalRange(positive, to: middle)
+        let raisedWhite = ShotMatchForwardModel.applyTonalRange(positive, to: flatWhite)
+        let loweredWhite = ShotMatchForwardModel.applyTonalRange(negative, to: flatWhite)
+
+        XCTAssertEqual(raisedMiddle.x, middle.x, accuracy: 0.0001,
+                       "Whites must not behave like a second Exposure control")
+        XCTAssertGreaterThan(raisedWhite.x, flatWhite.x + 0.03,
+                             "full positive Whites must be plainly visible on flat footage")
+        XCTAssertLessThan(loweredWhite.x, flatWhite.x - 0.03,
+                          "full negative Whites must be plainly visible on flat footage")
+    }
+
     func testAnEmptyProfileIsNotUsable() {
         XCTAssertFalse(ShotAnalyzer.empty().isUsable)
         XCTAssertTrue(ShotAnalyzer.profile(linearSamples: scene(seed: 51, count: 1000)).isUsable)

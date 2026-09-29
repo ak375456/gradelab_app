@@ -57,12 +57,11 @@ struct TextToolPanel: View {
                             .background(.white.opacity(0.07), in: RoundedRectangle(cornerRadius: 9))
                         }
                         .accessibilityLabel(fonts ? "Close font menu" : "Choose font")
-                        .popover(isPresented: $fonts, attachmentAnchor: .rect(.bounds), arrowEdge: .top) {
-                            FontMenu(selected: model.selectedText?.style.fontName) { name in
-                                model.editText("Font") { $0.style.fontName = name }
-                            }
-                            .presentationCompactAdaptation(.popover)
-                        }
+                        .modifier(FontMenuPresenter(
+                            isPresented: $fonts,
+                            selected: model.selectedText?.style.fontName,
+                            choose: { name in model.editText("Font") { $0.style.fontName = name } }
+                        ))
                         VStack(spacing: 0) {
                             Button { cycleFont(-1) } label: {
                                 Image(systemName: "chevron.up").frame(width: 38, height: 22)
@@ -290,8 +289,38 @@ struct TextToolPanel: View {
     }
 }
 
+/// A popover fits the desktop editor, but on iPad its inspector anchor sits
+/// directly above the software keyboard. Once search took focus the keyboard
+/// covered the fixed-height popover while the popover continued intercepting
+/// the editor, which looked exactly like a frozen app. A sheet gives iPadOS a
+/// keyboard-aware presentation with the search field and close button kept in
+/// the visible area.
+private struct FontMenuPresenter: ViewModifier {
+    @Binding var isPresented: Bool
+    let selected: String?
+    let choose: (String?) -> Void
+
+    @ViewBuilder
+    func body(content: Content) -> some View {
+        if AppPlatform.isMac {
+            content.popover(isPresented: $isPresented,
+                            attachmentAnchor: .rect(.bounds), arrowEdge: .top) {
+                FontMenu(selected: selected, fillsPresentation: false, choose: choose)
+                    .presentationCompactAdaptation(.popover)
+            }
+        } else {
+            content.sheet(isPresented: $isPresented) {
+                FontMenu(selected: selected, fillsPresentation: true, choose: choose)
+                    .presentationDetents([.large])
+                    .presentationDragIndicator(.visible)
+            }
+        }
+    }
+}
+
 private struct FontMenu: View {
     let selected: String?
+    let fillsPresentation: Bool
     let choose: (String?) -> Void
     @Environment(\.dismiss) private var dismiss
     @State private var query = ""
@@ -320,12 +349,19 @@ private struct FontMenu: View {
     }
 
     var body: some View {
-        VStack(spacing: 10) {
+        let menu = VStack(spacing: 10) {
             HStack(spacing: 8) {
                 Image(systemName: "magnifyingglass").foregroundStyle(.secondary)
                 TextField("Search fonts", text: $query)
                     .textInputAutocapitalization(.never)
                     .autocorrectionDisabled()
+                    .submitLabel(.search)
+                if fillsPresentation {
+                    Button("Done") { dismiss() }
+                        .font(.subheadline.weight(.semibold))
+                        .foregroundStyle(AppColors.accent)
+                        .frame(minWidth: 44, minHeight: 44)
+                }
             }
             .padding(.horizontal, 12).frame(height: 42)
             .background(.black.opacity(0.28), in: RoundedRectangle(cornerRadius: 9))
@@ -348,7 +384,14 @@ private struct FontMenu: View {
                 }
             }
         }
-        .padding(12).frame(width: 330, height: 440)
+        .padding(12)
+        Group {
+            if fillsPresentation {
+                menu.frame(maxWidth: .infinity, maxHeight: .infinity)
+            } else {
+                menu.frame(width: 330, height: 440)
+            }
+        }
         .background(AppColors.surface)
         .task { await load() }
         .preferredColorScheme(.dark)
