@@ -394,15 +394,21 @@ final class RelightStage: @unchecked Sendable {
             encoder.setComputePipelineState(pipeline)
             encoder.setTexture(luma, index: 0)
             encoder.setTexture(chroma, index: 1)
+            // Bound explicitly either way: the kernel tests for a null partner,
+            // and an explicit nil is what that test is written against.
             if let partnerTextures, case .biPlanar(_, let partnerLuma, _, let partnerChroma) = partnerTextures.storage {
                 encoder.setTexture(partnerLuma, index: 2)
                 encoder.setTexture(partnerChroma, index: 3)
+            } else {
+                encoder.setTexture(nil, index: 2)
+                encoder.setTexture(nil, index: 3)
             }
             encoder.setBytes(&yuv, length: MemoryLayout<YUVUniforms>.stride, index: 1)
         case .bgra(_, let texture), .linearHalf(_, let texture):
             pipeline = prepareRGB
             encoder.setComputePipelineState(pipeline)
             encoder.setTexture(texture, index: 0)
+            encoder.setTexture(nil, index: 1)
             if let partnerTextures {
                 switch partnerTextures.storage {
                 case .bgra(_, let other), .linearHalf(_, let other): encoder.setTexture(other, index: 1)

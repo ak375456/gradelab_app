@@ -366,8 +366,13 @@ final class RelightDepthStore: @unchecked Sendable {
     /// Whether `sample` would find depth at `position`, without loading any.
     func covers(identifier: String, quality: RelightQuality, position: Double,
                 maximumGap: Int64 = 9, maximumReach: Double = 2.5) -> Bool {
-        let key = Key(identifier: identifier, quality: quality)
-        let neighbours = bracket(key, position: position)
+        let frames = storedFrames(Key(identifier: identifier, quality: quality))
+        return Self.covers(frames, position: position, maximumGap: maximumGap, maximumReach: maximumReach)
+    }
+
+    private static func covers(_ frames: [Int64], position: Double,
+                               maximumGap: Int64 = 9, maximumReach: Double = 2.5) -> Bool {
+        let neighbours = Self.bracket(frames, position: position)
         switch (neighbours.below, neighbours.above) {
         case let (below?, above?):
             return above - below <= maximumGap
@@ -384,10 +389,14 @@ final class RelightDepthStore: @unchecked Sendable {
     func coverage(identifier: String, quality: RelightQuality, frames: ClosedRange<Int64>) -> Double {
         let span = max(frames.upperBound - frames.lowerBound, 0)
         let probes = Int(min(max(span / 3, 1), 160))
+        // The index is read once: the panel asks this on every progress
+        // report while an analysis runs.
+        let stored = storedFrames(Key(identifier: identifier, quality: quality))
+        guard !stored.isEmpty else { return 0 }
         var covered = 0
         for probe in 0...probes {
             let position = Double(frames.lowerBound) + Double(span) * Double(probe) / Double(probes)
-            if covers(identifier: identifier, quality: quality, position: position) { covered += 1 }
+            if Self.covers(stored, position: position) { covered += 1 }
         }
         return Double(covered) / Double(probes + 1)
     }
@@ -424,7 +433,10 @@ final class RelightDepthStore: @unchecked Sendable {
     }
 
     private func bracket(_ key: Key, position: Double) -> (below: Int64?, above: Int64?) {
-        let frames = storedFrames(key)
+        Self.bracket(storedFrames(key), position: position)
+    }
+
+    private static func bracket(_ frames: [Int64], position: Double) -> (below: Int64?, above: Int64?) {
         guard !frames.isEmpty else { return (nil, nil) }
         // First stored frame at or after the position.
         var low = 0, high = frames.count
