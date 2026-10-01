@@ -532,10 +532,13 @@ struct EditorView: View {
 
     /// Video and stills come from Files on Mac and from Photos everywhere else,
     /// which is the same split `MediaImportPicker` makes for the Home screen.
-    private func requestMedia(images: Bool, overlay: Bool) {
+    ///
+    /// `files` asks for the Files browser explicitly, which iPhone and iPad
+    /// offer as a second menu entry beside the Photos one.
+    private func requestMedia(images: Bool, overlay: Bool, files: Bool = AppPlatform.isMac) {
         importImage = images
         importOverlay = overlay
-        if AppPlatform.isMac { requestFiles(.media(images: images)) } else { mediaPicker = true }
+        if files { requestFiles(.media(images: images)) } else { mediaPicker = true }
     }
 
     private var editorInputs: some View {
@@ -1206,6 +1209,17 @@ struct EditorView: View {
         Button("Add image overlay", systemImage: "photo") {
             requestMedia(images: true, overlay: true)
         }
+        if !AppPlatform.isMac {
+            Button("Add video from Files", systemImage: "folder") {
+                requestMedia(images: false, overlay: false, files: true)
+            }
+            Button("Add video overlay from Files", systemImage: "folder") {
+                requestMedia(images: false, overlay: true, files: true)
+            }
+            Button("Add image overlay from Files", systemImage: "folder") {
+                requestMedia(images: true, overlay: true, files: true)
+            }
+        }
         Button("Add text", systemImage: "textformat", action: addTextAndType)
         Button("Add shape", systemImage: "square.on.circle") { openShapeTool(); model.addShape() }
     }
@@ -1301,6 +1315,17 @@ struct EditorView: View {
             }
             Button("Image overlay", systemImage: "photo") {
                 requestMedia(images: true, overlay: true)
+            }
+            if !AppPlatform.isMac {
+                Button("Video clip from Files", systemImage: "folder") {
+                    requestMedia(images: false, overlay: false, files: true)
+                }
+                Button("Video overlay from Files", systemImage: "folder") {
+                    requestMedia(images: false, overlay: true, files: true)
+                }
+                Button("Image overlay from Files", systemImage: "folder") {
+                    requestMedia(images: true, overlay: true, files: true)
+                }
             }
         }
         Section("Audio") {
