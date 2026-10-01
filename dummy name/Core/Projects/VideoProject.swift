@@ -276,6 +276,7 @@ struct VideoProject: Codable, Identifiable, Equatable, Sendable {
                 case .video(let clip):
                     try Self.validateAnimation(clip)
                     try Self.validateMaskedGrades(clip)
+                    try Self.validateRelight(clip)
                 case .audio: break
                 }
                 let sourceRange: TimelineRange?
@@ -364,6 +365,52 @@ struct VideoProject: Codable, Identifiable, Equatable, Sendable {
                     try validateCurveKeyframe(frame, property: track.property)
                 }
             }
+        }
+    }
+
+    /// Relight lights and their keyframes. Values themselves are repaired on
+    /// the way to the GPU by `RelightLight.clamped`, the same split masked
+    /// grades use: what is checked here is identity and keyframe sanity.
+    ///
+    /// Any relight property is accepted on any light, deliberately. Changing a
+    /// point light into a directional one leaves its position track in place —
+    /// unused, not invalid — so switching back restores it, and a document is
+    /// never refused for an edit the inspector allowed.
+    private static func validateRelight(_ clip: VideoClip) throws {
+        guard let relight = clip.gradeSettings.advanced?.relight else { return }
+        var seen = Set<UUID>()
+        for light in relight.lights {
+            guard seen.insert(light.id).inserted else {
+                throw TimelineError.invalid(String(localized: "Duplicate relight light on a clip."))
+            }
+        }
+        func check(_ animation: ClipAnimation?, allowed: [AnimatableProperty]) throws {
+            guard let animation else { return }
+            var properties = Set<AnimatableProperty>()
+            for track in animation.tracks {
+                guard properties.insert(track.property).inserted else {
+                    throw TimelineError.invalid(String(localized: "Duplicate relight animation track for \(track.property.title)."))
+                }
+                guard allowed.contains(track.property) else {
+                    throw TimelineError.invalid(String(localized: "\(track.property.title) cannot be animated on a light."))
+                }
+                guard track.keyframes.count <= AnimationTrack.keyframeLimit else {
+                    throw TimelineError.invalid(String(localized: "Too many keyframes on \(track.property.title)."))
+                }
+                for frame in track.keyframes {
+                    guard frame.time >= .zero, frame.value.isFinite,
+                          frame.value.kind == track.property.kind else {
+                        throw TimelineError.invalid(String(localized: "Invalid relight keyframe on \(track.property.title)."))
+                    }
+                    if case .number(let number) = frame.value, !track.property.range.contains(number) {
+                        throw TimelineError.invalid(String(localized: "\(track.property.title) keyframe is out of range."))
+                    }
+                }
+            }
+        }
+        try check(relight.animation, allowed: RelightSettings.animatableProperties)
+        for light in relight.lights {
+            try check(light.animation, allowed: RelightLight.animatableProperties)
         }
     }
 

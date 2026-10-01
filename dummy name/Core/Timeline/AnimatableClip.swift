@@ -160,6 +160,7 @@ struct AnimationSnapshot {
         placement = clip.placement
         animation = clip.animation
         isAnimated = clip.isAnimated || clip.resolvedMaskedGrades.contains(where: \.isAnimated)
+            || clip.hasRelightAnimation
         supports = { VideoClip.supports($0) }
         evaluatedValue = { clip.evaluatedValue(of: $0, atLocal: $1) }
         visibleKeyframes = { clip.visibleKeyframes($0) }
@@ -470,7 +471,7 @@ extension VideoClip: AnimatableClip {
     /// its animation window moved by a trim or a split, or the mask animation
     /// would slide against the picture it was drawn on.
     var maintainsAnimationWindow: Bool {
-        isAnimated || (maskedGrades?.contains(where: \.isAnimated) ?? false)
+        isAnimated || (maskedGrades?.contains(where: \.isAnimated) ?? false) || hasRelightAnimation
     }
 
     static func numberKeyPath(_ property: AnimatableProperty) -> WritableKeyPath<VideoClip, Double>? {
@@ -533,7 +534,11 @@ extension VideoClip {
     /// Mask keyframes are read against the CLIP's animation window, which is the
     /// window they are evaluated against.
     var allVisibleKeyframeSeconds: [Double] {
-        guard let masks = maskedGrades, masks.contains(where: \.isAnimated) else {
+        let masks = maskedGrades ?? []
+        // Relight keyframes live on the lights, like mask keyframes live on
+        // the masks, and are read against the same clip window.
+        let relightTimes = resolvedRelight?.keyframeLocalTimes ?? []
+        guard masks.contains(where: \.isAnimated) || !relightTimes.isEmpty else {
             return visibleKeyframeSeconds
         }
         let window = animation ?? ClipAnimation()
@@ -541,17 +546,19 @@ extension VideoClip {
         var seen = Set<Int64>()
         var result = visibleKeyframeSeconds
         for value in result { seen.insert(Int64((value * 100_000).rounded())) }
+        func add(_ local: TimelineTime) {
+            guard let time = window.compositionTime(forLocal: local,
+                                                    clipStart: placement.timelineStart),
+                  time >= placement.timelineStart, time < end,
+                  seen.insert(Int64((time.seconds * 100_000).rounded())).inserted else { return }
+            result.append(time.seconds)
+        }
         for mask in masks {
             for track in mask.animation?.tracks ?? [] {
-                for frame in track.keyframes {
-                    guard let time = window.compositionTime(forLocal: frame.time,
-                                                            clipStart: placement.timelineStart),
-                          time >= placement.timelineStart, time < end,
-                          seen.insert(Int64((time.seconds * 100_000).rounded())).inserted else { continue }
-                    result.append(time.seconds)
-                }
+                for frame in track.keyframes { add(frame.time) }
             }
         }
+        for local in relightTimes { add(local) }
         return result.sorted()
     }
 

@@ -56,7 +56,9 @@ enum AppleLogSpecialization {
         "compositeVideoAppleLog",
         "gradeExportAppleLogSDR10",
         "shotMatchSampleAppleLog",
-        "nrPrepareAppleLog"
+        "nrPrepareAppleLog",
+        "relightPrepareAppleLog",
+        "relightAnalysisPrepareAppleLog"
     ]
 
     /// Builds a compute pipeline for `function`, specialised when `isLog2`.

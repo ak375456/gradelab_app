@@ -3767,3 +3767,378 @@ kernel void gradeToTextureWorking(
     destination.write(float4(applyLookAndGradeHDR(
         working, uv, grade, lutTexture, curveLUT, warpField, locals), 1.0), position);
 }
+
+// ---------------------------------------------------------------------------
+// Relight
+//
+// Virtual lights that react to the shot's ESTIMATED geometry. Nothing here is a
+// reconstruction: the depth is a relative estimate from monocular analysis,
+// temporally fused and upsampled against the frame being drawn (see
+// RelightShaders.metal), and every lighting term is weighted by how far that
+// estimate can be trusted at this pixel.
+//
+// WHERE THIS SITS. After the input transform, after noise reduction, before
+// the look and the grade — the same seat noise reduction takes, for a related
+// reason. Light adds to light, so the arithmetic has to happen in LINEAR light
+// and on the scene as the camera recorded it, not on a picture a creative LUT
+// has already reshaped. The grade then sees a relit scene and is applied to it
+// exactly as it would be to footage that had been lit that way on set.
+//
+// WHAT THE REPRESENTATION IS. The same one noise reduction hands the grade:
+// Rec.709-ENCODED RGB on the SDR path (the grade linearises it itself), and the
+// shared extended-range working space — linear BT.2020, diffuse white at 1.0 —
+// for HLG and both Apple Log modes. So `gradeToTextureBGRA` and
+// `gradeToTextureWorking` grade a relit frame exactly as they grade a denoised
+// one, and no grading kernel had to change.
+//
+// These live here rather than in RelightShaders.metal because they use the
+// input transforms and the mask geometry, and there is exactly one copy of each.
+// ---------------------------------------------------------------------------
+
+// Working space to a display-referred Rec.709 picture with a gentle shoulder.
+// For ANALYSIS only — what Vision and a depth network are shown — never for a
+// delivered pixel. A Log frame decoded to scene light is far from what those
+// models were trained on; this is close enough to a normal picture for them.
+inline float3 relightAnalysisDisplay(float3 working) {
+    float3 c = max(kBT2020ToRec709 * working, 0.0);
+    c = select(c, 0.8 + 0.2 * (1.0 - exp(-(c - 0.8) / 0.2)), c > 0.8);
+    return saturate(linearToRec709(c));
+}
+
+// Analysis frames are a few hundred pixels across, reduced from up to 4K. A
+// single bilinear tap per output pixel would alias badly at that ratio, so each
+// output pixel averages a 4x4 grid of taps spread over its footprint.
+kernel void relightAnalysisPrepareYUV(
+    texture2d<float, access::sample> lumaTexture [[texture(0)]],
+    texture2d<float, access::sample> chromaTexture [[texture(1)]],
+    texture2d<float, access::write> picture [[texture(2)]],
+    texture2d<float, access::write> lumaOut [[texture(3)]],
+    constant YUVUniforms &yuv [[buffer(1)]],
+    uint2 position [[thread_position_in_grid]])
+{
+    if (position.x >= picture.get_width() || position.y >= picture.get_height()) { return; }
+    constexpr sampler s(coord::normalized, address::clamp_to_edge, filter::linear);
+    float2 size = float2(picture.get_width(), picture.get_height());
+    float3 total = 0.0;
+    for (int j = 0; j < 4; ++j) {
+        for (int i = 0; i < 4; ++i) {
+            float2 uv = (float2(position) + (float2(i, j) + 0.5) / 4.0) / size;
+            total += saturate(decodeYUV(lumaTexture.sample(s, uv).r, chromaTexture.sample(s, uv).rg, yuv));
+        }
+    }
+    float3 rgb = total / 16.0;
+    picture.write(float4(rgb, 1.0), position);
+    lumaOut.write(float4(dot(rgb, kRec709LumaWeights), 0.0, 0.0, 0.0), position);
+}
+
+// `mode.x` is 1 for an HLG signal (the HDR decoder's half-float surface) and 0
+// for straight-alpha SDR RGB.
+kernel void relightAnalysisPrepareRGB(
+    texture2d<float, access::sample> source [[texture(0)]],
+    texture2d<float, access::write> picture [[texture(2)]],
+    texture2d<float, access::write> lumaOut [[texture(3)]],
+    constant float4 &mode [[buffer(0)]],
+    constant HDRDisplayUniforms &hdr [[buffer(2)]],
+    uint2 position [[thread_position_in_grid]])
+{
+    if (position.x >= picture.get_width() || position.y >= picture.get_height()) { return; }
+    constexpr sampler s(coord::normalized, address::clamp_to_edge, filter::linear);
+    float2 size = float2(picture.get_width(), picture.get_height());
+    float3 total = 0.0;
+    for (int j = 0; j < 4; ++j) {
+        for (int i = 0; i < 4; ++i) {
+            float2 uv = (float2(position) + (float2(i, j) + 0.5) / 4.0) / size;
+            float4 p = source.sample(s, uv);
+            total += mode.x > 0.5
+                ? relightAnalysisDisplay(toWorkingSpace(p.rgb, hdr))
+                : saturate(p.a > 0.00001 ? p.rgb / p.a : float3(0.0));
+        }
+    }
+    float3 rgb = total / 16.0;
+    picture.write(float4(rgb, 1.0), position);
+    lumaOut.write(float4(dot(rgb, kRec709LumaWeights), 0.0, 0.0, 0.0), position);
+}
+
+kernel void relightAnalysisPrepareAppleLog(
+    texture2d<float, access::sample> lumaTexture [[texture(0)]],
+    texture2d<float, access::sample> chromaTexture [[texture(1)]],
+    texture2d<float, access::write> picture [[texture(2)]],
+    texture2d<float, access::write> lumaOut [[texture(3)]],
+    uint2 position [[thread_position_in_grid]])
+{
+    if (position.x >= picture.get_width() || position.y >= picture.get_height()) { return; }
+    constexpr sampler s(coord::normalized, address::clamp_to_edge, filter::linear);
+    float2 size = float2(picture.get_width(), picture.get_height());
+    float3 total = 0.0;
+    for (int j = 0; j < 4; ++j) {
+        for (int i = 0; i < 4; ++i) {
+            float2 uv = (float2(position) + (float2(i, j) + 0.5) / 4.0) / size;
+            total += relightAnalysisDisplay(appleLogToWorking(lumaTexture.sample(s, uv).r,
+                                                              chromaTexture.sample(s, uv).rg));
+        }
+    }
+    float3 rgb = total / 16.0;
+    picture.write(float4(rgb, 1.0), position);
+    lumaOut.write(float4(dot(rgb, kRec709LumaWeights), 0.0, 0.0, 0.0), position);
+}
+
+// The frame, into the representation the grade reads.
+//
+// `mode.x`: 0 encoded SDR, passed through; 1 an HLG signal, into working space;
+// 2 encoded SDR into working space (an SDR clip in an HDR or Log project, which
+// the compositor hands over in its own encoding); 3 already working.
+// `mode.y` is how far to cross-dissolve toward the partner frame, for a clip
+// retimed with frame blending — blended here, BEFORE relighting, so the light
+// is applied once to the picture the clip actually shows.
+struct RelightPrepareUniforms {
+    float4 mode;
+};
+
+inline float3 relightIntoRepresentation(float3 sample, float mode, constant HDRDisplayUniforms &hdr) {
+    if (mode > 2.5) { return sample; }
+    if (mode > 1.5) { return sdrToWorking(saturate(sample)); }
+    if (mode > 0.5) { return toWorkingSpace(sample, hdr); }
+    return sample;
+}
+
+kernel void relightPrepareYUV(
+    texture2d<float, access::sample> lumaTexture [[texture(0)]],
+    texture2d<float, access::sample> chromaTexture [[texture(1)]],
+    texture2d<float, access::sample> partnerLuma [[texture(2)]],
+    texture2d<float, access::sample> partnerChroma [[texture(3)]],
+    texture2d<float, access::write> destination [[texture(4)]],
+    constant RelightPrepareUniforms &u [[buffer(0)]],
+    constant YUVUniforms &yuv [[buffer(1)]],
+    constant HDRDisplayUniforms &hdr [[buffer(2)]],
+    uint2 position [[thread_position_in_grid]])
+{
+    if (position.x >= destination.get_width() || position.y >= destination.get_height()) { return; }
+    constexpr sampler s(coord::normalized, address::clamp_to_edge, filter::linear);
+    float2 uv = (float2(position) + 0.5) / float2(destination.get_width(), destination.get_height());
+    float3 value = relightIntoRepresentation(
+        decodeYUV(lumaTexture.sample(s, uv).r, chromaTexture.sample(s, uv).rg, yuv), u.mode.x, hdr);
+    if (!is_null_texture(partnerLuma) && !is_null_texture(partnerChroma) && u.mode.y > 0.0) {
+        float3 next = relightIntoRepresentation(
+            decodeYUV(partnerLuma.sample(s, uv).r, partnerChroma.sample(s, uv).rg, yuv), u.mode.x, hdr);
+        value = mix(value, next, saturate(u.mode.y));
+    }
+    destination.write(float4(value, 1.0), position);
+}
+
+kernel void relightPrepareRGB(
+    texture2d<float, access::sample> source [[texture(0)]],
+    texture2d<float, access::sample> partner [[texture(1)]],
+    texture2d<float, access::write> destination [[texture(4)]],
+    constant RelightPrepareUniforms &u [[buffer(0)]],
+    constant HDRDisplayUniforms &hdr [[buffer(2)]],
+    uint2 position [[thread_position_in_grid]])
+{
+    if (position.x >= destination.get_width() || position.y >= destination.get_height()) { return; }
+    constexpr sampler s(coord::normalized, address::clamp_to_edge, filter::linear);
+    float2 uv = (float2(position) + 0.5) / float2(destination.get_width(), destination.get_height());
+    float4 pixel = source.sample(s, uv);
+    float3 straight = u.mode.x < 0.5 ? (pixel.a > 0.00001 ? pixel.rgb / pixel.a : float3(0.0)) : pixel.rgb;
+    float3 value = relightIntoRepresentation(straight, u.mode.x, hdr);
+    if (!is_null_texture(partner) && u.mode.y > 0.0) {
+        float4 other = partner.sample(s, uv);
+        float3 next = u.mode.x < 0.5 ? (other.a > 0.00001 ? other.rgb / other.a : float3(0.0)) : other.rgb;
+        value = mix(value, relightIntoRepresentation(next, u.mode.x, hdr), saturate(u.mode.y));
+    }
+    destination.write(float4(value, 1.0), position);
+}
+
+kernel void relightPrepareAppleLog(
+    texture2d<float, access::sample> lumaTexture [[texture(0)]],
+    texture2d<float, access::sample> chromaTexture [[texture(1)]],
+    texture2d<float, access::sample> partnerLuma [[texture(2)]],
+    texture2d<float, access::sample> partnerChroma [[texture(3)]],
+    texture2d<float, access::write> destination [[texture(4)]],
+    constant RelightPrepareUniforms &u [[buffer(0)]],
+    uint2 position [[thread_position_in_grid]])
+{
+    if (position.x >= destination.get_width() || position.y >= destination.get_height()) { return; }
+    constexpr sampler s(coord::normalized, address::clamp_to_edge, filter::linear);
+    float2 uv = (float2(position) + 0.5) / float2(destination.get_width(), destination.get_height());
+    float3 working = appleLogToWorking(lumaTexture.sample(s, uv).r, chromaTexture.sample(s, uv).rg);
+    if (!is_null_texture(partnerLuma) && !is_null_texture(partnerChroma) && u.mode.y > 0.0) {
+        float3 next = appleLogToWorking(partnerLuma.sample(s, uv).r, partnerChroma.sample(s, uv).rg);
+        working = mix(working, next, saturate(u.mode.y));
+    }
+    destination.write(float4(working, 1.0), position);
+}
+
+// ---------------------------------------------------------------------------
+// The lighting model
+//
+// Relight space: x right and y DOWN across the upright picture, in frame
+// heights, centred; z toward the viewer, nearness times `geometry.y`. Lights
+// are placed in the same space on the CPU (RelightStage.swift), so a light on
+// the right of the screen is on the right here whatever way up the camera
+// stored the frame.
+//
+// Per light: N·L with a wrap that widens as the light softens, a reach that
+// falls off with distance, and a cone for a spot. Light is applied as STOPS —
+// `color.w` is the signed exposure a fully lit surface gains — so a light
+// brightens a surface in proportion to what is already there: a white shirt
+// lifts more than a black jacket, as it would on set, and a negative light
+// takes stops away rather than painting grey over the picture.
+//
+// Where the geometry estimate is unreliable — hair, glass, reflections, motion
+// blur, a depth edge — the response blends toward a broad, half-facing value:
+// the light still adds, but stops modelling a shape it cannot see.
+// ---------------------------------------------------------------------------
+
+constant uint kRelightMaxLights = 6u;
+
+struct RelightLightUniforms {
+    float4 position;   // xyz in relight space, w = type (0 directional, 1 point, 2 spot)
+    float4 direction;  // directional: unit vector TOWARD the light; spot: unit cone axis; w spare
+    float4 color;      // rgb working-primary colour with luminance 1, w = signed stops
+    float4 shape;      // x softness, y falloff exponent, z reach, w cos(outer half-angle)
+    float4 response;   // x cos(inner half-angle), y shadow response, z specular, w roughness
+    float4 extra;      // x light wrap, yzw spare
+};
+
+struct RelightUniforms {
+    float4 frame;      // x extended range (0/1), y strength, z preserve highlights, w protect blacks
+    float4 geometry;   // x display aspect, y depth range, z light count, w highlight ceiling
+    float4 orientU;    // upright u = dot(orientU.xy, uv) + orientU.z
+    float4 orientV;    // upright v = dot(orientV.xy, uv) + orientV.z
+    float4 mask;       // x = 1 + mask layer (0 is the whole frame), y = 1 when that mask is hidden
+    RelightLightUniforms lights[kRelightMaxLights];
+};
+
+// How much of this pixel the relight may touch: the whole frame, or one of the
+// clip's own masked grades evaluated exactly as the grade evaluates it — same
+// geometry, same feather, same tracking keyframes, same colour qualifier.
+inline float relightMaskWeight(float2 uv, constant RelightUniforms &u,
+                               constant LocalGradeStack &locals, float3 keyColour) {
+    if (u.mask.y > 0.5) { return 0.0; }
+    uint selected = uint(max(u.mask.x, 0.0) + 0.5);
+    if (selected == 0u) { return 1.0; }
+    uint index = selected - 1u;
+    uint count = min(uint(max(locals.header.x, 0.0) + 0.5), kMaxLocalGrades);
+    if (index >= count) { return 1.0; }
+    float aspect = max(locals.header.y, 1e-4);
+    float weight = qualifierIgnoresShape(locals.layers[index])
+        ? 1.0
+        : localMaskWeight(uv, locals.layers[index], locals.points, aspect);
+    return weight * qualifierWeight(keyColour, locals.layers[index]);
+}
+
+kernel void relightApply(
+    texture2d<float, access::read> working [[texture(0)]],
+    texture2d<float, access::sample> geometry [[texture(1)]],
+    texture2d<float, access::sample> normalSharp [[texture(2)]],
+    texture2d<float, access::sample> normalSoft [[texture(3)]],
+    texture2d<float, access::write> destination [[texture(4)]],
+    constant RelightUniforms &u [[buffer(0)]],
+    constant LocalGradeStack &locals [[buffer(8)]],
+    uint2 position [[thread_position_in_grid]])
+{
+    if (position.x >= destination.get_width() || position.y >= destination.get_height()) { return; }
+    float2 uv = (float2(position) + 0.5) / float2(destination.get_width(), destination.get_height());
+    float4 source = working.read(position);
+    bool extended = u.frame.x > 0.5;
+    float3 linearLight = extended ? source.rgb : rec709ToLinear(source.rgb);
+    float3 keyColour = extended ? workingToShaper(source.rgb) : saturate(source.rgb);
+    float weight = saturate(u.frame.y) * relightMaskWeight(uv, u, locals, keyColour);
+    if (weight <= 0.0005) {
+        destination.write(source, position);
+        return;
+    }
+
+    constexpr sampler s(coord::normalized, address::clamp_to_edge, filter::linear);
+    float2 depth = geometry.sample(s, uv).rg;
+    float4 sharpSample = normalSharp.sample(s, uv);
+    float4 softSample = normalSoft.sample(s, uv);
+    // Trust: what the analysis reported, lowered across a depth discontinuity
+    // so a silhouette never gets a confident slope that belongs to the gap
+    // behind it — that is what would otherwise halo a shoulder or hair.
+    float confidence = saturate(depth.y) * (1.0 - 0.75 * saturate(sharpSample.w));
+    float3 sharpNormal = normalize(sharpSample.xyz + float3(0.0, 0.0, 1e-4));
+    float3 softNormal = normalize(softSample.xyz + float3(0.0, 0.0, 1e-4));
+
+    float2 upright = float2(dot(u.orientU.xy, uv) + u.orientU.z, dot(u.orientV.xy, uv) + u.orientV.z);
+    float aspect = max(u.geometry.x, 1e-3);
+    float3 surface = float3((upright.x - 0.5) * aspect, upright.y - 0.5, depth.x * u.geometry.y);
+
+    float3 stops = 0.0;
+    float3 specular = 0.0;
+    float shading = 0.0;
+    uint count = min(uint(max(u.geometry.z, 0.0) + 0.5), kRelightMaxLights);
+    for (uint i = 0u; i < count; ++i) {
+        constant RelightLightUniforms &light = u.lights[i];
+        float softness = saturate(light.shape.x);
+        // A soft source reads the form at a larger scale: the normal is taken
+        // from a wider, still edge-aware neighbourhood rather than the image
+        // being blurred.
+        float3 normal = normalize(mix(sharpNormal, softNormal, softness));
+        float3 toLight;
+        float reach = 1.0;
+        float cone = 1.0;
+        uint type = uint(max(light.position.w, 0.0) + 0.5);
+        if (type == 0u) {
+            toLight = light.direction.xyz;
+        } else {
+            float3 offset = light.position.xyz - surface;
+            float distance = max(length(offset), 1e-4);
+            toLight = offset / distance;
+            float r = distance / max(light.shape.z, 1e-3);
+            reach = pow(1.0 / (1.0 + r * r), max(light.shape.y, 0.05));
+            if (type == 2u) {
+                cone = smoothstep(light.shape.w, light.response.x, dot(-toLight, light.direction.xyz));
+            }
+        }
+        float facing = dot(normal, toLight);
+        float wrap = softness * 0.85;
+        float lit = saturate((facing + wrap) / (1.0 + wrap));
+        lit = mix(0.55, lit, confidence);
+        // Light wrap: a little of the light reaches round a silhouette edge.
+        float edgeWrap = saturate(light.extra.x) * smoothstep(0.65, 0.15, normal.z) * (1.0 - lit) * 0.6;
+        float response = (lit + edgeWrap) * reach * cone;
+        float signedStops = light.color.w;
+        stops += light.color.rgb * (signedStops * response);
+        // Light + Shading: the side of the form turned away from this light
+        // darkens. Not a cast shadow — monocular depth cannot place one
+        // honestly — only the shading a dominant source gives a form.
+        float away = smoothstep(0.0, 0.7, -facing) * confidence * reach * cone;
+        shading += saturate(light.response.y) * abs(signedStops) * away * 0.6;
+        if (light.response.z > 0.0 && facing > 0.0) {
+            float3 halfway = normalize(toLight + float3(0.0, 0.0, 1.0));
+            float shininess = mix(96.0, 6.0, saturate(light.response.w));
+            float glint = pow(saturate(dot(normal, halfway)), shininess)
+                * light.response.z * reach * cone * confidence;
+            specular += light.color.rgb * glint * max(signedStops, 0.0);
+        }
+    }
+
+    // Protection. Both are smooth weights on the light being added, never a
+    // clamp on the picture: a highlight that is already near the ceiling gets
+    // less added to it, and the deepest blacks are not lifted into grey.
+    float ceiling = max(u.geometry.w, 1e-3);
+    float luma = max(dot(linearLight, extended ? kBT2020LumaWeights : kRec709LumaWeights), 0.0);
+    float highlightRoom = 1.0 - saturate(u.frame.z) * 0.75 * smoothstep(0.3 * ceiling, 0.95 * ceiling, luma);
+    float blackRoom = mix(1.0, smoothstep(0.0, 0.025, luma), saturate(u.frame.w));
+    float3 added = max(stops, 0.0) * highlightRoom * blackRoom;
+    float3 taken = min(stops, 0.0) - shading;
+    float3 relit = linearLight * exp2(clamp(added + taken, -6.0, 6.0))
+        + specular * 0.08 * highlightRoom * blackRoom;
+
+    // A soft shoulder toward the ceiling for whatever the light pushed past
+    // it: the white point of an SDR frame, the HLG peak, or a few stops of Log
+    // latitude. It only ever bends added light, never a highlight the source
+    // already had.
+    if (u.frame.z > 0.0) {
+        float after = dot(relit, extended ? kBT2020LumaWeights : kRec709LumaWeights);
+        float knee = 0.75 * ceiling;
+        if (after > knee && after > luma) {
+            float shoulder = knee + (ceiling - knee) * (1.0 - exp(-(after - knee) / (ceiling - knee)));
+            float target = max(mix(after, shoulder, saturate(u.frame.z)), luma);
+            relit *= target / max(after, 1e-5);
+        }
+    }
+
+    float3 result = mix(linearLight, relit, weight);
+    destination.write(float4(extended ? result : linearToRec709(result), source.a), position);
+}

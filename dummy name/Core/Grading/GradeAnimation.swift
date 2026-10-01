@@ -277,8 +277,13 @@ extension AnimatableProperty {
 
     var isGradeProperty: Bool { gradeSlot != nil }
 
-    var angularCycle: Double? { gradeSlot?.angularCycle }
-    var wrapsAngularRange: Bool { gradeSlot?.wrapsAngularRange ?? false }
+    /// A relight's bearing is an angle too, and its whole range is the circle:
+    /// a light swinging from 350° to 10° passes through 0° rather than sweeping
+    /// all the way round the subject the long way.
+    var angularCycle: Double? { self == .relightAzimuth ? 360 : gradeSlot?.angularCycle }
+    var wrapsAngularRange: Bool {
+        self == .relightAzimuth || (gradeSlot?.wrapsAngularRange ?? false)
+    }
 
     /// Every grading property, in panel order. Derived from the table above so
     /// a case that was added but never mapped simply is not offered, rather

@@ -843,6 +843,9 @@ enum TimelineEditing {
                 if let masks = clip.maskedGrades, masks.contains(where: \.isAnimated) {
                     clip.maskedGrades = masks.map { $0.retimed(through: remap) }
                 }
+                if let relight = clip.gradeSettings.advanced?.relight, relight.isAnimated {
+                    clip.gradeSettings.advanced?.relight = relight.retimed(through: remap)
+                }
             } else {
                 let factor = newDuration.seconds / previousDuration.seconds
                 if let animation = clip.animation, !animation.isEmpty {
@@ -850,6 +853,9 @@ enum TimelineEditing {
                 }
                 if let masks = clip.maskedGrades, masks.contains(where: \.isAnimated) {
                     clip.maskedGrades = masks.map { $0.retimed(by: factor) }
+                }
+                if let relight = clip.gradeSettings.advanced?.relight, relight.isAnimated {
+                    clip.gradeSettings.advanced?.relight = relight.retimed(by: factor)
                 }
             }
         }

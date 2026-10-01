@@ -92,11 +92,27 @@ enum AnimatableProperty: String, Codable, CaseIterable, Sendable {
     case curveHueVsHue, curveHueVsSaturation, curveHueVsLuma
     case curveLumaVsSaturation, curveSaturationVsSaturation, curveSaturationVsLuma
 
+    // ---------------------------------------------------------------------
+    // Relight.
+    //
+    // Stored on a relight light — or, for the strength, on the relight itself
+    // — so several lights on one clip each carry their own tracks. That is the
+    // arrangement masked local grades already use: the same tracks, the same
+    // interpolation and the same diamond, with only the binding to storage
+    // local. See RelightAnimation.swift.
+    // ---------------------------------------------------------------------
+    case relightStrength
+    case relightPositionX, relightPositionY, relightDistance, relightTargetX, relightTargetY
+    case relightAzimuth, relightElevation, relightIntensity, relightExposure
+    case relightTemperature, relightTint, relightSoftness, relightFalloff, relightRadius
+    case relightConeAngle, relightFeather, relightShadow, relightColor
+
     enum Kind: Sendable { case number, color, curve }
 
     var kind: Kind {
         switch self {
-        case .textColor, .strokeColor, .backgroundColor, .shadowColor, .glowColor, .fillColor: .color
+        case .textColor, .strokeColor, .backgroundColor, .shadowColor, .glowColor, .fillColor,
+             .relightColor: .color
         default: gradeSlot?.kind ?? .number
         }
     }
@@ -158,6 +174,25 @@ enum AnimatableProperty: String, Codable, CaseIterable, Sendable {
         case .backgroundColor: String(localized: "Background color")
         case .shadowColor: String(localized: "Shadow color")
         case .glowColor: String(localized: "Glow color")
+        case .relightStrength: String(localized: "Relight strength")
+        case .relightPositionX: String(localized: "Light position X")
+        case .relightPositionY: String(localized: "Light position Y")
+        case .relightDistance: String(localized: "Light distance")
+        case .relightTargetX: String(localized: "Aim X")
+        case .relightTargetY: String(localized: "Aim Y")
+        case .relightAzimuth: String(localized: "Light direction")
+        case .relightElevation: String(localized: "Light angle")
+        case .relightIntensity: String(localized: "Light intensity")
+        case .relightExposure: String(localized: "Light exposure")
+        case .relightTemperature: String(localized: "Light temperature")
+        case .relightTint: String(localized: "Light tint")
+        case .relightSoftness: String(localized: "Light softness")
+        case .relightFalloff: String(localized: "Light falloff")
+        case .relightRadius: String(localized: "Light reach")
+        case .relightConeAngle: String(localized: "Cone angle")
+        case .relightFeather: String(localized: "Cone feather")
+        case .relightShadow: String(localized: "Shadow response")
+        case .relightColor: String(localized: "Light color")
         // Only a grading property reaches here, and it was named above.
         default: rawValue
         }
@@ -195,6 +230,21 @@ enum AnimatableProperty: String, Codable, CaseIterable, Sendable {
         case .cornerRadius, .backgroundPadding, .shadowRadius, .glowRadius: 0...2048
         case .shadowOffsetX, .shadowOffsetY: -2048...2048
         case .textColor, .strokeColor, .backgroundColor, .shadowColor, .glowColor, .fillColor: 0...1
+        // Relight. Positions are allowed a little outside the frame, which is
+        // where a key light usually is.
+        case .relightStrength: 0...1
+        case .relightPositionX, .relightPositionY, .relightTargetX, .relightTargetY: -0.5...1.5
+        case .relightDistance: 0...1
+        case .relightAzimuth: 0...360
+        case .relightElevation: -80...90
+        case .relightIntensity: -100...200
+        case .relightExposure: 0...4
+        case .relightTemperature: 1500...15000
+        case .relightTint: -100...100
+        case .relightSoftness, .relightFalloff, .relightFeather, .relightShadow: 0...1
+        case .relightRadius: 0.05...4
+        case .relightConeAngle: 3...85
+        case .relightColor: 0...1
         // Only a grading property reaches here, and it was bounded above.
         default: 0...1
         }
@@ -238,6 +288,25 @@ enum AnimatableProperty: String, Codable, CaseIterable, Sendable {
         case .fillColor: .color(ShapeClip.defaultFill)
         case .strokeColor, .backgroundColor, .shadowColor: .color(.black)
         case .glowColor: .color(.white)
+        // Relight: the values a freshly added light starts with, so "Reset
+        // this property" lands where Add Light would have put it.
+        case .relightStrength: .number(1)
+        case .relightPositionX: .number(0.78)
+        case .relightPositionY: .number(0.32)
+        case .relightDistance: .number(0.25)
+        case .relightTargetX: .number(0.5)
+        case .relightTargetY: .number(0.45)
+        case .relightAzimuth: .number(25)
+        case .relightElevation: .number(35)
+        case .relightIntensity: .number(100)
+        case .relightExposure: .number(1)
+        case .relightTemperature: .number(6500)
+        case .relightTint: .number(0)
+        case .relightSoftness, .relightFalloff, .relightFeather: .number(0.5)
+        case .relightShadow: .number(0)
+        case .relightRadius: .number(0.9)
+        case .relightConeAngle: .number(26)
+        case .relightColor: .color(.white)
         // Only a grading property reaches here; its neutral came from its slot.
         default: .number(0)
         }

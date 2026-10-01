@@ -48,6 +48,9 @@ extension GradeSettings {
             // on rather than this one.
             var carried = incoming
             carried.mask = nil
+            // A relight limited to a mask names a window in the picture it was
+            // set up on. The lights travel; the window reference does not.
+            carried.relight?.maskID = nil
             return carried == .neutral ? nil : carried
         }
         var merged = base
@@ -86,6 +89,14 @@ extension GradeSettings {
         }
         if let effects = incoming.effects, !effects.isNeutral {
             merged.effects = effects
+        }
+        // Lighting is a setup, not an amount: two key lights added together is
+        // not what "also apply theirs" means. The incoming lights replace the
+        // clip's own where there are any, without the mask reference, which
+        // belongs to the other picture.
+        if var relight = incoming.relight, !relight.lights.isEmpty {
+            relight.maskID = nil
+            merged.relight = relight
         }
         // Untouched on purpose: `merged` starts from `base`, so the clip keeps
         // the window it already had.

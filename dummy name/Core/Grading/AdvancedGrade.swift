@@ -129,6 +129,16 @@ struct AdvancedGrade: Codable, Equatable, Sendable {
     /// persistence, undo coalescing, copy/paste, presets and the keyframe
     /// engine without a line of code in any of them.
     var noiseReduction: NoiseReduction?
+    /// Relight: virtual lights that react to the shot's estimated geometry.
+    /// Optional like every tool added after the first release, so a project
+    /// saved before Relight existed decodes with none and renders exactly the
+    /// picture it always did.
+    ///
+    /// On the grade rather than the clip for the reason noise reduction is:
+    /// the lights are values that can sensibly travel with a copied grade or a
+    /// preset. The depth they react to does not travel — it is derived from
+    /// each clip's own media and lives in a cache outside the document.
+    var relight: RelightSettings?
 
     static let neutral = AdvancedGrade()
 
