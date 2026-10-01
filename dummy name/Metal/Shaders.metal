@@ -1629,9 +1629,13 @@ kernel void compositeVideoHDR(
         return;
     }
     constexpr sampler videoSampler(coord::normalized, address::clamp_to_edge, filter::linear);
-    float3 working = layer.params.z > 0.5
-        ? sdrToWorking(source.sample(videoSampler, uv).rgb)
-        : toWorkingSpace(source.sample(videoSampler, uv).rgb, hdr);
+    // params.z: 0 an HLG signal, 1 Rec.709 SDR, 2 a relit layer that is
+    // already in working space.
+    float3 working = layer.params.z > 1.5
+        ? source.sample(videoSampler, uv).rgb
+        : (layer.params.z > 0.5
+            ? sdrToWorking(source.sample(videoSampler, uv).rgb)
+            : toWorkingSpace(source.sample(videoSampler, uv).rgb, hdr));
     if (layer.params.y > 0.0) {
         float3 next = layer.params.z > 0.5
             ? sdrToWorking(partner.sample(videoSampler, uv).rgb)
@@ -3211,6 +3215,8 @@ inline float3 logLayerWorking(texture2d<float, access::sample> y,
                              constant HDRLayerUniforms &layer,
                              constant YUVUniforms &yuv) {
     constexpr sampler s(coord::normalized, address::clamp_to_edge, filter::linear);
+    // 2: a relit layer, already in working space and bound in the luma slot.
+    if (layer.params.z > 1.5) { return y.sample(s, uv).rgb; }
     float luma = y.sample(s, uv).r;
     float2 chroma = c.sample(s, uv).rg;
     return layer.params.z > 0.5 ? sdrToWorking(decodeYUV(luma, chroma, yuv))

@@ -293,7 +293,7 @@ extension SequenceComposition {
             }
             try Task.checkCancellation()
         }
-        let state = LayerRenderState(project, context: context)
+        let state = LayerRenderState(project, context: context, forExport: forExport)
         if videos.isEmpty {
             guard let clock = composition.addMutableTrack(withMediaType: .video, preferredTrackID: kCMPersistentTrackID_Invalid) else { throw TimelineError.invalid(String(localized: "Could not create image timeline.")) }
             clock.insertEmptyTimeRange(CMTimeRange(start: .zero, duration: project.timeline.duration.cmTime))

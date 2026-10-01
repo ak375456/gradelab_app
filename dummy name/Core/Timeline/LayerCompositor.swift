@@ -20,7 +20,12 @@ final class LayerRenderState: @unchecked Sendable {
     private var backgroundInspectionTargetID: UUID?
     private var transparencyGrid = false
     let context: MetalContext?
-    init(_ project: VideoProject, context: MetalContext? = nil) { self.project = project; self.context = context }
+    /// True for the state an export builds. Relight reads it to draw at export
+    /// quality: High depth and full geometry, whatever the preview is set to.
+    let forExport: Bool
+    init(_ project: VideoProject, context: MetalContext? = nil, forExport: Bool = false) {
+        self.project = project; self.context = context; self.forExport = forExport
+    }
     func update(_ project: VideoProject, bypass: Bool, inspectingMatteOn target: UUID? = nil,
                 inspectingBackgroundOn background: UUID? = nil,
                 showsTransparencyGrid grid: Bool = false) {
@@ -167,6 +172,8 @@ class LayerCompositor: NSObject, AVVideoCompositing, @unchecked Sendable {
     private var appleLogRenderer: AppleLogLayerRenderer?
     private var backgroundRemovalGPU: BackgroundRemovalGPU?
     private var resources: CompositorResources.Bundle?
+    /// Each asset's depth identity and orientation, read once per compositor.
+    private var relightSources: [UUID: RelightSourceInfo] = [:]
 
     func renderContextChanged(_ newRenderContext: AVVideoCompositionRenderContext) {
         queue.async {
@@ -229,10 +236,22 @@ class LayerCompositor: NSObject, AVVideoCompositing, @unchecked Sendable {
         amount: Double,
         settings: GradeSettings,
         masks: [MaskedGradeLayer] = [],
-        bypass: Bool
+        bypass: Bool,
+        relight: RelightFrame? = nil
     ) throws -> CVPixelBuffer {
-        if amount <= 0.001 { return try graded(first, settings: settings, masks: masks, bypass: bypass) }
-        if amount >= 0.999 { return try graded(second, settings: settings, masks: masks, bypass: bypass) }
+        if amount <= 0.001 {
+            return try graded(first, settings: settings, masks: masks, bypass: bypass, relight: relight)
+        }
+        if amount >= 0.999 {
+            return try graded(second, settings: settings, masks: masks, bypass: bypass, relight: relight)
+        }
+        // A relit layer mixes the two frames inside the relight stage, before
+        // the light lands, so the light is applied once to the picture the
+        // clip actually shows — the same reason the grade is.
+        if relight != nil, !bypass {
+            return try graded(first, settings: settings, masks: masks, bypass: bypass,
+                              relight: relight, partner: second, blend: amount)
+        }
         guard let metal, let blendPipeline,
               let firstTextures = PixelBufferTextures(pixelBuffer: first, context: metal),
               let secondTextures = PixelBufferTextures(pixelBuffer: second, context: metal),
@@ -543,13 +562,35 @@ class LayerCompositor: NSObject, AVVideoCompositing, @unchecked Sendable {
 
     private func graded(_ source: CVPixelBuffer, settings: GradeSettings,
                         masks: [MaskedGradeLayer] = [], bypass: Bool,
-                        seconds: Double = 0) throws -> CVPixelBuffer {
+                        seconds: Double = 0, relight: RelightFrame? = nil,
+                        partner: CVPixelBuffer? = nil, blend: Double = 0) throws -> CVPixelBuffer {
         guard let metal, let pipeline else { throw GradeLabError.rendererInitializationFailed }
         let width = CVPixelBufferGetWidth(source), height = CVPixelBufferGetHeight(source)
         let output = try pooledBGRA(width: width, height: height)
         guard let textures = PixelBufferTextures(pixelBuffer: source, context: metal),
               let destination = metal.packedTexture(from: output, pixelFormat: .bgra8Unorm),
-              let command = metal.commandQueue.makeCommandBuffer(), let encoder = command.makeComputeCommandEncoder() else {
+              let command = metal.commandQueue.makeCommandBuffer() else {
+            throw GradeLabError.rendererInitializationFailed
+        }
+        // Relight, ahead of the grade and into the representation the grade
+        // reads, through the one stage every path shares. Its surfaces are
+        // shared between compositors, so the gate is held until this frame's
+        // GPU work has finished with them.
+        var relit: MTLTexture?
+        var relitPipeline: MTLComputePipelineState?
+        var heldGate: NSLock?
+        defer { heldGate?.unlock() }
+        if let relight, !bypass, case .biPlanar = textures.storage,
+           let shared = RelightSharedStage.shared(for: metal),
+           let gradeFromTexture = shared.sdrGradePipeline {
+            shared.gate.lock()
+            heldGate = shared.gate
+            relit = shared.stage.encode(
+                .pixelBuffer(source, partner: partner, blend: Float(blend), mode: .encodedSDR),
+                frame: relight, fallbackMatrix: "BT.709", into: command)
+            relitPipeline = gradeFromTexture
+        }
+        guard let encoder = command.makeComputeCommandEncoder() else {
             throw GradeLabError.rendererInitializationFailed
         }
         // The mask is normalised to the SOURCE frame, which is what this pass
@@ -562,8 +603,13 @@ class LayerCompositor: NSObject, AVVideoCompositing, @unchecked Sendable {
         var yuv = YUVUniforms.make(for: source, fallbackMatrix: "BT.709")
         switch textures.storage {
         case .biPlanar(_, let y, _, let uv):
-            encoder.setComputePipelineState(pipeline)
-            encoder.setTexture(y, index: 0); encoder.setTexture(uv, index: 1)
+            if let relit, let relitPipeline {
+                encoder.setComputePipelineState(relitPipeline)
+                encoder.setTexture(relit, index: 0)
+            } else {
+                encoder.setComputePipelineState(pipeline)
+                encoder.setTexture(y, index: 0); encoder.setTexture(uv, index: 1)
+            }
         case .bgra(_, let texture):
             guard let stillPipeline else { throw GradeLabError.rendererInitializationFailed }
             encoder.setComputePipelineState(stillPipeline); encoder.setTexture(texture, index: 0)
@@ -603,6 +649,40 @@ class LayerCompositor: NSObject, AVVideoCompositing, @unchecked Sendable {
         guard command.status == .completed else { throw GradeLabError.rendererInitializationFailed }
         return finished
     }
+    // MARK: - Relight
+
+    /// The relight one layer gets at this moment, or nil when it gets none:
+    /// no light on the clip, Show Original, a still, or no depth here yet.
+    ///
+    /// The preview draws at the editor's quality and the export at High with
+    /// full geometry — the same rule the direct paths follow.
+    private func relightFrame(
+        for clip: VideoClip, asset: ProjectMediaAsset, at compositionTime: CMTime,
+        masks: [MaskedGradeLayer], maskAspect: Double, colorMode: ProjectColorMode,
+        extendedRange: Bool, forExport: Bool, bypass: Bool
+    ) -> RelightFrame? {
+        guard !bypass, asset.stillImage == nil,
+              clip.gradeSettings.advanced?.resolvedRelight != nil || clip.hasRelightAnimation,
+              let time = try? TimelineTime(compositionTime) else { return nil }
+        let source: RelightSourceInfo
+        if let known = relightSources[asset.id] {
+            source = known
+        } else {
+            guard let made = RelightSourceInfo.make(asset: asset) else { return nil }
+            relightSources[asset.id] = made
+            source = made
+        }
+        let quality: RelightQuality = forExport ? .high : RelightQuality.loadPreference()
+        let longEdge = forExport
+            ? RelightCapability.exportGeometryLongEdge
+            : RelightCapability.previewGeometryLongEdge(quality: quality,
+                                                        interactive: RelightInteraction.isActive)
+        return RelightFrameResolver.resolve(
+            clip: clip, at: time, sources: [asset.id: source], preferredQuality: quality,
+            colorMode: colorMode, extendedRange: extendedRange, masks: masks, maskAspect: maskAspect,
+            geometryLongEdge: longEdge, prefetches: !forExport)
+    }
+
     // MARK: - Track matte
 
     /// One frame's rendered mattes, keyed by matte-source item id.
@@ -1053,13 +1133,20 @@ class LayerCompositor: NSObject, AVVideoCompositing, @unchecked Sendable {
                 }
                 let masks = (try? TimelineTime(request.compositionTime))
                     .map { clip.evaluatedMaskedGrades(at: $0) } ?? clip.resolvedMaskedGrades
+                let relight = relightFrame(
+                    for: clip, asset: asset, at: request.compositionTime, masks: masks,
+                    maskAspect: CGSize(width: CVPixelBufferGetWidth(source),
+                                       height: CVPixelBufferGetHeight(source)).maskAspect,
+                    colorMode: project.colorMode, extendedRange: false,
+                    forExport: instruction.state.forExport, bypass: bypass)
                 let gradedFrame: CVPixelBuffer
                 if let blendPartner {
                     gradedFrame = try gradedBlend(source, blendPartner, amount: blendAmount,
-                                                  settings: clip.gradeSettings, masks: masks, bypass: bypass)
+                                                  settings: clip.gradeSettings, masks: masks, bypass: bypass,
+                                                  relight: relight)
                 } else {
                     gradedFrame = try graded(source, settings: clip.gradeSettings, masks: masks, bypass: bypass,
-                                             seconds: request.compositionTime.seconds)
+                                             seconds: request.compositionTime.seconds, relight: relight)
                 }
                 let cutoutFrame = try backgroundRemoved(gradedFrame, original: source, clip: clip,
                     asset: asset, projectID: project.id, compositionTime: request.compositionTime)
@@ -1212,11 +1299,17 @@ class LayerCompositor: NSObject, AVVideoCompositing, @unchecked Sendable {
         }
         let masks = (try? TimelineTime(request.compositionTime))
             .map { clip.evaluatedMaskedGrades(at: $0) } ?? clip.resolvedMaskedGrades
+        let relight = relightFrame(
+            for: clip, asset: asset, at: request.compositionTime, masks: masks,
+            maskAspect: CGSize(width: CVPixelBufferGetWidth(source),
+                               height: CVPixelBufferGetHeight(source)).maskAspect,
+            colorMode: project.colorMode, extendedRange: false,
+            forExport: instruction.state.forExport, bypass: bypass)
         let gradedFrame = try blendPartner.map {
             try gradedBlend(source, $0, amount: blendAmount, settings: clip.gradeSettings,
-                            masks: masks, bypass: bypass)
+                            masks: masks, bypass: bypass, relight: relight)
         } ?? graded(source, settings: clip.gradeSettings, masks: masks, bypass: bypass,
-                    seconds: request.compositionTime.seconds)
+                    seconds: request.compositionTime.seconds, relight: relight)
         let cutoutFrame = try backgroundRemoved(gradedFrame, original: source, clip: clip,
             asset: asset, projectID: project.id, compositionTime: request.compositionTime)
         let frame = try masked(cutoutFrame, with: clip.resolvedLayerMask)
@@ -1302,6 +1395,10 @@ class LayerCompositor: NSObject, AVVideoCompositing, @unchecked Sendable {
             throw GradeLabError.rendererInitializationFailed
         }
         command.label = "GradeLab HDR layers"
+        // Held from the first relit layer until the frame's GPU work is done,
+        // because the relight stage's surfaces are shared between compositors.
+        var heldRelightGate: NSLock?
+        defer { heldRelightGate?.unlock() }
 
         if instruction.state.showsTransparencyGrid, let editorCheckerboardPipeline,
            let encoder = command.makeComputeCommandEncoder() {
@@ -1615,19 +1712,42 @@ class LayerCompositor: NSObject, AVVideoCompositing, @unchecked Sendable {
                     }
                     }
                 }
+                let layerMasks = (try? TimelineTime(request.compositionTime))
+                    .map { clip.evaluatedMaskedGrades(at: $0) } ?? clip.resolvedMaskedGrades
                 var program = GradeProgram(
                     settings: clip.gradeSettings,
-                    masks: (try? TimelineTime(request.compositionTime))
-                        .map { clip.evaluatedMaskedGrades(at: $0) } ?? clip.resolvedMaskedGrades,
+                    masks: layerMasks,
                     bypass: bypass, aspect: metadata.encodedSize.maskAspect)
                 program.setGrainSeed(request.compositionTime.seconds)
                 var grade = program.uniforms
                 topmostVideoGrade = grade
+                // Relight into working space ahead of the composite. The two
+                // frames of a blended retime are mixed inside the stage, so the
+                // kernel below is handed one working-space picture and no mix.
+                var relitWorking = false
+                if let relight = relightFrame(
+                    for: clip, asset: asset, at: request.compositionTime, masks: layerMasks,
+                    maskAspect: metadata.encodedSize.maskAspect, colorMode: project.colorMode,
+                    extendedRange: true, forExport: instruction.state.forExport, bypass: bypass),
+                   let shared = RelightSharedStage.shared(for: metal) {
+                    if heldRelightGate == nil { shared.gate.lock(); heldRelightGate = shared.gate }
+                    if let relit = shared.stage.encode(
+                        .texture(sourceTexture, partner: blendAmount > 0 ? partnerTexture : nil,
+                                 blend: Float(blendAmount), mode: sourceIsSDR ? .sdrToWorking : .hlgSignal),
+                        frame: relight, fallbackMatrix: nil, into: command) {
+                        sourceTexture = relit
+                        partnerTexture = relit
+                        blendAmount = 0
+                        relitWorking = true
+                    }
+                }
                 var layer = HDRLayerUniforms(
                     transform: Self.transform(clip.transform, metadata: metadata, canvas: canvasSize),
                     sourceSize: metadata.encodedSize, canvasSize: canvasSize,
                     opacity: clip.opacity, blendAmount: blendAmount, sourceIsSDR: sourceIsSDR,
                     matteInverted: layerMatte.inverted)
+                // 2 marks a source that is already in working space.
+                if relitWorking { layer.params.z = 2 }
                 var mask = LayerMaskUniforms(clip.layerMask)
                 var backgroundRemoval = BackgroundRemovalUniforms(clip.resolvedBackgroundRemoval ?? .automatic)
                 let lut = metal.luts.texture(for: program.lookIdentifier)
@@ -1954,6 +2074,10 @@ extension LayerCompositor {
         let time = try TimelineTime(request.compositionTime)
         var retained: [Any] = [output]
         var topmostGrade: GradeUniforms?
+        // Held from the first relit layer until the frame's GPU work is done,
+        // because the relight stage's surfaces are shared between compositors.
+        var heldRelightGate: NSLock?
+        defer { heldRelightGate?.unlock() }
 
         func blend(_ texture: MTLTexture, mode: VisualBlendMode) throws {
             var index = AppleLogLayerRenderer.blendIndex(mode)
@@ -2014,7 +2138,8 @@ extension LayerCompositor {
                 guard let metadata = asset.videoMetadata else { throw TimelineError.invalid(String(localized: "Missing video metadata.")) }
                 sourceSize = metadata.encodedSize
             }
-            var program = GradeProgram(settings: clip.gradeSettings, masks: clip.evaluatedMaskedGrades(at: time),
+            let layerMasks = clip.evaluatedMaskedGrades(at: time)
+            var program = GradeProgram(settings: clip.gradeSettings, masks: layerMasks,
                                        bypass: bypass, aspect: sourceSize.maskAspect)
             program.setGrainSeed(request.compositionTime.seconds)
             topmostGrade = program.uniforms
@@ -2057,6 +2182,9 @@ extension LayerCompositor {
             var sourceLuma = luma, sourceChroma = chroma
             var partnerLuma = luma, partnerChroma = chroma
             var amount = 0.0
+            // The buffers behind those textures, for the relight stage.
+            var sourceBuffer = frame
+            var partnerBuffer: CVPixelBuffer?
             do {
                 let sourceTime = try clip.sourceTime(at: time)
                 let pair = retimedPair(clip: clip, asset: asset, delivered: frame,
@@ -2073,6 +2201,7 @@ extension LayerCompositor {
                     retained.append(made)
                     sourceLuma = y; sourceChroma = c
                     partnerLuma = y; partnerChroma = c
+                    sourceBuffer = pair.frame
                 }
                 let phase = pair.phase
                 if clip.smoothsMotion, let partnerFrame = pair.partner {
@@ -2091,18 +2220,43 @@ extension LayerCompositor {
                     retained.append(made)
                     sourceLuma = y; sourceChroma = c
                     partnerLuma = y; partnerChroma = c
+                    sourceBuffer = interpolated
                 } else if let partner = PixelBufferTextures(pixelBuffer: partnerFrame, context: metal),
                           case .biPlanar(_, let y, _, let c) = partner.storage {
                     retained.append(partner)
                     partnerLuma = y; partnerChroma = c
+                    partnerBuffer = partnerFrame
                     amount = phase
                 }
+                }
+            }
+            // Relight into working space ahead of the composite, through the
+            // same Log input transform the kernel below would apply. A blended
+            // retime is mixed inside the stage, so the kernel is then handed
+            // one working-space picture and no mix.
+            var relitWorking = false
+            if let relight = relightFrame(
+                for: clip, asset: asset, at: request.compositionTime, masks: layerMasks,
+                maskAspect: sourceSize.maskAspect, colorMode: project.colorMode,
+                extendedRange: true, forExport: instruction.state.forExport, bypass: bypass),
+               let shared = RelightSharedStage.shared(for: metal) {
+                if heldRelightGate == nil { shared.gate.lock(); heldRelightGate = shared.gate }
+                if let relit = shared.stage.encode(
+                    .pixelBuffer(sourceBuffer, partner: amount > 0 ? partnerBuffer : nil, blend: Float(amount),
+                                 mode: profile != expectedProfile ? .sdrToWorking : .appleLog),
+                    frame: relight, fallbackMatrix: metadata.yCbCrMatrix, into: command) {
+                    sourceLuma = relit; sourceChroma = relit
+                    partnerLuma = relit; partnerChroma = relit
+                    amount = 0
+                    relitWorking = true
                 }
             }
             var layer = HDRLayerUniforms(transform: Self.transform(clip.transform, metadata: metadata, canvas: size),
                 sourceSize: sourceSize, canvasSize: size, opacity: clip.opacity,
                 blendAmount: amount, sourceIsSDR: profile != expectedProfile,
                 matteInverted: layerMatte.inverted)
+            // 2 marks a source that is already in working space.
+            if relitWorking { layer.params.z = 2 }
             var mask = LayerMaskUniforms(clip.layerMask)
             var grade = program.uniforms
             var backgroundRemoval = BackgroundRemovalUniforms(clip.resolvedBackgroundRemoval ?? .automatic)

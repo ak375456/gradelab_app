@@ -42,6 +42,8 @@ struct ExportView: View {
                 switch model.state {
                 case .preparing:
                     progressView(title: String(localized: "Preparing Export"), progress: nil)
+                case .analyzing(let progress):
+                    progressView(title: String(localized: "Analyzing Scene for Relight"), progress: progress)
                 case .exporting(let progress):
                     progressView(title: String(localized: "Exporting"), progress: progress)
                 case .finishing(let progress):

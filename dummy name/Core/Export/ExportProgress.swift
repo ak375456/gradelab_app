@@ -35,6 +35,8 @@ struct ExportProgress: Equatable, Sendable {
 enum ExportState: Equatable, Sendable {
     case idle
     case preparing
+    /// Estimating scene depth for Relight before the first frame is written.
+    case analyzing(ExportProgress)
     case exporting(ExportProgress)
     case finishing(ExportProgress)
     case completed(URL)

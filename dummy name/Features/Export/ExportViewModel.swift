@@ -119,7 +119,7 @@ final class ExportViewModel: ObservableObject {
 
     var isBusy: Bool {
         switch state {
-        case .preparing, .exporting, .finishing: true
+        case .preparing, .analyzing, .exporting, .finishing: true
         default: false
         }
     }
@@ -222,6 +222,14 @@ final class ExportViewModel: ObservableObject {
         // Cancelled has already been shown. Frames still draining out of the
         // exporter do not get to put the progress view back.
         guard !isCancelling else { return }
+        // Analysis progress is posted from the analysis thread and can land
+        // after the export has moved on; it never puts the ring back.
+        if case .analyzing = newState {
+            switch state {
+            case .preparing, .analyzing: break
+            default: return
+            }
+        }
         state = newState
         switch newState {
         case .exporting(let progress):
@@ -234,7 +242,7 @@ final class ExportViewModel: ObservableObject {
             // Writing the last samples and closing the file is not something
             // the frame progress can predict, so stop claiming a number.
             timeRemaining = nil
-        case .completed, .cancelled, .failed, .idle, .preparing:
+        case .completed, .cancelled, .failed, .idle, .preparing, .analyzing:
             timeRemaining = nil
         }
     }

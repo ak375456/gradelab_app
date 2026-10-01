@@ -87,6 +87,130 @@ final class MetalVideoRenderer: NSObject, MTKViewDelegate, @unchecked Sendable {
         stateLock.unlock()
         notify?()
     }
+    /// Relight. Built the first time a frame asks for it and emptied when no
+    /// clip uses it, like noise reduction, so a project that never lights
+    /// anything pays nothing for it.
+    private var relightStageStorage: RelightStage?
+    private var relightStageFailed = false
+    /// Where each asset's depth is filed and which way up it is.
+    private var relightSources: [UUID: RelightSourceInfo] = [:]
+    private var relightQuality = RelightQuality.loadPreference()
+    /// True while a light is being dragged: geometry drops to a lighter
+    /// resolution for the length of the gesture, so the handle keeps up.
+    private var relightInteractive = false
+    /// Set when the frame on screen wanted relight and had no depth yet. The
+    /// next draw after depth lands there repaints it — and only then, so an
+    /// analysis writing elsewhere in the clip does not repaint a paused frame
+    /// a hundred times for nothing.
+    private struct RelightWait {
+        let identifier: String
+        let position: Double
+        var storeRevision: UInt64
+    }
+    private var relightWait: RelightWait?
+
+    func setRelightSources(_ sources: [UUID: RelightSourceInfo]) {
+        stateLock.lock(); defer { stateLock.unlock() }
+        guard relightSources != sources else { return }
+        relightSources = sources
+        revision &+= 1
+    }
+
+    /// The preview's depth quality. Export always prefers High.
+    func setRelightQuality(_ quality: RelightQuality) {
+        stateLock.lock(); defer { stateLock.unlock() }
+        guard relightQuality != quality else { return }
+        relightQuality = quality
+        revision &+= 1
+    }
+
+    func setRelightInteractive(_ active: Bool) {
+        stateLock.lock(); defer { stateLock.unlock() }
+        guard relightInteractive != active else { return }
+        relightInteractive = active
+        // The frame left on screen when the drag ends is redrawn at full
+        // geometry rather than kept at the lighter one.
+        if !active { revision &+= 1 }
+    }
+
+    /// Forgets uploaded depth, for an analysis that replaced what was stored.
+    func invalidateRelightDepth() {
+        stateLock.lock(); let stage = relightStageStorage; revision &+= 1; stateLock.unlock()
+        stage?.releaseResources()
+    }
+
+    private var relightStage: RelightStage? {
+        stateLock.lock(); defer { stateLock.unlock() }
+        if relightStageStorage == nil, !relightStageFailed {
+            relightStageStorage = RelightStage(context: context)
+            relightStageFailed = relightStageStorage == nil
+        }
+        return relightStageStorage
+    }
+
+    private func releaseRelightSurfacesIfIdle(_ active: Bool) {
+        guard !active else { return }
+        stateLock.lock(); let stage = relightStageStorage; stateLock.unlock()
+        stage?.releaseResources()
+    }
+
+    /// Relights the frame about to be drawn, or returns nil when there is
+    /// nothing to do — no light, Show Original, a composited timeline (the
+    /// compositor relights its own layers), or no depth here yet.
+    ///
+    /// Never waits on analysis. A frame without depth is drawn unlit and
+    /// repainted when its depth lands.
+    private func encodeRelight(
+        pixelBuffer: CVPixelBuffer,
+        storage: PixelBufferTextures.Storage,
+        denoised: MTLTexture?,
+        activeClip: VideoClip?,
+        frameTime: TimelineTime?,
+        masks: [MaskedGradeLayer],
+        bypassing: Bool,
+        into command: MTLCommandBuffer
+    ) -> MTLTexture? {
+        guard !bypassing, let clip = activeClip, let frameTime,
+              clip.gradeSettings.advanced?.resolvedRelight != nil || clip.hasRelightAnimation else {
+            return nil
+        }
+        stateLock.lock()
+        let sources = relightSources
+        let quality = relightQuality
+        let interactive = relightInteractive || interactiveResize
+        stateLock.unlock()
+        let extendedRange = colorMode.isHDR || colorMode.isAppleLog
+        guard let frame = RelightFrameResolver.resolve(
+            clip: clip, at: frameTime, sources: sources, preferredQuality: quality,
+            colorMode: colorMode, extendedRange: extendedRange, masks: masks,
+            maskAspect: encodedMaskAspect,
+            geometryLongEdge: RelightCapability.previewGeometryLongEdge(quality: quality, interactive: interactive),
+            prefetches: true) else {
+            if clip.evaluatedRelight(at: frameTime) != nil, let source = sources[clip.assetID],
+               let sourceTime = try? clip.sourceTime(at: frameTime) {
+                let wait = RelightWait(identifier: source.cacheIdentifier,
+                                       position: source.framePosition(sourceTime: sourceTime),
+                                       storeRevision: RelightDepthStore.shared.revision)
+                stateLock.lock(); relightWait = wait; stateLock.unlock()
+            }
+            return nil
+        }
+        guard let stage = relightStage else { return nil }
+        let input: RelightStageInput
+        if let denoised {
+            input = .working(denoised)
+        } else {
+            let mode: RelightPrepareMode
+            switch storage {
+            case .linearHalf: mode = .hlgSignal
+            case .biPlanar: mode = colorMode.isAppleLog ? .appleLog : .encodedSDR
+            case .bgra: mode = .encodedSDR
+            }
+            input = .pixelBuffer(pixelBuffer, partner: nil, blend: 0, mode: mode)
+        }
+        return stage.encode(input, frame: frame, fallbackMatrix: fallbackMatrix, into: command)
+    }
+
     private lazy var gradeToTexture: [String: MTLComputePipelineState] = {
         var built: [String: MTLComputePipelineState] = [:]
         for name in ["gradeToTextureYUV", "gradeToTextureBGRA", "gradeToTextureHDR",
@@ -792,9 +916,13 @@ final class MetalVideoRenderer: NSObject, MTKViewDelegate, @unchecked Sendable {
         // on the way back.
         let denoising = settings.advanced?.resolvedNoiseReduction != nil
             || (sequenceClips?.contains { $0.gradeSettings.advanced?.resolvedNoiseReduction != nil } ?? false)
+        let relighting = sequenceClips?.contains {
+            $0.gradeSettings.advanced?.resolvedRelight != nil || $0.hasRelightAnimation
+        } ?? false
         stateLock.unlock()
         releaseEffectSurfacesIfIdle(active)
         releaseNoiseSurfacesIfIdle(denoising)
+        releaseRelightSurfacesIfIdle(relighting)
     }
 
     /// The area of the preview around the canvas.
@@ -871,6 +999,18 @@ final class MetalVideoRenderer: NSObject, MTKViewDelegate, @unchecked Sendable {
             stateLock.lock()
             lastDrawableSize = view.drawableSize
             let resizing = interactiveResize
+            if var wait = relightWait {
+                let storeRevision = RelightDepthStore.shared.revision
+                if storeRevision != wait.storeRevision {
+                    wait.storeRevision = storeRevision
+                    let landed = RelightQuality.allCases.contains {
+                        RelightDepthStore.shared.covers(identifier: wait.identifier, quality: $0,
+                                                        position: wait.position)
+                    }
+                    relightWait = landed ? nil : wait
+                    if landed { revision &+= 1 }
+                }
+            }
             let currentRevision = revision
             let activeClip = sequenceClips.flatMap {
                 TimelineEditing.activeClip(in: $0, at: frameProvider.presentationTime)
@@ -955,11 +1095,24 @@ final class MetalVideoRenderer: NSObject, MTKViewDelegate, @unchecked Sendable {
                 pixelBuffer: pixelBuffer, grade: frameGrade, bypassing: bypassing,
                 activeClip: activeClip, into: commandBuffer)
 
+            // Relight, after noise reduction and before the grade: light is
+            // added to the scene the camera recorded, in linear light, and the
+            // grade then sees a relit scene. It hands back the same
+            // representation noise reduction does, so the grade reads either
+            // the same way. Skipped under Show Original, which is what makes
+            // the comparison include it.
+            stateLock.lock(); relightWait = nil; stateLock.unlock()
+            let relitTexture = encodeRelight(
+                pixelBuffer: pixelBuffer, storage: textures.storage, denoised: noiseTexture,
+                activeClip: activeClip, frameTime: frameTime, masks: frameMasks,
+                bypassing: bypassing, into: commandBuffer)
+            let gradeSource = relitTexture ?? noiseTexture
+
             // The denoised frame lives in a texture, so the grade has to read it
             // from one — which is the same two-pass route a finishing effect
             // already takes.
             let wantsEffects = FilmEffectsStage.isActive(grade) && !resizing
-            let wantsTexturePass = wantsEffects || noiseTexture != nil
+            let wantsTexturePass = wantsEffects || gradeSource != nil
             stateLock.lock(); let stillSize = stillEffectSize; stateLock.unlock()
             // A still renders its effects in the picture's own geometry; video
             // keeps rendering them at the drawable, exactly as it always has.
@@ -967,7 +1120,7 @@ final class MetalVideoRenderer: NSObject, MTKViewDelegate, @unchecked Sendable {
             let effected: MTLTexture? = wantsTexturePass
                 ? effectedFrame(
                     textures: textures,
-                    noise: noiseTexture,
+                    noise: gradeSource,
                     size: (max(1, Int(effectSize.width)), max(1, Int(effectSize.height))),
                     grade: &grade, locals: locals, yuv: &yuv, hdr: &hdrUniforms,
                     lut: lutTexture, curveLUT: curveTexture, warpField: warpTexture,

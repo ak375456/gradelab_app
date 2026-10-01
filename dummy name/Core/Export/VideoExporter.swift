@@ -48,6 +48,12 @@ final class VideoExporter: @unchecked Sendable {
     /// What this device can hold. Applied here as well as in the preview, so
     /// the two agree about the window on the machine they are both running on.
     private var noiseCapability: NoiseReductionCapability?
+    /// Relight, shared with the preview. Built for an export with a relit
+    /// clip on the direct path and nil for every other export — a composited
+    /// export is relit by the compositor, one layer at a time.
+    private var relightStage: RelightStage?
+    /// Each asset's depth identity and orientation, read once per export.
+    private var relightSources: [UUID: RelightSourceInfo] = [:]
     /// Built lazily: 8-bit SDR exports never touch these.
     private let hdrPipeline: MTLComputePipelineState?
     private let sdr10Pipeline: MTLComputePipelineState?
@@ -123,6 +129,12 @@ final class VideoExporter: @unchecked Sendable {
                 await onStateChange?(.preparing)
                 try session.checkCancellation()
                 try ExportMediaSettings.validate(configuration)
+                relightSources = project.map(RelightSourceInfo.table(for:)) ?? [:]
+                if let project {
+                    let analysed = try await prepareRelightDepth(project: project, onStateChange: onStateChange)
+                    if analysed { await onStateChange?(.preparing) }
+                }
+                try session.checkCancellation()
                 let source: ExportSourceInfo
                 if let project {
                     // Composite at the size being written, not at the canvas.
@@ -500,6 +512,7 @@ final class VideoExporter: @unchecked Sendable {
         let sampler = ExportFrameSampler(output: pipeline.videoOutput, range: source.videoTimeRange,
             fps: configuration.frameRate.value)
         prepareNoiseReduction(settings: settings, source: source)
+        prepareRelight(source: source)
 
         while videoIsActive || audioIsActive.contains(true) {
             try session.checkCancellation()
@@ -627,6 +640,10 @@ final class VideoExporter: @unchecked Sendable {
         // read from the same clip at the same time.
         var frameSettings = settings
         var activeClipRange: CMTimeRange?
+        // The clip and its masks at this moment, for Relight, which reads its
+        // lights and depth off the clip rather than off the grade uniforms.
+        var relightClip: VideoClip?
+        var relightMasks: [MaskedGradeLayer] = []
         var grade = source.gradesBaked ? FrameGrade(settings: .neutral, bypass: true) : source.timelineClips.map { clips in
             let clip = TimelineEditing.activeClip(in: clips, at: presentationTime)
             let frameTime = try? TimelineTime(presentationTime)
@@ -644,6 +661,8 @@ final class VideoExporter: @unchecked Sendable {
                 CMTimeRange(start: $0.placement.timelineStart.cmTime,
                             duration: $0.placement.duration.cmTime)
             }
+            relightClip = clip
+            relightMasks = masks
             return FrameGrade(settings: settings, masks: masks,
                               bypass: false, aspect: maskAspect)
         } ?? grade
@@ -694,12 +713,19 @@ final class VideoExporter: @unchecked Sendable {
             }
         } ?? pulled.neighbours
 
+        // Noise reduction, then Relight, then the grade — the order every
+        // path draws in. Both hand the grade the same representation, so it
+        // reads whichever ran last.
+        let denoised = try denoise(source: sourcePixelBuffer, neighbours: neighbours,
+                                   settings: frameSettings)
+        let relit = try relight(
+            source: sourcePixelBuffer, denoised: denoised, clip: relightClip,
+            at: presentationTime, masks: relightMasks, maskAspect: maskAspect)
         try render(
             source: sourcePixelBuffer,
             destination: destination,
             grade: grade,
-            noise: try denoise(source: sourcePixelBuffer, neighbours: neighbours,
-                               settings: frameSettings)
+            noise: relit ?? denoised
         )
         guard adaptor.append(destination, withPresentationTime: presentationTime) else {
             throw GradeLabError.exportFailed(String(localized: "The video encoder rejected a processed frame."))
@@ -1159,6 +1185,114 @@ final class VideoExporter: @unchecked Sendable {
                     ?? "Noise reduction failed.")
         }
         return result.texture
+    }
+
+    // MARK: - Relight
+
+    /// Makes sure every relit clip has High-quality depth over the whole of
+    /// its source range before the first frame is written, analysing whatever
+    /// is missing. Returns true when it had to analyse anything.
+    ///
+    /// Export never draws at Fast and never skips a frame because its depth is
+    /// late: a light that shows on screen has to be in the file, at the
+    /// quality a file deserves. What the preview already analysed at High is
+    /// reused as it is.
+    private func prepareRelightDepth(project: VideoProject, onStateChange: StateHandler?) async throws -> Bool {
+        var jobs: [RelightAnalysisRequest] = []
+        var seen = Set<String>()
+        for track in project.timeline.tracks where track.isEnabled {
+            for case .video(let clip) in track.items where clip.placement.isEnabled {
+                guard clip.gradeSettings.advanced?.resolvedRelight != nil || clip.hasRelightAnimation,
+                      let asset = project.assets.first(where: { $0.id == clip.assetID }),
+                      let info = relightSources[asset.id],
+                      let end = try? clip.sourceRange.end else { continue }
+                let first = info.frameIndex(sourceTime: clip.sourceRange.start)
+                let last = max(first, info.frameIndex(sourceTime: end) - 1)
+                // One job per stretch of source, however many clips show it.
+                guard seen.insert("\(info.cacheIdentifier)|\(first)|\(last)").inserted else { continue }
+                let coverage = RelightDepthStore.shared.coverage(
+                    identifier: info.cacheIdentifier, quality: .high, frames: first...last)
+                guard coverage < 0.995 else { continue }
+                jobs.append(RelightAnalysisRequest(
+                    asset: asset, source: info, sourceRange: clip.sourceRange, startAt: nil,
+                    quality: .high, colorMode: project.colorMode))
+            }
+        }
+        guard !jobs.isEmpty else { return false }
+        let total = max(jobs.reduce(0) { $0 + $1.sourceRange.duration.seconds }, 0.001)
+        var done = 0.0
+        await onStateChange?(.analyzing(ExportProgress(
+            fractionCompleted: 0, processedDuration: 0, totalDuration: total, presentationTime: 0)))
+        for job in jobs {
+            try Task.checkCancellation()
+            let seconds = job.sourceRange.duration.seconds
+            let base = done
+            _ = try await RelightAnalyzer.analyze(job, context: context) { progress in
+                let processed = base + seconds * progress.fraction
+                let state = ExportState.analyzing(ExportProgress(
+                    fractionCompleted: processed / total, processedDuration: processed,
+                    totalDuration: total, presentationTime: processed))
+                Task { @MainActor in onStateChange?(state) }
+            }
+            done += seconds
+        }
+        return true
+    }
+
+    /// Builds the stage for an export that will need it on the direct path.
+    private func prepareRelight(source: ExportSourceInfo) {
+        relightStage = nil
+        guard !source.gradesBaked,
+              source.timelineClips?.contains(where: {
+                  $0.gradeSettings.advanced?.resolvedRelight != nil || $0.hasRelightAnimation
+              }) == true else { return }
+        relightStage = RelightStage(context: context)
+    }
+
+    /// Relights one source frame, or returns nil when its clip has no light
+    /// here. Always at High, with geometry at full export resolution.
+    private func relight(
+        source: CVPixelBuffer,
+        denoised: MTLTexture?,
+        clip: VideoClip?,
+        at time: CMTime,
+        masks: [MaskedGradeLayer],
+        maskAspect: Double
+    ) throws -> MTLTexture? {
+        guard let stage = relightStage, let clip, let frameTime = try? TimelineTime(time) else { return nil }
+        let extendedRange = activeColorMode.isHDR || activeColorMode.isAppleLog
+        guard let frame = RelightFrameResolver.resolve(
+            clip: clip, at: frameTime, sources: relightSources, preferredQuality: .high,
+            colorMode: activeColorMode, extendedRange: extendedRange, masks: masks,
+            maskAspect: maskAspect, geometryLongEdge: RelightCapability.exportGeometryLongEdge,
+            prefetches: true) else { return nil }
+        let input: RelightStageInput
+        if let denoised {
+            input = .working(denoised)
+        } else {
+            let mode: RelightPrepareMode
+            if CVPixelBufferGetPixelFormatType(source) == kCVPixelFormatType_64RGBAHalf {
+                mode = .hlgSignal
+            } else {
+                mode = activeColorMode.isAppleLog ? .appleLog : .encodedSDR
+            }
+            input = .pixelBuffer(source, partner: nil, blend: 0, mode: mode)
+        }
+        guard let command = context.commandQueue.makeCommandBuffer() else {
+            throw GradeLabError.exportFailed(String(localized: "Metal could not create an export command buffer."))
+        }
+        command.label = "GradeLab Relight"
+        guard let texture = stage.encode(input, frame: frame, fallbackMatrix: "BT.709", into: command) else {
+            command.commit()
+            return nil
+        }
+        command.commit()
+        command.waitUntilCompleted()
+        guard command.status == .completed else {
+            throw GradeLabError.exportFailed(
+                command.error.map { "Relight failed: \($0.localizedDescription)" } ?? "Relight failed.")
+        }
+        return texture
     }
 
     /// Grades a denoised frame and hands it to this export's encoder.

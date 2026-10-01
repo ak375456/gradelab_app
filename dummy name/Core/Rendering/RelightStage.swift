@@ -2,6 +2,7 @@
 import CoreGraphics
 import Foundation
 @preconcurrency import Metal
+import os
 import simd
 
 // ---------------------------------------------------------------------------
@@ -50,8 +51,24 @@ enum RelightStageInput {
     /// blending: the two frames are mixed before the light is applied, so the
     /// light lands once on the picture the clip actually shows.
     case pixelBuffer(CVPixelBuffer, partner: CVPixelBuffer?, blend: Float, mode: RelightPrepareMode)
+    /// A packed RGB frame the compositor already holds as a texture — the HDR
+    /// path's half-float sources, or a frame interpolated by optical flow.
+    case texture(MTLTexture, partner: MTLTexture?, blend: Float, mode: RelightPrepareMode)
     /// A frame already in the grade's representation — noise reduction's output.
     case working(MTLTexture)
+}
+
+/// Whether a light is being dragged right now, for the one path that cannot be
+/// told directly: AVFoundation rebuilds the layer compositor on every
+/// composition refresh, so it has no line back to the editor. Read per frame,
+/// written by the editor at the start and end of a gesture.
+enum RelightInteraction {
+    private static let state = OSAllocatedUnfairLock(initialState: false)
+
+    static var isActive: Bool {
+        get { state.withLock { $0 } }
+        set { state.withLock { $0 = newValue } }
+    }
 }
 
 /// Everything one relit frame needs, resolved once by whichever path is drawing.
@@ -238,14 +255,14 @@ final class RelightStage: @unchecked Sendable {
         switch input {
         case .pixelBuffer(let buffer, _, _, _):
             full = (CVPixelBufferGetWidth(buffer), CVPixelBufferGetHeight(buffer))
-        case .working(let texture):
+        case .texture(let texture, _, _, _), .working(let texture):
             full = (texture.width, texture.height)
         }
         guard full.width > 1, full.height > 1 else { return nil }
         let geometrySize = Self.fitted(full, longEdge: frame.geometryLongEdge)
         let lowSize = (width: frame.depth.first.plane.width, height: frame.depth.first.plane.height)
         let needsWorking: Bool
-        if case .pixelBuffer = input { needsWorking = true } else { needsWorking = false }
+        if case .working = input { needsWorking = false } else { needsWorking = true }
         guard let s = resolvedSurfaces(full: full, geometry: geometrySize, low: lowSize,
                                        needsWorking: needsWorking),
               let depthA = depthTexture(frame.depth.first) else { return nil }
@@ -262,6 +279,11 @@ final class RelightStage: @unchecked Sendable {
                   encodePrepare(buffer, partner: partner, blend: blend, mode: mode, isLog2: frame.isLog2,
                                 fallbackMatrix: fallbackMatrix, destination: destination,
                                 into: command) else { return nil }
+            working = destination
+        case .texture(let texture, let partner, let blend, let mode):
+            guard let destination = s.working,
+                  encodePrepare(texture, partner: partner, blend: blend, mode: mode,
+                                destination: destination, into: command) else { return nil }
             working = destination
         }
 
@@ -399,6 +421,29 @@ final class RelightStage: @unchecked Sendable {
             withExtendedLifetime(textures) {}
             withExtendedLifetime(partnerTextures) {}
         }
+        return true
+    }
+
+    /// The packed-RGB preparation, for a frame that is already a texture.
+    private func encodePrepare(
+        _ texture: MTLTexture,
+        partner: MTLTexture?,
+        blend: Float,
+        mode: RelightPrepareMode,
+        destination: MTLTexture,
+        into command: MTLCommandBuffer
+    ) -> Bool {
+        guard mode != .appleLog, let encoder = command.makeComputeCommandEncoder() else { return false }
+        var prepare = SIMD4<Float>(mode.code, partner == nil ? 0 : min(max(blend, 0), 1), 0, 0)
+        var hdr = HDRDisplayUniforms()
+        encoder.setComputePipelineState(prepareRGB)
+        encoder.setTexture(texture, index: 0)
+        encoder.setTexture(partner, index: 1)
+        encoder.setTexture(destination, index: 4)
+        encoder.setBytes(&prepare, length: MemoryLayout<SIMD4<Float>>.stride, index: 0)
+        encoder.setBytes(&hdr, length: MemoryLayout<HDRDisplayUniforms>.stride, index: 2)
+        Self.dispatch(encoder, prepareRGB, destination.width, destination.height)
+        encoder.endEncoding()
         return true
     }
 
