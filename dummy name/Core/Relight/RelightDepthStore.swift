@@ -196,7 +196,10 @@ final class RelightDepthStore: @unchecked Sendable {
     /// Stored frame indices per source and quality, sorted. Read from the
     /// directory once and kept current by every write.
     private var indexes: [Key: [Int64]] = [:]
-    private var memory: [FrameKey: RelightDepthPlane] = [:]
+    /// Planes in memory, each with the store revision it was written or
+    /// loaded at. The stamp is part of the key a renderer uploads under, so a
+    /// frame rewritten by a later analysis is never drawn from a stale upload.
+    private var memory: [FrameKey: (plane: RelightDepthPlane, stamp: UInt64)] = [:]
     private var order: [FrameKey] = []
     private let capacity = 72
     private var manifests: [Key: RelightAnalysisManifest] = [:]
@@ -223,8 +226,8 @@ final class RelightDepthStore: @unchecked Sendable {
         var list = loadedIndex(key)
         insertSorted(frame, into: &list)
         indexes[key] = list
-        insertMemory(plane, for: FrameKey(key: key, index: frame))
         revisionStorage &+= 1
+        insertMemory(plane, for: FrameKey(key: key, index: frame))
         lock.unlock()
     }
 
@@ -250,21 +253,31 @@ final class RelightDepthStore: @unchecked Sendable {
     /// Deletes every stored frame for a source, at both qualities.
     func remove(identifier: String) {
         for quality in RelightQuality.allCases {
-            let key = Key(identifier: identifier, quality: quality)
-            if let directory = try? directory(for: key) { try? fileManager.removeItem(at: directory) }
-            lock.lock()
-            indexes[key] = []
-            manifests[key] = nil
-            memory = memory.filter { $0.key.key != key }
-            order.removeAll { $0.key == key }
-            revisionStorage &+= 1
-            lock.unlock()
+            clear(Key(identifier: identifier, quality: quality))
         }
+    }
+
+    /// Deletes every stored frame for one source at one quality, so an
+    /// analysis can start again from nothing rather than over what was there.
+    func clear(_ key: Key) {
+        if let directory = try? directory(for: key) { try? fileManager.removeItem(at: directory) }
+        lock.lock()
+        indexes[key] = []
+        manifests[key] = nil
+        memory = memory.filter { $0.key.key != key }
+        order.removeAll { $0.key == key }
+        revisionStorage &+= 1
+        lock.unlock()
     }
 
     // MARK: - Reading
 
     func plane(_ key: Key, frame: Int64) -> RelightDepthPlane? {
+        stampedPlane(key, frame: frame)?.plane
+    }
+
+    /// The plane and the revision it entered memory at.
+    private func stampedPlane(_ key: Key, frame: Int64) -> (plane: RelightDepthPlane, stamp: UInt64)? {
         let frameKey = FrameKey(key: key, index: frame)
         lock.lock()
         if let cached = memory[frameKey] {
@@ -278,8 +291,9 @@ final class RelightDepthStore: @unchecked Sendable {
               let plane = try? RelightDepthPlane(decoding: data), plane.isValid else { return nil }
         lock.lock()
         insertMemory(plane, for: frameKey)
+        let stamped = memory[frameKey] ?? (plane, revisionStorage)
         lock.unlock()
-        return plane
+        return stamped
     }
 
     /// The stored frames for one source and quality, sorted.
@@ -311,7 +325,9 @@ final class RelightDepthStore: @unchecked Sendable {
         let cacheKey = "\(identifier)|\(quality.rawValue)|"
 
         func frame(_ index: Int64) -> RelightDepthSample.Frame? {
-            plane(key, frame: index).map { .init(index: index, plane: $0, cacheKey: cacheKey + String(index)) }
+            stampedPlane(key, frame: index).map {
+                .init(index: index, plane: $0.plane, cacheKey: cacheKey + "\(index)@\($0.stamp)")
+            }
         }
         func single(_ index: Int64) -> RelightDepthSample? {
             frame(index).map { RelightDepthSample(first: $0, second: nil, phase: 0, quality: quality) }
@@ -438,7 +454,7 @@ final class RelightDepthStore: @unchecked Sendable {
 
     /// Must be called with the lock held.
     private func insertMemory(_ plane: RelightDepthPlane, for key: FrameKey) {
-        memory[key] = plane
+        memory[key] = (plane, revisionStorage)
         order.removeAll { $0 == key }
         order.append(key)
         while order.count > capacity { memory.removeValue(forKey: order.removeFirst()) }

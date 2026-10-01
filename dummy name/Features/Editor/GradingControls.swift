@@ -115,6 +115,12 @@ struct GradingControls<Model: GradingModel>: View {
                     case .curves: CurvesPanel(model: model)
                     case .warper: ColorWarperPanel(model: model)
                     case .noise: NoiseReductionPanel(model: model)
+                    case .relight:
+                        // A timeline tool, like Match: `availablePanels`
+                        // keeps it out of the still editor.
+                        if let editor = model as? EditorViewModel {
+                            RelightPanel(model: editor)
+                        }
                     case .hsl: HSLPanel(model: model)
                     case .wheels: WheelsPanel(model: model)
                     case .match:

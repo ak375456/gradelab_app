@@ -569,7 +569,9 @@ final class ImageEditorViewModel: ObservableObject, GradingModel {
         // Noise reduction is a video tool: temporal reduction has no other
         // frames to look at in a photograph, and a still already has its own
         // route from file to picture. See `availablePanels`.
-        case .masks, .match, .noise: return
+        // Relight is a video tool too: its depth is estimated across a shot
+        // and carried along the motion between frames.
+        case .masks, .match, .noise, .relight: return
         case .vignette:
             advanced.vignette = 0; advanced.vignetteMidpoint = 50; advanced.vignetteFeather = 70
         case .effects: advanced.effects = nil

@@ -53,6 +53,35 @@ final class EditorViewModel: ObservableObject, GradingModel {
     @Published private(set) var isMeasuringNoise = false
     /// What the renderer actually managed on the last frame it drew.
     @Published private(set) var noiseStatus = NoiseReductionStatus.inactive
+
+    // MARK: Relight — editor state only. The lights live on the clip's grade;
+    // see RelightEditing.swift for everything that reads and writes them.
+
+    /// The light the Relight inspector and the viewer handles are pointed at.
+    @Published var selectedLightID: UUID?
+    /// The light under the pointer or the Pencil, for the viewer to highlight.
+    @Published var hoveredLightID: UUID?
+    /// The scene analysis running now, or nil.
+    @Published var relightProgress: RelightAnalysisProgress?
+    /// Which source the running analysis is for, so the panel of another clip
+    /// does not claim it.
+    @Published var relightAnalysisIdentifier: String?
+    /// The last thing analysis has to tell the person.
+    @Published var relightNotice: String?
+    /// Bumped when an analysis finishes or a cache is cleared, so readings of
+    /// the depth store refresh.
+    @Published var relightDepthRevision = 0
+    /// How hard the preview works on depth. A device preference, not part of
+    /// the document: export always analyses and draws at High.
+    @Published var relightQuality = RelightQuality.loadPreference()
+    var relightAnalysisTask: Task<Void, Never>?
+    /// Identifies the analysis in flight, so a late report from one that was
+    /// cancelled or superseded is ignored.
+    var relightAnalysisRun: UUID?
+    /// When the composited preview was last repainted for depth that landed.
+    var relightCompositeRefresh = Date.distantPast
+    /// The assets the renderer was last given depth identities for.
+    private var relightSourceAssets: [ProjectMediaAsset]?
     private var audioRouting = TimelineAudioMix()
     private var forceLayerPreview = false
     private var historyLabel = "Color"
@@ -1931,6 +1960,11 @@ final class EditorViewModel: ObservableObject, GradingModel {
                 clip.evaluatedValue(of: property, atLocal: local).map { (property, $0) }
             }
         } ?? []
+        // Lights carry their own tracks, as masks do; each keeps what is on
+        // screen.
+        let relightHeld = local.flatMap { time in
+            selectedClip?.resolvedRelight.flatMap { $0.isAnimated ? $0.evaluated(atLocal: time) : nil }
+        }
         let maskHeld: [UUID: [(AnimatableProperty, KeyframeValue)]] = maskedGrades.reduce(into: [:]) { result, layer in
             guard let local, let animation = layer.animation, !animation.isEmpty else { return }
             let evaluated = layer.evaluated(atLocal: local)
@@ -1941,6 +1975,12 @@ final class EditorViewModel: ObservableObject, GradingModel {
         changeVisual("Remove All Animation", immediate: true) { clip in
             clip.animation = nil
             for (property, value) in clipHeld { clip.setBaseValue(value, of: property) }
+            if var flattened = relightHeld, var advanced = clip.gradeSettings.advanced, advanced.relight != nil {
+                flattened.animation = nil
+                for index in flattened.lights.indices { flattened.lights[index].animation = nil }
+                advanced.relight = flattened
+                clip.gradeSettings.advanced = advanced
+            }
             guard var masks = clip.maskedGrades else { return }
             for index in masks.indices {
                 masks[index].animation = nil
@@ -2668,7 +2708,10 @@ final class EditorViewModel: ObservableObject, GradingModel {
     /// Asked once per panel button on every body pass, so it walks the tracks
     /// rather than building an array of the animated properties first.
     func panelHasAnimation(_ panel: GradePanel) -> Bool {
-        gradeAnimationTracks?.contains {
+        // Light keyframes live on the lights, the way mask keyframes live on
+        // the masks, so the tool is asked rather than the clip's tracks.
+        if panel == .relight { return selectedMaskID == nil && (selectedClip?.hasRelightAnimation ?? false) }
+        return gradeAnimationTracks?.contains {
             !$0.isEmpty && $0.property.gradeSlot?.panel == panel
         } ?? false
     }
@@ -3147,6 +3190,11 @@ final class EditorViewModel: ObservableObject, GradingModel {
             advanced.effects = nil
         case .noise:
             advanced.noiseReduction = nil
+        case .relight:
+            // The lights and their keyframes. The depth cache stays: it is
+            // the scene, not the lighting, and a new light can use it at once.
+            advanced.relight = nil
+            selectedLightID = nil
         case .lut:
             advanced.lut = nil; advanced.lutIntensity = nil
         case .masks:
@@ -3494,6 +3542,30 @@ final class EditorViewModel: ObservableObject, GradingModel {
         )
         renderer.setMaskMatte(maskMatte)
         synchronizeNoiseReduction()
+        synchronizeRelightSources()
+    }
+
+    /// Hands the renderer each asset's depth identity and orientation, when
+    /// the assets have changed — not on every slider tick.
+    private func synchronizeRelightSources() {
+        guard relightSourceAssets != project.assets else { return }
+        relightSourceAssets = project.assets
+        renderer.setRelightSources(RelightSourceInfo.table(for: project))
+    }
+
+    /// Records which analysis a clip's lights were set up against.
+    ///
+    /// Written without an undo entry: it describes the cache the lights were
+    /// placed on, not an edit anyone made, and undoing it would undo nothing
+    /// a person could see.
+    func recordRelightAnalysis(_ reference: RelightAnalysisReference, on clipID: UUID) {
+        guard var grade = project.timeline.videoClip(id: clipID)?.gradeSettings,
+              var advanced = grade.advanced, var relight = advanced.relight,
+              relight.analysis != reference else { return }
+        relight.analysis = reference
+        advanced.relight = relight
+        grade.advanced = advanced
+        if project.timeline.setGrade(grade, for: clipID) { project.updatedAt = .now }
     }
 }
 

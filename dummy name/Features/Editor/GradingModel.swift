@@ -181,7 +181,7 @@ extension GradingModel {
     /// would be offering the spatial half of a tool under the name of the whole
     /// one.
     var availablePanels: [GradePanel] {
-        GradePanel.allCases.filter { $0 != .masks && $0 != .match && $0 != .noise }
+        GradePanel.allCases.filter { $0 != .masks && $0 != .match && $0 != .noise && $0 != .relight }
     }
     var editingMaskName: String? { nil }
 

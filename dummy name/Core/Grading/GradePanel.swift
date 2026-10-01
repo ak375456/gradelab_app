@@ -17,6 +17,7 @@ enum GradePanel: String, CaseIterable, Identifiable, Sendable {
     case hsl = "HSL"
     case warper = "Warper"
     case noise = "Noise"
+    case relight = "Relight"
     case wheels = "Wheels"
     case match = "Match"
     case masks = "Masks"
@@ -47,6 +48,7 @@ enum GradePanel: String, CaseIterable, Identifiable, Sendable {
         case .hsl: "slider.horizontal.3"
         case .warper: "circle.hexagongrid"
         case .noise: "camera.aperture"
+        case .relight: "lightbulb.max"
         case .wheels: "circle.lefthalf.filled"
         case .match: "rectangle.on.rectangle.angled"
         case .masks: "circle.dashed.inset.filled"
@@ -94,6 +96,17 @@ enum GradePanel: String, CaseIterable, Identifiable, Sendable {
             Detail Recovery is not sharpening. It measures what the reduction removed and puts back only the part too large to have been noise.
 
             Hold the picture to compare, and zoom in while you tune \u{2014} noise reduction is judged at 100%, not fitted to the screen.
+            """)
+        case .relight: String(localized: """
+            Add virtual lights that react to the shape of the scene.
+
+            GradeLab estimates how far away each part of the picture is and which way its surfaces face, then lights them: a key from the right brightens what faces right and leaves what faces away. It is an estimate from the picture, not a 3D scan, so it shapes light convincingly rather than casting exact shadows.
+
+            Analysis runs once per clip, in the background, starting at the playhead. Lights can be moved, recoloured and keyframed instantly afterwards — the scene is never analysed again for a light change.
+
+            Directional is a distant source like the sun or a window. Point is a lamp in the scene. Spot is an aimed cone. Negative intensity takes light away.
+
+            Drag a light on the picture to move it. Hold \\ to compare with the original.
             """)
         case .wheels: String(localized: "Tint shadows, midtones, or highlights separately. Drag toward a color; farther from the center means stronger color. Try cool shadows with warm highlights.")
         case .match: String(localized: """

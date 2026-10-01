@@ -424,7 +424,7 @@ struct RelightSettings: Codable, Equatable, Sendable {
     /// Whether the relight would change a pixel, before any depth is known.
     var isActive: Bool {
         isEnabled && strength.isFinite && strength > 0.0005
-            && lights.prefix(Self.maximumLights).contains(where: \.contributes)
+            && lights.contains(where: \.contributes)
     }
 
     /// The lights that reach the GPU, in list order, within the budget.

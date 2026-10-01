@@ -61,6 +61,17 @@ struct EditorView: View {
     private var maskedGradeMode: Bool {
         colorMode && (model.selectedMaskID != nil || model.selectedPanel == .masks)
     }
+    /// The Relight tool is open: its lights are on the picture, and a drag on
+    /// one moves it rather than the viewport.
+    private var relightMode: Bool {
+        colorMode && model.selectedPanel == .relight && model.selectedMaskID == nil
+    }
+    /// The keyboard reaches the selected light: arrows nudge it, Delete and
+    /// ⌘D act on it. Otherwise the same keys keep their timeline meaning, so
+    /// one key never has two owners at once.
+    private var relightKeysActive: Bool {
+        relightMode && model.selectedLight != nil && model.canEditRelight
+    }
     /// The overlay also stays up for a finished lasso with no tool armed: the
     /// outline is the selection, so hiding it would leave the user guessing
     /// what is about to be cut — and, once tracked, unable to watch it hold on
@@ -87,7 +98,7 @@ struct EditorView: View {
         let drawsOnPicture = model.selectedText != nil || model.selectedShape != nil
             || model.evaluatedMediaOverlay != nil
             || model.isPickingCurveHue || model.isPickingWarpColor || model.isPickingMaskQualifier
-            || maskMode || localMaskMode || maskedGradeMode
+            || maskMode || localMaskMode || maskedGradeMode || relightMode
         return drawsOnPicture ? .off : .full
     }
     @State private var speedTool = false
@@ -721,6 +732,9 @@ struct EditorView: View {
             : String(localized: "Every colour adjustment on the selected mask goes back to neutral. The clip's own grade is not affected.")
     }
 
+    /// One arrow press moves a light this far across the picture.
+    private static let lightNudge = 0.005
+
     private var shortcutsEnabled: Bool {
         !typingText && !model.showsExport && clipExport == nil && !savingPreset && !help
             && !settingsSheet && !layers && !markers && !soundEffects && !showsFileImporter && !mediaPicker
@@ -742,18 +756,41 @@ struct EditorView: View {
                 model.playback.pause(); comparePinned = false; model.showsExport = true
             },
             .init(.playPause, isEnabled: ready && model.hasMedia, run: model.playback.togglePlayback),
-            .init(.previousFrame, isEnabled: ready && model.hasMedia) { model.stepFrames(-1) },
-            .init(.nextFrame, isEnabled: ready && model.hasMedia) { model.stepFrames(1) },
-            .init(.backTenFrames, isEnabled: ready && model.hasMedia) { model.stepFrames(-10) },
-            .init(.forwardTenFrames, isEnabled: ready && model.hasMedia) { model.stepFrames(10) },
+            // In Relight, with a light selected, the arrows move the light
+            // instead of the playhead. Same keys, one owner each, decided by
+            // what the person is working on.
+            .init(.previousFrame, isEnabled: ready && model.hasMedia) {
+                if relightKeysActive { model.nudgeSelectedLight(dx: -Self.lightNudge, dy: 0) } else { model.stepFrames(-1) }
+            },
+            .init(.nextFrame, isEnabled: ready && model.hasMedia) {
+                if relightKeysActive { model.nudgeSelectedLight(dx: Self.lightNudge, dy: 0) } else { model.stepFrames(1) }
+            },
+            .init(.backTenFrames, isEnabled: ready && model.hasMedia) {
+                if relightKeysActive { model.nudgeSelectedLight(dx: -Self.lightNudge * 10, dy: 0) } else { model.stepFrames(-10) }
+            },
+            .init(.forwardTenFrames, isEnabled: ready && model.hasMedia) {
+                if relightKeysActive { model.nudgeSelectedLight(dx: Self.lightNudge * 10, dy: 0) } else { model.stepFrames(10) }
+            },
+            .init(.nudgeLightUp, isEnabled: relightKeysActive) { model.nudgeSelectedLight(dx: 0, dy: -Self.lightNudge) },
+            .init(.nudgeLightDown, isEnabled: relightKeysActive) { model.nudgeSelectedLight(dx: 0, dy: Self.lightNudge) },
+            .init(.nudgeLightUpLarge, isEnabled: relightKeysActive) { model.nudgeSelectedLight(dx: 0, dy: -Self.lightNudge * 10) },
+            .init(.nudgeLightDownLarge, isEnabled: relightKeysActive) { model.nudgeSelectedLight(dx: 0, dy: Self.lightNudge * 10) },
+            .init(.nudgeLightLeftFine, isEnabled: relightKeysActive) { model.nudgeSelectedLight(dx: -Self.lightNudge / 5, dy: 0) },
+            .init(.nudgeLightRightFine, isEnabled: relightKeysActive) { model.nudgeSelectedLight(dx: Self.lightNudge / 5, dy: 0) },
+            .init(.nudgeLightUpFine, isEnabled: relightKeysActive) { model.nudgeSelectedLight(dx: 0, dy: -Self.lightNudge / 5) },
+            .init(.nudgeLightDownFine, isEnabled: relightKeysActive) { model.nudgeSelectedLight(dx: 0, dy: Self.lightNudge / 5) },
             .init(.undo, isEnabled: ready && model.canUndo, run: model.undo),
             .init(.redo, isEnabled: ready && model.canRedo, run: model.redo),
             .init(.cutClip, isEnabled: ready && singleSelection && model.canEditSelection) { model.deleteClip(cutting: true) },
             .init(.copyClip, isEnabled: singleSelection, run: model.copyClip),
             .init(.pasteClip, isEnabled: ready && model.clipboard != nil, run: model.pasteClip),
-            .init(.duplicateClip, isEnabled: ready && singleSelection && model.canEditSelection, run: model.duplicateClip),
+            .init(.duplicateClip, isEnabled: relightKeysActive || (ready && singleSelection && model.canEditSelection)) {
+                if relightKeysActive, let id = model.selectedLightID { model.duplicateLight(id) } else { model.duplicateClip() }
+            },
             .init(.splitAtPlayhead, isEnabled: ready && model.canSplit && model.canEditSelection, run: model.split),
-            .init(.deleteClips, isEnabled: ready && model.canEditSelection) { model.deleteClip() },
+            .init(.deleteClips, isEnabled: relightKeysActive || (ready && model.canEditSelection)) {
+                if relightKeysActive, let id = model.selectedLightID { model.deleteLight(id) } else { model.deleteClip() }
+            },
             .init(.toggleMarker, isEnabled: ready, run: model.toggleMarker),
             .init(.toggleSnapping) { timelineSnapping.toggle() },
             .init(.compareOriginal, isEnabled: model.hasMedia) { comparePinned.toggle() },
@@ -768,6 +805,10 @@ struct EditorView: View {
             .init(.toolShape, isEnabled: ready) { select(.shape) },
             .init(.toolAudio, isEnabled: ready) { select(.audio) },
             .init(.toolColor, isEnabled: ready) { select(.color) },
+            .init(.toolRelight, isEnabled: ready) {
+                select(.color)
+                if colorMode, model.availablePanels.contains(.relight) { model.selectedPanel = .relight }
+            },
             .init(.toolTransform, isEnabled: ready) { select(.transform) },
             .init(.toolMask, isEnabled: ready) { select(.mask) },
             .init(.toolMatte, isEnabled: ready) { select(.matte) },
@@ -961,6 +1002,9 @@ struct EditorView: View {
                     }
                     if maskMode {
                         LayerMaskOverlay(model: model, displayedRect: model.renderer.displayedVideoRect)
+                    }
+                    if relightMode && !model.showsOriginal {
+                        RelightOverlay(model: model, displayedRect: model.renderer.displayedVideoRect)
                     }
                     if backgroundInteractionActive {
                         BackgroundRemovalOverlay(model: model,

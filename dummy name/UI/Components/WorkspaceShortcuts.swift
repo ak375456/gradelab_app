@@ -57,6 +57,9 @@ struct WorkspaceShortcut: Identifiable {
         case toolTimeline, toolText, toolShape, toolAudio, toolColor
         case toolTransform, toolMask, toolMatte, toolBackground, toolSpeed
         case speedRamp, resetSpeed
+        case toolRelight
+        case nudgeLightUp, nudgeLightDown, nudgeLightUpLarge, nudgeLightDownLarge
+        case nudgeLightLeftFine, nudgeLightRightFine, nudgeLightUpFine, nudgeLightDownFine
 
         var id: String { rawValue }
 
@@ -148,6 +151,29 @@ struct WorkspaceShortcut: Identifiable {
                 (String(localized: "Speed Ramp"), "r", [], .editing, .videoEditor)
             case .resetSpeed:
                 (String(localized: "Reset Speed"), "r", .shift, .editing, .videoEditor)
+
+            // Relight. ⇧⌘L opens the tool from anywhere. With a light
+            // selected in it, ← and → move the light instead of the playhead
+            // (Shift for ten times further); these add the vertical moves and
+            // the fine Option steps, which nothing else in the editor uses.
+            case .toolRelight:
+                (String(localized: "Relight Tool"), "l", [.command, .shift], .tools, .videoEditor)
+            case .nudgeLightUp:
+                (String(localized: "Move Light Up"), .upArrow, [], .editing, .videoEditor)
+            case .nudgeLightDown:
+                (String(localized: "Move Light Down"), .downArrow, [], .editing, .videoEditor)
+            case .nudgeLightUpLarge:
+                (String(localized: "Move Light Up More"), .upArrow, .shift, .editing, .videoEditor)
+            case .nudgeLightDownLarge:
+                (String(localized: "Move Light Down More"), .downArrow, .shift, .editing, .videoEditor)
+            case .nudgeLightLeftFine:
+                (String(localized: "Move Light Left Slightly"), .leftArrow, .option, .editing, .videoEditor)
+            case .nudgeLightRightFine:
+                (String(localized: "Move Light Right Slightly"), .rightArrow, .option, .editing, .videoEditor)
+            case .nudgeLightUpFine:
+                (String(localized: "Move Light Up Slightly"), .upArrow, .option, .editing, .videoEditor)
+            case .nudgeLightDownFine:
+                (String(localized: "Move Light Down Slightly"), .downArrow, .option, .editing, .videoEditor)
             }
         }
 
