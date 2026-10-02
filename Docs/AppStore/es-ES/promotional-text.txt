@@ -1,1 +1,1 @@
-Llega la rampa de velocidad: moldea una curva de velocidad en cualquier clip y el flujo óptico crea los fotogramas intermedios para una cámara lenta nítida.
+Novedad: Relight. Añade luces virtuales a lo que ya has grabado: luz principal, contraluz o atardecer, que sigue la forma de las caras.

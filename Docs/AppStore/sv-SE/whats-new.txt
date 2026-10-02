@@ -1,9 +1,9 @@
-Hastighetsramp och optiskt flöde är här.
+Relight är här.
 
-• Hastighet: håll en konstant hastighet eller bygg en kurva. Placera hastighetspunkter var som helst i klippet och forma rampen med mjuka övergångar och Bézier-handtag.
-• Optiskt flöde: nya bildrutor skapas mellan de verkliga, så att slow motion förblir skarp i stället för hackig. Bildblandning och bildsampling finns också.
-• Frysbild och baklänges: håll kvar en bildruta så länge du vill, eller spela klippet baklänges.
-• Förinställningar: Montage, Hero, Bullet, Jump cut, Snabb ingång och Snabb utgång – var och en visar kurvan den skapar, och alla går att redigera fritt efteråt.
-• Tidslinje: markera två eller flera flyttbara rader och dra dem tillsammans.
-• Optimerade förhandsvisningar för smidigare redigering.
+• Relight: lägg till virtuellt ljus i material du redan har filmat. GradeLab uppskattar scenens form, så ljuset sveper runt ansikten och motiv i stället för att ligga ovanpå som en platt cirkel.
+• Riktat ljus, punktljus och spotljus, upp till sex per klipp. Dra dem direkt i bilden och sätt keyframes för varje värde.
+• Förinställningar: Mjukt huvudljus, Varm solnedgång, Kallt månljus, Sidoljus, Toppljus, Kantljus, Dramatiskt och Mjuk fyllnad.
+• Fungerar med SDR, HLG HDR och Apple Log, och med hastighetsramper, delade och baklängesspelade klipp. Begränsa det till en mask för att bara ljussätta ett område.
+• Importera från Filer på iPhone och iPad: lägg till videor, videoöverlägg och bildöverlägg direkt från appen Filer.
+• Åtgärdat: fotoprojekt kunde visa ”Bilden är inte tillgänglig” efter en uppdatering. Berörda projekt öppnas igen.
 • Förbättringar av gränssnittet, buggfixar och allmänna optimeringar.

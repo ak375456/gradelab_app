@@ -38,7 +38,18 @@ actor ImageProjectStore {
         guard let database = try ProjectLibraryStorage.load(
             Database.self, at: databaseURL, decoder: decoder, fileManager: fileManager
         ) else { return [] }
-        return database.projects.sorted { $0.updatedAt > $1.updatedAt }
+        var projects = database.projects
+        var repairedContainerPaths = false
+        for index in projects.indices {
+            repairedContainerPaths = projects[index].relocateManagedFiles(
+                to: rootURL,
+                fileManager: fileManager
+            ) || repairedContainerPaths
+        }
+        // Persisted at once, as the video store does, so the repair does not
+        // depend on the project being edited before the app is stopped.
+        if repairedContainerPaths { try persist(projects) }
+        return projects.sorted { $0.updatedAt > $1.updatedAt }
     }
 
     /// Every media file the stored photo projects still point at. The video

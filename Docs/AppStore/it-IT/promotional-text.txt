@@ -1,1 +1,1 @@
-Arriva la rampa di velocità: modella una curva di velocità su qualsiasi clip e il flusso ottico crea i fotogrammi intermedi per un rallentatore nitido.
+Novità: Relight. Aggiungi luci virtuali alle riprese già fatte: luce principale, controluce o tramonto, che seguono la forma dei volti.

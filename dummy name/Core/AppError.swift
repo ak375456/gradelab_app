@@ -14,6 +14,7 @@ enum GradeLabError: LocalizedError, Equatable, Sendable {
     case photoLibrarySaveFailed
     case invalidLUT(String)
     case assetUnavailable
+    case imageUnavailable
     case exportCancelled
     case unsupportedExport(String)
     case presetThumbnailFailed
@@ -50,6 +51,8 @@ enum GradeLabError: LocalizedError, Equatable, Sendable {
             String(localized: "This LUT is invalid. \(detail)")
         case .assetUnavailable:
             String(localized: "The source video is no longer available.")
+        case .imageUnavailable:
+            String(localized: "The source image is no longer available.")
         case .exportCancelled:
             String(localized: "Export was cancelled.")
         case .unsupportedExport(let detail):

@@ -1,1 +1,1 @@
-Speed ramping arrives: shape a speed curve on any clip, and let Optical Flow build the in-between frames so slow motion stays sharp.
+New: Relight. Add virtual lights to footage you've already shot – key, rim or warm sunset light that follows the shape of faces and moves with the scene.

@@ -1,1 +1,1 @@
-Nopeusramppi saapuu: muotoile nopeuskäyrä mihin tahansa klippiin, ja optinen virtaus luo välikuvat, jotta hidastus pysyy terävänä.
+Uutta: Relight. Lisää virtuaalisia valoja jo kuvattuun materiaaliin – valo seuraa kasvojen muotoja ja liikkuu kohtauksen mukana.

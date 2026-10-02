@@ -70,6 +70,40 @@ struct ImageProject: Codable, Identifiable, Equatable, Sendable {
     var sourceURL: URL { asset.url }
     var colorSupport: ImageColorSupport { ImageColorSupport(metadata: metadata) }
 
+    /// Repairs app-owned absolute paths after iOS moves the app's data
+    /// container, the same repair `GradeProject.relocateManagedFiles` makes for
+    /// video. Photo projects never had it, so every install of a new build left
+    /// them pointing at the previous container: "Image Unavailable" and a blank
+    /// card, with the picture still sitting in `Imports`.
+    ///
+    /// Only a missing path with a same-named file in GradeLab's current managed
+    /// folder is changed, so this never substitutes unrelated external media.
+    @discardableResult
+    mutating func relocateManagedFiles(to rootURL: URL, fileManager: FileManager = .default) -> Bool {
+        var changed = false
+        if !fileManager.fileExists(atPath: asset.url.path) {
+            let candidate = rootURL
+                .appendingPathComponent("Imports", isDirectory: true)
+                .appendingPathComponent(asset.url.lastPathComponent)
+            if fileManager.fileExists(atPath: candidate.path) {
+                asset.url = candidate
+                changed = true
+            }
+        }
+
+        if let thumbnailFileName,
+           !fileManager.fileExists(atPath: thumbnailFileName) {
+            let candidate = rootURL
+                .appendingPathComponent("Thumbnails", isDirectory: true)
+                .appendingPathComponent(URL(fileURLWithPath: thumbnailFileName).lastPathComponent)
+            if fileManager.fileExists(atPath: candidate.path) {
+                self.thumbnailFileName = candidate.path
+                changed = true
+            }
+        }
+        return changed
+    }
+
     func validate() throws {
         guard documentVersion <= Self.currentVersion else {
             throw TimelineError.unsupportedVersion("This photo project was made by a newer version of GradeLab. Update the app to open it.")

@@ -1,9 +1,9 @@
-Speed ramping and optical flow are here.
+Relight is here.
 
-• Speed: hold a constant rate, or build a curve. Place speed points anywhere on a clip and shape the ramp with eases and Bezier handles.
-• Optical Flow: new frames are generated between the real ones, so slow motion stays sharp instead of stuttering. Frame Blending and Frame Sampling are there too.
-• Freeze Frame and Reverse: hold a frame for as long as you want, or play a clip backwards.
-• Presets: Montage, Hero, Bullet, Jump cut, Flash in and Flash out, each showing the curve it will make. Every one stays fully editable afterwards.
-• Timeline: select two or more draggable rows and move them together.
-• Optimized previews for smoother editing.
+• Relight: add virtual lights to footage you've already shot. GradeLab estimates the shape of the scene, so light wraps around faces and subjects instead of sitting on top as a flat circle.
+• Directional, point and spot lights, up to six per clip. Drag them on the picture and keyframe every value.
+• Presets: Soft Key, Warm Sunset, Cool Moonlight, Side Light, Top Light, Rim Light, Dramatic and Soft Fill.
+• Works with SDR, HLG HDR and Apple Log, and with speed ramps, splits and reversed clips. Limit it to a mask to light one area only.
+• Import from Files on iPhone and iPad: add videos, video overlays and image overlays straight from the Files app.
+• Fixed photo projects that could show "Image Unavailable" after an update. Affected projects open again.
 • Interface improvements, bug fixes, and general app optimizations.

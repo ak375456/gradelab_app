@@ -1,1 +1,1 @@
-Neu: Tempo-Ramping. Forme eine Tempokurve auf jedem Clip, und der Optische Fluss erzeugt die Frames dazwischen – Zeitlupe bleibt scharf.
+Neu: Relight. Füge bereits gedrehtem Material virtuelles Licht hinzu – Key, Rim oder warmes Abendlicht, das der Form von Gesichtern folgt.

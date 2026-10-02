@@ -1,9 +1,9 @@
-La rampe de vitesse et le flux optique arrivent.
+Relight est arrivé.
 
-• Vitesse : gardez une vitesse constante, ou construisez une courbe. Placez des points de vitesse n’importe où sur un plan et modelez la rampe avec des accélérations et des poignées de Bézier.
-• Flux optique : de nouvelles images sont générées entre les vraies, pour un ralenti net plutôt que saccadé. Fusion d’images et échantillonnage d’images également.
-• Arrêt sur image et lecture inversée : figez une image aussi longtemps que vous le voulez, ou lisez un plan à l’envers.
-• Préréglages : Montage, Plan héros, Bullet, Jump cut, Entrée rapide et Sortie rapide, chacun affichant la courbe qu’il va créer. Tous restent entièrement modifiables ensuite.
-• Timeline : sélectionnez au moins deux lignes déplaçables et faites-les glisser ensemble.
-• Aperçus optimisés pour un montage plus fluide.
+• Relight : ajoutez des lumières virtuelles à des images déjà tournées. GradeLab estime la forme de la scène : la lumière enveloppe les visages et les sujets au lieu de se poser dessus comme un cercle plat.
+• Lumières directionnelles, ponctuelles et spots, jusqu’à six par plan. Faites-les glisser sur l’image et créez des keyframes pour chaque valeur.
+• Préréglages : Principale douce, Coucher de soleil chaud, Clair de lune froid, Lumière latérale, Lumière zénithale, Contre-jour, Dramatique et Appoint doux.
+• Compatible SDR, HDR HLG et Apple Log, ainsi qu’avec les rampes de vitesse, les plans scindés et inversés. Limitez-le à un masque pour n’éclairer qu’une zone.
+• Import depuis Fichiers sur iPhone et iPad : ajoutez vidéos, incrustations vidéo et incrustations d’image directement depuis l’app Fichiers.
+• Correction : des projets photo pouvaient afficher « Image indisponible » après une mise à jour. Ils s’ouvrent de nouveau.
 • Améliorations de l’interface, corrections et optimisations générales.

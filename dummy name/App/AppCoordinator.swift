@@ -103,28 +103,28 @@ final class AppCoordinator: ObservableObject {
                 self.screen = .home
             } catch {
                 self.screen = .home
-                self.present(error: error, title: "Couldn’t Import Image")
+                self.present(error: error, title: String(localized: "Couldn’t Import Image"))
             }
         }
     }
 
     func openImageProject(_ project: ImageProject) {
         guard FileManager.default.fileExists(atPath: project.sourceURL.path) else {
-            present(error: GradeLabError.assetUnavailable, title: "Image Unavailable")
+            present(error: GradeLabError.imageUnavailable, title: String(localized: "Image Unavailable"))
             return
         }
         let support = project.colorSupport
         guard support.allowsEditor else {
             present(error: GradeLabError.unsupportedExport(
-                support.notice ?? "This image is outside GradeLab’s validated colour pipeline."),
-                    title: "Editor Unavailable")
+                support.notice ?? String(localized: "This image is outside GradeLab’s validated colour pipeline.")),
+                    title: String(localized: "Editor Unavailable"))
             return
         }
         do {
             imageEditorModel = try ImageEditorViewModel(project: project)
             withAnimation(.easeInOut(duration: 0.16)) { screen = .imageEditor }
         } catch {
-            present(error: error, title: "Couldn’t Open Editor")
+            present(error: error, title: String(localized: "Couldn’t Open Editor"))
         }
     }
 
@@ -137,7 +137,7 @@ final class AppCoordinator: ObservableObject {
                 try await imageProjectStore.save(project)
                 await loadImageProjects()
             } catch {
-                present(error: error, title: "Project Not Saved")
+                present(error: error, title: String(localized: "Project Not Saved"))
             }
         }
     }
@@ -158,7 +158,7 @@ final class AppCoordinator: ObservableObject {
             } catch is CancellationError {
                 // A newer grade snapshot superseded this write.
             } catch {
-                self.present(error: error, title: "Project Not Saved")
+                self.present(error: error, title: String(localized: "Project Not Saved"))
             }
         }
     }
@@ -172,7 +172,7 @@ final class AppCoordinator: ObservableObject {
                 )
                 await loadImageProjects()
             } catch {
-                present(error: error, title: "Couldn’t Delete Project")
+                present(error: error, title: String(localized: "Couldn’t Delete Project"))
             }
         }
     }
@@ -193,7 +193,7 @@ final class AppCoordinator: ObservableObject {
                 if activeProject?.id == project.id { activeProject = nil }
                 await loadProjects()
             } catch {
-                present(error: error, title: "Couldn’t Delete Project")
+                present(error: error, title: String(localized: "Couldn’t Delete Project"))
             }
         }
     }
@@ -208,7 +208,7 @@ final class AppCoordinator: ObservableObject {
             // their place says so.
             imageProjects = []
             imageProjectLoadFailure = reportLoadFailure(
-                error, previous: imageProjectLoadFailure, title: "Couldn’t Load Photo Projects")
+                error, previous: imageProjectLoadFailure, title: String(localized: "Couldn’t Load Photo Projects"))
         }
     }
 
@@ -277,7 +277,7 @@ final class AppCoordinator: ObservableObject {
                 print("Import failed: \(error)")
                 #endif
                 self.screen = .home
-                self.present(error: error, title: "Couldn’t Import Video")
+                self.present(error: error, title: String(localized: "Couldn’t Import Video"))
             }
         }
     }
@@ -296,7 +296,7 @@ final class AppCoordinator: ObservableObject {
 
     func openProject(_ project: GradeProject) {
         guard FileManager.default.fileExists(atPath: project.sourceURL.path) else {
-            present(error: GradeLabError.assetUnavailable, title: "Source Unavailable")
+            present(error: GradeLabError.assetUnavailable, title: String(localized: "Source Unavailable"))
             return
         }
         activeProject = project
@@ -326,16 +326,16 @@ final class AppCoordinator: ObservableObject {
     func openEditor() {
         guard let project = activeProject else { return }
         guard FileManager.default.fileExists(atPath: project.sourceURL.path) else {
-            present(error: GradeLabError.assetUnavailable, title: "Source Unavailable")
+            present(error: GradeLabError.assetUnavailable, title: String(localized: "Source Unavailable"))
             return
         }
         let support = ColorPipelineSupport(metadata: project.metadata)
         guard support.allowsEditor else {
             present(
                 error: GradeLabError.unsupportedExport(
-                    support.notice ?? "This source is outside GradeLab’s validated color pipeline."
+                    support.notice ?? String(localized: "This source is outside GradeLab’s validated color pipeline.")
                 ),
-                title: "Editor Unavailable"
+                title: String(localized: "Editor Unavailable")
             )
             return
         }
@@ -343,7 +343,7 @@ final class AppCoordinator: ObservableObject {
             editorModel = try EditorViewModel(project: project)
             withAnimation(.easeInOut(duration: 0.16)) { screen = .editor }
         } catch {
-            present(error: error, title: "Couldn’t Open Editor")
+            present(error: error, title: String(localized: "Couldn’t Open Editor"))
         }
     }
 
@@ -358,7 +358,7 @@ final class AppCoordinator: ObservableObject {
                 try await projectStore.save(project)
                 await loadProjects()
             } catch {
-                present(error: error, title: "Project Not Saved")
+                present(error: error, title: String(localized: "Project Not Saved"))
             }
         }
     }
@@ -384,7 +384,7 @@ final class AppCoordinator: ObservableObject {
             } catch is CancellationError {
                 // A newer grade snapshot superseded this write.
             } catch {
-                self.present(error: error, title: "Project Not Saved")
+                self.present(error: error, title: String(localized: "Project Not Saved"))
             }
         }
     }
@@ -396,7 +396,7 @@ final class AppCoordinator: ObservableObject {
         } catch {
             projects = []
             projectLoadFailure = reportLoadFailure(
-                error, previous: projectLoadFailure, title: "Couldn’t Load Projects")
+                error, previous: projectLoadFailure, title: String(localized: "Couldn’t Load Projects"))
         }
     }
 

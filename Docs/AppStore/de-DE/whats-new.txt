@@ -1,9 +1,9 @@
-Neu: Tempo-Ramping und Optischer Fluss.
+Neu: Relight.
 
-• Tempo: ein konstantes Tempo halten oder eine Kurve bauen. Setze Tempopunkte überall im Clip und forme die Ramp mit Eases und Bezier-Griffen.
-• Optischer Fluss: Neue Frames werden zwischen den echten erzeugt, damit Zeitlupe scharf bleibt statt zu ruckeln. Frame-Überblendung und Frame-Abtastung sind ebenfalls dabei.
-• Standbild und Rückwärts: Halte einen Frame so lange du willst, oder spiele einen Clip rückwärts ab.
-• Presets: Montage, Hero, Bullet, Jump Cut, Flash in und Flash out – jedes zeigt die Kurve, die es erzeugt, und bleibt danach voll bearbeitbar.
-• Timeline: Zwei oder mehr verschiebbare Zeilen auswählen und gemeinsam ziehen.
-• Optimierte Vorschau für flüssigeres Bearbeiten.
+• Relight: Füge bereits gedrehtem Material virtuelles Licht hinzu. GradeLab schätzt die Form der Szene, sodass das Licht Gesichter und Motive umschließt, statt als flacher Kreis darüberzuliegen.
+• Gerichtetes Licht, Punkt- und Spotlicht, bis zu sechs pro Clip. Ziehe sie direkt im Bild und setze für jeden Wert Keyframes.
+• Presets: Soft Key, Warm Sunset, Cool Moonlight, Side Light, Top Light, Rim Light, Dramatic und Soft Fill.
+• Funktioniert mit SDR, HLG-HDR und Apple Log sowie mit Tempo-Ramps, geteilten und rückwärts laufenden Clips. Begrenze es auf eine Maske, um nur einen Bereich zu beleuchten.
+• Import aus Dateien auf iPhone und iPad: Füge Videos, Video-Overlays und Bild-Overlays direkt aus der Dateien-App hinzu.
+• Behoben: Fotoprojekte konnten nach einem Update „Bild nicht verfügbar“ anzeigen. Betroffene Projekte lassen sich wieder öffnen.
 • Verbesserungen der Oberfläche, Fehlerbehebungen und allgemeine App-Optimierungen.

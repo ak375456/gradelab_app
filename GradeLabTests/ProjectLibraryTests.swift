@@ -203,6 +203,47 @@ final class ProjectLibraryTests: XCTestCase {
         XCTAssertFalse(exists(databaseURL))
     }
 
+    /// iOS moves the app's data container when a new build is installed. A
+    /// photo project stores absolute paths, so before this repair every one of
+    /// them reported "Image Unavailable" after the next install, with the
+    /// picture still sitting in `Imports`.
+    func testPhotoProjectsFollowTheContainerWhenItMoves() async throws {
+        let root = makeRoot()
+        let picture = try makeMediaFile(in: root.appendingPathComponent("Imports"), named: "A.heic")
+        let thumbnail = try makeMediaFile(in: root.appendingPathComponent("Thumbnails"), named: "image-A.jpg")
+        let oldContainer = URL(fileURLWithPath: "/private/var/mobile/Containers/Data/Application/OLD/GradeLab")
+        let project = ImageProject(
+            displayName: "Moved",
+            asset: ImageAsset(id: UUID(),
+                              url: oldContainer.appendingPathComponent("Imports/A.heic"),
+                              metadata: makeImageMetadata()),
+            thumbnailFileName: oldContainer.appendingPathComponent("Thumbnails/image-A.jpg").path)
+        try await ImageProjectStore(rootURL: root).save(project)
+
+        let loaded = try await ImageProjectStore(rootURL: root).loadProjects()
+        XCTAssertEqual(loaded.first?.sourceURL.standardizedFileURL, picture.standardizedFileURL)
+        XCTAssertEqual(loaded.first?.thumbnailFileName.map { URL(fileURLWithPath: $0).standardizedFileURL },
+                       thumbnail.standardizedFileURL)
+
+        // Written back, not just repaired in memory for this launch.
+        let stored = try String(contentsOf: root.appendingPathComponent("image-projects.json"), encoding: .utf8)
+        XCTAssertFalse(stored.contains("/OLD/"))
+    }
+
+    /// A missing picture with no same-named copy in `Imports` is left alone, so
+    /// the repair can never point a project at some other file.
+    func testAPhotoWithNoManagedCopyIsNotRedirected() async throws {
+        let root = makeRoot()
+        let gone = URL(fileURLWithPath: "/private/var/mobile/Containers/Data/Application/OLD/GradeLab/Imports/B.heic")
+        let project = ImageProject(
+            displayName: "Gone",
+            asset: ImageAsset(id: UUID(), url: gone, metadata: makeImageMetadata()))
+        try await ImageProjectStore(rootURL: root).save(project)
+
+        let loaded = try await ImageProjectStore(rootURL: root).loadProjects()
+        XCTAssertEqual(loaded.first?.sourceURL, gone)
+    }
+
     /// A library that has never been written is empty, not broken, and must not
     /// raise anything at all.
     func testAnAbsentLibraryIsSimplyEmpty() async throws {

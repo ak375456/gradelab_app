@@ -1,9 +1,9 @@
-Nopeusramppi ja optinen virtaus ovat täällä.
+Relight on täällä.
 
-• Nopeus: pidä vakionopeus tai rakenna käyrä. Lisää nopeuspisteitä mihin tahansa kohtaan klippiä ja muotoile ramppi pehmennyksillä ja Bézier-kahvoilla.
-• Optinen virtaus: uudet kuvat luodaan oikeiden väliin, jolloin hidastus pysyy terävänä eikä nyki. Mukana myös kuvien sekoitus ja kuvanäytteistys.
-• Pysäytyskuva ja käänteinen toisto: pysäytä kuva niin pitkäksi aikaa kuin haluat tai toista klippi takaperin.
-• Esiasetukset: Montage, Hero, Bullet, Jump cut, Nopea sisääntulo ja Nopea ulostulo – jokainen näyttää luomansa käyrän, ja kaikkia voi muokata vapaasti jälkeenpäin.
-• Aikajana: valitse kaksi tai useampi siirrettävä rivi ja siirrä ne yhdessä.
-• Sujuvammat esikatselut.
+• Relight: lisää virtuaalisia valoja jo kuvattuun materiaaliin. GradeLab arvioi kohtauksen muodon, joten valo kietoutuu kasvojen ja kohteiden ympärille eikä jää niiden päälle litteäksi ympyräksi.
+• Suunnattu valo, pistevalo ja kohdevalo, enintään kuusi klippiä kohden. Vedä niitä suoraan kuvassa ja lisää avainkuvia jokaiselle arvolle.
+• Esiasetukset: Pehmeä päävalo, Lämmin auringonlasku, Viileä kuunvalo, Sivuvalo, Yläpuolinen valo, Reunavalo, Dramaattinen ja Pehmeä täyte.
+• Toimii SDR-, HLG HDR- ja Apple Log -materiaalin sekä nopeusramppien, jaettujen ja takaperin toistettavien klippien kanssa. Rajaa se maskiin, jos haluat valaista vain yhden alueen.
+• Tuonti Tiedostoista iPhonessa ja iPadissa: lisää videoita, videopäällysteitä ja kuvapäällysteitä suoraan Tiedostot-apista.
+• Korjattu: kuvaprojektit saattoivat näyttää ilmoituksen ”Kuva ei ole saatavilla” päivityksen jälkeen. Projektit avautuvat taas.
 • Käyttöliittymän parannuksia, virheenkorjauksia ja yleisiä optimointeja.

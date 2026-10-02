@@ -1,1 +1,1 @@
-La rampe de vitesse arrive : modelez une courbe de vitesse sur n’importe quel plan, et le flux optique crée les images intermédiaires pour un ralenti net.
+Nouveau : Relight. Ajoutez des lumières virtuelles à vos images déjà tournées. Elles épousent la forme des visages et suivent la scène.

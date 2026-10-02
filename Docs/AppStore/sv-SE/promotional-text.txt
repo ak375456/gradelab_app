@@ -1,1 +1,1 @@
-Hastighetsramp är här: forma en hastighetskurva på vilket klipp som helst och låt optiskt flöde skapa bildrutorna emellan för skarp slow motion.
+Nytt: Relight. Lägg till virtuellt ljus i material du redan har filmat – ljus som följer ansiktens form och rör sig med scenen.

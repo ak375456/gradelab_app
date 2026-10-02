@@ -396,10 +396,10 @@ struct RelightPanel: View {
         VStack(alignment: .leading, spacing: 12) {
             Text("SCENE").font(.caption.weight(.semibold)).tracking(1.2)
             strengthSlider
-            percentSlider("Preserve Highlights", \.preserveHighlights, neutral: 0.7,
-                          detail: "Rolls added light off smoothly before it reaches white.")
-            percentSlider("Protect Blacks", \.protectBlacks, neutral: 0.35,
-                          detail: "Keeps the deepest shadows from being lifted into grey.")
+            percentSlider(String(localized: "Preserve Highlights"), \.preserveHighlights, neutral: 0.7,
+                          detail: String(localized: "Rolls added light off smoothly before it reaches white."))
+            percentSlider(String(localized: "Protect Blacks"), \.protectBlacks, neutral: 0.35,
+                          detail: String(localized: "Keeps the deepest shadows from being lifted into grey."))
             formSlider
             affectPicker
         }
@@ -537,74 +537,74 @@ private struct LightInspector: View {
             }
             .pickerStyle(.segmented)
 
-            group("LIGHT") {
-                slider(.relightIntensity, "Intensity", -100...200, neutral: 100,
+            group(String(localized: "LIGHT")) {
+                slider(.relightIntensity, String(localized: "Intensity"), -100...200, neutral: 100,
                        format: { "\(Int($0.rounded()))%" })
                 if shown.intensity < 0 {
                     Text("Negative light takes light away — a flag or negative fill.")
                         .font(.caption2).foregroundStyle(AppColors.textTertiary)
                 }
-                slider(.relightExposure, "Exposure", 0...4, step: 0.05, neutral: 1,
+                slider(.relightExposure, String(localized: "Exposure"), 0...4, step: 0.05, neutral: 1,
                        format: { String(format: "%.2f EV", locale: .current, $0) })
-                slider(.relightSoftness, "Softness", 0...1, scale: 100, neutral: 0.5,
+                slider(.relightSoftness, String(localized: "Softness"), 0...1, scale: 100, neutral: 0.5,
                        format: { "\(Int($0.rounded()))%" })
             }
 
-            group("COLOR") {
-                slider(.relightTemperature, "Temperature", 1500...15000, step: 50, neutral: 6500,
+            group(String(localized: "COLOR")) {
+                slider(.relightTemperature, String(localized: "Temperature"), 1500...15000, step: 50, neutral: 6500,
                        format: { "\(Int($0.rounded()))K" })
                 temperaturePresets
-                slider(.relightTint, "Tint", -100...100, neutral: 0, format: { "\(Int($0.rounded()))" })
+                slider(.relightTint, String(localized: "Tint"), -100...100, neutral: 0, format: { "\(Int($0.rounded()))" })
                 colorFilter
             }
 
-            group(light.type == .directional ? "DIRECTION" : "PLACEMENT") {
+            group(light.type == .directional ? String(localized: "DIRECTION") : String(localized: "PLACEMENT")) {
                 switch light.type {
                 case .directional:
-                    slider(.relightAzimuth, "Direction", 0...360, neutral: 25,
+                    slider(.relightAzimuth, String(localized: "Direction"), 0...360, neutral: 25,
                            format: { "\(Int($0.rounded()))°" })
-                    slider(.relightElevation, "Elevation", -80...90, neutral: 35,
+                    slider(.relightElevation, String(localized: "Elevation"), -80...90, neutral: 35,
                            format: { "\(Int($0.rounded()))°" })
                     Text("Elevation 90° is light from the camera, 0° is pure side light, and below zero it comes from behind the subject.")
                         .font(.caption2).foregroundStyle(AppColors.textTertiary)
                 case .point, .spot:
-                    slider(.relightPositionX, "Position X", -0.5...1.5, scale: 100, neutral: 0.5,
+                    slider(.relightPositionX, String(localized: "Position X"), -0.5...1.5, scale: 100, neutral: 0.5,
                            format: { "\(Int($0.rounded()))%" })
-                    slider(.relightPositionY, "Position Y", -0.5...1.5, scale: 100, neutral: 0.5,
+                    slider(.relightPositionY, String(localized: "Position Y"), -0.5...1.5, scale: 100, neutral: 0.5,
                            format: { "\(Int($0.rounded()))%" })
-                    slider(.relightDistance, "Distance", 0...1, scale: 100, neutral: 0.25,
+                    slider(.relightDistance, String(localized: "Distance"), 0...1, scale: 100, neutral: 0.25,
                            format: { "\(Int($0.rounded()))%" })
                     Text("Near puts the light in front of everything; far puts it behind the subject, as a rim or background light.")
                         .font(.caption2).foregroundStyle(AppColors.textTertiary)
-                    slider(.relightRadius, "Reach", 0.05...4, scale: 100, step: 5, neutral: 0.9,
+                    slider(.relightRadius, String(localized: "Reach"), 0.05...4, scale: 100, step: 5, neutral: 0.9,
                            format: { "\(Int($0.rounded()))%" })
-                    slider(.relightFalloff, "Falloff", 0...1, scale: 100, neutral: 0.5,
+                    slider(.relightFalloff, String(localized: "Falloff"), 0...1, scale: 100, neutral: 0.5,
                            format: { "\(Int($0.rounded()))%" })
                 }
                 if light.type == .spot {
-                    slider(.relightTargetX, "Aim X", -0.5...1.5, scale: 100, neutral: 0.5,
+                    slider(.relightTargetX, String(localized: "Aim X"), -0.5...1.5, scale: 100, neutral: 0.5,
                            format: { "\(Int($0.rounded()))%" })
-                    slider(.relightTargetY, "Aim Y", -0.5...1.5, scale: 100, neutral: 0.45,
+                    slider(.relightTargetY, String(localized: "Aim Y"), -0.5...1.5, scale: 100, neutral: 0.45,
                            format: { "\(Int($0.rounded()))%" })
-                    slider(.relightConeAngle, "Cone", 3...85, neutral: 26, format: { "\(Int($0.rounded()))°" })
-                    slider(.relightFeather, "Cone Feather", 0...1, scale: 100, neutral: 0.5,
+                    slider(.relightConeAngle, String(localized: "Cone"), 3...85, neutral: 26, format: { "\(Int($0.rounded()))°" })
+                    slider(.relightFeather, String(localized: "Cone Feather"), 0...1, scale: 100, neutral: 0.5,
                            format: { "\(Int($0.rounded()))%" })
                 }
             }
 
-            group("SHADOWS") {
+            group(String(localized: "SHADOWS")) {
                 Picker("Shadow Response", selection: Binding(
                     get: { shown.shadowResponse > 0.001 },
                     set: { shading in
                         model.setLightNumbers(light.id, [(.relightShadow, shading ? 0.5 : 0)],
-                                              label: "Shadow Response", immediate: true)
+                                              label: String(localized: "Shadow Response"), immediate: true)
                     })) {
                     Text("Light Only").tag(false)
                     Text("Light + Shading").tag(true)
                 }
                 .pickerStyle(.segmented)
                 if shown.shadowResponse > 0.001 || model.lightKeyframeState(light.id, .relightShadow) != .off {
-                    slider(.relightShadow, "Shading", 0...1, scale: 100, neutral: 0,
+                    slider(.relightShadow, String(localized: "Shading"), 0...1, scale: 100, neutral: 0,
                            format: { "\(Int($0.rounded()))%" })
                 }
                 Text("Light + Shading also darkens the side of a form turned away from this light. It shapes; it does not cast shadows.")
@@ -614,9 +614,9 @@ private struct LightInspector: View {
             if !isCompact || showsAdvanced {
                 DisclosureGroup("Advanced", isExpanded: $showsAdvanced) {
                     VStack(alignment: .leading, spacing: 12) {
-                        plainSlider("Specular", \.specular, detail: "A restrained sheen on surfaces facing both the light and the camera.")
-                        plainSlider("Roughness", \.roughness, detail: "How broad that sheen is. Higher is a matte surface.")
-                        plainSlider("Light Wrap", \.lightWrap, detail: "Lets a little light reach round a silhouette edge.")
+                        plainSlider(String(localized: "Specular"), \.specular, detail: String(localized: "A restrained sheen on surfaces facing both the light and the camera."))
+                        plainSlider(String(localized: "Roughness"), \.roughness, detail: String(localized: "How broad that sheen is. Higher is a matte surface."))
+                        plainSlider(String(localized: "Light Wrap"), \.lightWrap, detail: String(localized: "Lets a little light reach round a silhouette edge."))
                     }
                     .padding(.top, 8)
                 }
@@ -627,10 +627,10 @@ private struct LightInspector: View {
             }
 
             HStack(spacing: AppSpacing.small) {
-                actionButton("Duplicate", role: nil) { model.duplicateLight(light.id) }
+                actionButton(String(localized: "Duplicate"), role: nil) { model.duplicateLight(light.id) }
                     .disabled(!model.canAddLight)
-                actionButton("Reset", role: nil) { model.resetLight(light.id) }
-                actionButton("Delete", role: .destructive) { confirmsDelete = light.id }
+                actionButton(String(localized: "Reset"), role: nil) { model.resetLight(light.id) }
+                actionButton(String(localized: "Delete"), role: .destructive) { confirmsDelete = light.id }
             }
         }
         .disabled(!model.canEditRelight)
@@ -705,7 +705,7 @@ private struct LightInspector: View {
                     let peak = max(rgb.x, max(rgb.y, rgb.z), 1e-5)
                     Button {
                         model.setLightNumbers(light.id, [(.relightTemperature, preset.kelvin)],
-                                              label: "Light Temperature", immediate: true)
+                                              label: String(localized: "Light Temperature"), immediate: true)
                     } label: {
                         HStack(spacing: 5) {
                             Circle()

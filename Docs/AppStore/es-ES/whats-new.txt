@@ -1,9 +1,9 @@
-Llegan la rampa de velocidad y el flujo óptico.
+Llega Relight.
 
-• Velocidad: mantén una velocidad constante o construye una curva. Coloca puntos de velocidad en cualquier parte del clip y moldea la rampa con suavizados y tiradores Bézier.
-• Flujo óptico: se generan fotogramas nuevos entre los reales, así la cámara lenta se mantiene nítida en lugar de entrecortarse. También hay mezcla y muestreo de fotogramas.
-• Congelar fotograma e invertir: congela un fotograma el tiempo que quieras, o reproduce un clip al revés.
-• Preajustes: Montaje, Plano estrella, Bullet, Jump cut, Entrada rápida y Salida rápida, cada uno mostrando la curva que va a crear. Todos siguen siendo totalmente editables después.
-• Línea de tiempo: selecciona dos o más filas que se puedan arrastrar y muévelas juntas.
-• Vistas previas optimizadas para editar con más fluidez.
+• Relight: añade luces virtuales a lo que ya has grabado. GradeLab estima la forma de la escena, así que la luz envuelve caras y sujetos en lugar de quedarse encima como un círculo plano.
+• Luces direccionales, puntuales y focos, hasta seis por clip. Arrástralas sobre la imagen y añade keyframes a cada valor.
+• Ajustes: Principal suave, Atardecer cálido, Luz de luna fría, Luz lateral, Luz cenital, Contraluz, Dramática y Relleno suave.
+• Funciona con SDR, HDR HLG y Apple Log, y con rampas de velocidad, clips divididos e invertidos. Limítalo a una máscara para iluminar solo una zona.
+• Importa desde Archivos en iPhone y iPad: añade vídeos, superposiciones de vídeo y de imagen directamente desde la app Archivos.
+• Corregido: los proyectos de foto podían mostrar «Imagen no disponible» tras una actualización. Los proyectos afectados vuelven a abrirse.
 • Mejoras de interfaz, correcciones y optimizaciones generales.
