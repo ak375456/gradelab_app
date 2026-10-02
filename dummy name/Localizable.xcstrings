@@ -259,6 +259,16 @@
     "%@" : {
       "shouldTranslate" : false
     },
+    "%@ · %@ · stored on this device, not in the project" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "%1$@ · %2$@ · stored on this device, not in the project"
+          }
+        }
+      }
+    },
     "%@ · %lld frames" : {
       "localizations" : {
         "de" : {
@@ -467,6 +477,9 @@
         }
       }
     },
+    "%@ aim" : {
+
+    },
     "%@ animation actions" : {
       "localizations" : {
         "de" : {
@@ -546,6 +559,9 @@
           }
         }
       }
+    },
+    "%@ cannot be animated on a light." : {
+
     },
     "%@ cannot be animated on a mask." : {
       "localizations" : {
@@ -1709,6 +1725,9 @@
         }
       }
     },
+    "%@ reach" : {
+
+    },
     "%@ saturation" : {
       "localizations" : {
         "de" : {
@@ -1945,6 +1964,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "%@ kompilerades av en annan version av GradeLab."
+          }
+        }
+      }
+    },
+    "%@, %@ light" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "%1$@, %2$@ light"
           }
         }
       }
@@ -2528,6 +2557,16 @@
                 }
               }
             }
+          }
+        }
+      }
+    },
+    "%lld of %lld frames · lights work as it fills in" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "%1$lld of %2$lld frames · lights work as it fills in"
           }
         }
       }
@@ -3397,6 +3436,9 @@
     "100" : {
       "shouldTranslate" : false
     },
+    "A clip can carry %lld lights. Delete one to add another." : {
+
+    },
     "A clip can carry %lld masks. Delete one to add another." : {
       "localizations" : {
         "de" : {
@@ -3517,6 +3559,9 @@
         }
       }
     },
+    "A depth frame could not be stored." : {
+
+    },
     "A double tap on an animated property resets its value at the playhead. Use Reset in the property's Animation menu to clear its keyframes as well." : {
       "localizations" : {
         "de" : {
@@ -3636,6 +3681,9 @@
           }
         }
       }
+    },
+    "A frame could not be prepared for scene analysis." : {
+
     },
     "A frame could not be read from this clip." : {
       "localizations" : {
@@ -4122,6 +4170,9 @@
         }
       }
     },
+    "A large, gentle key from the front right." : {
+
+    },
     "A layer cannot be its own track matte." : {
       "localizations" : {
         "de" : {
@@ -4242,6 +4293,9 @@
         }
       }
     },
+    "A light behind the subject that outlines its edges." : {
+
+    },
     "A multichannel source audio track has no channel layout and cannot be preserved safely." : {
       "localizations" : {
         "de" : {
@@ -4281,6 +4335,12 @@
           }
         }
       }
+    },
+    "A narrow spot from above with the rest of the frame held down." : {
+
+    },
+    "A preset replaces this clip's lights. Every value it sets is an ordinary one you can change." : {
+
     },
     "A professional finish" : {
       "localizations" : {
@@ -5447,6 +5507,9 @@
         }
       }
     },
+    "Add %@ light" : {
+
+    },
     "Add %@ mask" : {
       "localizations" : {
         "de" : {
@@ -5606,6 +5669,9 @@
           }
         }
       }
+    },
+    "Add a light, or start from a preset. Directional is a distant source like the sun or a window; Point is a lamp in the scene; Spot is an aimed cone." : {
+
     },
     "Add a second layer — a title, a shape, a logo or another clip — to use as the matte." : {
       "comment" : "A hint explaining that a second layer is needed to use as a track matte.",
@@ -6009,6 +6075,46 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Lägg till bildöverlägg"
+          }
+        }
+      }
+    },
+    "Add image overlay from Files" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Bild-Overlay aus Dateien hinzufügen"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Añadir superposición de imagen desde Archivos"
+          }
+        },
+        "fi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Lisää kuvapeitto Tiedostoista"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ajouter une incrustation d'image depuis Fichiers"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Aggiungi sovrapposizione immagine da File"
+          }
+        },
+        "sv" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Lägg till bildoverlay från Filer"
           }
         }
       }
@@ -6821,6 +6927,46 @@
         }
       }
     },
+    "Add video from Files" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Video aus Dateien hinzufügen"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Añadir vídeo desde Archivos"
+          }
+        },
+        "fi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Lisää video Tiedostoista"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ajouter une vidéo depuis Fichiers"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Aggiungi video da File"
+          }
+        },
+        "sv" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Lägg till video från Filer"
+          }
+        }
+      }
+    },
     "Add video overlay" : {
       "localizations" : {
         "de" : {
@@ -6860,6 +7006,49 @@
           }
         }
       }
+    },
+    "Add video overlay from Files" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Video-Overlay aus Dateien hinzufügen"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Añadir superposición de vídeo desde Archivos"
+          }
+        },
+        "fi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Lisää videopeitto Tiedostoista"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ajouter une incrustation vidéo depuis Fichiers"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Aggiungi sovrapposizione video da File"
+          }
+        },
+        "sv" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Lägg till videooverlay från Filer"
+          }
+        }
+      }
+    },
+    "Add virtual lights that react to the shape of the scene.\n\nGradeLab estimates how far away each part of the picture is and which way its surfaces face, then lights them: a key from the right brightens what faces right and leaves what faces away. It is an estimate from the picture, not a 3D scan, so it shapes light convincingly rather than casting exact shadows.\n\nAnalysis runs once per clip, in the background, starting at the playhead. Lights can be moved, recoloured and keyframed instantly afterwards — the scene is never analysed again for a light change.\n\nDirectional is a distant source like the sun or a window. Point is a lamp in the scene. Spot is an aimed cone. Negative intensity takes light away.\n\nDrag a light on the picture to move it. Hold \\ to compare with the original." : {
+
     },
     "Adds a keyframe here" : {
       "localizations" : {
@@ -6901,6 +7090,9 @@
         }
       }
     },
+    "Adjust" : {
+
+    },
     "Adjusted" : {
       "localizations" : {
         "de" : {
@@ -6940,6 +7132,9 @@
           }
         }
       }
+    },
+    "Advanced" : {
+
     },
     "ADVANCED" : {
       "comment" : "An advanced transition.",
@@ -7023,6 +7218,12 @@
         }
       }
     },
+    "Advanced…" : {
+
+    },
+    "Affect" : {
+
+    },
     "AFTER" : {
       "localizations" : {
         "de" : {
@@ -7062,6 +7263,12 @@
           }
         }
       }
+    },
+    "Aim X" : {
+
+    },
+    "Aim Y" : {
+
     },
     "Align bottom" : {
       "localizations" : {
@@ -7882,6 +8089,12 @@
         }
       }
     },
+    "Analysed at %@" : {
+
+    },
+    "Analysing scene" : {
+
+    },
     "Analysis canceled." : {
       "localizations" : {
         "de" : {
@@ -8041,6 +8254,9 @@
           }
         }
       }
+    },
+    "Analyze Scene" : {
+
     },
     "Analyze whole clip" : {
       "localizations" : {
@@ -8283,6 +8499,9 @@
           }
         }
       }
+    },
+    "Analyzing Scene for Relight" : {
+
     },
     "Analyzing video" : {
       "localizations" : {
@@ -13056,6 +13275,9 @@
         }
       }
     },
+    "Built-in scene geometry" : {
+
+    },
     "Bullet" : {
       "localizations" : {
         "de" : {
@@ -13590,6 +13812,9 @@
           }
         }
       }
+    },
+    "Captured depth" : {
+
     },
     "Carries tone, palette and saturation across. Leaves exposure close to where you have it. For a film still or a photograph." : {
       "localizations" : {
@@ -15057,6 +15282,12 @@
         }
       }
     },
+    "Clear Analysis" : {
+
+    },
+    "Clear Filter" : {
+
+    },
     "Clear Geometry Animation" : {
       "localizations" : {
         "de" : {
@@ -15216,6 +15447,9 @@
           }
         }
       }
+    },
+    "Clear this clip's scene analysis?" : {
+
     },
     "Clear Tracking" : {
       "comment" : "A button that clears the tracking of a background lasso.",
@@ -15990,6 +16224,9 @@
         }
       }
     },
+    "Cold top light with the far side pulled down." : {
+
+    },
     "Color" : {
       "localizations" : {
         "de" : {
@@ -16071,6 +16308,9 @@
           }
         }
       }
+    },
+    "Color Filter" : {
+
     },
     "Color model" : {
       "localizations" : {
@@ -16839,6 +17079,12 @@
         }
       }
     },
+    "Cone angle" : {
+
+    },
+    "Cone feather" : {
+
+    },
     "Constant" : {
       "comment" : "A label for the \"Constant\" speed mode in the speed panel.",
       "isCommentAutoGenerated" : true,
@@ -16880,6 +17126,9 @@
           }
         }
       }
+    },
+    "Continue Analysis" : {
+
     },
     "Continue Backward" : {
       "localizations" : {
@@ -17083,6 +17332,12 @@
         }
       }
     },
+    "Cool" : {
+
+    },
+    "Cool Moonlight" : {
+
+    },
     "Copy" : {
       "localizations" : {
         "de" : {
@@ -17202,6 +17457,9 @@
           }
         }
       }
+    },
+    "Core ML depth model" : {
+
     },
     "Corner radius" : {
       "localizations" : {
@@ -18241,6 +18499,9 @@
         }
       }
     },
+    "Daylight" : {
+
+    },
     "Declare exactly one LUT size." : {
       "localizations" : {
         "de" : {
@@ -18753,6 +19014,9 @@
         }
       }
     },
+    "Delete Light" : {
+
+    },
     "Delete marker" : {
       "localizations" : {
         "de" : {
@@ -19239,6 +19503,9 @@
         }
       }
     },
+    "Delete this light?" : {
+
+    },
     "Delete this mask?" : {
       "localizations" : {
         "de" : {
@@ -19723,6 +19990,18 @@
         }
       }
     },
+    "Directional" : {
+
+    },
+    "Disable" : {
+
+    },
+    "Disable %@" : {
+
+    },
+    "Disabled" : {
+
+    },
     "Dismiss keyframe tip" : {
       "localizations" : {
         "de" : {
@@ -20167,6 +20446,9 @@
         }
       }
     },
+    "Drag a light on the picture to move it. Arrow keys nudge the selected light — Shift for larger steps, Option for finer ones. Delete removes it and ⌘D duplicates it." : {
+
+    },
     "Drag edges to trim · Hold to move · Keep holding for more" : {
       "localizations" : {
         "de" : {
@@ -20247,7 +20529,9 @@
         }
       }
     },
-    "Drag the gradient on the picture; Rotation changes its direction." : {},
+    "Drag the gradient on the picture; Rotation changes its direction." : {
+
+    },
     "Drag the line on the picture to place it; rotate to change its direction." : {
       "localizations" : {
         "de" : {
@@ -20488,6 +20772,9 @@
         }
       }
     },
+    "Drag to move the light. Double-tap to select it." : {
+
+    },
     "Drag to move the mask on the picture" : {
       "localizations" : {
         "de" : {
@@ -20647,6 +20934,9 @@
           }
         }
       }
+    },
+    "Dramatic" : {
+
     },
     "Draw a closed outline around the object you want to keep." : {
       "comment" : "Instruction to draw a closed outline around an object to be kept in a background removal process.",
@@ -21133,6 +21423,12 @@
           }
         }
       }
+    },
+    "Duplicate relight animation track for %@." : {
+
+    },
+    "Duplicate relight light on a clip." : {
+
     },
     "Duplicate track identifiers." : {
       "localizations" : {
@@ -22103,6 +22399,9 @@
         }
       }
     },
+    "Elevation 90° is light from the camera, 0° is pure side light, and below zero it comes from behind the subject." : {
+
+    },
     "Ellipse" : {
       "localizations" : {
         "de" : {
@@ -22142,6 +22441,12 @@
           }
         }
       }
+    },
+    "Enable" : {
+
+    },
+    "Enable %@" : {
+
     },
     "End color" : {
       "localizations" : {
@@ -22342,6 +22647,9 @@
           }
         }
       }
+    },
+    "Entire Frame" : {
+
     },
     "Essentials" : {
       "localizations" : {
@@ -23749,6 +24057,9 @@
         }
       }
     },
+    "Fast" : {
+
+    },
     "Fast → Slow" : {
       "comment" : "Title of a time remap preset that builds from slow motion into speed.",
       "extractionState" : "stale",
@@ -24074,6 +24385,9 @@
           }
         }
       }
+    },
+    "Fill Light" : {
+
     },
     "Fills the canvas wherever no clip covers it, and is part of the export. The outline on the preview shows where the canvas ends." : {
       "comment" : "A description of the background colour picker.",
@@ -24762,6 +25076,9 @@
           }
         }
       }
+    },
+    "Form" : {
+
     },
     "Format" : {
       "localizations" : {
@@ -26019,6 +26336,9 @@
           }
         }
       }
+    },
+    "Gentle frontal light that opens up the shadows." : {
+
     },
     "GEOMETRIC" : {
       "comment" : "A category name for a transition.",
@@ -27873,6 +28193,9 @@
         }
       }
     },
+    "Hard light across the subject from the right." : {
+
+    },
     "HDR export needs %@ to be %@; this source reports %@." : {
       "localizations" : {
         "de" : {
@@ -29282,6 +29605,9 @@
         }
       }
     },
+    "How finely the preview analyses and draws depth. Export always uses High." : {
+
+    },
     "How keyframes work" : {
       "localizations" : {
         "de" : {
@@ -29361,6 +29687,9 @@
           }
         }
       }
+    },
+    "How strongly light follows the estimated shape. Lower is a gentler wash, higher sculpts harder." : {
+
     },
     "How to use" : {
       "localizations" : {
@@ -29802,6 +30131,46 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Bildöverlägg"
+          }
+        }
+      }
+    },
+    "Image overlay from Files" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Bild-Overlay aus Dateien"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Superposición de imagen desde Archivos"
+          }
+        },
+        "fi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Kuvapeitto Tiedostoista"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Incrustation d'image depuis Fichiers"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Sovrapposizione immagine da File"
+          }
+        },
+        "sv" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Bildoverlay från Filer"
           }
         }
       }
@@ -31293,6 +31662,9 @@
         }
       }
     },
+    "Invalid relight keyframe on %@." : {
+
+    },
     "Invalid shape geometry or appearance." : {
       "localizations" : {
         "de" : {
@@ -32256,6 +32628,9 @@
           }
         }
       }
+    },
+    "Key Light" : {
+
     },
     "Keyboard" : {
       "localizations" : {
@@ -33224,6 +33599,66 @@
           }
         }
       }
+    },
+    "Light %lld" : {
+
+    },
+    "Light + Shading" : {
+
+    },
+    "Light + Shading also darkens the side of a form turned away from this light. It shapes; it does not cast shadows." : {
+
+    },
+    "Light angle" : {
+
+    },
+    "Light color" : {
+
+    },
+    "Light direction" : {
+
+    },
+    "Light distance" : {
+
+    },
+    "Light exposure" : {
+
+    },
+    "Light falloff" : {
+
+    },
+    "Light intensity" : {
+
+    },
+    "Light Only" : {
+
+    },
+    "Light position X" : {
+
+    },
+    "Light position Y" : {
+
+    },
+    "Light reach" : {
+
+    },
+    "Light softness" : {
+
+    },
+    "Light temperature" : {
+
+    },
+    "Light tint" : {
+
+    },
+    "Lights" : {
+
+    },
+    "LIGHTS" : {
+
+    },
+    "Limits the light to one of this clip's masks — the same window, feather and tracking." : {
+
     },
     "Line" : {
       "localizations" : {
@@ -34198,6 +34633,9 @@
           }
         }
       }
+    },
+    "Low, warm sun from the side with a cool sky fill." : {
+
     },
     "Lower layer" : {
       "localizations" : {
@@ -37389,6 +37827,30 @@
         }
       }
     },
+    "Move Light Down" : {
+
+    },
+    "Move Light Down More" : {
+
+    },
+    "Move Light Down Slightly" : {
+
+    },
+    "Move Light Left Slightly" : {
+
+    },
+    "Move Light Right Slightly" : {
+
+    },
+    "Move Light Up" : {
+
+    },
+    "Move Light Up More" : {
+
+    },
+    "Move Light Up Slightly" : {
+
+    },
     "Move Speed Point" : {
       "comment" : "Action label for moving a speed curve point.",
       "isCommentAutoGenerated" : true,
@@ -37431,6 +37893,9 @@
         }
       }
     },
+    "Move the playhead inside the clip to change an animated light." : {
+
+    },
     "Move the playhead inside the clip to change an animated mask value." : {
       "localizations" : {
         "de" : {
@@ -37470,6 +37935,9 @@
           }
         }
       }
+    },
+    "Move the playhead inside the clip to change an animated strength." : {
+
     },
     "Move the playhead inside the clip to change an animated value." : {
       "localizations" : {
@@ -38085,6 +38553,18 @@
         }
       }
     },
+    "Near puts the light in front of everything; far puts it behind the subject, as a rim or background light." : {
+
+    },
+    "negative" : {
+
+    },
+    "Negative Fill" : {
+
+    },
+    "Negative light takes light away — a flag or negative fill." : {
+
+    },
     "Neutral" : {
       "localizations" : {
         "de" : {
@@ -38528,6 +39008,9 @@
           }
         }
       }
+    },
+    "No frames could be read from this clip." : {
+
     },
     "no grade yet" : {
       "localizations" : {
@@ -41155,6 +41638,9 @@
         }
       }
     },
+    "Overhead light that models the brow and shoulders." : {
+
+    },
     "Overlay" : {
       "localizations" : {
         "de" : {
@@ -41439,6 +41925,9 @@
         }
       }
     },
+    "Partly analysed · %lld%%" : {
+
+    },
     "Paste" : {
       "localizations" : {
         "de" : {
@@ -41640,6 +42129,9 @@
           }
         }
       }
+    },
+    "Paused — the device is hot" : {
+
     },
     "Payment is charged to your Apple Account. Renews automatically until cancelled in account settings at least 24 hours before renewal." : {
       "localizations" : {
@@ -43138,6 +43630,9 @@
         }
       }
     },
+    "Point" : {
+
+    },
     "Points" : {
       "localizations" : {
         "de" : {
@@ -43824,6 +44319,9 @@
         }
       }
     },
+    "Preparing scene analysis" : {
+
+    },
     "Preparing source frames" : {
       "localizations" : {
         "de" : {
@@ -44149,6 +44647,9 @@
           }
         }
       }
+    },
+    "PRESETS" : {
+
     },
     "Preview" : {
       "localizations" : {
@@ -45608,6 +46109,9 @@
         }
       }
     },
+    "Re-analyze" : {
+
+    },
     "Read the picture, don't guess." : {
       "localizations" : {
         "de" : {
@@ -46251,6 +46755,30 @@
           }
         }
       }
+    },
+    "Relight" : {
+
+    },
+    "Relight is not available here" : {
+
+    },
+    "Relight lights" : {
+
+    },
+    "Relight on" : {
+
+    },
+    "Relight shapes light from an estimate of the scene's depth, not a 3D scan: it reads surfaces and forms convincingly but does not cast exact shadows. Hold the picture — or press \\ — to compare." : {
+
+    },
+    "Relight strength" : {
+
+    },
+    "Relight Tool" : {
+
+    },
+    "Relight works on video. Its depth is estimated across a shot and carried along the motion between frames, which a still image does not have." : {
+
     },
     "Remaps saturation. Lowering the right compresses colors that are already strong; lifting the left brings up quiet ones." : {
       "localizations" : {
@@ -47428,6 +47956,9 @@
         }
       }
     },
+    "Rename light" : {
+
+    },
     "Rename mask" : {
       "localizations" : {
         "de" : {
@@ -48564,6 +49095,9 @@
         }
       }
     },
+    "Reset Relight" : {
+
+    },
     "Reset returns the curve to neutral. Drag anywhere off a point to scroll this panel." : {
       "localizations" : {
         "de" : {
@@ -49532,6 +50066,9 @@
           }
         }
       }
+    },
+    "Rim Light" : {
+
     },
     "Ripple" : {
       "localizations" : {
@@ -50869,6 +51406,30 @@
         }
       }
     },
+    "Scene" : {
+
+    },
+    "SCENE" : {
+
+    },
+    "Scene analysed" : {
+
+    },
+    "Scene analysis could not start." : {
+
+    },
+    "Scene analysis progress" : {
+
+    },
+    "Scene analysis stopped on the GPU." : {
+
+    },
+    "Scene analysis stopped unexpectedly." : {
+
+    },
+    "Scene not analysed yet" : {
+
+    },
     "Scope intensity" : {
       "localizations" : {
         "de" : {
@@ -51271,6 +51832,9 @@
         }
       }
     },
+    "Select a light in the list or on the picture to adjust it." : {
+
+    },
     "Select a mask to grade it. With none selected, every control in this tab changes the whole clip." : {
       "localizations" : {
         "de" : {
@@ -51390,6 +51954,9 @@
           }
         }
       }
+    },
+    "Select a video clip to relight it." : {
+
     },
     "Select a video or image clip first." : {
       "comment" : "A tooltip explaining why the speed tool cannot be used when a video clip is not selected.",
@@ -52398,6 +52965,12 @@
           }
         }
       }
+    },
+    "Shadow response" : {
+
+    },
+    "Shadow Response" : {
+
     },
     "Shadows" : {
       "localizations" : {
@@ -53445,6 +54018,9 @@
         }
       }
     },
+    "Side Light" : {
+
+    },
     "Sink" : {
       "comment" : "Animation title for sinking text.",
       "isCommentAutoGenerated" : true,
@@ -54096,6 +54672,12 @@
           }
         }
       }
+    },
+    "Soft Fill" : {
+
+    },
+    "Soft Key" : {
+
     },
     "Soft Light" : {
       "localizations" : {
@@ -55355,6 +55937,9 @@
         }
       }
     },
+    "Spot" : {
+
+    },
     "Squeeze" : {
       "localizations" : {
         "de" : {
@@ -55594,6 +56179,9 @@
           }
         }
       }
+    },
+    "Starting at the playhead" : {
+
     },
     "Step frame by frame to check the cutout. Where it drifts, redraw the lasso on that frame and track again from there." : {
       "comment" : "A description of the tracking process in the background removal panel.",
@@ -56765,7 +57353,9 @@
         }
       }
     },
-    "Tap points or drag around the subject" : {},
+    "Tap points or drag around the subject" : {
+
+    },
     "Tap the background color to remove." : {
       "localizations" : {
         "de" : {
@@ -58880,6 +59470,9 @@
         }
       }
     },
+    "The depth model returned nothing usable." : {
+
+    },
     "The destination extension must match the selected container." : {
       "localizations" : {
         "de" : {
@@ -60041,6 +60634,9 @@
           }
         }
       }
+    },
+    "The light and its keyframes are removed. Undo brings it back." : {
+
     },
     "The look or curve tables could not be prepared." : {
       "localizations" : {
@@ -61442,6 +62038,9 @@
         }
       }
     },
+    "The stored depth is deleted at both qualities. Your lights are kept; they light nothing until the scene is analysed again." : {
+
+    },
     "The temporary file will be removed. Save a copy using Save to Files, Save to Photos, or Share first." : {
       "comment" : "A message displayed when the user closes an export that hasn't been saved.",
       "isCommentAutoGenerated" : true,
@@ -62645,6 +63244,9 @@
         }
       }
     },
+    "This clip cannot be decoded for scene analysis." : {
+
+    },
     "This clip could not be prepared for export on its own." : {
       "localizations" : {
         "de" : {
@@ -62724,6 +63326,9 @@
           }
         }
       }
+    },
+    "This clip has no video to analyse." : {
+
     },
     "This clip has no video to analyze." : {
       "localizations" : {
@@ -62854,6 +63459,9 @@
           }
         }
       }
+    },
+    "This clip's file could not be read, so its scene cannot be analysed." : {
+
     },
     "This clip's media is missing." : {
       "localizations" : {
@@ -63334,6 +63942,9 @@
           }
         }
       }
+    },
+    "This device could not prepare scene analysis." : {
+
     },
     "This device does not allow GradeLab to add to Photos." : {
       "localizations" : {
@@ -63886,6 +64497,9 @@
           }
         }
       }
+    },
+    "This frame's format cannot be analysed." : {
+
     },
     "This HLG source reports %lld-bit precision, which cannot be encoded as Main 10." : {
       "localizations" : {
@@ -65865,6 +66479,9 @@
         }
       }
     },
+    "To light only part of the picture, draw a window in Masks and choose it here." : {
+
+    },
     "Toggle Snapping" : {
       "localizations" : {
         "de" : {
@@ -66224,6 +66841,9 @@
           }
         }
       }
+    },
+    "Top Light" : {
+
     },
     "Trace around the object on the picture. The shape closes itself when you lift your finger." : {
       "comment" : "A description of how to use the lasso tool in the background removal panel.",
@@ -67777,6 +68397,9 @@
         }
       }
     },
+    "Tungsten" : {
+
+    },
     "Turn one color into another. Pick a hue, then drag its point up or down to rotate it. Neighbouring hues follow smoothly." : {
       "localizations" : {
         "de" : {
@@ -67976,6 +68599,9 @@
           }
         }
       }
+    },
+    "Type" : {
+
     },
     "Typewriter" : {
       "comment" : "Title for the \"Typewriter\" text animation preset.",
@@ -69633,6 +70259,12 @@
         }
       }
     },
+    "Uses the built-in scene geometry, strongest on people. Runs once, in the background, from the playhead." : {
+
+    },
+    "Uses the installed Core ML depth model. Runs once, in the background, from the playhead." : {
+
+    },
     "Value" : {
       "localizations" : {
         "de" : {
@@ -69959,6 +70591,46 @@
         }
       }
     },
+    "Video clip from Files" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Videoclip aus Dateien"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Videoclip desde Archivos"
+          }
+        },
+        "fi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Videoleike Tiedostoista"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Clip vidéo depuis Fichiers"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Clip video da File"
+          }
+        },
+        "sv" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Videoklipp från Filer"
+          }
+        }
+      }
+    },
     "Video clips can only be dropped on video layers." : {
       "localizations" : {
         "de" : {
@@ -70077,6 +70749,46 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Videoöverlägg"
+          }
+        }
+      }
+    },
+    "Video overlay from Files" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Video-Overlay aus Dateien"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Superposición de vídeo desde Archivos"
+          }
+        },
+        "fi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Videopeitto Tiedostoista"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Incrustation vidéo depuis Fichiers"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Sovrapposizione video da File"
+          }
+        },
+        "sv" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Videooverlay från Filer"
           }
         }
       }
@@ -70562,6 +71274,12 @@
           }
         }
       }
+    },
+    "Warm" : {
+
+    },
+    "Warm Sunset" : {
+
     },
     "Warm, contrasty cinematic look with soft highlights and flattering skin tones." : {
       "localizations" : {
@@ -72769,246 +73487,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Zooma ut tidslinjen"
-          }
-        }
-      }
-    },
-    "Add video from Files" : {
-      "localizations" : {
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Video aus Dateien hinzufügen"
-          }
-        },
-        "es" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Añadir vídeo desde Archivos"
-          }
-        },
-        "fi" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Lisää video Tiedostoista"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Ajouter une vidéo depuis Fichiers"
-          }
-        },
-        "it" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Aggiungi video da File"
-          }
-        },
-        "sv" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Lägg till video från Filer"
-          }
-        }
-      }
-    },
-    "Add video overlay from Files" : {
-      "localizations" : {
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Video-Overlay aus Dateien hinzufügen"
-          }
-        },
-        "es" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Añadir superposición de vídeo desde Archivos"
-          }
-        },
-        "fi" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Lisää videopeitto Tiedostoista"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Ajouter une incrustation vidéo depuis Fichiers"
-          }
-        },
-        "it" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Aggiungi sovrapposizione video da File"
-          }
-        },
-        "sv" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Lägg till videooverlay från Filer"
-          }
-        }
-      }
-    },
-    "Add image overlay from Files" : {
-      "localizations" : {
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Bild-Overlay aus Dateien hinzufügen"
-          }
-        },
-        "es" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Añadir superposición de imagen desde Archivos"
-          }
-        },
-        "fi" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Lisää kuvapeitto Tiedostoista"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Ajouter une incrustation d'image depuis Fichiers"
-          }
-        },
-        "it" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Aggiungi sovrapposizione immagine da File"
-          }
-        },
-        "sv" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Lägg till bildoverlay från Filer"
-          }
-        }
-      }
-    },
-    "Video clip from Files" : {
-      "localizations" : {
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Videoclip aus Dateien"
-          }
-        },
-        "es" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Videoclip desde Archivos"
-          }
-        },
-        "fi" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Videoleike Tiedostoista"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Clip vidéo depuis Fichiers"
-          }
-        },
-        "it" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Clip video da File"
-          }
-        },
-        "sv" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Videoklipp från Filer"
-          }
-        }
-      }
-    },
-    "Video overlay from Files" : {
-      "localizations" : {
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Video-Overlay aus Dateien"
-          }
-        },
-        "es" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Superposición de vídeo desde Archivos"
-          }
-        },
-        "fi" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Videopeitto Tiedostoista"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Incrustation vidéo depuis Fichiers"
-          }
-        },
-        "it" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Sovrapposizione video da File"
-          }
-        },
-        "sv" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Videooverlay från Filer"
-          }
-        }
-      }
-    },
-    "Image overlay from Files" : {
-      "localizations" : {
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Bild-Overlay aus Dateien"
-          }
-        },
-        "es" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Superposición de imagen desde Archivos"
-          }
-        },
-        "fi" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Kuvapeitto Tiedostoista"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Incrustation d'image depuis Fichiers"
-          }
-        },
-        "it" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Sovrapposizione immagine da File"
-          }
-        },
-        "sv" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Bildoverlay från Filer"
           }
         }
       }
