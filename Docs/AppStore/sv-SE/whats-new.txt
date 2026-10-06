@@ -1,9 +1,4 @@
-Relight är här.
+Förbättringar och buggfixar.
 
-• Relight: lägg till virtuellt ljus i material du redan har filmat. GradeLab uppskattar scenens form, så ljuset sveper runt ansikten och motiv i stället för att ligga ovanpå som en platt cirkel.
-• Riktat ljus, punktljus och spotljus, upp till sex per klipp. Dra dem direkt i bilden och sätt keyframes för varje värde.
-• Förinställningar: Mjukt huvudljus, Varm solnedgång, Kallt månljus, Sidoljus, Toppljus, Kantljus, Dramatiskt och Mjuk fyllnad.
-• Fungerar med SDR, HLG HDR och Apple Log, och med hastighetsramper, delade och baklängesspelade klipp. Begränsa det till en mask för att bara ljussätta ett område.
-• Importera från Filer på iPhone och iPad: lägg till videor, videoöverlägg och bildöverlägg direkt från appen Filer.
-• Åtgärdat: fotoprojekt kunde visa ”Bilden är inte tillgänglig” efter en uppdatering. Berörda projekt öppnas igen.
-• Förbättringar av gränssnittet, buggfixar och allmänna optimeringar.
+• Förbättringar av gränssnittet och mindre buggfixar.
+• Förbättringar av stabilitet och prestanda.

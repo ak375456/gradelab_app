@@ -1,9 +1,4 @@
-Relight est arrivé.
+Améliorations et corrections de bugs.
 
-• Relight : ajoutez des lumières virtuelles à des images déjà tournées. GradeLab estime la forme de la scène : la lumière enveloppe les visages et les sujets au lieu de se poser dessus comme un cercle plat.
-• Lumières directionnelles, ponctuelles et spots, jusqu’à six par plan. Faites-les glisser sur l’image et créez des keyframes pour chaque valeur.
-• Préréglages : Principale douce, Coucher de soleil chaud, Clair de lune froid, Lumière latérale, Lumière zénithale, Contre-jour, Dramatique et Appoint doux.
-• Compatible SDR, HDR HLG et Apple Log, ainsi qu’avec les rampes de vitesse, les plans scindés et inversés. Limitez-le à un masque pour n’éclairer qu’une zone.
-• Import depuis Fichiers sur iPhone et iPad : ajoutez vidéos, incrustations vidéo et incrustations d’image directement depuis l’app Fichiers.
-• Correction : des projets photo pouvaient afficher « Image indisponible » après une mise à jour. Ils s’ouvrent de nouveau.
-• Améliorations de l’interface, corrections et optimisations générales.
+• Améliorations de l’interface et corrections de bugs mineurs.
+• Améliorations de la stabilité et des performances.

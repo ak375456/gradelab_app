@@ -1,9 +1,4 @@
-Relight on täällä.
+Parannuksia ja virheenkorjauksia.
 
-• Relight: lisää virtuaalisia valoja jo kuvattuun materiaaliin. GradeLab arvioi kohtauksen muodon, joten valo kietoutuu kasvojen ja kohteiden ympärille eikä jää niiden päälle litteäksi ympyräksi.
-• Suunnattu valo, pistevalo ja kohdevalo, enintään kuusi klippiä kohden. Vedä niitä suoraan kuvassa ja lisää avainkuvia jokaiselle arvolle.
-• Esiasetukset: Pehmeä päävalo, Lämmin auringonlasku, Viileä kuunvalo, Sivuvalo, Yläpuolinen valo, Reunavalo, Dramaattinen ja Pehmeä täyte.
-• Toimii SDR-, HLG HDR- ja Apple Log -materiaalin sekä nopeusramppien, jaettujen ja takaperin toistettavien klippien kanssa. Rajaa se maskiin, jos haluat valaista vain yhden alueen.
-• Tuonti Tiedostoista iPhonessa ja iPadissa: lisää videoita, videopäällysteitä ja kuvapäällysteitä suoraan Tiedostot-apista.
-• Korjattu: kuvaprojektit saattoivat näyttää ilmoituksen ”Kuva ei ole saatavilla” päivityksen jälkeen. Projektit avautuvat taas.
-• Käyttöliittymän parannuksia, virheenkorjauksia ja yleisiä optimointeja.
+• Käyttöliittymän parannuksia ja pieniä virheenkorjauksia.
+• Vakauden ja suorituskyvyn parannuksia.

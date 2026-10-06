@@ -1,9 +1,4 @@
-Arriva Relight.
+Miglioramenti e correzioni di bug.
 
-• Relight: aggiungi luci virtuali alle riprese già fatte. GradeLab stima la forma della scena, così la luce avvolge volti e soggetti invece di posarsi sopra come un cerchio piatto.
-• Luci direzionali, puntiformi e spot, fino a sei per clip. Trascinale sull’immagine e aggiungi keyframe a ogni valore.
-• Preset: Principale morbida, Tramonto caldo, Luce lunare fredda, Luce laterale, Luce dall’alto, Controluce, Drammatica e Riempimento morbido.
-• Funziona con SDR, HDR HLG e Apple Log, e con rampe di velocità, clip divise e invertite. Limitalo a una maschera per illuminare una sola zona.
-• Importa da File su iPhone e iPad: aggiungi video, overlay video e overlay immagine direttamente dall’app File.
-• Risolto: i progetti foto potevano mostrare «Immagine non disponibile» dopo un aggiornamento. I progetti interessati si riaprono.
-• Migliorie all’interfaccia, correzioni e ottimizzazioni generali.
+• Migliorie all’interfaccia e correzioni di bug minori.
+• Miglioramenti di stabilità e prestazioni.
