@@ -1341,6 +1341,60 @@ final class EditorViewModel: ObservableObject, GradingModel {
         }
     }
 
+    var canReplaceClip: Bool {
+        selectedClipIDs.count == 1 && selectedClip != nil && canEditSelection && !isImporting
+    }
+
+    /// Stage media without editing the document. Cancelling the replacement
+    /// leaves the timeline and its history untouched.
+    func loadReplacementMedia(_ source: MediaImportSource, image: Bool) async throws -> ProjectMediaAsset {
+        guard !isImporting else {
+            throw TimelineError.invalid(String(localized: "Wait for the current import to finish."))
+        }
+        isImporting = true
+        defer { isImporting = false }
+        if case .file(let url) = source { return try await importedAsset(for: url) }
+        if image { return try await ImageImportService.load(source) }
+        let imported = try await VideoImportService(projectStore: ProjectStore()).importVideo(from: source)
+        let video = try await VideoMetadataReader().read(from: imported.url, originalFileName: imported.originalFilename)
+        _ = try await ExportSourceInspector.inspect(video, requireExportColorTags: false)
+        try Task.checkCancellation()
+        return try .init(id: UUID(), url: video.url,
+                         sourceRange: video.sourceRange ?? .init(start: .zero, duration: .seconds(video.metadata.durationSeconds)),
+                         videoMetadata: video.metadata, frameDuration: video.frameDuration)
+    }
+
+    @discardableResult
+    func replaceClip(_ id: UUID, with asset: ProjectMediaAsset, timing: ClipReplacementTiming,
+                     sourceStart: TimelineTime?, useAudio: Bool) -> Bool {
+        // Recompute against the current document: a preview must never overwrite
+        // an intervening edit with a stale snapshot.
+        var succeeded = false
+        commit(String(localized: "Replace clip"), seekToSelection: true) { project in
+            let plan = try ClipReplacement.prepare(clipID: id, asset: asset, timing: timing,
+                sourceStart: sourceStart, useAudio: useAudio, in: project)
+            project = plan.project
+            succeeded = true
+            return id
+        }
+        return succeeded
+    }
+
+    /// Only media staged by this sheet is eligible. Keep files referenced by
+    /// either the document or undo/redo, so cancellation can release unused
+    /// imports without stranding a committed replacement.
+    func discardStagedReplacementMedia(_ staged: [ProjectMediaAsset]) {
+        let documents = [project] + (history.undoEntries + history.redoEntries).flatMap { [$0.before, $0.after] }
+        let referenced = Set(documents.flatMap(\.assets).map { $0.url.standardizedFileURL })
+        let imports = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first?
+            .appendingPathComponent("GradeLab/Imports", isDirectory: true).standardizedFileURL
+        for asset in staged {
+            let url = asset.url.standardizedFileURL
+            guard !referenced.contains(url), url.deletingLastPathComponent() == imports else { continue }
+            try? FileManager.default.removeItem(at: url)
+        }
+    }
+
     /// Where a bin placement should land, so the caller says what it means
     /// rather than passing two booleans that can disagree.
     enum MediaPlacement: Equatable {

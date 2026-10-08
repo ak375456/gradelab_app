@@ -1,1 +1,1 @@
-Speed ramping on the Mac: drag speed points on a large curve editor, type exact values, and let Optical Flow build the in-between frames.
+New on the Mac: Relight. Add virtual lights to footage you've already shot, drag them on the picture, and nudge them with the arrow keys.

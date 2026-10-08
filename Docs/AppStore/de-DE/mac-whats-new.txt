@@ -1,0 +1,9 @@
+Neu: Relight.
+
+• Relight: Füge bereits gedrehtem Material virtuelles Licht hinzu. GradeLab schätzt die Form der Szene, sodass das Licht Gesichter und Motive umschließt, statt als flacher Kreis darüberzuliegen.
+• Gerichtetes Licht, Punkt- und Spotlicht, bis zu sechs pro Clip. Ziehe sie mit dem Zeiger direkt im Bild und setze für jeden Wert Keyframes.
+• Presets: Soft Key, Warm Sunset, Cool Moonlight, Side Light, Top Light, Rim Light, Dramatic und Soft Fill.
+• Funktioniert mit SDR, HLG-HDR und Apple Log sowie mit Tempo-Ramps, geteilten und rückwärts laufenden Clips. Begrenze es auf eine Maske, um nur einen Bereich zu beleuchten.
+• Tastatur: ⇧⌘L öffnet Relight. Die Pfeiltasten verschieben das ausgewählte Licht, mit ⇧ in größeren und mit ⌥ in feineren Schritten. ⌫ löscht es, ⌘D dupliziert es.
+• Rechtsklick auf ein Licht für Duplizieren, Deaktivieren, Zurücksetzen und Löschen.
+• Verbesserungen der Oberfläche, Fehlerbehebungen und allgemeine App-Optimierungen.

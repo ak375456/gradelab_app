@@ -1,1 +1,1 @@
-Nopeusramppi Macissä: vedä nopeuspisteitä suuressa käyräeditorissa, kirjoita tarkat arvot, ja optinen virtaus luo välikuvat.
+Uutta Macissä: Relight. Lisää virtuaalisia valoja jo kuvattuun materiaaliin, vedä niitä kuvassa ja siirrä nuolinäppäimillä.

@@ -1,1 +1,1 @@
-La rampe de vitesse sur Mac : posez des points sur un grand éditeur de courbe, saisissez des valeurs exactes, et le flux optique fait les images intermédiaires.
+Nouveau sur Mac : Relight. Ajoutez des lumières virtuelles à vos images déjà tournées, placez-les sur l’image et ajustez-les aux flèches.

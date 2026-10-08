@@ -1,1 +1,1 @@
-Rampa de velocidad en el Mac: arrastra puntos en un editor de curva grande, escribe valores exactos y el flujo óptico crea los fotogramas intermedios.
+Novedad en el Mac: Relight. Añade luces virtuales a lo que ya has grabado, arrástralas sobre la imagen y ajústalas con las flechas.

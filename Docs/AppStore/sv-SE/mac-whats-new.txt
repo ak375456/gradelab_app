@@ -1,0 +1,9 @@
+Relight är här.
+
+• Relight: lägg till virtuellt ljus i material du redan har filmat. GradeLab uppskattar scenens form, så ljuset sveper runt ansikten och motiv i stället för att ligga ovanpå som en platt cirkel.
+• Riktat ljus, punktljus och spotljus, upp till sex per klipp. Dra dem i bilden med pekaren och sätt keyframes för varje värde.
+• Förinställningar: Mjukt huvudljus, Varm solnedgång, Kallt månljus, Sidoljus, Toppljus, Kantljus, Dramatiskt och Mjuk fyllnad.
+• Fungerar med SDR, HLG HDR och Apple Log, och med hastighetsramper, delade och baklängesspelade klipp. Begränsa det till en mask för att bara ljussätta ett område.
+• Tangentbord: ⇧⌘L öppnar Relight. Piltangenterna flyttar det markerade ljuset, med ⇧ för större steg och ⌥ för finare. ⌫ raderar det och ⌘D duplicerar det.
+• Högerklicka på ett ljus för Duplicera, Inaktivera, Återställ och Radera.
+• Förbättringar av gränssnittet, buggfixar och allmänna optimeringar.

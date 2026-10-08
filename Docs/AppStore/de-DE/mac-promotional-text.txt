@@ -1,1 +1,1 @@
-Tempo-Ramping auf dem Mac: Tempopunkte im großen Kurveneditor ziehen, exakte Werte tippen, und der Optische Fluss erzeugt die Frames dazwischen.
+Neu auf dem Mac: Relight. Füge bereits gedrehtem Material virtuelles Licht hinzu, ziehe es im Bild und verschiebe es mit den Pfeiltasten.

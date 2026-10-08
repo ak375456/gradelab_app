@@ -1,0 +1,9 @@
+Llega Relight.
+
+• Relight: añade luces virtuales a lo que ya has grabado. GradeLab estima la forma de la escena, así que la luz envuelve caras y sujetos en lugar de quedarse encima como un círculo plano.
+• Luces direccionales, puntuales y focos, hasta seis por clip. Arrástralas sobre la imagen con el puntero y añade keyframes a cada valor.
+• Ajustes: Principal suave, Atardecer cálido, Luz de luna fría, Luz lateral, Luz cenital, Contraluz, Dramática y Relleno suave.
+• Funciona con SDR, HDR HLG y Apple Log, y con rampas de velocidad, clips divididos e invertidos. Limítalo a una máscara para iluminar solo una zona.
+• Teclado: ⇧⌘L abre Relight. Las flechas desplazan la luz seleccionada, con ⇧ para pasos más grandes y ⌥ para pasos más finos. ⌫ la elimina y ⌘D la duplica.
+• Haz clic derecho en una luz para Duplicar, Desactivar, Restablecer y Eliminar.
+• Mejoras de interfaz, correcciones y optimizaciones generales.

@@ -49,6 +49,18 @@ struct TimelineAudioMix {
                         timeRange: CMTimeRange(start: CMTimeSubtract(end, length), duration: length))
                 }
             }
+            if let clip = project.timeline.videoClip(id: clipID) {
+                for hold in clip.resolvedRemap.resolvedFreezes(sourceDuration: clip.sourceRange.duration)
+                    where hold.silencesAudio == true {
+                    let map = clip.timeMap
+                    let first = map.timelineOffset(atSourceOffset: hold.sourceOffset)
+                    let last = map.timelineOffset(atSourceOffset: hold.sourceEnd)
+                    let start = CMTimeAdd(clip.placement.timelineStart.cmTime, min(first, last).cmTime)
+                    let end = CMTimeAdd(clip.placement.timelineStart.cmTime, max(first, last).cmTime)
+                    parameter.setVolume(0, at: start)
+                    parameter.setVolume(level, at: end)
+                }
+            }
             return parameter
         }
         return mix

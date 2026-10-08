@@ -173,6 +173,12 @@ struct FreezeSegment: Codable, Equatable, Identifiable, Sendable {
     var duration: TimelineTime
     /// How much source the hold consumes: one frame of the media it came from.
     var sourceWidth: TimelineTime
+    /// Replacement holds must fill an existing slot to the exact project tick.
+    /// Nil retains the integration used by previously saved speed edits.
+    var integratesExactly: Bool? = nil
+    /// A last-frame hold fills time with a picture, without stretching the
+    /// frame's audio into a drone. Nil keeps existing authored freezes unchanged.
+    var silencesAudio: Bool? = nil
 
     /// Shortest freeze offered. Below about a sixth of a second a freeze reads
     /// as a stutter rather than as a hold.
@@ -183,11 +189,13 @@ struct FreezeSegment: Codable, Equatable, Identifiable, Sendable {
     static let defaultDuration = 1.0
 
     init(id: UUID = UUID(), sourceOffset: TimelineTime, duration: TimelineTime,
-         sourceWidth: TimelineTime) {
+         sourceWidth: TimelineTime, integratesExactly: Bool? = nil, silencesAudio: Bool? = nil) {
         self.id = id
         self.sourceOffset = sourceOffset
         self.duration = duration
         self.sourceWidth = sourceWidth
+        self.integratesExactly = integratesExactly
+        self.silencesAudio = silencesAudio
     }
 
     /// The rate the held stretch plays at: one frame over the whole hold.

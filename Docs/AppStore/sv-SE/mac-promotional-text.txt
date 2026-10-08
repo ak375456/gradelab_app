@@ -1,1 +1,1 @@
-Hastighetsramp på Mac: dra hastighetspunkter i en stor kurvredigerare, skriv exakta värden och låt optiskt flöde skapa bildrutorna emellan.
+Nytt på Mac: Relight. Lägg till virtuellt ljus i material du redan har filmat, dra det i bilden och flytta det med piltangenterna.

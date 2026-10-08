@@ -108,11 +108,11 @@ struct TimeMap: Equatable, Sendable {
         // special case in the integration — it is one frame of source taking a
         // second of timeline, which is simply a very low rate over a very short
         // interval, and the rest of this function never learns about it.
-        let holds: [(start: Double, end: Double, rate: Double)] = freezes.map { freeze in
+        let holds: [(start: Double, end: Double, rate: Double, duration: Int64, exact: Bool)] = freezes.map { freeze in
             let at = Double(Self.ticks(freeze.sourceOffset))
             let width = Double(Self.ticks(freeze.sourceWidth))
             let start = remap.reverses ? Double(span) - at - width : at
-            return (start, start + width, freeze.rate)
+            return (start, start + width, freeze.rate, Self.ticks(freeze.duration), freeze.integratesExactly == true)
         }
 
         // Speed at a source offset in ticks, reading the curve mirrored when the
@@ -157,8 +157,20 @@ struct TimeMap: Equatable, Sendable {
             let a = 1 / speed(atTick: previousTick)
             let b = 1 / speed(atTick: (previousTick + tick) / 2)
             let c = 1 / speed(atTick: min(tick, previousTick + width * 0.999999))
-            let contribution = width * (a + 4 * b + c) / 6
-            elapsed += Int64(contribution.rounded())
+            if let hold = holds.first(where: {
+                $0.exact && (previousTick + tick) / 2 >= $0.start && (previousTick + tick) / 2 < $0.end
+            }) {
+                // Round cumulative progress through a hold, rather than each
+                // cell separately, so its cells sum to its exact requested
+                // duration. Old freezes keep their original integration.
+                let span = hold.end - hold.start
+                let from = Int64((Double(hold.duration) * (previousTick - hold.start) / span).rounded())
+                let to = Int64((Double(hold.duration) * (tick - hold.start) / span).rounded())
+                elapsed += to - from
+            } else {
+                let contribution = width * (a + 4 * b + c) / 6
+                elapsed += Int64(contribution.rounded())
+            }
             sourceTicks.append(Int64(tick.rounded()))
             timelineTicks.append(elapsed)
             previousTick = tick
@@ -409,7 +421,10 @@ extension TimeMap {
                 [CMTimeConvertScale($0.sourceOffset.cmTime, timescale: timescale,
                                     method: .roundHalfAwayFromZero).value,
                  CMTimeConvertScale($0.duration.cmTime, timescale: timescale,
-                                    method: .roundHalfAwayFromZero).value]
+                                    method: .roundHalfAwayFromZero).value,
+                 CMTimeConvertScale($0.sourceWidth.cmTime, timescale: timescale,
+                                    method: .roundHalfAwayFromZero).value,
+                 $0.integratesExactly == true ? 1 : 0]
             })
         return Store.shared.map(for: key) {
             TimeMap(remap: remap, sourceDuration: sourceDuration)

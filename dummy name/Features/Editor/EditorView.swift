@@ -24,6 +24,7 @@ struct EditorView: View {
     @FocusState private var textFocused: Bool
     @State private var keyboardOverlap: CGFloat = 0
     @State private var clipOptions = false
+    @State private var replacementClipID: UUID?
     @StateObject private var filmstrip = FilmstripStore()
     @State private var assetFrames: [UUID: [UIImage]] = [:]
     @State private var waveforms: [UUID: [Float]] = [:]
@@ -664,6 +665,12 @@ struct EditorView: View {
             self.mediaItem = nil
         }
         .sheet(isPresented: $layers) { LayerControls(model: model).presentationDetents([.medium, .large]) }
+        .sheet(isPresented: Binding(get: { replacementClipID != nil },
+                                    set: { if !$0 { replacementClipID = nil } })) {
+            if let id = replacementClipID {
+                ClipReplacementSheet(model: model, clipID: id, assetFrames: assetFrames)
+            }
+        }
         .sheet(isPresented: $settingsSheet) { EditorSettings() }
         .sheet(isPresented: $markers) { MarkerControls(model: model).presentationDetents([.medium]) }
         .sheet(isPresented: $soundEffects) {
@@ -738,7 +745,7 @@ struct EditorView: View {
     private var shortcutsEnabled: Bool {
         !typingText && !model.showsExport && clipExport == nil && !savingPreset && !help
             && !settingsSheet && !layers && !markers && !soundEffects && !showsFileImporter && !mediaPicker
-            && !clipOptions && !confirmsResetAll && !colorInfo && model.editError == nil
+            && !clipOptions && replacementClipID == nil && !confirmsResetAll && !colorInfo && model.editError == nil
     }
 
     private var workspaceShortcuts: [WorkspaceShortcut] {
@@ -1200,6 +1207,14 @@ struct EditorView: View {
             }
             .accessibilityLabel("Split at playhead")
             .disabled(!model.canSplit)
+            Button(action: openReplacement) {
+                Image(systemName: "arrow.triangle.2.circlepath")
+                    .frame(width: AppPlatform.isMac ? 40 : 44,
+                           height: AppPlatform.isMac ? 36 : 44)
+            }
+            .accessibilityLabel("Replace selected clip")
+            .help("Replace selected clip")
+            .disabled(!model.canReplaceClip)
             Button(action: openTransitionTool) {
                 Image(systemName: "rectangle.2.swap").frame(width: 40, height: 36)
             }
@@ -1893,6 +1908,8 @@ struct EditorView: View {
 
     @ViewBuilder private var clipOptionActions: some View {
         if let id = model.selectedClipID, model.project.timeline.videoClip(id: id) != nil {
+            Button("Replace clip", systemImage: "arrow.triangle.2.circlepath", action: openReplacement)
+                .disabled(!model.canReplaceClip)
             Button("Export this clip") {
                 model.playback.pause()
                 comparePinned = false
@@ -1910,6 +1927,12 @@ struct EditorView: View {
         if model.selectedClip?.embeddedAudio != nil {
             Button("Separate audio", systemImage: "waveform", action: model.separateAudio).disabled(!model.canEditSelection)
         }
+    }
+
+    private func openReplacement() {
+        guard model.canReplaceClip, let id = model.selectedClipID else { return }
+        model.playback.pause()
+        replacementClipID = id
     }
 
 }

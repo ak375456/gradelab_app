@@ -47,1406 +47,6 @@
         }
       }
     },
-    "A restrained sheen on surfaces facing both the light and the camera." : {
-      "localizations" : {
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Ein dezenter Glanz auf Flächen, die sowohl dem Licht als auch der Kamera zugewandt sind."
-          }
-        },
-        "es" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Un brillo discreto en las superficies orientadas tanto a la luz como a la cámara."
-          }
-        },
-        "fi" : {
-          "stringUnit" : {
-            "state" : "needs_review",
-            "value" : "Hillitty kiilto pinnoilla, jotka ovat sekä valoon että kameraan päin."
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Un léger reflet sur les surfaces tournées à la fois vers la lumière et vers la caméra."
-          }
-        },
-        "it" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Una lucentezza discreta sulle superfici rivolte sia verso la luce sia verso la fotocamera."
-          }
-        },
-        "sv" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "En diskret glans på ytor som vetter mot både ljuset och kameran."
-          }
-        }
-      }
-    },
-    "Cone" : {
-      "localizations" : {
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Kegel"
-          }
-        },
-        "es" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Cono"
-          }
-        },
-        "fi" : {
-          "stringUnit" : {
-            "state" : "needs_review",
-            "value" : "Keila"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Cône"
-          }
-        },
-        "it" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Cono"
-          }
-        },
-        "sv" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Kon"
-          }
-        }
-      }
-    },
-    "Cone Feather" : {
-      "localizations" : {
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Weiche Kegelkante"
-          }
-        },
-        "es" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Desvanecido del cono"
-          }
-        },
-        "fi" : {
-          "stringUnit" : {
-            "state" : "needs_review",
-            "value" : "Keilan pehmennys"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Adoucissement du cône"
-          }
-        },
-        "it" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Sfumatura del cono"
-          }
-        },
-        "sv" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Mjuk konkant"
-          }
-        }
-      }
-    },
-    "Couldn’t Delete Project" : {
-      "localizations" : {
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Projekt konnte nicht gelöscht werden"
-          }
-        },
-        "es" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "No se pudo eliminar el proyecto"
-          }
-        },
-        "fi" : {
-          "stringUnit" : {
-            "state" : "needs_review",
-            "value" : "Projektia ei voitu poistaa"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Impossible de supprimer le projet"
-          }
-        },
-        "it" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Impossibile eliminare il progetto"
-          }
-        },
-        "sv" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Det gick inte att radera projektet"
-          }
-        }
-      }
-    },
-    "Couldn’t Import Image" : {
-      "localizations" : {
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Bild konnte nicht importiert werden"
-          }
-        },
-        "es" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "No se pudo importar la imagen"
-          }
-        },
-        "fi" : {
-          "stringUnit" : {
-            "state" : "needs_review",
-            "value" : "Kuvaa ei voitu tuoda"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Impossible d’importer l’image"
-          }
-        },
-        "it" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Impossibile importare l’immagine"
-          }
-        },
-        "sv" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Det gick inte att importera bilden"
-          }
-        }
-      }
-    },
-    "Couldn’t Import Video" : {
-      "localizations" : {
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Video konnte nicht importiert werden"
-          }
-        },
-        "es" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "No se pudo importar el vídeo"
-          }
-        },
-        "fi" : {
-          "stringUnit" : {
-            "state" : "needs_review",
-            "value" : "Videota ei voitu tuoda"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Impossible d’importer la vidéo"
-          }
-        },
-        "it" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Impossibile importare il video"
-          }
-        },
-        "sv" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Det gick inte att importera videon"
-          }
-        }
-      }
-    },
-    "Couldn’t Load Photo Projects" : {
-      "localizations" : {
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Fotoprojekte konnten nicht geladen werden"
-          }
-        },
-        "es" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "No se pudieron cargar los proyectos de foto"
-          }
-        },
-        "fi" : {
-          "stringUnit" : {
-            "state" : "needs_review",
-            "value" : "Kuvaprojekteja ei voitu ladata"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Impossible de charger les projets photo"
-          }
-        },
-        "it" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Impossibile caricare i progetti foto"
-          }
-        },
-        "sv" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Det gick inte att läsa in fotoprojekten"
-          }
-        }
-      }
-    },
-    "Couldn’t Load Projects" : {
-      "localizations" : {
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Projekte konnten nicht geladen werden"
-          }
-        },
-        "es" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "No se pudieron cargar los proyectos"
-          }
-        },
-        "fi" : {
-          "stringUnit" : {
-            "state" : "needs_review",
-            "value" : "Projekteja ei voitu ladata"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Impossible de charger les projets"
-          }
-        },
-        "it" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Impossibile caricare i progetti"
-          }
-        },
-        "sv" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Det gick inte att läsa in projekten"
-          }
-        }
-      }
-    },
-    "Couldn’t Open Editor" : {
-      "localizations" : {
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Editor konnte nicht geöffnet werden"
-          }
-        },
-        "es" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "No se pudo abrir el editor"
-          }
-        },
-        "fi" : {
-          "stringUnit" : {
-            "state" : "needs_review",
-            "value" : "Editoria ei voitu avata"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Impossible d’ouvrir l’éditeur"
-          }
-        },
-        "it" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Impossibile aprire l’editor"
-          }
-        },
-        "sv" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Det gick inte att öppna redigeraren"
-          }
-        }
-      }
-    },
-    "DIRECTION" : {
-      "localizations" : {
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "RICHTUNG"
-          }
-        },
-        "es" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "DIRECCIÓN"
-          }
-        },
-        "fi" : {
-          "stringUnit" : {
-            "state" : "needs_review",
-            "value" : "SUUNTA"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "DIRECTION"
-          }
-        },
-        "it" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "DIREZIONE"
-          }
-        },
-        "sv" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "RIKTNING"
-          }
-        }
-      }
-    },
-    "Distance" : {
-      "localizations" : {
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Abstand"
-          }
-        },
-        "es" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Distancia"
-          }
-        },
-        "fi" : {
-          "stringUnit" : {
-            "state" : "needs_review",
-            "value" : "Etäisyys"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Distance"
-          }
-        },
-        "it" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Distanza"
-          }
-        },
-        "sv" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Avstånd"
-          }
-        }
-      }
-    },
-    "Elevation" : {
-      "localizations" : {
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Höhe"
-          }
-        },
-        "es" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Elevación"
-          }
-        },
-        "fi" : {
-          "stringUnit" : {
-            "state" : "needs_review",
-            "value" : "Korkeus"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Élévation"
-          }
-        },
-        "it" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Elevazione"
-          }
-        },
-        "sv" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Höjd"
-          }
-        }
-      }
-    },
-    "Falloff" : {
-      "localizations" : {
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Abfall"
-          }
-        },
-        "es" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Atenuación"
-          }
-        },
-        "fi" : {
-          "stringUnit" : {
-            "state" : "needs_review",
-            "value" : "Vaimeneminen"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Atténuation"
-          }
-        },
-        "it" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Attenuazione"
-          }
-        },
-        "sv" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Avtoning"
-          }
-        }
-      }
-    },
-    "How broad that sheen is. Higher is a matte surface." : {
-      "localizations" : {
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Wie breit dieser Glanz ist. Höher bedeutet eine matte Oberfläche."
-          }
-        },
-        "es" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Lo amplio que es ese brillo. Más alto es una superficie mate."
-          }
-        },
-        "fi" : {
-          "stringUnit" : {
-            "state" : "needs_review",
-            "value" : "Kuinka laaja kiilto on. Suurempi arvo tarkoittaa mattapintaa."
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Étendue de ce reflet. Plus la valeur est élevée, plus la surface est mate."
-          }
-        },
-        "it" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Quanto è ampia quella lucentezza. Più alto significa una superficie opaca."
-          }
-        },
-        "sv" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Hur bred glansen är. Högre ger en matt yta."
-          }
-        }
-      }
-    },
-    "Image Unavailable" : {
-      "localizations" : {
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Bild nicht verfügbar"
-          }
-        },
-        "es" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Imagen no disponible"
-          }
-        },
-        "fi" : {
-          "stringUnit" : {
-            "state" : "needs_review",
-            "value" : "Kuva ei ole saatavilla"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Image indisponible"
-          }
-        },
-        "it" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Immagine non disponibile"
-          }
-        },
-        "sv" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Bilden är inte tillgänglig"
-          }
-        }
-      }
-    },
-    "Intensity" : {
-      "localizations" : {
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Intensität"
-          }
-        },
-        "es" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Intensidad"
-          }
-        },
-        "fi" : {
-          "stringUnit" : {
-            "state" : "needs_review",
-            "value" : "Voimakkuus"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Intensité"
-          }
-        },
-        "it" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Intensità"
-          }
-        },
-        "sv" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Intensitet"
-          }
-        }
-      }
-    },
-    "Keeps the deepest shadows from being lifted into grey." : {
-      "localizations" : {
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Verhindert, dass die tiefsten Schatten ins Graue angehoben werden."
-          }
-        },
-        "es" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Evita que las sombras más profundas se vuelvan grises."
-          }
-        },
-        "fi" : {
-          "stringUnit" : {
-            "state" : "needs_review",
-            "value" : "Estää syvimpiä varjoja vaalenemasta harmaiksi."
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Empêche les ombres les plus profondes de virer au gris."
-          }
-        },
-        "it" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Evita che le ombre più profonde diventino grigie."
-          }
-        },
-        "sv" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Hindrar de djupaste skuggorna från att lyftas till grått."
-          }
-        }
-      }
-    },
-    "Lets a little light reach round a silhouette edge." : {
-      "localizations" : {
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Lässt ein wenig Licht um eine Silhouettenkante herumreichen."
-          }
-        },
-        "es" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Deja que un poco de luz rodee el borde de una silueta."
-          }
-        },
-        "fi" : {
-          "stringUnit" : {
-            "state" : "needs_review",
-            "value" : "Antaa hieman valoa kiertää siluetin reunan ympäri."
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Laisse un peu de lumière contourner le bord d’une silhouette."
-          }
-        },
-        "it" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Lascia che un po’ di luce avvolga il bordo di una silhouette."
-          }
-        },
-        "sv" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Låter lite ljus nå runt en silhuettkant."
-          }
-        }
-      }
-    },
-    "LIGHT" : {
-      "localizations" : {
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "LICHT"
-          }
-        },
-        "es" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "LUZ"
-          }
-        },
-        "fi" : {
-          "stringUnit" : {
-            "state" : "needs_review",
-            "value" : "VALO"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "LUMIÈRE"
-          }
-        },
-        "it" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "LUCE"
-          }
-        },
-        "sv" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "LJUS"
-          }
-        }
-      }
-    },
-    "Light Temperature" : {
-      "localizations" : {
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Lichttemperatur"
-          }
-        },
-        "es" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Temperatura de la luz"
-          }
-        },
-        "fi" : {
-          "stringUnit" : {
-            "state" : "needs_review",
-            "value" : "Valon värilämpötila"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Température de la lumière"
-          }
-        },
-        "it" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Temperatura della luce"
-          }
-        },
-        "sv" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Ljustemperatur"
-          }
-        }
-      }
-    },
-    "Light Wrap" : {
-      "localizations" : {
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Light Wrap"
-          }
-        },
-        "es" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Envoltura de luz"
-          }
-        },
-        "fi" : {
-          "stringUnit" : {
-            "state" : "needs_review",
-            "value" : "Valon kierto"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Enveloppement"
-          }
-        },
-        "it" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Avvolgimento luce"
-          }
-        },
-        "sv" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Ljusomslutning"
-          }
-        }
-      }
-    },
-    "PLACEMENT" : {
-      "localizations" : {
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "POSITION"
-          }
-        },
-        "es" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "POSICIÓN"
-          }
-        },
-        "fi" : {
-          "stringUnit" : {
-            "state" : "needs_review",
-            "value" : "SIJOITTELU"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "PLACEMENT"
-          }
-        },
-        "it" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "POSIZIONE"
-          }
-        },
-        "sv" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "PLACERING"
-          }
-        }
-      }
-    },
-    "Preserve Highlights" : {
-      "localizations" : {
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Lichter bewahren"
-          }
-        },
-        "es" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Conservar altas luces"
-          }
-        },
-        "fi" : {
-          "stringUnit" : {
-            "state" : "needs_review",
-            "value" : "Säilytä huippuvalot"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Préserver les hautes lumières"
-          }
-        },
-        "it" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Preserva alte luci"
-          }
-        },
-        "sv" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Bevara högdagrar"
-          }
-        }
-      }
-    },
-    "Project Not Saved" : {
-      "localizations" : {
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Projekt nicht gesichert"
-          }
-        },
-        "es" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Proyecto no guardado"
-          }
-        },
-        "fi" : {
-          "stringUnit" : {
-            "state" : "needs_review",
-            "value" : "Projektia ei tallennettu"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Projet non enregistré"
-          }
-        },
-        "it" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Progetto non salvato"
-          }
-        },
-        "sv" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Projektet sparades inte"
-          }
-        }
-      }
-    },
-    "Protect Blacks" : {
-      "localizations" : {
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Schwarz schützen"
-          }
-        },
-        "es" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Proteger negros"
-          }
-        },
-        "fi" : {
-          "stringUnit" : {
-            "state" : "needs_review",
-            "value" : "Suojaa mustat"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Protéger les noirs"
-          }
-        },
-        "it" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Proteggi neri"
-          }
-        },
-        "sv" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Skydda svärta"
-          }
-        }
-      }
-    },
-    "Reach" : {
-      "localizations" : {
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Reichweite"
-          }
-        },
-        "es" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Alcance"
-          }
-        },
-        "fi" : {
-          "stringUnit" : {
-            "state" : "needs_review",
-            "value" : "Kantama"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Portée"
-          }
-        },
-        "it" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Portata"
-          }
-        },
-        "sv" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Räckvidd"
-          }
-        }
-      }
-    },
-    "Rolls added light off smoothly before it reaches white." : {
-      "localizations" : {
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Lässt hinzugefügtes Licht sanft auslaufen, bevor es Weiß erreicht."
-          }
-        },
-        "es" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Suaviza la luz añadida antes de que llegue al blanco."
-          }
-        },
-        "fi" : {
-          "stringUnit" : {
-            "state" : "needs_review",
-            "value" : "Pehmentää lisätyn valon ennen kuin se saavuttaa valkoisen."
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Atténue en douceur la lumière ajoutée avant qu’elle n’atteigne le blanc."
-          }
-        },
-        "it" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Attenua dolcemente la luce aggiunta prima che raggiunga il bianco."
-          }
-        },
-        "sv" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Rundar mjukt av tillagt ljus innan det når vitt."
-          }
-        }
-      }
-    },
-    "Roughness" : {
-      "localizations" : {
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Rauheit"
-          }
-        },
-        "es" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Rugosidad"
-          }
-        },
-        "fi" : {
-          "stringUnit" : {
-            "state" : "needs_review",
-            "value" : "Karheus"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Rugosité"
-          }
-        },
-        "it" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Ruvidità"
-          }
-        },
-        "sv" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Grovhet"
-          }
-        }
-      }
-    },
-    "Shading" : {
-      "localizations" : {
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Schattierung"
-          }
-        },
-        "es" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Sombreado"
-          }
-        },
-        "fi" : {
-          "stringUnit" : {
-            "state" : "needs_review",
-            "value" : "Varjostus"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Ombrage"
-          }
-        },
-        "it" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Ombreggiatura"
-          }
-        },
-        "sv" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Skuggning"
-          }
-        }
-      }
-    },
-    "SHADOWS" : {
-      "localizations" : {
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "SCHATTEN"
-          }
-        },
-        "es" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "SOMBRAS"
-          }
-        },
-        "fi" : {
-          "stringUnit" : {
-            "state" : "needs_review",
-            "value" : "VARJOT"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "OMBRES"
-          }
-        },
-        "it" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "OMBRE"
-          }
-        },
-        "sv" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "SKUGGOR"
-          }
-        }
-      }
-    },
-    "Softness" : {
-      "localizations" : {
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Weichheit"
-          }
-        },
-        "es" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Suavidad"
-          }
-        },
-        "fi" : {
-          "stringUnit" : {
-            "state" : "needs_review",
-            "value" : "Pehmeys"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Douceur"
-          }
-        },
-        "it" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Morbidezza"
-          }
-        },
-        "sv" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Mjukhet"
-          }
-        }
-      }
-    },
-    "Source Unavailable" : {
-      "localizations" : {
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Quelle nicht verfügbar"
-          }
-        },
-        "es" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Fuente no disponible"
-          }
-        },
-        "fi" : {
-          "stringUnit" : {
-            "state" : "needs_review",
-            "value" : "Lähde ei ole saatavilla"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Source indisponible"
-          }
-        },
-        "it" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Sorgente non disponibile"
-          }
-        },
-        "sv" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Källan är inte tillgänglig"
-          }
-        }
-      }
-    },
-    "Specular" : {
-      "localizations" : {
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Glanzlicht"
-          }
-        },
-        "es" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Especular"
-          }
-        },
-        "fi" : {
-          "stringUnit" : {
-            "state" : "needs_review",
-            "value" : "Kiilto"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Spéculaire"
-          }
-        },
-        "it" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Speculare"
-          }
-        },
-        "sv" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Glans"
-          }
-        }
-      }
-    },
-    "This image is outside GradeLab’s validated colour pipeline." : {
-      "localizations" : {
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Dieses Bild liegt außerhalb der validierten Farb-Pipeline von GradeLab."
-          }
-        },
-        "es" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Esta imagen está fuera del flujo de color validado de GradeLab."
-          }
-        },
-        "fi" : {
-          "stringUnit" : {
-            "state" : "needs_review",
-            "value" : "Tämä kuva on GradeLabin vahvistetun väriputken ulkopuolella."
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Cette image se situe hors du pipeline couleur validé de GradeLab."
-          }
-        },
-        "it" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Questa immagine è al di fuori della pipeline colore convalidata di GradeLab."
-          }
-        },
-        "sv" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Bilden ligger utanför GradeLabs validerade färgflöde."
-          }
-        }
-      }
-    },
-    "This source is outside GradeLab’s validated color pipeline." : {
-      "localizations" : {
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Diese Quelle liegt außerhalb der validierten Farb-Pipeline von GradeLab."
-          }
-        },
-        "es" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Esta fuente está fuera del flujo de color validado de GradeLab."
-          }
-        },
-        "fi" : {
-          "stringUnit" : {
-            "state" : "needs_review",
-            "value" : "Tämä lähde on GradeLabin vahvistetun väriputken ulkopuolella."
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Cette source se situe hors du pipeline couleur validé de GradeLab."
-          }
-        },
-        "it" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Questa sorgente è al di fuori della pipeline colore convalidata di GradeLab."
-          }
-        },
-        "sv" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Källan ligger utanför GradeLabs validerade färgflöde."
-          }
-        }
-      }
-    },
     "·" : {
       "shouldTranslate" : false
     },
@@ -3681,6 +2281,9 @@
         }
       }
     },
+    "%@s" : {
+
+    },
     "%lld" : {
       "shouldTranslate" : false
     },
@@ -4717,6 +3320,9 @@
           }
         }
       }
+    },
+    "%lld transitions will be removed because the new footage has no extra frames at those cuts." : {
+
     },
     "%lld-bit" : {
       "localizations" : {
@@ -6256,6 +4862,46 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "En professionell finish"
+          }
+        }
+      }
+    },
+    "A restrained sheen on surfaces facing both the light and the camera." : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ein dezenter Glanz auf Flächen, die sowohl dem Licht als auch der Kamera zugewandt sind."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Un brillo discreto en las superficies orientadas tanto a la luz como a la cámara."
+          }
+        },
+        "fi" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "Hillitty kiilto pinnoilla, jotka ovat sekä valoon että kameraan päin."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Un léger reflet sur les surfaces tournées à la fois vers la lumière et vers la caméra."
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Una lucentezza discreta sulle superfici rivolte sia verso la luce sia verso la fotocamera."
+          }
+        },
+        "sv" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "En diskret glans på ytor som vetter mot både ljuset och kameran."
           }
         }
       }
@@ -16893,6 +15539,9 @@
         }
       }
     },
+    "Choose a replacement" : {
+
+    },
     "Choose a shape to apply the mask immediately" : {
       "localizations" : {
         "de" : {
@@ -16932,6 +15581,9 @@
           }
         }
       }
+    },
+    "Choose a starting point inside the replacement video." : {
+
     },
     "Choose a supported still image." : {
       "localizations" : {
@@ -17014,6 +15666,9 @@
           }
         }
       }
+    },
+    "Choose a video or image to replace this clip." : {
+
     },
     "Choose an effect at the playhead" : {
       "localizations" : {
@@ -17340,6 +15995,9 @@
           }
         }
       }
+    },
+    "Choose the starting frame" : {
+
     },
     "Choose videos from Finder" : {
       "comment" : "A hint for choosing videos from the Finder.",
@@ -19697,6 +18355,46 @@
         }
       }
     },
+    "Cone" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Kegel"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Cono"
+          }
+        },
+        "fi" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "Keila"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Cône"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Cono"
+          }
+        },
+        "sv" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Kon"
+          }
+        }
+      }
+    },
     "Cone angle" : {
       "localizations" : {
         "de" : {
@@ -19738,6 +18436,46 @@
       }
     },
     "Cone feather" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Weiche Kegelkante"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Desvanecido del cono"
+          }
+        },
+        "fi" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "Keilan pehmennys"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Adoucissement du cône"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Sfumatura del cono"
+          }
+        },
+        "sv" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Mjuk konkant"
+          }
+        }
+      }
+    },
+    "Cone Feather" : {
       "localizations" : {
         "de" : {
           "stringUnit" : {
@@ -20657,6 +19395,246 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Det gick inte att skapa videolagret."
+          }
+        }
+      }
+    },
+    "Couldn’t Delete Project" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Projekt konnte nicht gelöscht werden"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "No se pudo eliminar el proyecto"
+          }
+        },
+        "fi" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "Projektia ei voitu poistaa"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Impossible de supprimer le projet"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Impossibile eliminare il progetto"
+          }
+        },
+        "sv" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Det gick inte att radera projektet"
+          }
+        }
+      }
+    },
+    "Couldn’t Import Image" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Bild konnte nicht importiert werden"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "No se pudo importar la imagen"
+          }
+        },
+        "fi" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "Kuvaa ei voitu tuoda"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Impossible d’importer l’image"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Impossibile importare l’immagine"
+          }
+        },
+        "sv" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Det gick inte att importera bilden"
+          }
+        }
+      }
+    },
+    "Couldn’t Import Video" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Video konnte nicht importiert werden"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "No se pudo importar el vídeo"
+          }
+        },
+        "fi" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "Videota ei voitu tuoda"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Impossible d’importer la vidéo"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Impossibile importare il video"
+          }
+        },
+        "sv" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Det gick inte att importera videon"
+          }
+        }
+      }
+    },
+    "Couldn’t Load Photo Projects" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Fotoprojekte konnten nicht geladen werden"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "No se pudieron cargar los proyectos de foto"
+          }
+        },
+        "fi" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "Kuvaprojekteja ei voitu ladata"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Impossible de charger les projets photo"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Impossibile caricare i progetti foto"
+          }
+        },
+        "sv" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Det gick inte att läsa in fotoprojekten"
+          }
+        }
+      }
+    },
+    "Couldn’t Load Projects" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Projekte konnten nicht geladen werden"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "No se pudieron cargar los proyectos"
+          }
+        },
+        "fi" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "Projekteja ei voitu ladata"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Impossible de charger les projets"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Impossibile caricare i progetti"
+          }
+        },
+        "sv" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Det gick inte att läsa in projekten"
+          }
+        }
+      }
+    },
+    "Couldn’t Open Editor" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Editor konnte nicht geöffnet werden"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "No se pudo abrir el editor"
+          }
+        },
+        "fi" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "Editoria ei voitu avata"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Impossible d’ouvrir l’éditeur"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Impossibile aprire l’editor"
+          }
+        },
+        "sv" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Det gick inte att öppna redigeraren"
           }
         }
       }
@@ -22941,6 +21919,46 @@
         }
       }
     },
+    "DIRECTION" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "RICHTUNG"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "DIRECCIÓN"
+          }
+        },
+        "fi" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "SUUNTA"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "DIRECTION"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "DIREZIONE"
+          }
+        },
+        "sv" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "RIKTNING"
+          }
+        }
+      }
+    },
     "Directional" : {
       "localizations" : {
         "de" : {
@@ -23177,6 +22195,46 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Övertoning"
+          }
+        }
+      }
+    },
+    "Distance" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Abstand"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Distancia"
+          }
+        },
+        "fi" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "Etäisyys"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Distance"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Distanza"
+          }
+        },
+        "sv" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Avstånd"
           }
         }
       }
@@ -25720,6 +24778,46 @@
         }
       }
     },
+    "Elevation" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Höhe"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Elevación"
+          }
+        },
+        "fi" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "Korkeus"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Élévation"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Elevazione"
+          }
+        },
+        "sv" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Höjd"
+          }
+        }
+      }
+    },
     "Elevation 90° is light from the camera, 0° is pure side light, and below zero it comes from behind the subject." : {
       "localizations" : {
         "de" : {
@@ -27484,6 +26582,46 @@
         }
       }
     },
+    "Falloff" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Abfall"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Atenuación"
+          }
+        },
+        "fi" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "Vaimeneminen"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Atténuation"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Attenuazione"
+          }
+        },
+        "sv" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Avtoning"
+          }
+        }
+      }
+    },
     "False Colour" : {
       "comment" : "Title of the \"False Colour\" viewer assist.",
       "isCommentAutoGenerated" : true,
@@ -27931,6 +27069,9 @@
           }
         }
       }
+    },
+    "Fill the existing slot. Other clips stay in place." : {
+
     },
     "Fills the canvas wherever no clip covers it, and is part of the export. The outline on the preview shows where the canvas ends." : {
       "comment" : "A description of the background colour picker.",
@@ -28497,6 +27638,15 @@
           }
         }
       }
+    },
+    "Following clips move earlier by %@." : {
+
+    },
+    "Following clips move later by %@." : {
+
+    },
+    "Following clips on this track move with their embedded audio. On the main track, later text and overlays move too. Separate audio stays in place." : {
+
     },
     "Font" : {
       "comment" : "The text for a tab in the text tool panel.",
@@ -29755,6 +28905,9 @@
           }
         }
       }
+    },
+    "From Files" : {
+
     },
     "Full" : {
       "comment" : "Short preview-quality badge",
@@ -33177,6 +32330,46 @@
         }
       }
     },
+    "How broad that sheen is. Higher is a matte surface." : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Wie breit dieser Glanz ist. Höher bedeutet eine matte Oberfläche."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Lo amplio que es ese brillo. Más alto es una superficie mate."
+          }
+        },
+        "fi" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "Kuinka laaja kiilto on. Suurempi arvo tarkoittaa mattapintaa."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Étendue de ce reflet. Plus la valeur est élevée, plus la surface est mate."
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Quanto è ampia quella lucentezza. Più alto significa una superficie opaca."
+          }
+        },
+        "sv" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Hur bred glansen är. Högre ger en matt yta."
+          }
+        }
+      }
+    },
     "How far the filter reaches. Small for fine grain; large for the blotchy noise of a lifted shadow." : {
       "localizations" : {
         "de" : {
@@ -33741,6 +32934,9 @@
         }
       }
     },
+    "Image from Photos" : {
+
+    },
     "Image information" : {
       "localizations" : {
         "de" : {
@@ -33939,6 +33135,46 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Förhandsvisning av bild"
+          }
+        }
+      }
+    },
+    "Image Unavailable" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Bild nicht verfügbar"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Imagen no disponible"
+          }
+        },
+        "fi" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "Kuva ei ole saatavilla"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Image indisponible"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Immagine non disponibile"
+          }
+        },
+        "sv" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Bilden är inte tillgänglig"
           }
         }
       }
@@ -34906,6 +34142,46 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Granskar skapad metadata …"
+          }
+        }
+      }
+    },
+    "Intensity" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Intensität"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Intensidad"
+          }
+        },
+        "fi" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "Voimakkuus"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Intensité"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Intensità"
+          }
+        },
+        "sv" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Intensitet"
           }
         }
       }
@@ -36034,6 +35310,9 @@
         }
       }
     },
+    "Keep %@" : {
+
+    },
     "Keep at least one frame in the clip." : {
       "localizations" : {
         "de" : {
@@ -36310,6 +35589,46 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Behålla den här gradingen och lägga till den kopierade, eller ersätta den?"
+          }
+        }
+      }
+    },
+    "Keeps the deepest shadows from being lifted into grey." : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Verhindert, dass die tiefsten Schatten ins Graue angehoben werden."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Evita que las sombras más profundas se vuelvan grises."
+          }
+        },
+        "fi" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "Estää syvimpiä varjoja vaalenemasta harmaiksi."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Empêche les ombres les plus profondes de virer au gris."
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Evita che le ombre più profonde diventino grigie."
+          }
+        },
+        "sv" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Hindrar de djupaste skuggorna från att lyftas till grått."
           }
         }
       }
@@ -37202,6 +36521,46 @@
         }
       }
     },
+    "Lets a little light reach round a silhouette edge." : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Lässt ein wenig Licht um eine Silhouettenkante herumreichen."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Deja que un poco de luz rodee el borde de una silueta."
+          }
+        },
+        "fi" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "Antaa hieman valoa kiertää siluetin reunan ympäri."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Laisse un peu de lumière contourner le bord d’une silhouette."
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Lascia che un po’ di luce avvolga il bordo di una silhouette."
+          }
+        },
+        "sv" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Låter lite ljus nå runt en silhuettkant."
+          }
+        }
+      }
+    },
     "Lifetime Pro" : {
       "localizations" : {
         "de" : {
@@ -37398,6 +36757,46 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Ljus"
+          }
+        }
+      }
+    },
+    "LIGHT" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "LICHT"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "LUZ"
+          }
+        },
+        "fi" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "VALO"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "LUMIÈRE"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "LUCE"
+          }
+        },
+        "sv" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "LJUS"
           }
         }
       }
@@ -38042,6 +37441,46 @@
         }
       }
     },
+    "Light Temperature" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Lichttemperatur"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Temperatura de la luz"
+          }
+        },
+        "fi" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "Valon värilämpötila"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Température de la lumière"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Temperatura della luce"
+          }
+        },
+        "sv" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ljustemperatur"
+          }
+        }
+      }
+    },
     "Light tint" : {
       "localizations" : {
         "de" : {
@@ -38078,6 +37517,46 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Ljusnyans"
+          }
+        }
+      }
+    },
+    "Light Wrap" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Light Wrap"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Envoltura de luz"
+          }
+        },
+        "fi" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "Valon kierto"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Enveloppement"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Avvolgimento luce"
+          }
+        },
+        "sv" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ljusomslutning"
           }
         }
       }
@@ -45190,6 +44669,9 @@
         }
       }
     },
+    "One transition will be removed because the new footage has no extra frames at that cut." : {
+
+    },
     "one-time payment" : {
       "localizations" : {
         "de" : {
@@ -46485,6 +45967,9 @@
           }
         }
       }
+    },
+    "Other clips stay in place." : {
+
     },
     "Out" : {
       "comment" : "Title for the \"Out\" slot of a text animation.",
@@ -48024,6 +47509,9 @@
         }
       }
     },
+    "Pick from your media or import a new video or image." : {
+
+    },
     "Pick Key Color" : {
       "comment" : "A button label that allows the user to pick a color to use as a key for background removal.",
       "isCommentAutoGenerated" : true,
@@ -48346,6 +47834,46 @@
         }
       }
     },
+    "PLACEMENT" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "POSITION"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "POSICIÓN"
+          }
+        },
+        "fi" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "SIJOITTELU"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "PLACEMENT"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "POSIZIONE"
+          }
+        },
+        "sv" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "PLACERING"
+          }
+        }
+      }
+    },
     "Plan unavailable" : {
       "localizations" : {
         "de" : {
@@ -48549,6 +48077,9 @@
           }
         }
       }
+    },
+    "Play the video, then hold its last frame. Other clips stay in place." : {
+
     },
     "Playback" : {
       "localizations" : {
@@ -49639,6 +49170,9 @@
         }
       }
     },
+    "Preparing replacement…" : {
+
+    },
     "Preparing scene analysis" : {
       "localizations" : {
         "de" : {
@@ -49715,6 +49249,46 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Förbereder källbildrutor"
+          }
+        }
+      }
+    },
+    "Preserve Highlights" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Lichter bewahren"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Conservar altas luces"
+          }
+        },
+        "fi" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "Säilytä huippuvalot"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Préserver les hautes lumières"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Preserva alte luci"
+          }
+        },
+        "sv" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Bevara högdagrar"
           }
         }
       }
@@ -50817,6 +50391,46 @@
         }
       }
     },
+    "Project Not Saved" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Projekt nicht gesichert"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Proyecto no guardado"
+          }
+        },
+        "fi" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "Projektia ei tallennettu"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Projet non enregistré"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Progetto non salvato"
+          }
+        },
+        "sv" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Projektet sparades inte"
+          }
+        }
+      }
+    },
     "Projects couldn’t be loaded" : {
       "localizations" : {
         "de" : {
@@ -50853,6 +50467,46 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Projekten kunde inte läsas in"
+          }
+        }
+      }
+    },
+    "Protect Blacks" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Schwarz schützen"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Proteger negros"
+          }
+        },
+        "fi" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "Suojaa mustat"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Protéger les noirs"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Proteggi neri"
+          }
+        },
+        "sv" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Skydda svärta"
           }
         }
       }
@@ -51543,6 +51197,46 @@
         }
       }
     },
+    "Reach" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Reichweite"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Alcance"
+          }
+        },
+        "fi" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "Kantama"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Portée"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Portata"
+          }
+        },
+        "sv" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Räckvidd"
+          }
+        }
+      }
+    },
     "Read the picture, don't guess." : {
       "localizations" : {
         "de" : {
@@ -51942,6 +51636,9 @@
           }
         }
       }
+    },
+    "Redo the cutout on the new footage. The previous cutout is cleared." : {
+
     },
     "Redraw" : {
       "comment" : "A button label that says \"Redraw\".",
@@ -53885,6 +53582,9 @@
         }
       }
     },
+    "Replace clip" : {
+
+    },
     "Replace existing mask motion in this range?" : {
       "localizations" : {
         "de" : {
@@ -53925,6 +53625,9 @@
         }
       }
     },
+    "Replace selected clip" : {
+
+    },
     "Replace Tracking Range" : {
       "localizations" : {
         "de" : {
@@ -53964,6 +53667,9 @@
           }
         }
       }
+    },
+    "Replacement starting frame" : {
+
     },
     "Replaces the last match. Anything you changed by hand since is replaced too." : {
       "localizations" : {
@@ -56030,6 +55736,46 @@
         }
       }
     },
+    "Rolls added light off smoothly before it reaches white." : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Lässt hinzugefügtes Licht sanft auslaufen, bevor es Weiß erreicht."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Suaviza la luz añadida antes de que llegue al blanco."
+          }
+        },
+        "fi" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "Pehmentää lisätyn valon ennen kuin se saavuttaa valkoisen."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Atténue en douceur la lumière ajoutée avant qu’elle n’atteigne le blanc."
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Attenua dolcemente la luce aggiunta prima che raggiunga il bianco."
+          }
+        },
+        "sv" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Rundar mjukt av tillagt ljus innan det når vitt."
+          }
+        }
+      }
+    },
     "Rotate" : {
       "comment" : "Short, so the tiles read at a glance.",
       "isCommentAutoGenerated" : true,
@@ -56228,6 +55974,46 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Rotation"
+          }
+        }
+      }
+    },
+    "Roughness" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Rauheit"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Rugosidad"
+          }
+        },
+        "fi" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "Karheus"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Rugosité"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ruvidità"
+          }
+        },
+        "sv" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Grovhet"
           }
         }
       }
@@ -58412,6 +58198,9 @@
         }
       }
     },
+    "Selected clip" : {
+
+    },
     "Selected layers. Drag to move them together." : {
       "localizations" : {
         "de" : {
@@ -58894,6 +58683,46 @@
         }
       }
     },
+    "Shading" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Schattierung"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Sombreado"
+          }
+        },
+        "fi" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "Varjostus"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ombrage"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ombreggiatura"
+          }
+        },
+        "sv" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Skuggning"
+          }
+        }
+      }
+    },
     "Shadow" : {
       "localizations" : {
         "de" : {
@@ -59290,6 +59119,46 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Skuggor"
+          }
+        }
+      }
+    },
+    "SHADOWS" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "SCHATTEN"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "SOMBRAS"
+          }
+        },
+        "fi" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "VARJOT"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "OMBRES"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "OMBRE"
+          }
+        },
+        "sv" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "SKUGGOR"
           }
         }
       }
@@ -61152,6 +61021,46 @@
         }
       }
     },
+    "Softness" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Weichheit"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Suavidad"
+          }
+        },
+        "fi" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "Pehmeys"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Douceur"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Morbidezza"
+          }
+        },
+        "sv" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Mjukhet"
+          }
+        }
+      }
+    },
     "Sony's Cine+709 conversion for S-Log2: more contrast and a film-style curve." : {
       "comment" : "Summary of the \"S-Log2 to Cine 709\" LUTAsset.",
       "isCommentAutoGenerated" : true,
@@ -61722,6 +61631,49 @@
         }
       }
     },
+    "Source preview" : {
+
+    },
+    "Source Unavailable" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Quelle nicht verfügbar"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Fuente no disponible"
+          }
+        },
+        "fi" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "Lähde ei ole saatavilla"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Source indisponible"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Sorgente non disponibile"
+          }
+        },
+        "sv" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Källan är inte tillgänglig"
+          }
+        }
+      }
+    },
     "Space" : {
       "localizations" : {
         "de" : {
@@ -61880,6 +61832,46 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Spatial under uppspelning"
+          }
+        }
+      }
+    },
+    "Specular" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Glanzlicht"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Especular"
+          }
+        },
+        "fi" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "Kiilto"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Spéculaire"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Speculare"
+          }
+        },
+        "sv" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Glans"
           }
         }
       }
@@ -68336,6 +68328,46 @@
         }
       }
     },
+    "The source image is no longer available." : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Das Quellbild ist nicht mehr verfügbar."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "La imagen de origen ya no está disponible."
+          }
+        },
+        "fi" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "Lähdekuvaa ei enää ole saatavilla."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "L’image source n’est plus disponible."
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "L’immagine sorgente non è più disponibile."
+          }
+        },
+        "sv" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Källbilden är inte längre tillgänglig."
+          }
+        }
+      }
+    },
     "The source uses %@ %@. Only 8-bit Rec.709 SDR export is supported right now." : {
       "localizations" : {
         "de" : {
@@ -68532,46 +68564,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Källvideon anger inga giltiga kodade mått."
-          }
-        }
-      }
-    },
-    "The source image is no longer available." : {
-      "localizations" : {
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Das Quellbild ist nicht mehr verfügbar."
-          }
-        },
-        "es" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "La imagen de origen ya no está disponible."
-          }
-        },
-        "fi" : {
-          "stringUnit" : {
-            "state" : "needs_review",
-            "value" : "Lähdekuvaa ei enää ole saatavilla."
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "L’image source n’est plus disponible."
-          }
-        },
-        "it" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "L’immagine sorgente non è più disponibile."
-          }
-        },
-        "sv" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Källbilden är inte längre tillgänglig."
           }
         }
       }
@@ -71381,6 +71373,46 @@
         }
       }
     },
+    "This image is outside GradeLab’s validated colour pipeline." : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Dieses Bild liegt außerhalb der validierten Farb-Pipeline von GradeLab."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Esta imagen está fuera del flujo de color validado de GradeLab."
+          }
+        },
+        "fi" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "Tämä kuva on GradeLabin vahvistetun väriputken ulkopuolella."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Cette image se situe hors du pipeline couleur validé de GradeLab."
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Questa immagine è al di fuori della pipeline colore convalidata di GradeLab."
+          }
+        },
+        "sv" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Bilden ligger utanför GradeLabs validerade färgflöde."
+          }
+        }
+      }
+    },
     "This image is too large to process on this device." : {
       "localizations" : {
         "de" : {
@@ -71869,6 +71901,9 @@
         }
       }
     },
+    "This media has changed. Choose it again." : {
+
+    },
     "This name appears in the timeline and in this list. Leaving it empty restores the default." : {
       "localizations" : {
         "de" : {
@@ -72231,6 +72266,9 @@
         }
       }
     },
+    "This replacement has no audio." : {
+
+    },
     "This source declares itself as %@, not %@, so it is not processed through the %@ transform." : {
       "localizations" : {
         "de" : {
@@ -72391,6 +72429,46 @@
         }
       }
     },
+    "This source is outside GradeLab’s validated color pipeline." : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Diese Quelle liegt außerhalb der validierten Farb-Pipeline von GradeLab."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Esta fuente está fuera del flujo de color validado de GradeLab."
+          }
+        },
+        "fi" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "Tämä lähde on GradeLabin vahvistetun väriputken ulkopuolella."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Cette source se situe hors du pipeline couleur validé de GradeLab."
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Questa sorgente è al di fuori della pipeline colore convalidata di GradeLab."
+          }
+        },
+        "sv" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Källan ligger utanför GradeLabs validerade färgflöde."
+          }
+        }
+      }
+    },
     "This source reports %lld-bit precision, so it does not need the wide path." : {
       "localizations" : {
         "de" : {
@@ -72430,6 +72508,9 @@
           }
         }
       }
+    },
+    "This speed curve cannot fit the shorter source. Use the full clip instead." : {
+
     },
     "This timeline is %@, but this clip is %@. A timeline cannot mix the two Log formats." : {
       "localizations" : {
@@ -73158,6 +73239,12 @@
           }
         }
       }
+    },
+    "Timing unchanged" : {
+
+    },
+    "Timing updated" : {
+
     },
     "Tint" : {
       "localizations" : {
@@ -75997,6 +76084,9 @@
         }
       }
     },
+    "Unlock following clips and tracks before changing the replacement's duration." : {
+
+    },
     "Unlock GradeLab Pro" : {
       "localizations" : {
         "de" : {
@@ -77165,6 +77255,12 @@
         }
       }
     },
+    "Use full clip" : {
+
+    },
+    "Use full clip · %@" : {
+
+    },
     "Use grading mask" : {
       "localizations" : {
         "de" : {
@@ -77243,6 +77339,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Använd lagret ovanför · %@"
+          }
+        }
+      }
+    },
+    "Use replacement audio" : {
+
+    },
+    "Use the whole video at the clip's current speed." : {
+
+    },
+    "Uses %@–%@ of the source." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Uses %1$@–%2$@ of the source."
           }
         }
       }
@@ -77772,6 +77884,9 @@
           }
         }
       }
+    },
+    "Video from Photos" : {
+
     },
     "Video overlay" : {
       "comment" : "A button that adds a video overlay to the timeline.",
@@ -78336,6 +78451,9 @@
           }
         }
       }
+    },
+    "Wait for the current import to finish." : {
+
     },
     "Warm" : {
       "localizations" : {
@@ -80259,6 +80377,9 @@
         }
       }
     },
+    "Your grade, transforms and keyframes carry over." : {
+
+    },
     "Your imported clips, photographs and non-destructive grades will appear here." : {
       "localizations" : {
         "de" : {
@@ -80298,6 +80419,9 @@
           }
         }
       }
+    },
+    "Your media" : {
+
     },
     "Zebra threshold" : {
       "comment" : "A label describing the slider that adjusts the threshold for zebra mode.",
