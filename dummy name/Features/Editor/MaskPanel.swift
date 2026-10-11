@@ -356,6 +356,10 @@ private struct MaskInspector: View {
             title: title,
             range: Float(range.lowerBound * scale)...Float(range.upperBound * scale),
             step: 1,
+            spectrum: keyPath == \.hueCenter ? .hue
+                : (keyPath == \.saturationMin || keyPath == \.saturationMax)
+                    ? .saturation(hue: (mask.qualifier ?? .skin).hueCenter)
+                : (keyPath == \.lumaMin || keyPath == \.lumaMax) ? .luminance : nil,
             valueFormatter: { "\(Int($0))\(suffix)" }
         )
     }

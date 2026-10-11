@@ -60,8 +60,15 @@ struct TimelineSourceMapping {
     func fraction(atOffset offset: Double, pixelsPerSecond: Double) -> Double {
         let elapsed = offset / max(0.0001, pixelsPerSecond)
         let sourceTime: Double
-        if let map, let local = try? TimelineTime.seconds(max(0, elapsed + trimOffset)) {
-            sourceTime = clipSourceStart + map.sourceOffset(atTimelineOffset: local).seconds
+        if let map, let local = try? TimelineTime.seconds(elapsed + trimOffset) {
+            if local < .zero {
+                let first = map.sourceOffset(atTimelineOffset: .zero).seconds
+                let last = map.sourceOffset(atTimelineOffset: map.timelineDuration).seconds
+                let direction = first > last ? -1.0 : 1.0
+                sourceTime = clipSourceStart + first + local.seconds * map.speed(atTimelineOffset: .zero) * direction
+            } else {
+                sourceTime = clipSourceStart + map.sourceOffset(atTimelineOffset: local).seconds
+            }
         } else {
             sourceTime = sourceStart + elapsed * speed
         }

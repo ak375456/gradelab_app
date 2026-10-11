@@ -2506,7 +2506,9 @@ final class EditorViewModel: ObservableObject, GradingModel {
                 let edge = operation == .trimEnd
                     ? ((try? item.placement.range.end.seconds) ?? 0)
                     : item.placement.timelineStart.seconds
-                let target = try TimelineTime.seconds(max(0, edge + delta))
+                // A negative virtual head edge restores earlier source on the
+                // magnetic main row; the trim keeps its stored start at zero.
+                let target = try TimelineTime.seconds(edge + delta)
                 if project.timeline.audioClip(id: id) != nil {
                     try AudioEditing.edit(id, operation: operation, to: target, clamping: true, in: &project)
                 } else if item.isDrawnOverlay {

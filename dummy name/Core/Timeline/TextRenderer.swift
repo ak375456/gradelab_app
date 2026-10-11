@@ -4,8 +4,19 @@ import CoreImage
 import CoreText
 
 /// Shared, screen-independent CoreText renderer. All dimensions are canvas units.
-/// Glyph paths preserve shaping, ligatures and real font traits, including on arcs.
+/// Glyph paths and native colour glyphs preserve shaping and real font traits,
+/// including emoji sequences, per-character animation and curved text.
 enum TextRenderer {
+    /// Bitmap/colour fonts have no outline. Keep the shaped glyph and fallback
+    /// font so CoreText can draw its original colours at the same position.
+    struct ColorGlyph {
+        let font: CTFont
+        let glyph: CGGlyph
+        let transform: CGAffineTransform
+        let bounds: CGRect
+        let cluster: Int
+        var center: CGPoint { CGPoint(x: bounds.midX, y: bounds.midY) }
+    }
     /// One drawn piece of the title, already positioned in layout space.
     ///
     /// Kept so a per-glyph animation can move, scale and fade pieces of the
@@ -34,6 +45,7 @@ enum TextRenderer {
         let fittedBounds: CGRect
         /// Empty unless something asked for per-glyph animation.
         var elements: [Element] = []
+        var colorGlyphs: [ColorGlyph] = []
     }
 
     /// The string CoreText is actually handed, after the case mode. Shared so
@@ -112,6 +124,7 @@ enum TextRenderer {
         let text = displayText(clip)
         let ordinals = collectingElements ? clusterOrdinals(text) : []
         var elements: [Element] = []
+        var colorGlyphs: [ColorGlyph] = []
         // Explicit per-line alignment avoids a huge artificial text rectangle.
         let attrs: [NSAttributedString.Key: Any] = [
             NSAttributedString.Key(kCTFontAttributeName as String): font,
@@ -156,7 +169,6 @@ enum TextRenderer {
                     CTRunGetStringIndices(run, CFRange(location: 0, length: 0), &stringIndices)
                 }
                 for i in 0..<count {
-                    guard let glyph = CTFontCreatePathForGlyph(runFont, glyphs[i], nil) else { continue }
                     let gx = positions[i].x
                     var transform: CGAffineTransform
                     if curvature != 0 {
@@ -166,10 +178,25 @@ enum TextRenderer {
                             .concatenating(.init(translationX: left+lineWidth/2+sin(angle)/curvature,
                                 y: baseline+positions[i].y+(1-cos(angle))/curvature))
                     } else { transform = .init(translationX: left+gx, y: baseline+positions[i].y) }
+                    let offset = stringIndices[i]
+                    let cluster = offset >= 0 && offset < ordinals.count ? ordinals[offset] : max(lineFirstCluster, 0)
+                    if collectingElements {
+                        lineLastCluster = max(lineLastCluster, cluster)
+                        if lineFirstCluster < 0 { lineFirstCluster = cluster }
+                    }
+                    let glyph = CTFontCreatePathForGlyph(runFont, glyphs[i], nil)
+                    if CTFontGetSymbolicTraits(runFont).contains(.traitColorGlyphs) || glyph == nil {
+                        var glyphID = glyphs[i]
+                        let box = CTFontGetBoundingRectsForGlyphs(runFont, .horizontal, &glyphID, nil, 1)
+                        // Spaces and line breaks have neither ink nor a bitmap.
+                        guard !box.isNull, !box.isEmpty else { continue }
+                        colorGlyphs.append(ColorGlyph(font: runFont, glyph: glyphID,
+                            transform: transform, bounds: box.applying(transform), cluster: cluster))
+                        continue
+                    }
+                    guard let glyph else { continue }
                     path.addPath(glyph, transform: transform)
                     if collectingElements, let placed = glyph.copy(using: &transform) {
-                        let offset = stringIndices[i]
-                        let cluster = offset >= 0 && offset < ordinals.count ? ordinals[offset] : max(lineFirstCluster, 0)
                         let box = placed.boundingBoxOfPath
                         // A space has no outline to measure, so it falls back to
                         // its pen position rather than an empty rect at the origin.
@@ -177,8 +204,6 @@ enum TextRenderer {
                             ? CGPoint(x: left+gx, y: baseline+positions[i].y)
                             : CGPoint(x: box.midX, y: box.midY)
                         elements.append(Element(path: placed, cluster: cluster, center: center))
-                        lineLastCluster = max(lineLastCluster, cluster)
-                        if lineFirstCluster < 0 { lineFirstCluster = cluster }
                     }
                 }
             }
@@ -205,7 +230,7 @@ enum TextRenderer {
             baseline -= CTFontGetAscent(font)+CTFontGetDescent(font)+CTFontGetLeading(font)+CGFloat(clip.style.lineSpacing)
             index += count
         }
-        let ink = path.boundingBoxOfPath
+        let ink = colorGlyphs.reduce(path.boundingBoxOfPath) { $0.union($1.bounds) }
         // Preserve the wrapping box for consistent multiline alignment.
         let bounds = CGRect(x: 0, y: ink.isNull ? -size*0.2 : ink.minY, width: width,
             height: max(size, ink.isNull ? size : ink.height))
@@ -219,7 +244,8 @@ enum TextRenderer {
             let minY = min(bottom, ink.minY), maxY = max(top, ink.maxY)
             fitted = CGRect(x: ink.minX, y: minY, width: ink.width, height: maxY-minY)
         }
-        return .init(path: path, bounds: bounds, ink: ink, fittedBounds: fitted, elements: elements)
+        return .init(path: path, bounds: bounds, ink: ink, fittedBounds: fitted,
+                     elements: elements, colorGlyphs: colorGlyphs)
     }
     static func placement(_ clip: TextClip, bounds: CGRect, canvas: CGSize) -> CGAffineTransform {
         clip.transform.placement(bounds: bounds, canvas: canvas)
@@ -252,7 +278,10 @@ enum TextRenderer {
            authoredCanvas.width > 0, authoredCanvas.height > 0,
            authoredCanvas != canvas {
             guard let authored = image(resolved, canvas: authoredCanvas) else { return nil }
-            return authored.transformed(by: .init(
+            // Materialize the authored extent in the image graph before
+            // scaling. Otherwise CoreImage can fold the two transforms and
+            // round fractional edges differently at preview and export sizes.
+            return authored.clampedToExtent().cropped(to: authored.extent).transformed(by: .init(
                 scaleX: canvas.width / authoredCanvas.width,
                 y: canvas.height / authoredCanvas.height
             ))
@@ -263,7 +292,7 @@ enum TextRenderer {
         // evict rasters that are still worth keeping. Everything else — every
         // whole-title move, scale, rotation and fade — stays fully cached,
         // because the key already ignores transform and opacity.
-        let states = effects.glyphStates
+        let states = effects.glyphStates.flatMap { $0.isEmpty ? nil : $0 }
         let cacheable = states == nil
         var key = clip; key.transform = .init(); key.opacity = 1
         key.placement = .init(id: clip.id, trackID: clip.placement.trackID, timelineStart: .zero, duration: .zero)
@@ -355,6 +384,26 @@ enum TextRenderer {
                 context.saveGState()
                 context.setAlpha(unit.alpha)
                 fillGlyphs(unit.path)
+                context.restoreGState()
+            }
+            // Text fill and gradients apply to outlines. Colour glyphs keep
+            // their native palette; the completed alpha still feeds shadows,
+            // glow, wipes and the same preview/export compositing path.
+            for colorGlyph in geometry.colorGlyphs {
+                let state = states.map { $0[min(max(colorGlyph.cluster, 0), $0.count - 1)] } ?? .neutral
+                guard state.opacity > 0.001 else { continue }
+                context.saveGState()
+                context.setAlpha(state.opacity)
+                let center = colorGlyph.center
+                context.translateBy(x: center.x + state.offsetX, y: center.y + state.offsetY)
+                context.rotate(by: state.rotationDegrees * .pi / 180)
+                context.scaleBy(x: state.scale, y: state.scale)
+                context.translateBy(x: -center.x, y: -center.y)
+                context.concatenate(colorGlyph.transform)
+                context.textMatrix = .identity
+                var glyph = colorGlyph.glyph
+                var position = CGPoint.zero
+                CTFontDrawGlyphs(colorGlyph.font, &glyph, &position, 1, context)
                 context.restoreGState()
             }
             guard let cg = context.makeImage() else { return nil }

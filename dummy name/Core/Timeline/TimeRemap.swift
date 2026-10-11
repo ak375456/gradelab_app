@@ -546,6 +546,24 @@ extension TimeRemap {
         return trailing
     }
 
+    /// Restored footage precedes the retained speed curve. Move its points and
+    /// holds with their source frames; the new head uses the first retained rate.
+    func extendedHead(bySource restored: TimelineTime) -> TimeRemap {
+        guard restored > .zero else { return self }
+        var extended = self
+        extended.points = points.map { point in
+            var moved = point
+            moved.sourceOffset = (try? point.sourceOffset.adding(restored)) ?? point.sourceOffset
+            return moved
+        }
+        extended.freezes = freezes.map { freeze in
+            var moved = freeze
+            moved.sourceOffset = (try? freeze.sourceOffset.adding(restored)) ?? freeze.sourceOffset
+            return moved
+        }
+        return extended
+    }
+
     /// The retiming with everything past `duration` of source discarded.
     func trimmedTail(toSource duration: TimelineTime, sourceDuration: TimelineTime) -> TimeRemap {
         let (leading, _) = split(atSourceOffset: duration, sourceDuration: sourceDuration)

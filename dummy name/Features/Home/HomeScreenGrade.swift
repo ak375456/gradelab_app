@@ -37,6 +37,10 @@ struct HomeScreenGrade: Equatable {
     static let liftRange: ClosedRange<Float> = -100...100
 
     var isNeutral: Bool { self == .neutral }
+    static var baseHueDegrees: Double { Double(BaseColor.accent.hue) * 360 }
+    var accentHueDegrees: Double {
+        Double(ColorComponents.wrap(BaseColor.accent.hue + CGFloat(hue) / 360)) * 360
+    }
 
     // MARK: Derived palette
 

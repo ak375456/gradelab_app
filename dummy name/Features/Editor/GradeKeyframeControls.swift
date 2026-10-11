@@ -69,6 +69,15 @@ struct GradeSlider<Model: GradingModel>: View {
     var neutral: Float = 0
     let valueFormatter: (Float) -> String
 
+    private var spectrum: SliderSpectrum? {
+        var hue: Double = 0
+        if case .wheelStrength(let index) = property.gradeSlot,
+           let hueProperty = AnimatableProperty.wheel(index: index, .hue) {
+            hue = Double(model.gradeBinding(hueProperty).wrappedValue)
+        }
+        return SliderSpectrum.grading(property, wheelHue: hue)
+    }
+
     var body: some View {
         VStack(spacing: AppSpacing.small) {
             AdjustmentSlider(
@@ -77,6 +86,7 @@ struct GradeSlider<Model: GradingModel>: View {
                 range: range,
                 step: step,
                 neutralValue: neutral,
+                spectrum: spectrum,
                 valueFormatter: valueFormatter
             ) {
                 GradeKeyframeDiamond(model: model, property: property)

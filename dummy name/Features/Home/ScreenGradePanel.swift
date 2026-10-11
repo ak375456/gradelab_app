@@ -36,6 +36,7 @@ struct ScreenGradePanel: View {
                 range: HomeScreenGrade.hueRange,
                 step: 5,
                 tint: grade.accent,
+                spectrum: .hueRange((HomeScreenGrade.baseHueDegrees - 180)...(HomeScreenGrade.baseHueDegrees + 180)),
                 valueFormatter: Self.degrees
             )
 
@@ -45,6 +46,7 @@ struct ScreenGradePanel: View {
                 range: HomeScreenGrade.vibranceRange,
                 step: 5,
                 tint: grade.accent,
+                spectrum: .saturation(hue: grade.accentHueDegrees),
                 valueFormatter: AdjustmentValueFormatters.percent()
             )
 
@@ -54,6 +56,7 @@ struct ScreenGradePanel: View {
                 range: HomeScreenGrade.liftRange,
                 step: 5,
                 tint: grade.accent,
+                spectrum: .luminance,
                 valueFormatter: AdjustmentValueFormatters.percent()
             )
         }

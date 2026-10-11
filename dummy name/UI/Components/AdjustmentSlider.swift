@@ -18,10 +18,12 @@ extension AdjustmentSlider where Accessory == EmptyView {
         step: Float,
         neutralValue: Float = 0,
         tint: Color = AppColors.accent,
+        spectrum: SliderSpectrum? = nil,
         valueFormatter: @escaping (Float) -> String
     ) {
         self.init(value: value, title: title, range: range, step: step,
                   neutralValue: neutralValue, tint: tint,
+                  spectrum: spectrum,
                   valueFormatter: valueFormatter) { EmptyView() }
     }
 }
@@ -33,11 +35,9 @@ struct AdjustmentSlider<Accessory: View>: View {
     let range: ClosedRange<Float>
     let step: Float
     let neutralValue: Float
-    /// What the filled part of the rail and the read-out are coloured with.
-    /// Defaults to the brand accent, which is what every grading control in the
-    /// editor wants; the home screen passes its own grade's accent so the
-    /// controls agree with the screen they are re-colouring.
+    /// The active fill and read-out colour for controls without a spectrum.
     let tint: Color
+    let spectrum: SliderSpectrum?
     let valueFormatter: (Float) -> String
     /// Sits at the end of the header row, beside the read-out. The keyframe
     /// diamond goes here, so an animatable grading control is the ordinary
@@ -52,6 +52,7 @@ struct AdjustmentSlider<Accessory: View>: View {
 
     @ScaledMetric(relativeTo: .caption) private var endpointLabelHeight: CGFloat = 16
     @Environment(\.requestNumericEntry) private var requestNumericEntry
+    @Environment(\.isEnabled) private var isEnabled
 
     init(
         value: Binding<Float>,
@@ -60,6 +61,7 @@ struct AdjustmentSlider<Accessory: View>: View {
         step: Float,
         neutralValue: Float = 0,
         tint: Color = AppColors.accent,
+        spectrum: SliderSpectrum? = nil,
         valueFormatter: @escaping (Float) -> String,
         @ViewBuilder accessory: () -> Accessory
     ) {
@@ -69,6 +71,7 @@ struct AdjustmentSlider<Accessory: View>: View {
         self.step = abs(step)
         self.neutralValue = min(max(neutralValue, range.lowerBound), range.upperBound)
         self.tint = tint
+        self.spectrum = spectrum
         self.valueFormatter = valueFormatter
         self.accessory = accessory()
     }
@@ -121,19 +124,30 @@ struct AdjustmentSlider<Accessory: View>: View {
             let activeWidth = max(abs(currentX - neutralX), 1)
 
             ZStack(alignment: .leading) {
-                Capsule()
-                    .fill(AppColors.controlTrack)
-                    .frame(height: 4)
-                    .offset(x: sideInset)
-                    .padding(.trailing, sideInset * 2)
-
-                Capsule()
-                    .fill(tint)
-                    .frame(width: activeWidth, height: 4)
-                    .offset(x: activeStart)
+                if let spectrum {
+                    // Keep the whole range visible, including at neutral. The
+                    // position and read-out carry the value; colour explains it.
+                    Capsule()
+                        .fill(spectrum.gradient)
+                        .frame(width: railWidth, height: 5)
+                        .offset(x: sideInset)
+                    Capsule()
+                        .fill(.white.opacity(0.18))
+                        .frame(width: activeWidth, height: 5)
+                        .offset(x: activeStart)
+                } else {
+                    Capsule()
+                        .fill(AppColors.controlTrack)
+                        .frame(width: railWidth, height: 4)
+                        .offset(x: sideInset)
+                    Capsule()
+                        .fill(tint)
+                        .frame(width: activeWidth, height: 4)
+                        .offset(x: activeStart)
+                }
 
                 Rectangle()
-                    .fill(AppColors.textTertiary)
+                    .fill(spectrum == nil ? AppColors.textTertiary : .white.opacity(0.85))
                     .frame(width: 1, height: 14)
                     .offset(x: neutralX - 0.5)
                     .accessibilityHidden(true)
@@ -149,7 +163,8 @@ struct AdjustmentSlider<Accessory: View>: View {
                     .offset(x: currentX - (isDragging ? 10 : 9))
                     .accessibilityHidden(true)
             }
-            .frame(maxWidth: .infinity, maxHeight: .infinity)
+            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .leading)
+            .opacity(isEnabled ? 1 : 0.4)
             .contentShape(Rectangle())
             .highPriorityGesture(
                 TapGesture(count: 2)

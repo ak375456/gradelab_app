@@ -658,7 +658,10 @@ private struct LightInspector: View {
                                set: { binding.wrappedValue = Double($0) / scale }),
                 title: title,
                 range: Float(range.lowerBound * scale)...Float(range.upperBound * scale),
-                step: step, neutralValue: Float(neutral * scale), valueFormatter: format
+                step: step, neutralValue: Float(neutral * scale),
+                spectrum: property == .relightTemperature ? .lightTemperature
+                    : property == .relightTint ? .tint : nil,
+                valueFormatter: format
             ) {
                 KeyframeDiamond(state: state, title: title,
                                 enabled: model.relightAnimationTime != nil && model.canEditRelight) {

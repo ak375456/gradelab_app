@@ -417,12 +417,13 @@ enum TimelineEditing {
         // source — the first half of a backwards clip is the LAST of the media.
         if original.isRamped || original.isReversed {
             let (leading, trailing) = original.resolvedRemap.split(
-                atSourceOffset: leftSource, sourceDuration: original.sourceRange.duration)
+                atSourceOffset: original.isReversed ? rightSource : leftSource,
+                sourceDuration: original.sourceRange.duration)
             if original.isReversed {
-                left.sourceRange = .init(start: try original.sourceRange.start.adding(leftSource),
-                                         duration: rightSource)
+                left.sourceRange = .init(start: try original.sourceRange.start.adding(rightSource),
+                                         duration: leftSource)
                 left.timeRemap = trailing
-                right.sourceRange = .init(start: original.sourceRange.start, duration: leftSource)
+                right.sourceRange = .init(start: original.sourceRange.start, duration: rightSource)
                 right.timeRemap = leading
             } else {
                 left.sourceRange.duration = leftSource
@@ -509,27 +510,35 @@ enum TimelineEditing {
         var boundary = try snapped(time, frame: project.canvas.frameDuration)
         let end = try clip.placement.range.end
         let minimum = try project.canvas.frameDuration ?? TimelineTime.seconds(0.01)
+        // The requested head edge may be negative to recover source after a
+        // clip has been moved to zero. Persisted positions never are negative.
+        // The main row also packs later clips after its length changes.
+        let ripples = clamping && project.timeline.tracks
+            .first { $0.id == clip.placement.trackID }?.kind == .mainVideo
         if clamping {
             let others = try clips(in: project).filter { $0.id != id && $0.placement.trackID == clip.placement.trackID }
             guard let asset = project.assets.first(where: { $0.id == clip.assetID }) else { throw TimelineError.invalid(String(localized: "Missing source.")) }
             let source = asset.sourceRange
             // The main video track is repacked from zero after every timing
-            // edit, so a neighbour there is not a wall: it is something that
-            // moves out of the way. Overlay tracks keep their positions and
-            // cannot overlap, so they keep the hard limits.
-            let ripples = project.timeline.tracks
-                .first { $0.id == clip.placement.trackID }?.kind == .mainVideo
+            // edit, so a neighbour there moves out of the way. Video layers
+            // keep their neighbours in place and use the available space.
             if edge == .left {
-                let available = try clip.sourceRange.start.subtracting(source.start)
-                var lower = max(.zero, try clip.placement.timelineStart.subtracting(available))
-                for other in others where other.placement.timelineStart < clip.placement.timelineStart {
-                    // A rippling neighbour only has to keep its order. Stopping
-                    // one frame short of its start is what guarantees that:
-                    // repacking sorts by start time, and two clips that crossed
-                    // would come back in the wrong order.
-                    lower = max(lower, ripples
-                        ? try other.placement.timelineStart.adding(minimum)
-                        : try other.placement.range.end)
+                let available = try clip.isReversed
+                    ? source.end.subtracting(clip.sourceRange.end)
+                    : clip.sourceRange.start.subtracting(source.start)
+                let headSpeed = clip.timeMap.speed(atTimelineOffset: .zero)
+                let travel = try ClipSpeed.timelineDuration(sourceDuration: available, speed: headSpeed)
+                var lower = try clip.placement.timelineStart.subtracting(travel)
+                if !ripples {
+                    let previous = others.filter { $0.placement.timelineStart < clip.placement.timelineStart }
+                    if !previous.isEmpty {
+                        for other in previous { lower = max(lower, try other.placement.range.end) }
+                    } else if let next = others.filter({ $0.placement.timelineStart >= end })
+                        .map(\.placement.timelineStart).min() {
+                        // Recovering past zero grows the tail, since the head
+                        // stays at zero. Stop where that tail meets a neighbour.
+                        lower = max(lower, try end.subtracting(next))
+                    }
                 }
                 boundary = max(lower, min(boundary, try end.subtracting(minimum)))
             } else {
@@ -548,26 +557,32 @@ enum TimelineEditing {
             // that distance at the clip's speed, which for a retimed clip is not
             // the same number.
             let delta = try boundary.subtracting(clip.placement.timelineStart)
-            let sourceDelta = try clip.sourceDuration(forTimelineDuration: delta)
+            let sourceDelta = try delta < .zero
+                ? ClipSpeed.sourceDuration(timelineDuration: delta,
+                                           speed: clip.timeMap.speed(atTimelineOffset: .zero))
+                : clip.sourceDuration(forTimelineDuration: delta)
             // The curve is measured from the clip's first frame, so moving that
             // frame moves the whole curve with it. A reversed clip hides source
             // off the far end instead, and its curve is untouched.
             if clip.isRamped, !clip.isReversed, sourceDelta > .zero {
                 clip.timeRemap = clip.resolvedRemap.trimmedHead(
                     bySource: sourceDelta, sourceDuration: clip.sourceRange.duration)
+            } else if clip.isRamped, !clip.isReversed, sourceDelta < .zero {
+                clip.timeRemap = clip.resolvedRemap.extendedHead(bySource: try .zero.subtracting(sourceDelta))
             }
             if !clip.isReversed {
                 clip.sourceRange.start = try clip.sourceRange.start.adding(sourceDelta)
             }
-            clip.placement.timelineStart = boundary
+            clip.sourceRange.duration = try clip.sourceRange.duration.subtracting(sourceDelta)
+            if !ripples { clip.placement.timelineStart = clamping ? max(.zero, boundary) : boundary }
             clip.placement.duration = try end.subtracting(boundary)
             // Head trims hide animation rather than discarding it; extending restores it.
             clip.shiftAnimationWindow(by: delta)
         } else {
             clip.placement.duration = try boundary.subtracting(clip.placement.timelineStart)
+            clip.sourceRange.duration = try clip.sourceDuration(
+                forTimelineDuration: clip.placement.duration)
         }
-        clip.sourceRange.duration = try clip.sourceDuration(
-            forTimelineDuration: clip.placement.duration)
         // Re-derive from the stored source so the document invariant
         // (timeline duration is what the time map makes of the source range)
         // holds exactly rather than approximately after the conversion rounds.
