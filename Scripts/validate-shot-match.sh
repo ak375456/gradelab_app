@@ -9,7 +9,7 @@ import subprocess, sys
 root = Path('dummy name/Core')
 build = Path(sys.argv[1])
 files = [root / 'AppError.swift']
-for folder in ['ShotMatch', 'Grading', 'Timeline', 'LUT', 'Export', 'Rendering', 'Video',
+for folder in ['Audio', 'ShotMatch', 'Grading', 'Timeline', 'LUT', 'Export', 'Rendering', 'Video',
                'BackgroundRemoval', 'Retiming', 'NoiseReduction']:
     files += sorted((root / folder).glob('*.swift'))
 # The same exclusions the other harnesses use: anything that needs UIKit, a
@@ -19,7 +19,7 @@ excluded = {'LookPreviewRenderer.swift', 'ThumbnailGenerator.swift', 'MetalPrevi
             'BackgroundRemovalAnalyzer.swift', 'BackgroundLassoTracker.swift',
             'ShotMatchAnalysisRenderer.swift', 'ShotMatchEngine.swift',
             'ShotMatchFrameSource.swift'}
-files = [str(p) for p in files if p.name not in excluded]
+files = [str(p) for p in files if p.name not in excluded and p.name != 'SoundEffectLibrary.swift']
 files += [str(root / p) for p in ['Projects/VideoProject.swift', 'Projects/GradeProject.swift',
     'Projects/ProjectStore.swift', 'Projects/ProjectLibraryStorage.swift', 'Import/AudioImportService.swift',
     'Images/ImageMetadata.swift', 'Images/ImageColorSupport.swift',

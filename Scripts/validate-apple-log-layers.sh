@@ -10,11 +10,11 @@ from pathlib import Path
 import subprocess, sys
 root = Path('dummy name/Core')
 files = [root / 'AppError.swift']
-for folder in ['Grading', 'Timeline', 'LUT', 'Export', 'Rendering', 'Video']:
+for folder in ['Audio', 'Grading', 'Timeline', 'LUT', 'Export', 'Rendering', 'Video']:
     files += sorted((root / folder).glob('*.swift'))
 excluded = {'LookPreviewRenderer.swift', 'ThumbnailGenerator.swift', 'MetalPreviewView.swift',
             'MetalVideoRenderer.swift', 'ImageExporter.swift', 'ImageExportConfiguration.swift'}
-files = [str(p) for p in files if p.name not in excluded]
+files = [str(p) for p in files if p.name not in excluded and p.name != 'SoundEffectLibrary.swift']
 files += [str(root / p) for p in ['Projects/VideoProject.swift', 'Projects/GradeProject.swift',
     'Images/ImageMetadata.swift', 'Images/ImageColorSupport.swift',
     'Playback/PreviewQuality.swift', 'Playback/PreviewCompositions.swift']]

@@ -226,6 +226,10 @@ struct VideoProject: Codable, Identifiable, Equatable, Sendable {
                    !linked.volume.isFinite || !(0...1).contains(linked.volume) {
                     throw TimelineError.invalid(String(localized: "Audio volume must be between 0 and 100 percent."))
                 }
+                if case .video(let clip) = item, let processing = clip.embeddedAudio?.processing,
+                   !processing.isValid {
+                    throw TimelineError.invalid(String(localized: "Invalid audio tone or pan settings."))
+                }
                 if case .audio = item, assets.first(where: { $0.id == item.assetID })?.stillImage != nil {
                     throw TimelineError.invalid(String(localized: "An audio clip cannot reference an image."))
                 }

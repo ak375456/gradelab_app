@@ -1,9 +1,10 @@
-Arriva Relight.
+Nuovi strumenti audio, Relight e miglioramenti al montaggio.
 
-• Relight: aggiungi luci virtuali alle riprese già fatte. GradeLab stima la forma della scena, così la luce avvolge volti e soggetti invece di posarsi sopra come un cerchio piatto.
-• Luci direzionali, puntiformi e spot, fino a sei per clip. Trascinale sull’immagine con il puntatore e aggiungi keyframe a ogni valore.
-• Preset: Principale morbida, Tramonto caldo, Luce lunare fredda, Luce laterale, Luce dall’alto, Controluce, Drammatica e Riempimento morbido.
-• Funziona con SDR, HDR HLG e Apple Log, e con rampe di velocità, clip divise e invertite. Limitalo a una maschera per illuminare una sola zona.
-• Tastiera: ⇧⌘L apre Relight. I tasti freccia spostano la luce selezionata, con ⇧ per passi più ampi e ⌥ per passi più fini. ⌫ la elimina e ⌘D la duplica.
-• Clic destro su una luce per Duplica, Disattiva, Reimposta ed Elimina.
-• Migliorie all’interfaccia, correzioni e ottimizzazioni generali.
+• Controlli audio: Regola volume, dissolvenze, bilanciamento stereo ed equalizzazione, oppure parti da un preset vocale.
+• Compressore: Attenua i passaggi più forti con un semplice controllo di intensità e impostazioni avanzate.
+• Ducking automatico: Scegli una clip vocale per abbassare automaticamente la musica mentre si sente la voce.
+• Effetti audio creativi: Aggiungi eco, riverbero, distorsione e bitcrusher. Prova i preset di ambiente e controlla il livello di ogni clip in tempo reale.
+• Relight: Aggiungi luci virtuali ai video già girati. Regola posizione, colore e intensità oppure parti da un preset.
+• Le sfumature di colore nei cursori rendono più chiari i controlli di temperatura, tinta, tonalità e saturazione.
+• Le emoji ora vengono visualizzate correttamente insieme al testo nelle anteprime e nelle esportazioni.
+• Recupera le parti tagliate con la maniglia sinistra, anche dopo aver spostato la clip all’inizio della timeline.

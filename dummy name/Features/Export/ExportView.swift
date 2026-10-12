@@ -4,6 +4,7 @@ struct ExportView: View {
     @StateObject private var model: ExportViewModel
     @ObservedObject private var store = ProStore.shared
     @Environment(\.dismiss) private var dismiss
+    @Environment(\.scenePhase) private var scenePhase
     @State private var confirmsClose = false
     @State private var showsSaveFile = false
     @State private var savedToFile = false
@@ -90,6 +91,9 @@ struct ExportView: View {
         }
         .onChange(of: model.outputURL) { _, _ in savedToFile = false }
         .onAppear(perform: model.prepare)
+        .onChange(of: scenePhase) { _, phase in
+            if phase == .active { model.refreshCapabilities() }
+        }
         .paywallSheet($paywallFeature)
         .sheet(isPresented: $model.showsShareSheet) {
             if let outputURL = model.outputURL {
@@ -361,15 +365,21 @@ struct ExportView: View {
                 .appSurface()
         } else if let capabilities = model.capabilities {
             VStack(alignment: .leading, spacing: AppSpacing.small) {
-                Label("This device cannot export this configuration.", systemImage: "exclamationmark.triangle.fill")
+                Label("Export needs attention", systemImage: "exclamationmark.triangle.fill")
                     .font(AppTypography.bodyEmphasized).foregroundStyle(AppColors.warning)
                 ForEach(capabilities.issues, id: \.self) { issue in
                     Text(issue).font(AppTypography.caption).foregroundStyle(AppColors.textSecondary)
                 }
-                Text(model.project.colorMode.isWidePrecision
-                     ? "This needs hardware HEVC Main 10 support at the selected size and frame rate."
-                     : "Requires a supported 8-bit SDR source and a compatible hardware encoder. Try a smaller size or another codec.")
-                    .font(AppTypography.caption).foregroundStyle(AppColors.textTertiary)
+                if !capabilities.encoderIsSupported || !capabilities.writerAcceptsVideoSettings {
+                    Text(model.project.colorMode.isWidePrecision
+                         ? "This needs hardware HEVC Main 10 support at the selected size and frame rate."
+                         : "Requires a supported 8-bit SDR source and a compatible hardware encoder. Try a smaller size or another codec.")
+                        .font(AppTypography.caption).foregroundStyle(AppColors.textTertiary)
+                }
+                Button("Check Again", action: model.refreshCapabilities)
+                    .font(AppTypography.secondary)
+                    .foregroundStyle(AppColors.accent)
+                    .frame(minHeight: 44)
             }
             .frame(maxWidth: .infinity, alignment: .leading)
             .padding(AppSpacing.standard)

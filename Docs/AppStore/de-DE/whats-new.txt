@@ -1,4 +1,10 @@
-Verbesserungen und Fehlerbehebungen.
+Neue Audiowerkzeuge, Relight und Verbesserungen beim Bearbeiten.
 
-• Verbesserungen der Oberfläche und kleinere Fehlerbehebungen.
-• Verbesserungen bei Stabilität und Leistung.
+• Audiosteuerung: Passe Lautstärke, Ein- und Ausblendungen, Stereo-Balance und EQ an oder starte mit einem Sprach-Preset.
+• Kompressor: Zähme laute Stellen mit einem einfachen Stärkeregler und erweiterten Einstellungen.
+• Automatische Musikabsenkung: Wähle einen Sprachclip, damit die Musik automatisch leiser wird, während die Stimme zu hören ist.
+• Kreative Audioeffekte: Ergänze Echo, Hall, Verzerrung und Bitcrusher. Probiere Raum-Presets aus und behalte den Pegel jedes Clips im Blick.
+• Relight: Füge bereits gedrehten Videos virtuelle Lichter hinzu. Passe Position, Farbe und Intensität an oder beginne mit einer Voreinstellung.
+• Farbverläufe auf den Reglern machen Farbtemperatur, Tönung, Farbton und Sättigung leichter verständlich.
+• Emojis werden jetzt zusammen mit Text in der Vorschau und beim Export korrekt dargestellt.
+• Stelle gekürztes Material mit dem linken Trimmgriff wieder her, auch wenn du den Clip an den Anfang der Timeline verschoben hast.

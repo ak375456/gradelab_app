@@ -10,9 +10,9 @@ Terminology is taken from the catalog rather than translated afresh.
 | `name.txt` | 23 | 30 |
 | `subtitle.txt` | 24 | 30 |
 | `keywords.txt` | 95 | 100 |
-| `promotional-text.txt` | 149 | 170 |
+| `promotional-text.txt` | 129 | 170 |
 | `description.txt` | 3856 | 4000 |
-| `whats-new.txt` | 777 | 4000 |
+| `whats-new.txt` | 1010 | 4000 |
 
 ## Conventions carried over from the app
 

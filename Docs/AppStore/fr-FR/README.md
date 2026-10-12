@@ -13,9 +13,9 @@ suivi, forme d'onde, parade RVB.
 | `name.txt` | 21 | 30 |
 | `subtitle.txt` | 28 | 30 |
 | `keywords.txt` | 93 | 100 |
-| `promotional-text.txt` | 164 | 170 |
+| `promotional-text.txt` | 148 | 170 |
 | `description.txt` | 3969 | 4000 |
-| `whats-new.txt` | 845 | 4000 |
+| `whats-new.txt` | 1032 | 4000 |
 
 The description needed real trimming: a full translation of the English came to
 **4430 characters**, 430 over Apple's limit. It was tightened to 3969 without

@@ -6,10 +6,10 @@ trap 'rm -rf "$build_dir"' EXIT
 mkdir -p "$build_dir/Validator.app/Contents/MacOS" "$build_dir/Validator.app/Contents/Resources"
 cp 'dummy name/Resources/LUTs/Imported/Apple_Log_To_Rec_709.cube' "$build_dir/Validator.app/Contents/Resources/"
 sources=('dummy name/Core/AppError.swift')
-for folder in Grading Timeline LUT Export Rendering Video; do
+for folder in Audio Grading Timeline LUT Export Rendering Video; do
     for source in "dummy name/Core/$folder/"*.swift; do
         case "$source" in
-            */LookPreviewRenderer.swift|*/ThumbnailGenerator.swift|*/MetalPreviewView.swift|*/MetalVideoRenderer.swift|*/ImageExporter.swift|*/ImageExportConfiguration.swift) continue ;;
+            */SoundEffectLibrary.swift|*/LookPreviewRenderer.swift|*/ThumbnailGenerator.swift|*/MetalPreviewView.swift|*/MetalVideoRenderer.swift|*/ImageExporter.swift|*/ImageExportConfiguration.swift) continue ;;
         esac
         sources+=("$source")
     done

@@ -80,6 +80,10 @@ struct ExportCapabilityChecker: Sendable {
 
             var issues: [String] = []
             var notes: [String] = []
+            if let issue = ExportStorage.issue(at: checkURL, estimatedBytes:
+                ExportStorage.estimatedBytes(asset: asset, configuration: configuration, project: project)) {
+                issues.append(issue)
+            }
             let colorSupport = ColorPipelineSupport(metadata: asset.metadata)
             if colorSupport == .assumedRec709, let notice = colorSupport.notice {
                 notes.append(notice)

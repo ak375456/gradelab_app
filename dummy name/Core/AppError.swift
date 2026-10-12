@@ -44,7 +44,7 @@ enum GradeLabError: LocalizedError, Equatable, Sendable {
         case .exportFailed(let detail):
             detail.isEmpty ? String(localized: "The graded video could not be exported.") : detail
         case .insufficientStorage:
-            String(localized: "There isn’t enough free storage to export this video.")
+            String(localized: "There isn’t enough free storage to export this video. Free up space on your device and try again.")
         case .photoLibrarySaveFailed:
             String(localized: "The exported video could not be saved to Photos.")
         case .invalidLUT(let detail):

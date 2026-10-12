@@ -9,12 +9,12 @@ import subprocess, sys
 root = Path('dummy name/Core')
 build = Path(sys.argv[1])
 files = [root / 'AppError.swift']
-for folder in ['Grading', 'Timeline', 'LUT', 'Export', 'Rendering', 'Video', 'BackgroundRemoval']:
+for folder in ['Audio', 'Grading', 'Timeline', 'LUT', 'Export', 'Rendering', 'Video', 'BackgroundRemoval']:
     files += sorted((root / folder).glob('*.swift'))
 excluded = {'LookPreviewRenderer.swift', 'ThumbnailGenerator.swift', 'MetalPreviewView.swift',
             'MetalVideoRenderer.swift', 'ImageExporter.swift', 'ImageExportConfiguration.swift',
             'BackgroundRemovalAnalyzer.swift', 'BackgroundLassoTracker.swift'}
-files = [str(p) for p in files if p.name not in excluded]
+files = [str(p) for p in files if p.name not in excluded and p.name != 'SoundEffectLibrary.swift']
 files += [str(root / p) for p in ['Projects/VideoProject.swift', 'Projects/GradeProject.swift',
     'Projects/ProjectStore.swift', 'Projects/ProjectLibraryStorage.swift', 'Import/AudioImportService.swift',
     'Images/ImageMetadata.swift', 'Images/ImageColorSupport.swift',

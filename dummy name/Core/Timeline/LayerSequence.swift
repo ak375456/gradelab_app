@@ -88,6 +88,28 @@ extension SequenceComposition {
         }
         var audio: [ExportAudioTrackInfo] = []
         var routing = TimelineAudioMix()
+        var preparedAudio: [UUID: [ExportAudioTrackInfo]] = [:]
+        // Tracks do not retain their owning asset. Keep cached stereo assets
+        // alive until their ranges have been inserted into the composition.
+        var audioAssets: [AVAsset] = []
+        defer { withExtendedLifetime(audioAssets) {} }
+        func stereoSources(_ originals: [ExportAudioTrackInfo], id: UUID, url: URL) async throws -> [ExportAudioTrackInfo] {
+            if let prepared = preparedAudio[id] { return prepared }
+            var prepared: [ExportAudioTrackInfo] = []
+            for original in originals {
+                if original.channelCount == 1 {
+                    let asset = try await AudioStereoSource.asset(for: original.track, sourceURL: url,
+                                                                 sampleRate: original.sampleRate)
+                    audioAssets.append(asset)
+                    guard let track = try await asset.loadTracks(withMediaType: .audio).first else {
+                        throw TimelineError.invalid(String(localized: "Could not read prepared stereo audio."))
+                    }
+                    prepared.append(try await ExportSourceInspector.inspectAudioTrack(track))
+                } else { prepared.append(original) }
+            }
+            preparedAudio[id] = prepared
+            return prepared
+        }
         for clip in clips.sorted(by: { $0.placement.timelineStart < $1.placement.timelineStart }) {
             let media = project.assets.first(where: { $0.id == clip.assetID })
             if media?.stillImage != nil { continue }
@@ -217,7 +239,7 @@ extension SequenceComposition {
             // Reverse off brings the sound back exactly as it was.
             if clip.embeddedAudio != nil, !clip.isReversed,
                clip.resolvedRemap.audioBehaviour != .mute {
-                for original in source.audioTracks {
+                for original in try await stereoSources(source.audioTracks, id: clip.assetID, url: media?.url ?? project.sourceURL) {
                     let range = CMTimeRangeGetIntersection(clip.sourceRange.cmTimeRange, otherRange: original.timeRange)
                     guard range.duration > .zero else { continue }
                     guard let track = composition.addMutableTrack(withMediaType: .audio, preferredTrackID: kCMPersistentTrackID_Invalid) else { throw TimelineError.invalid(String(localized: "Could not create linked audio.")) }
@@ -255,10 +277,6 @@ extension SequenceComposition {
             }
         }
         var independentSources: [UUID: [ExportAudioTrackInfo]] = [:]
-        // AVAssetTrack does not keep its owning asset alive. Retain audio-only
-        // assets until all their source ranges have been inserted.
-        var audioAssets: [AVAsset] = []
-        defer { withExtendedLifetime(audioAssets) {} }
         for clip in project.timeline.audioClips {
             if independentSources[clip.assetID] == nil {
                 if let existing = sources[clip.assetID] { independentSources[clip.assetID] = existing.audioTracks }
@@ -276,7 +294,8 @@ extension SequenceComposition {
                     independentSources[clip.assetID] = inspected
                 }
             }
-            let originals = independentSources[clip.assetID] ?? []
+            let originals = try await stereoSources(independentSources[clip.assetID] ?? [], id: clip.assetID,
+                url: project.assets.first(where: { $0.id == clip.assetID })?.url ?? project.sourceURL)
             guard !originals.isEmpty, clip.sourceTrackIndex.map({ originals.indices.contains($0) }) ?? true else {
                 throw TimelineError.invalid(String(localized: "The selected source audio track is unavailable."))
             }
@@ -399,12 +418,13 @@ extension SequenceComposition {
         let playbackCompositions = forExport
             ? [:]
             : Self.playbackCompositions(base: vc, scalingTrack: nil)
+        try await routing.prepareDucking(project, composition: composition)
         return Self(source: .init(asset: composition, videoTrack: videos[0], encodedWidth: Int(renderSize.width),
             encodedHeight: Int(renderSize.height), duration: range.duration, videoTimeRange: range, sessionStartTime: .zero,
             preferredTransform: .identity, nominalFrameRate: 1/cadence.seconds, naturalTimeScale: TimelineTime.projectTimescale,
             audioTracks: audio, videoComposition: vc, playbackVideoCompositions: playbackCompositions,
             timelineClips: nil, compositionVideoTracks: videos,
-            gradesBaked: true, audioMix: routing.makeMix(project),
+            gradesBaked: true, audioMix: try routing.makeMix(project),
             // Log is an input profile. This source now carries rendered Rec.709;
             // leaving it marked Log would apply the input transform a second time.
             colorMode: project.colorMode.isAppleLog ? .sdrWide : project.colorMode),

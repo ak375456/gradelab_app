@@ -181,7 +181,7 @@ struct ValidateSequence {
         var soundClip = audioProject.timeline.audioClip(id: soundID)!
         soundClip.volume = 0.25
         try AudioEditing.replace(soundID, with: [soundClip], in: &audioProject)
-        let liveMix = separatedSequence.audioRouting.makeMix(audioProject)
+        let liveMix = try separatedSequence.audioRouting.makeMix(audioProject)
         let liveVolume = try await audioRMS(separatedSequence.source.asset, at: 0.5, mix: liveMix)
         precondition(abs(liveVolume/previewSound-0.25) < 0.03, "Live mix did not update existing composition")
         log("Exporting separated audio at 25%")

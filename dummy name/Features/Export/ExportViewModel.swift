@@ -286,6 +286,12 @@ final class ExportViewModel: ObservableObject {
         state = .idle
         isInspectingOutput = false
         message = nil
+        checkCapabilities()
+    }
+
+    func refreshCapabilities() {
+        guard state == .idle, exporter != nil else { return }
+        checkCapabilities()
     }
 
     func saveToPhotos() {

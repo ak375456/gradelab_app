@@ -1,9 +1,10 @@
-Relight on täällä.
+Uudet äänityökalut, Relight ja parannuksia muokkaukseen.
 
-• Relight: lisää virtuaalisia valoja jo kuvattuun materiaaliin. GradeLab arvioi kohtauksen muodon, joten valo kietoutuu kasvojen ja kohteiden ympärille eikä jää niiden päälle litteäksi ympyräksi.
-• Suunnattu valo, pistevalo ja kohdevalo, enintään kuusi klippiä kohden. Vedä niitä kuvassa osoittimella ja lisää avainkuvia jokaiselle arvolle.
-• Esiasetukset: Pehmeä päävalo, Lämmin auringonlasku, Viileä kuunvalo, Sivuvalo, Yläpuolinen valo, Reunavalo, Dramaattinen ja Pehmeä täyte.
-• Toimii SDR-, HLG HDR- ja Apple Log -materiaalin sekä nopeusramppien, jaettujen ja takaperin toistettavien klippien kanssa. Rajaa se maskiin, jos haluat valaista vain yhden alueen.
-• Näppäimistö: ⇧⌘L avaa Relightin. Nuolinäppäimet siirtävät valittua valoa, ⇧ isommin askelin ja ⌥ hienommin. ⌫ poistaa sen ja ⌘D monistaa sen.
-• Napsauta valoa toissijaisesti: Monista, Poista käytöstä, Palauta ja Poista.
-• Käyttöliittymän parannuksia, virheenkorjauksia ja yleisiä optimointeja.
+• Äänisäätimet: Säädä äänenvoimakkuutta, häivytyksiä, stereotasapainoa ja taajuuskorjausta tai aloita puheäänen esiasetuksesta.
+• Kompressori: Tasoita voimakkaita ääniä yhdellä säätimellä tai hienosäädä lisäasetuksilla.
+• Automaattinen musiikin vaimennus: Valitse puheleike, niin musiikki hiljenee automaattisesti puheen ajaksi.
+• Luovat äänitehosteet: Lisää viive-, kaiku-, särö- ja bitcrusher-tehosteita. Kokeile tilaesiasetuksia ja seuraa kunkin leikkeen äänitasoa reaaliajassa.
+• Relight: Lisää virtuaalisia valoja jo kuvattuihin videoihin. Säädä valojen sijaintia, väriä ja voimakkuutta tai aloita valmiista asetuksesta.
+• Liukusäätimien väriliu’ut havainnollistavat esimerkiksi värilämpötilan ja kylläisyyden säätöjä.
+• Emojit näkyvät nyt oikein tekstin rinnalla esikatselussa ja viedyissä videoissa.
+• Palauta pois leikatut kohdat vetämällä leikkeen vasenta reunakahvaa, vaikka olisit siirtänyt leikkeen aikajanan alkuun.

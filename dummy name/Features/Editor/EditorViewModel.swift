@@ -1172,7 +1172,7 @@ final class EditorViewModel: ObservableObject, GradingModel {
     var audioSettings: EmbeddedAudio? {
         if let audio = selectedAudio {
             return .init(volume: audio.volume, isMuted: audio.isMuted,
-                         fadeIn: audio.fadeIn, fadeOut: audio.fadeOut)
+                         fadeIn: audio.fadeIn, fadeOut: audio.fadeOut, processing: audio.processing)
         }
         return selectedClip?.embeddedAudio
     }
@@ -1188,12 +1188,53 @@ final class EditorViewModel: ObservableObject, GradingModel {
     var audioFadeLimit: Double {
         max(0, min(AudioFade.maximum, audioClipDuration / 2))
     }
+    var audioProcessing: AudioProcessingSettings { audioSettings?.processing ?? .init() }
+    var audioDuckingSources: [(id: UUID, name: String)] {
+        project.timeline.tracks.flatMap { track in
+            track.items.compactMap { item -> (id: UUID, name: String)? in
+                guard item.id != selectedClipID else { return nil }
+                let assetID: UUID
+                switch item {
+                case .audio(let clip): assetID = clip.assetID
+                case .video(let clip):
+                    guard clip.embeddedAudio != nil, !clip.resolvedRemap.reverses else { return nil }
+                    assetID = clip.assetID
+                default: return nil
+                }
+                let media = project.assets.first { $0.id == assetID }
+                let name = media?.audioName ?? media?.url.deletingPathExtension().lastPathComponent ?? track.name
+                return (item.id, "\(name) · \(String(format: "%.1fs", item.placement.timelineStart.seconds))")
+            }
+        }
+    }
+    var audioDuckingPreview: [Double] {
+        guard let id = selectedClipID, let item = project.timeline.item(id: id),
+              let envelope = audioRouting.duckingEnvelope(for: id, in: project) else { return [] }
+        return (0...80).map { envelope.gain(at: item.placement.timelineStart.seconds + Double($0) / 80 * item.placement.duration.seconds) }
+    }
+    var audioLevel: AudioLevelReading {
+        guard playback.player.rate != 0, let id = selectedClipID else { return .init() }
+        return audioRouting.level(for: id)
+    }
+
+    func changeAudioProcessing(_ change: (inout AudioProcessingSettings) -> Void) {
+        var settings = audioProcessing
+        change(&settings)
+        changeAudio(processing: settings.sanitized)
+    }
+
+    func applyAudioPreset(_ preset: AudioVoicePreset) {
+        flushGradeHistory()
+        changeAudioProcessing { $0 = $0.applying(preset) }
+        flushGradeHistory()
+    }
     func beginAudioEditing() {
         flushGradeHistory(); forceLayerPreview = true
         if layerState == nil { rebuildSequence() }
     }
     func changeAudio(volume: Double? = nil, muted: Bool? = nil,
-                     fadeIn: Double? = nil, fadeOut: Double? = nil) {
+                     fadeIn: Double? = nil, fadeOut: Double? = nil,
+                     processing: AudioProcessingSettings? = nil) {
         guard canEditSelection, let id = selectedClipID else { return }
         let limit = audioFadeLimit
         // Zero is stored as "no fade" rather than as a fade of length zero, so a
@@ -1209,22 +1250,33 @@ final class EditorViewModel: ObservableObject, GradingModel {
                 if let muted { clip.isMuted = muted }
                 if let fadeIn { clip.fadeIn = fade(fadeIn) }
                 if let fadeOut { clip.fadeOut = fade(fadeOut) }
+                if let processing { clip.processing = processing == .init() ? nil : processing }
                 try AudioEditing.replace(id, with: [clip], in: &candidate)
             } else if var clip = selectedClip, var linked = clip.embeddedAudio {
                 if let volume { linked.volume = min(1, max(0, volume)) }
                 if let muted { linked.isMuted = muted }
                 if let fadeIn { linked.fadeIn = fade(fadeIn) }
                 if let fadeOut { linked.fadeOut = fade(fadeOut) }
+                if let processing { linked.processing = processing == .init() ? nil : processing }
                 clip.embeddedAudio = linked
                 try TimelineEditing.replace(id, with: [clip], in: &candidate)
             } else { return }
             guard candidate != project else { return }
+            let duckChanged = processing.map { $0.ducking != audioProcessing.ducking } ?? false
+            let sourceChanged = processing.map {
+                $0.ducking?.sourceClipID != audioProcessing.ducking?.sourceClipID
+                    || ($0.ducking?.isEnabled == true && audioProcessing.ducking?.isEnabled != true)
+            } ?? false
+            let mix = processing == nil || (duckChanged && !sourceChanged) ? try audioRouting.makeMix(candidate) : nil
             if gradeBaseline == nil {
                 gradeBaseline = project
-                historyLabel = fadeIn != nil || fadeOut != nil ? "Audio fade" : "Audio level"
+                historyLabel = processing != nil ? "Audio effects"
+                    : fadeIn != nil || fadeOut != nil ? "Audio fade" : "Audio level"
             }
             project = candidate; project.updatedAt = .now
-            playback.player.currentItem?.audioMix = audioRouting.makeMix(project)
+            if sourceChanged { forceLayerPreview = true; rebuildSequence() }
+            else if let mix { playback.player.currentItem?.audioMix = mix }
+            else { audioRouting.updateProcessing(project) }
             gradeTask?.cancel()
             gradeTask = Task { [weak self] in
                 do { try await Task.sleep(for: .milliseconds(650)) } catch { return }

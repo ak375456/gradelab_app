@@ -129,6 +129,10 @@ final class VideoExporter: @unchecked Sendable {
                 await onStateChange?(.preparing)
                 try session.checkCancellation()
                 try ExportMediaSettings.validate(configuration)
+                if let issue = ExportStorage.issue(at: destinationURL, estimatedBytes:
+                    ExportStorage.estimatedBytes(asset: asset, configuration: configuration, project: project)) {
+                    throw GradeLabError.exportFailed(issue)
+                }
                 relightSources = project.map(RelightSourceInfo.table(for:)) ?? [:]
                 if let project {
                     let analysed = try await prepareRelightDepth(project: project, onStateChange: onStateChange)
@@ -286,6 +290,7 @@ final class VideoExporter: @unchecked Sendable {
             #if DEBUG
             print("Could not create export reader/writer: \(error)")
             #endif
+            if ExportStorage.isOutOfSpace(error) { throw GradeLabError.insufficientStorage }
             throw GradeLabError.exportFailed(String(localized: "The export session could not be prepared."))
         }
         writer.shouldOptimizeForNetworkUse = configuration.optimizeForNetworkUse
@@ -524,6 +529,7 @@ final class VideoExporter: @unchecked Sendable {
                     try processNextVideoFrame(
                         sampler: sampler,
                         adaptor: pipeline.adaptor,
+                        writer: pipeline.writer,
                         source: source,
                         settings: settings,
                         grade: grade
@@ -606,6 +612,7 @@ final class VideoExporter: @unchecked Sendable {
     private func processNextVideoFrame(
         sampler: ExportFrameSampler,
         adaptor: AVAssetWriterInputPixelBufferAdaptor,
+        writer: AVAssetWriter,
         source: ExportSourceInfo,
         settings: GradeSettings,
         grade: FrameGrade
@@ -728,6 +735,11 @@ final class VideoExporter: @unchecked Sendable {
             noise: relit ?? denoised
         )
         guard adaptor.append(destination, withPresentationTime: presentationTime) else {
+            #if DEBUG
+            print("Video append failed at \(presentationTime.seconds)s; writer status \(writer.status.rawValue); format \(CVPixelBufferGetPixelFormatType(destination)); \(CVPixelBufferGetWidth(destination))x\(CVPixelBufferGetHeight(destination)); error: \(String(describing: writer.error))")
+            #endif
+            if writer.status == .failed { throw writerFailure(writer) }
+            if writer.status == .cancelled { throw GradeLabError.exportCancelled }
             throw GradeLabError.exportFailed(String(localized: "The video encoder rejected a processed frame."))
         }
         return .appended(presentationTime)
@@ -1650,9 +1662,7 @@ final class VideoExporter: @unchecked Sendable {
             print("Asset writer failed: \(error)")
         }
         #endif
-        if let error = writer.error as NSError?,
-           error.domain == NSCocoaErrorDomain,
-           error.code == NSFileWriteOutOfSpaceError {
+        if ExportStorage.isOutOfSpace(writer.error) {
             return .insufficientStorage
         }
         return .exportFailed("The video encoder could not finish the exported movie.")
@@ -1662,6 +1672,7 @@ final class VideoExporter: @unchecked Sendable {
         if session.isCancelled || error is CancellationError {
             return .exportCancelled
         }
+        if ExportStorage.isOutOfSpace(error) { return .insufficientStorage }
         if let error = error as? GradeLabError {
             return error
         }

@@ -1,4 +1,10 @@
-Mejoras y corrección de errores.
+Nuevas herramientas de audio, Relight y mejoras de edición.
 
-• Mejoras de interfaz y correcciones de errores menores.
-• Mejoras de estabilidad y rendimiento.
+• Controles de audio: Ajusta el volumen, los fundidos, el balance estéreo y la ecualización, o empieza con un preajuste de voz.
+• Compresor: Reduce los picos de volumen con un control de intensidad y ajustes avanzados.
+• Atenuación automática: Elige un clip de voz para bajar automáticamente la música mientras se oye la voz.
+• Efectos de audio creativos: Añade eco, reverberación, distorsión y bitcrusher. Prueba los preajustes de ambiente y comprueba el nivel de cada clip en tiempo real.
+• Relight: Añade luces virtuales a vídeos que ya has grabado. Ajusta su posición, color e intensidad o empieza con un preajuste.
+• Los degradados de los deslizadores facilitan los ajustes de temperatura, tinte, tono y saturación.
+• Los emojis ahora se muestran correctamente junto al texto en las vistas previas y las exportaciones.
+• Recupera el metraje recortado con el tirador izquierdo, incluso tras mover el clip al inicio de la línea de tiempo.

@@ -1,9 +1,10 @@
-Relight est arrivé.
+Nouveaux outils audio, Relight et améliorations du montage.
 
-• Relight : ajoutez des lumières virtuelles à des images déjà tournées. GradeLab estime la forme de la scène : la lumière enveloppe les visages et les sujets au lieu de se poser dessus comme un cercle plat.
-• Lumières directionnelles, ponctuelles et spots, jusqu’à six par plan. Faites-les glisser sur l’image avec le pointeur et créez des keyframes pour chaque valeur.
-• Préréglages : Principale douce, Coucher de soleil chaud, Clair de lune froid, Lumière latérale, Lumière zénithale, Contre-jour, Dramatique et Appoint doux.
-• Compatible SDR, HDR HLG et Apple Log, ainsi qu’avec les rampes de vitesse, les plans scindés et inversés. Limitez-le à un masque pour n’éclairer qu’une zone.
-• Clavier : ⇧⌘L ouvre Relight. Les flèches déplacent la lumière sélectionnée, avec ⇧ pour de plus grands pas et ⌥ pour des pas plus fins. ⌫ la supprime et ⌘D la duplique.
-• Clic droit sur une lumière pour Dupliquer, Désactiver, Réinitialiser et Supprimer.
-• Améliorations de l’interface, corrections et optimisations générales.
+• Réglages audio : ajustez le volume, les fondus, la balance stéréo et l’égalisation, ou partez d’un préréglage vocal.
+• Compresseur : atténuez les passages trop forts avec un réglage d’intensité simple et des paramètres avancés.
+• Ducking automatique : choisissez un clip vocal pour baisser automatiquement la musique lorsque la voix est audible.
+• Effets audio créatifs : ajoutez écho, réverbération, distorsion et bitcrusher. Essayez les préréglages d’ambiance et suivez le niveau de chaque clip en temps réel.
+• Relight : ajoutez des lumières virtuelles à des vidéos déjà tournées. Réglez leur position, leur couleur et leur intensité, ou partez d’un préréglage.
+• Les dégradés des curseurs facilitent les réglages de température, de teinte et de saturation.
+• Les emojis s’affichent désormais correctement avec le texte dans les aperçus et les exports.
+• Récupérez les images retirées avec la poignée gauche, même après avoir déplacé le clip au début de la timeline.

@@ -86,7 +86,7 @@ final class ClipReplacementTests: XCTestCase {
     func testLastFrameHoldSilencesAudioOnlyDuringTheHold() throws {
         let (project, middle, _) = try sequence()
         let plan = try ClipReplacement.prepare(clipID: middle, asset: asset(3), timing: .keepDuration, in: project)
-        let mix = TimelineAudioMix(clipsByTrack: [1: middle]).makeMix(plan.project)
+        let mix = try TimelineAudioMix(clipsByTrack: [1: middle]).makeMix(plan.project)
         let parameter = try XCTUnwrap(mix.inputParameters.first)
         var start: Float = -1, end: Float = -1
         var range = CMTimeRange.invalid

@@ -11,9 +11,9 @@ into App Store Connect.
 | `name.txt` | 23 | 30 |
 | `subtitle.txt` | 25 | 30 |
 | `keywords.txt` | 94 | 100 |
-| `promotional-text.txt` | 149 | 170 |
+| `promotional-text.txt` | 130 | 170 |
 | `description.txt` | 3920 | 4000 |
-| `whats-new.txt` | 810 | 4000 |
+| `whats-new.txt` | 1033 | 4000 |
 
 The German description needed trimming: a straight translation of the English
 came to 4339 characters, over Apple's 4000 limit. It was tightened without

@@ -378,6 +378,7 @@ struct EmbeddedAudio: Codable, Equatable, Sendable {
     /// nothing rather than a zero.
     var fadeIn: Double? = nil
     var fadeOut: Double? = nil
+    var processing: AudioProcessingSettings? = nil
 }
 
 struct AudioClip: TimelineClip {
@@ -391,6 +392,7 @@ struct AudioClip: TimelineClip {
     /// Fade lengths in seconds, as for `EmbeddedAudio`.
     var fadeIn: Double? = nil
     var fadeOut: Double? = nil
+    var processing: AudioProcessingSettings? = nil
 }
 
 /// Where a clip's fade lengths are decided, once, for everything that needs

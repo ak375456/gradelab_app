@@ -11,9 +11,9 @@ store copy and the app agree.
 | `name.txt` | 19 | 30 |
 | `subtitle.txt` | 27 | 30 |
 | `keywords.txt` | 95 | 100 |
-| `promotional-text.txt` | 164 | 170 |
+| `promotional-text.txt` | 133 | 170 |
 | `description.txt` | 3906 | 4000 |
-| `whats-new.txt` | 787 | 4000 |
+| `whats-new.txt` | 1002 | 4000 |
 
 ## Conventions carried over from the app
 

@@ -29,6 +29,7 @@ enum AudioEditing {
             guard case .audio(let clip) = item, clip.volume.isFinite, (0...1).contains(clip.volume),
                   clip.fadeIn.map({ $0.isFinite && $0 >= 0 }) ?? true,
                   clip.fadeOut.map({ $0.isFinite && $0 >= 0 }) ?? true,
+                  clip.processing?.isValid ?? true,
                   clip.sourceTrackIndex.map({ $0 >= 0 }) ?? true else { throw TimelineError.invalid(String(localized: "Invalid audio clip.")) }
         }
         for (left, right) in zip(ordered, ordered.dropFirst()) {
@@ -44,7 +45,8 @@ enum AudioEditing {
         let trackID = UUID()
         let clip = AudioClip(placement: .init(id: UUID(), trackID: trackID, timelineStart: video.placement.timelineStart,
             duration: video.placement.duration, isEnabled: video.placement.isEnabled), assetID: video.assetID,
-            sourceRange: video.sourceRange, volume: linked.volume, isMuted: linked.isMuted)
+            sourceRange: video.sourceRange, volume: linked.volume, isMuted: linked.isMuted,
+            fadeIn: linked.fadeIn, fadeOut: linked.fadeOut, processing: linked.processing)
         let enabled = candidate.timeline.tracks.first { $0.id == video.placement.trackID }?.isEnabled ?? true
         video.embeddedAudio = nil
         try TimelineEditing.replace(id, with: [video], in: &candidate)
