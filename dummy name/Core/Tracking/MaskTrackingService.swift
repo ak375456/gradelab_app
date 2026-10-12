@@ -44,6 +44,7 @@ enum MaskTrackingService {
             var completedSpan = 0.0
             var frames = 0
             var lastProgress = -1.0
+            var lastProgressUpdate = ProcessInfo.processInfo.systemUptime
 
             for direction in passes {
                 try Task.checkCancellation()
@@ -61,6 +62,8 @@ enum MaskTrackingService {
                 }
                 vision.inputObservation = seeded
                 let referenceBox = coordinates.sourceBox(fromVision: seeded.boundingBox)
+                var previousBox = referenceBox
+                var previousTime = anchor.time
 
                 func consume(_ frame: TrackingFrame) throws -> Bool {
                     try Task.checkCancellation()
@@ -73,6 +76,10 @@ enum MaskTrackingService {
                         result.lostTime = local; return false
                     }
                     let box = coordinates.sourceBox(fromVision: observation.boundingBox)
+                    guard MaskTrackingCoordinates.isContinuous(box, after: previousBox,
+                        elapsed: abs(frame.time.seconds - previousTime.seconds)) else {
+                        result.lostTime = local; return false
+                    }
                     let visible = box.intersection(CGRect(x: 0, y: 0, width: 1, height: 1))
                     guard MaskTrackingCoordinates.isValid(box), MaskTrackingCoordinates.isValid(visible),
                           visible.width * visible.height >= box.width * box.height * 0.2 else {
@@ -94,9 +101,12 @@ enum MaskTrackingService {
                     for i in 0..<4 { values[i] = MaskTrackingMotion.properties[i].clamped(values[i]) }
                     result.samples.append(.init(localTime: local, values: values, confidence: observation.confidence))
                     vision.inputObservation = observation
+                    previousBox = box; previousTime = frame.time
                     frames += 1
                     let fraction = min(1, (completedSpan + abs(frame.time.seconds - anchorTime.seconds)) / totalSpan)
-                    if fraction - lastProgress >= 0.002 || frames % 12 == 0 {
+                    let now = ProcessInfo.processInfo.systemUptime
+                    if now - lastProgressUpdate >= 0.1 || fraction >= 1 {
+                        lastProgressUpdate = now
                         lastProgress = fraction
                         progress(.init(fraction: fraction, frames: frames, direction: direction))
                     }

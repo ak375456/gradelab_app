@@ -312,7 +312,7 @@ final class LookSettingsTests: XCTestCase {
     /// neither: they are listed explicitly so they can carry their own name,
     /// category and input colour space, none of which a filename can express.
     func testImportedLookNamesComeFromTheFilename() {
-        let listed = Set(LUTAsset.bundledLogConversions.map(\.id))
+        let listed = Set((LUTAsset.bundledLogConversions + LUTAsset.bundledCuratedLooks).map(\.id))
         for asset in LUTAsset.bundledLooks where !asset.isBuiltIn && !listed.contains(asset.id) {
             XCTAssertFalse(asset.name.contains("_"), "\(asset.filename) name still has underscores")
             XCTAssertFalse(asset.name.hasSuffix(".cube"), "\(asset.filename) name kept its extension")

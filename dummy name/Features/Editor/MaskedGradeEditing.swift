@@ -11,6 +11,32 @@ import SwiftUI
 // ---------------------------------------------------------------------------
 
 extension EditorViewModel {
+    /// Live rendering of an in-flight gesture uses a copy of the project. A
+    /// pinch cancellation can discard it without an edit, autosave or undo.
+    var maskPreviewProject: VideoProject {
+        guard let geometry = maskGeometryPreview, let id = selectedMaskID,
+              var clip = selectedClip, let index = clip.resolvedMaskedGrades.firstIndex(where: { $0.id == id }) else {
+            return project
+        }
+        var preview = project
+        var masks = clip.resolvedMaskedGrades
+        masks[index].geometry = geometry
+        // The draft is already evaluated at the playhead; retained keys must
+        // not override it in the preview copy. Grade/strength animation stays.
+        for property in MaskedGradeLayer.geometryProperties where property != .localMaskStrength {
+            masks[index].animation?.removeAnimation(of: property)
+        }
+        clip.maskedGrades = masks
+        try? TimelineEditing.replace(clip.id, with: [clip], in: &preview)
+        return preview
+    }
+
+    func setMaskGeometryPreview(_ geometry: MaskGeometry?) {
+        guard maskGeometryPreview != geometry else { return }
+        maskGeometryPreview = geometry
+        synchronizeRenderer()
+    }
+
     /// The mask whose local grade the Color controls are pointed at, or nil for
     /// the clip's global grade.
     var selectedMask: MaskedGradeLayer? {
@@ -390,44 +416,48 @@ extension EditorViewModel {
         }
         updateMask(id, label: "Draw Mask", immediate: immediate) { mask in
             mask.geometry.points.append(point.clamped)
-            // The pivot follows the shape while it is being drawn, and the
-            // position is pinned to it, so the path starts untranslated and
-            // scales and rotates about its own centre of gravity.
-            if let centroid = mask.geometry.pointCentroid {
-                mask.geometry.pivotX = min(max(centroid.x, 0), 1)
-                mask.geometry.pivotY = min(max(centroid.y, 0), 1)
-                mask.geometry.centerX = mask.geometry.pivotX
-                mask.geometry.centerY = mask.geometry.pivotY
-            }
+            mask.geometry.recenterPointPivot(aspect: maskSourceAspect)
         }
     }
 
     func moveMaskPoint(_ id: UUID, index: Int, to point: MaskPoint, committing: Bool) {
         updateMask(id, label: "Move Mask Point", immediate: committing) { mask in
             guard mask.geometry.points.indices.contains(index) else { return }
-            mask.geometry.points[index] = point.clamped
-            // The pivot follows the shape so later scaling stays centred, and
-            // the position follows it so reshaping never nudges the mask.
-            if let centroid = mask.geometry.pointCentroid {
-                let aspect = selectedClip.flatMap { clip in
-                    project.assets.first(where: { $0.id == clip.assetID })?.videoMetadata?.encodedSize.maskAspect
-                } ?? 1
-                let px = min(max(centroid.x, 0), 1), py = min(max(centroid.y, 0), 1)
-                let dx = (px - mask.geometry.pivotX) * aspect * mask.geometry.width
-                let dy = (py - mask.geometry.pivotY) * mask.geometry.height
-                let angle = mask.geometry.rotationDegrees * .pi / 180
-                // Moving the pivot must preserve the existing scaled/rotated
-                // placement of every other vertex, including after tracking.
-                mask.geometry.centerX = min(1, max(0, mask.geometry.centerX + (cos(angle) * dx - sin(angle) * dy) / aspect))
-                mask.geometry.centerY = min(1, max(0, mask.geometry.centerY + sin(angle) * dx + cos(angle) * dy))
-                mask.geometry.pivotX = px; mask.geometry.pivotY = py
-            }
+            // Handles are relative to the anchor and travel with it.
+            mask.geometry.points[index].x = point.clamped.x
+            mask.geometry.points[index].y = point.clamped.y
+            mask.geometry.recenterPointPivot(aspect: maskSourceAspect)
         }
+    }
+
+    private var maskSourceAspect: Double {
+        selectedClip.flatMap { clip in
+            project.assets.first(where: { $0.id == clip.assetID })?.videoMetadata?.encodedSize.maskAspect
+        } ?? 1
     }
 
     /// The name shown in the Color tab's context bar, or nil when the controls
     /// are editing the whole clip.
     var editingMaskName: String? { selectedMask?.name }
+
+    func setMaskTangent(_ id: UUID, index: Int, incoming: Bool, to tangent: MaskTangent,
+                        committing: Bool) {
+        updateMask(id, label: "Adjust Mask Curve", immediate: committing) { mask in
+            guard mask.geometry.points.indices.contains(index) else { return }
+            if incoming { mask.geometry.points[index].incoming = tangent.clamped }
+            else { mask.geometry.points[index].outgoing = tangent.clamped }
+        }
+    }
+
+    func setMaskPointSmooth(_ id: UUID, index: Int, smooth: Bool) {
+        updateMask(id, label: smooth ? "Smooth Mask Point" : "Corner Mask Point", immediate: true) { mask in
+            guard mask.geometry.points.indices.contains(index) else { return }
+            let a = mask.geometry.suggestedTangent(at: index, incoming: true)
+            let b = mask.geometry.suggestedTangent(at: index, incoming: false)
+            mask.geometry.points[index].incoming = smooth ? a : nil
+            mask.geometry.points[index].outgoing = smooth ? b : nil
+        }
+    }
 
     func removeMaskPoint(_ id: UUID, index: Int) {
         updateMask(id, label: "Delete Mask Point", immediate: true) { mask in
@@ -435,9 +465,11 @@ extension EditorViewModel {
                   mask.geometry.points.count > 3 else { return }
             mask.geometry.points.remove(at: index)
         }
+        selectedMaskPointIndex = nil
     }
 
     func clearMaskPoints(_ id: UUID) {
+        selectedMaskPointIndex = nil
         updateMask(id, label: "Reset Mask Shape", immediate: true) { mask in
             mask.geometry.points = []
             mask.geometry.centerX = 0.5
@@ -454,10 +486,12 @@ extension EditorViewModel {
     /// Ends drawing. A path with fewer than three points encloses nothing, so it
     /// is reported rather than left as a mask that silently never renders.
     func finishDrawingMask(_ id: UUID) {
-        isDrawingMask = false
         guard let layer = maskedGrades.first(where: { $0.id == id }),
-              layer.geometry.shape == .freehand,
-              layer.geometry.points.count < 3 else { return }
-        editError = String(localized: "A freehand mask needs at least three points. Tap around the subject to draw one.")
+              layer.geometry.shape == .freehand else { return }
+        guard layer.geometry.points.count >= 3 else {
+            editError = String(localized: "A freehand mask needs at least three points. Tap or trace the area you want to adjust.")
+            return
+        }
+        isDrawingMask = false
     }
 }

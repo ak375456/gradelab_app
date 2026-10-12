@@ -139,7 +139,12 @@ final class EditorViewModel: ObservableObject, GradingModel {
     /// Which masked local grade the Color controls are editing, or nil for the
     /// clip's own grade. UI state: the masks themselves live in the document,
     /// but which one is being worked on does not.
-    @Published private(set) var selectedMaskID: UUID?
+    @Published private(set) var selectedMaskID: UUID? {
+        didSet { selectedMaskPointIndex = nil; isDrawingMask = false; maskGeometryPreview = nil }
+    }
+    @Published var selectedMaskPointIndex: Int?
+    /// Transient direct manipulation; never saved or added to history.
+    var maskGeometryPreview: MaskGeometry?
     /// Show Mask. The preview draws this mask as a matte instead of a picture.
     /// Editor state only — the export paths cannot reach it.
     @Published var maskMatteID: UUID? { didSet { synchronizeRenderer() } }
@@ -3637,15 +3642,16 @@ final class EditorViewModel: ObservableObject, GradingModel {
     /// Not private: the masked-grade editing extension pushes mask changes
     /// through the same one path everything else uses.
     func synchronizeRenderer() {
-        layerState?.update(project, bypass: showsOriginal, inspectingMatteOn: inspectedMatteTargetID,
+        let previewProject = maskPreviewProject
+        layerState?.update(previewProject, bypass: showsOriginal, inspectingMatteOn: inspectedMatteTargetID,
                            inspectingBackgroundOn: showsBackgroundMatte ? selectedClipID : nil,
                            showsTransparencyGrid: !showsOriginal && !showsBackgroundMatte
                                && selectedBackgroundRemoval?.isEnabled == true)
         if layerState != nil { playback.refreshCompositionFrame() }
-        renderer.updateSequence(clips)
+        renderer.updateSequence(maskGeometryPreview == nil ? clips : ((try? TimelineEditing.clips(in: previewProject)) ?? clips))
         renderer.update(
             settings: globalSettings,
-            masks: maskedGrades,
+            masks: selectedClipID.flatMap { previewProject.timeline.videoClip(id: $0)?.resolvedMaskedGrades } ?? [],
             bypass: showsOriginal || !colorSupport.allowsGrading
         )
         renderer.setMaskMatte(maskMatte)

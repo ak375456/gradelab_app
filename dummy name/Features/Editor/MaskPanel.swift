@@ -413,9 +413,9 @@ private struct MaskInspector: View {
     private var freehandControls: some View {
         VStack(alignment: .leading, spacing: AppSpacing.small) {
             HStack(spacing: AppSpacing.small) {
-                Button(model.isDrawingMask ? "Done Drawing" : "Draw Points") {
+                Button(model.isDrawingMask ? "Done Drawing" : "Add Points") {
                     if model.isDrawingMask { model.finishDrawingMask(mask.id) }
-                    else { model.isDrawingMask = true }
+                    else { model.selectedMaskPointIndex = nil; model.isDrawingMask = true }
                 }
                 .font(AppTypography.caption.weight(.semibold))
                 .frame(maxWidth: .infinity, minHeight: 44)
@@ -430,9 +430,30 @@ private struct MaskInspector: View {
                     .foregroundStyle(AppColors.textPrimary)
             }
             .buttonStyle(.plain)
+            if !model.isDrawingMask, let index = model.selectedMaskPointIndex,
+               mask.geometry.points.indices.contains(index) {
+                HStack(spacing: AppSpacing.small) {
+                    Text("Point \(index + 1)").font(.caption2.monospacedDigit())
+                        .foregroundStyle(AppColors.textSecondary)
+                    Spacer(minLength: 0)
+                    Menu {
+                        Button("Smooth Point", systemImage: "point.topleft.down.to.point.bottomright.curvepath") {
+                            model.setMaskPointSmooth(mask.id, index: index, smooth: true)
+                        }
+                        Button("Corner Point", systemImage: "angle") {
+                            model.setMaskPointSmooth(mask.id, index: index, smooth: false)
+                        }
+                    } label: { Text("Point Type").frame(minHeight: 44) }
+                    Button("Delete Point", role: .destructive) { model.removeMaskPoint(mask.id, index: index) }
+                        .frame(minHeight: 44)
+                        .disabled(mask.geometry.points.count <= 3)
+                }
+                .font(AppTypography.caption.weight(.semibold))
+                .buttonStyle(.plain)
+            }
             Text(model.isDrawingMask
-                 ? "Tap around the subject on the picture. Three points or more make a shape; tap a point to remove it once you are done."
-                 : "\(mask.geometry.points.count) points. Drag a point on the picture to move it, or drag inside the shape to move the whole mask.")
+                 ? "Tap or trace the area you want to adjust, including sky or background. Tap the first point to close, or choose Done Drawing. Pinch to zoom; pan with two fingers."
+                 : "\(mask.geometry.points.count) points. Tap a point to show curve handles; drag a point or handle to refine the edge. Drag inside to move the mask. Pinch to zoom; pan with two fingers.")
                 .font(.caption2)
                 .foregroundStyle(AppColors.textSecondary)
         }

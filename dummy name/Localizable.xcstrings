@@ -2947,6 +2947,7 @@
       }
     },
     "%lld points. Drag a point on the picture to move it, or drag inside the shape to move the whole mask." : {
+      "extractionState" : "stale",
       "localizations" : {
         "de" : {
           "stringUnit" : {
@@ -2985,6 +2986,9 @@
           }
         }
       }
+    },
+    "%lld points. Tap a point to show curve handles; drag a point or handle to refine the edge. Drag inside to move the mask. Pinch to zoom; pan with two fingers." : {
+
     },
     "%lld shape layers selected" : {
       "localizations" : {
@@ -3982,6 +3986,9 @@
         }
       }
     },
+    "A film-print palette with warm skin tones and rich, clear blues." : {
+
+    },
     "A frame could not be prepared for scene analysis." : {
       "localizations" : {
         "de" : {
@@ -4183,6 +4190,7 @@
       }
     },
     "A freehand mask needs at least three points. Tap around the subject to draw one." : {
+      "extractionState" : "stale",
       "localizations" : {
         "de" : {
           "stringUnit" : {
@@ -4221,6 +4229,9 @@
           }
         }
       }
+    },
+    "A freehand mask needs at least three points. Tap or trace the area you want to adjust." : {
+
     },
     "A freeze needs the source's frame rate, and this media does not report one." : {
       "comment" : "Error message when a freeze is requested on a media that does not report a frame rate.",
@@ -7087,6 +7098,9 @@
           }
         }
       }
+    },
+    "Add Points" : {
+
     },
     "Add shape" : {
       "localizations" : {
@@ -13973,6 +13987,9 @@
     "Bright Voice" : {
 
     },
+    "Bright, warm color for a sunlit feel. Lower the strength for a softer finish." : {
+
+    },
     "Brightness by saturation. Lowering the right darkens the most colorful areas and leaves neutrals alone." : {
       "localizations" : {
         "de" : {
@@ -16355,6 +16372,9 @@
           }
         }
       }
+    },
+    "Clean black-and-white with crisp contrast and bright midtones." : {
+
     },
     "Clear" : {
       "comment" : "A button to clear the lasso selection.",
@@ -19066,6 +19086,9 @@
           }
         }
       }
+    },
+    "Corner Point" : {
+
     },
     "Corner radius" : {
       "localizations" : {
@@ -23453,6 +23476,7 @@
       }
     },
     "Draw Points" : {
+      "extractionState" : "stale",
       "localizations" : {
         "de" : {
           "stringUnit" : {
@@ -27290,6 +27314,9 @@
         }
       }
     },
+    "Finish drawing mask" : {
+
+    },
     "Finish in ProRes." : {
       "localizations" : {
         "de" : {
@@ -27409,6 +27436,9 @@
           }
         }
       }
+    },
+    "Fit · 100%" : {
+
     },
     "Five frames across the shot, averaged." : {
       "localizations" : {
@@ -29778,6 +29808,9 @@
           }
         }
       }
+    },
+    "Golden midtones, muted greens and a nostalgic chrome palette." : {
+
     },
     "Good" : {
       "localizations" : {
@@ -48585,6 +48618,12 @@
         }
       }
     },
+    "Point %lld" : {
+
+    },
+    "Point Type" : {
+
+    },
     "Points" : {
       "localizations" : {
         "de" : {
@@ -49921,6 +49960,9 @@
           }
         }
       }
+    },
+    "Preview zoom, %lld percent" : {
+
     },
     "Previous" : {
       "comment" : "A button that steps to the previous frame in the timeline.",
@@ -54584,6 +54626,9 @@
         }
       }
     },
+    "Reset preview to Fit, 100 percent" : {
+
+    },
     "Reset preview zoom" : {
       "localizations" : {
         "de" : {
@@ -54623,6 +54668,9 @@
           }
         }
       }
+    },
+    "Reset preview zoom and position" : {
+
     },
     "Reset Refinement" : {
       "comment" : "A button that resets the background refinement settings.",
@@ -55274,6 +55322,9 @@
         }
       }
     },
+    "Restrained color with a cooler balance and gentle blue highlights." : {
+
+    },
     "Restrained modern teal-shadow / warm-highlight look with controlled greens." : {
       "localizations" : {
         "de" : {
@@ -55637,6 +55688,9 @@
           }
         }
       }
+    },
+    "Rich color, deeper midtones and bold blue skies." : {
+
     },
     "Right side" : {
       "localizations" : {
@@ -60855,6 +60909,9 @@
         }
       }
     },
+    "Smooth Point" : {
+
+    },
     "Smooth Slow" : {
       "comment" : "Name of a time remap preset.",
       "extractionState" : "stale",
@@ -63375,6 +63432,9 @@
         }
       }
     },
+    "Subtle skin-tone shaping with restrained color for portraits." : {
+
+    },
     "Support & contact" : {
       "localizations" : {
         "de" : {
@@ -63900,6 +63960,7 @@
       }
     },
     "Tap around the subject on the picture. Three points or more make a shape; tap a point to remove it once you are done." : {
+      "extractionState" : "stale",
       "localizations" : {
         "de" : {
           "stringUnit" : {
@@ -63939,7 +64000,11 @@
         }
       }
     },
+    "Tap or trace the area you want to adjust, including sky or background. Tap the first point to close, or choose Done Drawing. Pinch to zoom; pan with two fingers." : {
+
+    },
     "Tap points or drag around the subject" : {
+      "extractionState" : "stale",
       "localizations" : {
         "de" : {
           "stringUnit" : {
@@ -68981,6 +69046,9 @@
         }
       }
     },
+    "The tracking frame could not be converted." : {
+
+    },
     "The tracking frame could not be resized." : {
       "localizations" : {
         "de" : {
@@ -69020,6 +69088,9 @@
           }
         }
       }
+    },
+    "The tracking frame has invalid dimensions." : {
+
     },
     "The usual starting point for phone and mirrorless footage." : {
       "localizations" : {
@@ -78645,6 +78716,9 @@
         }
       }
     },
+    "Warm highlights and cool blues for a stylized cinematic finish." : {
+
+    },
     "Warm Sunset" : {
       "localizations" : {
         "de" : {
@@ -80903,6 +80977,9 @@
           }
         }
       }
+    },
+    "Zoom relative to Fit. Pinch anywhere to zoom; use two fingers to pan." : {
+
     }
   },
   "version" : "1.1"

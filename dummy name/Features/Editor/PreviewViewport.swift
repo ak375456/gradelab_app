@@ -1,139 +1,253 @@
 import SwiftUI
+import UIKit
 
-/// What the preview lets the user do with the picture itself.
-enum PreviewInteraction: Equatable {
-    /// Pinch to zoom, one finger to pan once zoomed, double tap to reset.
-    case full
-    /// Two fingers zoom and pan; one finger is left entirely alone.
-    ///
-    /// For the tools that draw directly on the picture — the cutout lasso and
-    /// its refinement brushes. Tracing an edge at fit-to-screen size is the
-    /// difference between a usable cutout and an approximate one, so the
-    /// viewport has to zoom *while* the tool is armed rather than only before
-    /// it is. The one-finger pan is given up to buy that: it is the same touch
-    /// the tool needs.
-    case pinchOnly
-    /// Held at 1x, with every gesture belonging to the content.
-    case off
+private struct PreviewMagnificationKey: EnvironmentKey { static let defaultValue: CGFloat = 1 }
+extension EnvironmentValues {
+    var previewMagnification: CGFloat {
+        get { self[PreviewMagnificationKey.self] }
+        set { self[PreviewMagnificationKey.self] = newValue }
+    }
 }
 
-/// Inspection only: this transform never changes the project or exported frame.
+/// Tools retain one-finger input; the viewport always accepts two fingers.
+enum PreviewInteraction: Equatable {
+    case full
+    case pinchOnly
+}
+
+/// Inspection only: picture and tool overlays share one native zoom surface.
+/// UIScrollView owns pinch and two-finger pan, so drawing recognizers cannot
+/// steal zoom, and panning does not depend on changing the pinch distance.
 struct PreviewViewport<Content: View>: View {
     var interaction: PreviewInteraction = .full
-    /// Called when a two-finger zoom starts and again when it ends — twice per
-    /// gesture, not once per event, because the owner of this flag redraws on
-    /// it. It lets a tool drawing on the picture throw away the stroke the
-    /// pinch's first finger was leaving behind.
     var onPinchChanged: (Bool) -> Void = { _ in }
     @ViewBuilder let content: () -> Content
-    @State private var scale: CGFloat = 1
-    @State private var offset: CGSize = .zero
-    @GestureState private var magnification: CGFloat = 1
-    @GestureState private var translation: CGSize = .zero
-    /// Where the in-flight two-finger gesture started. Every frame of that
-    /// gesture is computed from this rather than accumulated, so it cannot
-    /// drift, and the drag baseline means a pinch begun mid-stroke does not
-    /// jump the picture by however far the stroke had already travelled.
-    @State private var pinchStart: PinchStart?
-
-    private struct PinchStart {
-        let scale: CGFloat
-        let offset: CGSize
-        let drag: CGSize
-        let anchor: UnitPoint
-    }
-
-    private static var maximumZoom: CGFloat { 6 }
+    @State private var zoom: CGFloat = 1
+    @State private var command = PreviewZoomCommand(scale: 1, reset: true)
 
     var body: some View {
-        GeometryReader { geometry in
-            let zoom = min(Self.maximumZoom, max(1, scale * magnification))
-            let position = bounded(CGSize(width: offset.width + translation.width,
-                                          height: offset.height + translation.height), zoom: zoom, size: geometry.size)
-            content()
-                .frame(width: geometry.size.width, height: geometry.size.height)
-                .scaleEffect(zoom).offset(position)
-                .frame(width: geometry.size.width, height: geometry.size.height)
-                .clipped().contentShape(Rectangle())
-                .gesture(MagnifyGesture()
-                    .updating($magnification) { value, state, _ in state = value.magnification }
-                    .onEnded { value in
-                        scale = min(Self.maximumZoom, max(1, scale * value.magnification))
-                        offset = bounded(offset, zoom: scale, size: geometry.size)
-                    }, including: interaction == .full ? .all : .subviews)
-                .simultaneousGesture(DragGesture(minimumDistance: 4)
-                    .updating($translation) { value, state, _ in if scale > 1 { state = value.translation } }
-                    .onEnded { value in
-                        guard scale > 1 else { return }
-                        offset = bounded(CGSize(width: offset.width + value.translation.width,
-                                                height: offset.height + value.translation.height), zoom: scale, size: geometry.size)
-                    }, including: interaction == .full ? .all : .subviews)
-                .simultaneousGesture(precisionZoom(in: geometry.size),
-                                     including: interaction == .pinchOnly ? .all : .subviews)
-                // Only where a double tap cannot also be two strokes of a
-                // brush. A pinch back down to 1x resets the other mode, since
-                // `bounded` allows no offset at all at that zoom.
-                .onTapGesture(count: 2) { if interaction == .full { reset() } }
-                .onChange(of: interaction) { _, mode in
-                    endPinch()
-                    if mode == .off { reset() }
+        NativePreviewViewport(content: content().environment(\.previewMagnification, zoom), interaction: interaction,
+                              command: command, zoom: $zoom, onNavigationChanged: onPinchChanged)
+            .overlay(alignment: .bottomLeading) { zoomControls.padding(10) }
+            .accessibilityAction(named: "Reset preview zoom") { reset() }
+    }
+
+    private var zoomControls: some View {
+        HStack(spacing: 0) {
+            Button { setZoom(zoom / 1.25) } label: {
+                Image(systemName: "minus").frame(width: 44, height: 44)
+            }
+            .disabled(zoom <= PreviewZoom.minimum)
+            .accessibilityLabel("Zoom out")
+            Menu {
+                Button("Fit · 100%") { reset() }
+                ForEach([50, 200, 400, 800], id: \.self) { percent in
+                    Button("\(percent)%") { setZoom(CGFloat(percent) / 100) }
                 }
-                .accessibilityAction(named: "Reset preview zoom") { reset() }
+            } label: {
+                Text("\(Int((zoom * 100).rounded()))%")
+                    .monospacedDigit().frame(minWidth: 56, minHeight: 44)
+            }
+            .accessibilityLabel("Preview zoom, \(Int((zoom * 100).rounded())) percent")
+            .help("Zoom relative to Fit. Pinch anywhere to zoom; use two fingers to pan.")
+            Button { setZoom(zoom * 1.25) } label: {
+                Image(systemName: "plus").frame(width: 44, height: 44)
+            }
+            .disabled(zoom >= PreviewZoom.maximum)
+            .accessibilityLabel("Zoom in")
+            Rectangle().fill(.white.opacity(0.18)).frame(width: 1, height: 16)
+            Button(action: reset) {
+                Image(systemName: "arrow.counterclockwise").frame(width: 44, height: 44)
+            }
+            .accessibilityLabel("Reset preview to Fit, 100 percent")
+            .help("Reset preview zoom and position")
+        }
+        .font(.system(size: 12, weight: .semibold))
+        .foregroundStyle(.white)
+        .buttonStyle(.plain)
+        .background(.black.opacity(0.78), in: Capsule())
+        .overlay(Capsule().strokeBorder(.white.opacity(0.12), lineWidth: 1))
+        .accessibilityElement(children: .contain)
+    }
+
+    private func setZoom(_ value: CGFloat) {
+        command = PreviewZoomCommand(scale: PreviewZoom.clamped(value), reset: false)
+    }
+
+    private func reset() { command = PreviewZoomCommand(scale: 1, reset: true) }
+}
+
+/// Fit is the stable 100% reference on every device, including while a tool is
+/// active. Snap only on release, so a pinch can pass smoothly through 100%.
+enum PreviewZoom {
+    static let minimum: CGFloat = 0.5
+    static let maximum: CGFloat = 8
+    static func clamped(_ scale: CGFloat) -> CGFloat { min(maximum, max(minimum, scale)) }
+    static func snapped(_ scale: CGFloat) -> CGFloat { abs(scale - 1) <= 0.06 ? 1 : clamped(scale) }
+}
+
+private struct PreviewZoomCommand: Equatable {
+    let id = UUID()
+    let scale: CGFloat
+    let reset: Bool
+}
+
+private final class PreviewScrollView: UIScrollView {
+    var onLayout: (() -> Void)?
+    override func layoutSubviews() { super.layoutSubviews(); onLayout?() }
+    // Direct manipulation should immediately receive a finger, but yield when
+    // the native two-finger navigation recognizer begins.
+    override func touchesShouldCancel(in view: UIView) -> Bool { true }
+}
+
+private struct NativePreviewViewport<Content: View>: UIViewRepresentable {
+    var content: Content
+    var interaction: PreviewInteraction
+    var command: PreviewZoomCommand
+    @Binding var zoom: CGFloat
+    var onNavigationChanged: (Bool) -> Void
+
+    func makeCoordinator() -> Coordinator { Coordinator(self) }
+
+    func makeUIView(context: Context) -> UIScrollView {
+        let scroll = PreviewScrollView()
+        let coordinator = context.coordinator
+        scroll.backgroundColor = .clear
+        scroll.minimumZoomScale = PreviewZoom.minimum
+        scroll.maximumZoomScale = PreviewZoom.maximum
+        scroll.bouncesZoom = false
+        scroll.showsHorizontalScrollIndicator = false
+        scroll.showsVerticalScrollIndicator = false
+        scroll.contentInsetAdjustmentBehavior = .never
+        scroll.delaysContentTouches = false
+        scroll.delegate = coordinator
+        scroll.panGestureRecognizer.minimumNumberOfTouches = interaction == .full ? 1 : 2
+        scroll.addSubview(coordinator.host.view)
+        scroll.onLayout = { [weak coordinator, weak scroll] in
+            guard let scroll else { return }
+            coordinator?.layout(scroll)
+        }
+        let doubleTap = UITapGestureRecognizer(target: coordinator, action: #selector(Coordinator.gradeLabResetPreviewZoom(_:)))
+        doubleTap.numberOfTapsRequired = 2
+        doubleTap.delegate = coordinator
+        scroll.addGestureRecognizer(doubleTap)
+        return scroll
+    }
+
+    func updateUIView(_ scroll: UIScrollView, context: Context) {
+        let coordinator = context.coordinator
+        coordinator.parent = self
+        coordinator.host.rootView = content
+        scroll.panGestureRecognizer.minimumNumberOfTouches = interaction == .full ? 1 : 2
+        coordinator.layout(scroll)
+        if coordinator.lastCommand != command.id {
+            coordinator.lastCommand = command.id
+            coordinator.apply(command, to: scroll)
         }
     }
 
-    /// Two-finger zoom and pan that leaves one finger to the content.
-    ///
-    /// The drag is bundled with the pinch rather than attached separately so
-    /// there is one recogniser pair to reason about, and it is consulted only
-    /// once the pinch itself has recognised. A `DragGesture` fires for a single
-    /// finger too, and acting on that is exactly what would steal the stroke
-    /// the lasso is drawing.
-    private func precisionZoom(in size: CGSize) -> some Gesture {
-        SimultaneousGesture(MagnifyGesture(), DragGesture(minimumDistance: 0))
-            .onChanged { value in
-                guard let magnify = value.first else { return }
-                let drag = value.second?.translation ?? .zero
-                let start: PinchStart
-                if let pinchStart {
-                    start = pinchStart
-                } else {
-                    start = PinchStart(scale: scale, offset: offset, drag: drag, anchor: magnify.startAnchor)
-                    pinchStart = start
-                    onPinchChanged(true)
-                }
-                let zoom = min(Self.maximumZoom, max(1, start.scale * magnify.magnification))
-                // Zoom about the point the fingers landed on, so pinching an
-                // edge brings that edge in rather than magnifying the middle of
-                // the frame and leaving the edge off screen. Derived rather
-                // than applied as a `scaleEffect` anchor because the offset is
-                // what the pan and the bounds clamp both work in.
-                let ratio = zoom / max(start.scale, 0.0001)
-                let dx = (start.anchor.x - 0.5) * size.width
-                let dy = (start.anchor.y - 0.5) * size.height
-                let panned = CGSize(
-                    width: dx * (1 - ratio) + start.offset.width * ratio + (drag.width - start.drag.width),
-                    height: dy * (1 - ratio) + start.offset.height * ratio + (drag.height - start.drag.height))
-                scale = zoom
-                offset = bounded(panned, zoom: zoom, size: size)
+    static func dismantleUIView(_ scroll: UIScrollView, coordinator: Coordinator) {
+        coordinator.setNavigating(false)
+        scroll.delegate = nil
+    }
+
+    final class Coordinator: NSObject, UIScrollViewDelegate, UIGestureRecognizerDelegate {
+        var parent: NativePreviewViewport
+        let host: UIHostingController<Content>
+        var lastCommand: UUID?
+        private var lastSize: CGSize = .zero
+        private var navigating = false
+
+        init(_ parent: NativePreviewViewport) {
+            self.parent = parent
+            host = UIHostingController(rootView: parent.content)
+            super.init()
+            host.view.backgroundColor = .clear
+            host.safeAreaRegions = []
+        }
+
+        func layout(_ scroll: UIScrollView) {
+            let size = scroll.bounds.size
+            guard size.width > 0, size.height > 0, size != lastSize else { return }
+            let oldSize = lastSize
+            let scale = scroll.zoomScale
+            let center = scroll.convert(CGPoint(x: scroll.bounds.midX, y: scroll.bounds.midY), to: host.view)
+            lastSize = size
+            scroll.setZoomScale(1, animated: false)
+            host.view.frame = CGRect(origin: .zero, size: size)
+            scroll.contentSize = size
+            scroll.setZoomScale(scale, animated: false)
+            if oldSize.width > 0, oldSize.height > 0, scale > 1 {
+                scroll.contentOffset = CGPoint(x: center.x / oldSize.width * size.width * scale - size.width / 2,
+                                               y: center.y / oldSize.height * size.height * scale - size.height / 2)
             }
-            .onEnded { _ in endPinch() }
-    }
+            centerContent(scroll)
+        }
 
-    private func endPinch() {
-        guard pinchStart != nil else { return }
-        pinchStart = nil
-        onPinchChanged(false)
-    }
+        func viewForZooming(in scrollView: UIScrollView) -> UIView? { host.view }
 
-    private func reset() {
-        scale = 1
-        offset = .zero
-        endPinch()
-    }
+        func scrollViewDidZoom(_ scrollView: UIScrollView) {
+            centerContent(scrollView)
+            reportZoom(scrollView.zoomScale)
+        }
 
-    private func bounded(_ value: CGSize, zoom: CGFloat, size: CGSize) -> CGSize {
-        let x = size.width * (zoom-1)/2, y = size.height * (zoom-1)/2
-        return CGSize(width: min(x, max(-x, value.width)), height: min(y, max(-y, value.height)))
+        private func centerContent(_ scroll: UIScrollView) {
+            host.view.center = CGPoint(x: max(scroll.bounds.width, scroll.contentSize.width) / 2,
+                                       y: max(scroll.bounds.height, scroll.contentSize.height) / 2)
+        }
+
+        func scrollViewWillBeginZooming(_ scrollView: UIScrollView, with view: UIView?) { setNavigating(true) }
+
+        func scrollViewDidEndZooming(_ scrollView: UIScrollView, with view: UIView?, atScale scale: CGFloat) {
+            let snapped = PreviewZoom.snapped(scale)
+            if snapped != scale { apply(.init(scale: snapped, reset: false), to: scrollView) }
+            if !scrollView.isDragging { setNavigating(false) }
+        }
+
+        func scrollViewWillBeginDragging(_ scrollView: UIScrollView) { setNavigating(true) }
+        func scrollViewDidEndDragging(_ scrollView: UIScrollView, willDecelerate decelerate: Bool) {
+            if !scrollView.isZooming { setNavigating(false) }
+        }
+
+        func setNavigating(_ value: Bool) {
+            guard navigating != value else { return }
+            navigating = value
+            parent.onNavigationChanged(value)
+        }
+
+        private func reportZoom(_ value: CGFloat) {
+            // Delegate callbacks also occur during representable layout.
+            // Publish on the next run loop, coalescing unchanged values.
+            DispatchQueue.main.async { [weak self] in
+                guard let self, abs(self.parent.zoom - value) > 0.001 else { return }
+                self.parent.zoom = value
+            }
+        }
+
+        func apply(_ command: PreviewZoomCommand, to scroll: UIScrollView) {
+            guard lastSize != .zero else { return }
+            if command.reset {
+                scroll.setZoomScale(1, animated: false)
+                scroll.setContentOffset(.zero, animated: false)
+            } else {
+                let scale = PreviewZoom.clamped(command.scale)
+                let center = scroll.convert(CGPoint(x: scroll.bounds.midX, y: scroll.bounds.midY), to: host.view)
+                scroll.zoom(to: CGRect(x: center.x - scroll.bounds.width / scale / 2,
+                                       y: center.y - scroll.bounds.height / scale / 2,
+                                       width: scroll.bounds.width / scale, height: scroll.bounds.height / scale), animated: false)
+            }
+            reportZoom(scroll.zoomScale)
+        }
+
+        func gestureRecognizerShouldBegin(_ gestureRecognizer: UIGestureRecognizer) -> Bool {
+            parent.interaction == .full
+        }
+
+        // Keep our action distinct from UIKit's private selector names: App
+        // Store validation also checks Objective-C selectors on app classes.
+        @objc func gradeLabResetPreviewZoom(_ recognizer: UITapGestureRecognizer) {
+            guard let scroll = recognizer.view as? UIScrollView else { return }
+            apply(.init(scale: 1, reset: true), to: scroll)
+        }
     }
 }

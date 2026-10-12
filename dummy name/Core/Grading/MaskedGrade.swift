@@ -59,16 +59,53 @@ enum MaskShape: String, Codable, CaseIterable, Identifiable, Sendable {
     var hasCornerRadius: Bool { self == .rectangle }
 }
 
+/// A Bezier handle stored as an offset from its anchor. Moving an anchor thus
+/// carries its handles with it, including on rotated or tracked masks.
+struct MaskTangent: Codable, Equatable, Sendable {
+    var x: Double
+    var y: Double
+
+    var clamped: MaskTangent {
+        .init(x: min(2, max(-2, x.isFinite ? x : 0)),
+              y: min(2, max(-2, y.isFinite ? y : 0)))
+    }
+}
+
 /// One freehand vertex, normalised to the source frame.
 struct MaskPoint: Codable, Equatable, Sendable {
     var x: Double
     var y: Double
+    // Optional for compatibility with every existing polygon and lasso.
+    var incoming: MaskTangent?
+    var outgoing: MaskTangent?
 
     init(x: Double, y: Double) { self.x = x; self.y = y }
 
     var clamped: MaskPoint {
-        MaskPoint(x: min(max(x.isFinite ? x : 0.5, -1), 2),
-                  y: min(max(y.isFinite ? y : 0.5, -1), 2))
+        var point = MaskPoint(x: min(max(x.isFinite ? x : 0.5, -1), 2),
+                              y: min(max(y.isFinite ? y : 0.5, -1), 2))
+        point.incoming = incoming?.clamped
+        point.outgoing = outgoing?.clamped
+        return point
+    }
+}
+
+/// Tracking changes placement, not the authored path. Keep tessellation off
+/// the per-frame render path; preview and export may read this concurrently.
+private final class MaskPathCache: @unchecked Sendable {
+    static let shared = MaskPathCache()
+    private let lock = NSLock()
+    private var entries: [(anchors: [MaskPoint], samples: [MaskPoint])] = []
+
+    func samples(for anchors: [MaskPoint]) -> [MaskPoint]? {
+        lock.lock(); defer { lock.unlock() }
+        return entries.first(where: { $0.anchors == anchors })?.samples
+    }
+
+    func store(_ samples: [MaskPoint], for anchors: [MaskPoint]) {
+        lock.lock(); defer { lock.unlock() }
+        if entries.count >= 32 { entries.removeFirst() }
+        entries.append((anchors, samples))
     }
 }
 
@@ -150,6 +187,80 @@ struct MaskGeometry: Codable, Equatable, Sendable {
         guard !points.isEmpty else { return nil }
         let sum = points.reduce(into: (x: 0.0, y: 0.0)) { $0.x += $1.x; $0.y += $1.y }
         return MaskPoint(x: sum.x / Double(points.count), y: sum.y / Double(points.count))
+    }
+
+    mutating func recenterPointPivot(aspect: Double) {
+        guard let centroid = pointCentroid else { return }
+        let px = min(1, max(0, centroid.x)), py = min(1, max(0, centroid.y))
+        let dx = (px - pivotX) * aspect * width, dy = (py - pivotY) * height
+        let angle = rotationDegrees * .pi / 180
+        let cx = centerX + (cos(angle) * dx - sin(angle) * dy) / aspect
+        let cy = centerY + sin(angle) * dx + cos(angle) * dy
+        // At a frame boundary keep the existing pivot rather than clamping
+        // the new centre and accidentally shifting every other vertex.
+        guard (0...1).contains(cx), (0...1).contains(cy) else { return }
+        centerX = cx; centerY = cy; pivotX = px; pivotY = py
+    }
+
+    /// Suggested handles are editor furniture until dragged or Smooth is used.
+    /// Simply selecting a corner never changes the authored outline.
+    func suggestedTangent(at index: Int, incoming: Bool) -> MaskTangent {
+        guard points.indices.contains(index), points.count > 1 else { return .init(x: 0, y: 0) }
+        let point = points[index]
+        if let stored = incoming ? point.incoming : point.outgoing { return stored }
+        let previous = points[(index + points.count - 1) % points.count]
+        let next = points[(index + 1) % points.count]
+        let dx = next.x - previous.x, dy = next.y - previous.y
+        let length = max(0.0001, hypot(dx, dy))
+        let reach = min(hypot(point.x - previous.x, point.y - previous.y),
+                        hypot(next.x - point.x, next.y - point.y)) / 3
+        let sign = incoming ? -1.0 : 1.0
+        return .init(x: dx / length * reach * sign, y: dy / length * reach * sign)
+    }
+
+    /// The same bounded polyline is used by the overlay, tracking bounds and
+    /// ALL GPU paths. Curves never expand the shared Metal point budget or make
+    /// another mask disappear. Straight legacy polygons stay byte-for-byte.
+    var renderPoints: [MaskPoint] {
+        let anchors = Array(points.prefix(Self.maximumPoints)).map(\.clamped)
+        guard anchors.count >= 3, anchors.contains(where: { $0.incoming != nil || $0.outgoing != nil }) else {
+            return anchors
+        }
+        if let cached = MaskPathCache.shared.samples(for: anchors) { return cached }
+        var samples: [(point: MaskPoint, anchor: Bool)] = []
+        let curvedCount = anchors.indices.filter {
+            anchors[$0].outgoing != nil || anchors[($0 + 1) % anchors.count].incoming != nil
+        }.count
+        let curveSteps = max(2, min(16, 1 + (Self.maximumPoints * 2 - anchors.count) / max(1, curvedCount)))
+        for index in anchors.indices {
+            let a = anchors[index], b = anchors[(index + 1) % anchors.count]
+            let curved = a.outgoing != nil || b.incoming != nil
+            let steps = curved ? curveSteps : 1
+            let c = MaskPoint(x: a.x + (a.outgoing?.x ?? 0), y: a.y + (a.outgoing?.y ?? 0))
+            let d = MaskPoint(x: b.x + (b.incoming?.x ?? 0), y: b.y + (b.incoming?.y ?? 0))
+            for step in 0..<steps {
+                let t = Double(step) / Double(steps), u = 1 - t
+                samples.append((MaskPoint(
+                    x: u*u*u*a.x + 3*u*u*t*c.x + 3*u*t*t*d.x + t*t*t*b.x,
+                    y: u*u*u*a.y + 3*u*u*t*c.y + 3*u*t*t*d.y + t*t*t*b.y), step == 0))
+            }
+        }
+        // Remove the least significant bend first, preferring to keep anchors.
+        // This is bounded (at most 128 temporary samples) and deterministic.
+        while samples.count > Self.maximumPoints {
+            var best = 0, smallest = Double.infinity
+            for i in samples.indices {
+                let a = samples[(i + samples.count - 1) % samples.count].point
+                let b = samples[i].point, c = samples[(i + 1) % samples.count].point
+                let error = abs((b.x-a.x)*(c.y-a.y) - (b.y-a.y)*(c.x-a.x))
+                    + (samples[i].anchor ? 0.00000001 : 0)
+                if error < smallest { smallest = error; best = i }
+            }
+            samples.remove(at: best)
+        }
+        let result = samples.map(\.point)
+        MaskPathCache.shared.store(result, for: anchors)
+        return result
     }
 
     /// A starting shape for a newly added mask, centred in the frame.

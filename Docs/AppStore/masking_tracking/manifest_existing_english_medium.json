@@ -1,0 +1,110 @@
+[
+  {
+    "source": "store_localizations/sv-SE/sources/ios/01_color_grading.png",
+    "file": "ios_store_localizations/existing_gallery_1206x2622/en-US/01_Color_Grading_English_1206x2622.png",
+    "pixels": [
+      1206,
+      2622
+    ],
+    "mode": "RGB",
+    "locale": "en-US",
+    "resized_content": [
+      1206,
+      2610
+    ],
+    "background_extension": [
+      6,
+      6
+    ]
+  },
+  {
+    "source": "store_localizations/sv-SE/sources/ios/02_looks.png",
+    "file": "ios_store_localizations/existing_gallery_1206x2622/en-US/02_Cinematic_Looks_English_1206x2622.png",
+    "pixels": [
+      1206,
+      2622
+    ],
+    "mode": "RGB",
+    "locale": "en-US",
+    "resized_content": [
+      1206,
+      2610
+    ],
+    "background_extension": [
+      6,
+      6
+    ]
+  },
+  {
+    "source": "store_localizations/sv-SE/sources/ios/04_color_warper.png",
+    "file": "ios_store_localizations/existing_gallery_1206x2622/en-US/03_Color_Warper_English_1206x2622.png",
+    "pixels": [
+      1206,
+      2622
+    ],
+    "mode": "RGB",
+    "locale": "en-US",
+    "resized_content": [
+      1206,
+      2610
+    ],
+    "background_extension": [
+      6,
+      6
+    ]
+  },
+  {
+    "source": "store_localizations/sv-SE/sources/ios/03_curves.png",
+    "file": "ios_store_localizations/existing_gallery_1206x2622/en-US/04_Curves_and_Scopes_English_1206x2622.png",
+    "pixels": [
+      1206,
+      2622
+    ],
+    "mode": "RGB",
+    "locale": "en-US",
+    "resized_content": [
+      1206,
+      2610
+    ],
+    "background_extension": [
+      6,
+      6
+    ]
+  },
+  {
+    "source": "store_localizations/sv-SE/sources/ios/05_fine_tune.png",
+    "file": "ios_store_localizations/existing_gallery_1206x2622/en-US/05_Fine_Tune_English_1206x2622.png",
+    "pixels": [
+      1206,
+      2622
+    ],
+    "mode": "RGB",
+    "locale": "en-US",
+    "resized_content": [
+      1206,
+      2610
+    ],
+    "background_extension": [
+      6,
+      6
+    ]
+  },
+  {
+    "source": "store_localizations/sv-SE/sources/ios/06_effects.png",
+    "file": "ios_store_localizations/existing_gallery_1206x2622/en-US/06_Pro_Effects_English_1206x2622.png",
+    "pixels": [
+      1206,
+      2622
+    ],
+    "mode": "RGB",
+    "locale": "en-US",
+    "resized_content": [
+      1206,
+      2610
+    ],
+    "background_extension": [
+      6,
+      6
+    ]
+  }
+]

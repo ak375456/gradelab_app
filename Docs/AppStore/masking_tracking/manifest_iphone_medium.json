@@ -1,0 +1,114 @@
+[
+  {
+    "locale": "en-US",
+    "file": "ios_store_localizations/masking_tracking/iphone_dynamic_island_medium/GradeLab_iPhone_Masking_Tracking_English_1206x2622.png",
+    "pixels": [
+      1206,
+      2622
+    ],
+    "mode": "RGB",
+    "app_store_slot": "iPhone with Dynamic Island (medium display)",
+    "copy": [
+      "Mask with precision",
+      "Track the motion",
+      "Draw, refine and track your masks.",
+      "Motion tracking"
+    ]
+  },
+  {
+    "locale": "fr-FR",
+    "file": "ios_store_localizations/masking_tracking/iphone_dynamic_island_medium/GradeLab_iPhone_Masking_Tracking_French_1206x2622.png",
+    "pixels": [
+      1206,
+      2622
+    ],
+    "mode": "RGB",
+    "app_store_slot": "iPhone with Dynamic Island (medium display)",
+    "copy": [
+      "Masquez avec précision",
+      "Suivez le mouvement",
+      "Masques à main levée et suivi de mouvement.",
+      "Suivi de mouvement"
+    ]
+  },
+  {
+    "locale": "de-DE",
+    "file": "ios_store_localizations/masking_tracking/iphone_dynamic_island_medium/GradeLab_iPhone_Masking_Tracking_German_1206x2622.png",
+    "pixels": [
+      1206,
+      2622
+    ],
+    "mode": "RGB",
+    "app_store_slot": "iPhone with Dynamic Island (medium display)",
+    "copy": [
+      "Masken nach Maß",
+      "Bewegungen verfolgen",
+      "Freihand zeichnen, verfeinern und verfolgen.",
+      "Bewegungsverfolgung"
+    ]
+  },
+  {
+    "locale": "it-IT",
+    "file": "ios_store_localizations/masking_tracking/iphone_dynamic_island_medium/GradeLab_iPhone_Masking_Tracking_Italian_1206x2622.png",
+    "pixels": [
+      1206,
+      2622
+    ],
+    "mode": "RGB",
+    "app_store_slot": "iPhone with Dynamic Island (medium display)",
+    "copy": [
+      "Maschere precise",
+      "Segui il movimento",
+      "Disegna, rifinisci e traccia le tue maschere.",
+      "Tracciamento"
+    ]
+  },
+  {
+    "locale": "es-ES",
+    "file": "ios_store_localizations/masking_tracking/iphone_dynamic_island_medium/GradeLab_iPhone_Masking_Tracking_Spanish_Spain_1206x2622.png",
+    "pixels": [
+      1206,
+      2622
+    ],
+    "mode": "RGB",
+    "app_store_slot": "iPhone with Dynamic Island (medium display)",
+    "copy": [
+      "Máscaras precisas",
+      "Sigue el movimiento",
+      "Dibuja, ajusta y sigue tus máscaras.",
+      "Seguimiento de movimiento"
+    ]
+  },
+  {
+    "locale": "sv-SE",
+    "file": "ios_store_localizations/masking_tracking/iphone_dynamic_island_medium/GradeLab_iPhone_Masking_Tracking_Swedish_1206x2622.png",
+    "pixels": [
+      1206,
+      2622
+    ],
+    "mode": "RGB",
+    "app_store_slot": "iPhone with Dynamic Island (medium display)",
+    "copy": [
+      "Maska med precision",
+      "Följ rörelsen",
+      "Rita, finjustera och spåra dina masker.",
+      "Rörelsespårning"
+    ]
+  },
+  {
+    "locale": "fi-FI",
+    "file": "ios_store_localizations/masking_tracking/iphone_dynamic_island_medium/GradeLab_iPhone_Masking_Tracking_Finnish_1206x2622.png",
+    "pixels": [
+      1206,
+      2622
+    ],
+    "mode": "RGB",
+    "app_store_slot": "iPhone with Dynamic Island (medium display)",
+    "copy": [
+      "Maskaa tarkasti",
+      "Seuraa liikettä",
+      "Piirrä, hienosäädä ja seuraa maskeja.",
+      "Liikkeenseuranta"
+    ]
+  }
+]

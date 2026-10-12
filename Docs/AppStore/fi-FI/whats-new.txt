@@ -1,10 +1,7 @@
-Uudet äänityökalut, Relight ja parannuksia muokkaukseen.
+Tarkemmat maskit, helpompi zoomaus ja kahdeksan uutta LUT-tyyliä.
 
-• Äänisäätimet: Säädä äänenvoimakkuutta, häivytyksiä, stereotasapainoa ja taajuuskorjausta tai aloita puheäänen esiasetuksesta.
-• Kompressori: Tasoita voimakkaita ääniä yhdellä säätimellä tai hienosäädä lisäasetuksilla.
-• Automaattinen musiikin vaimennus: Valitse puheleike, niin musiikki hiljenee automaattisesti puheen ajaksi.
-• Luovat äänitehosteet: Lisää viive-, kaiku-, särö- ja bitcrusher-tehosteita. Kokeile tilaesiasetuksia ja seuraa kunkin leikkeen äänitasoa reaaliajassa.
-• Relight: Lisää virtuaalisia valoja jo kuvattuihin videoihin. Säädä valojen sijaintia, väriä ja voimakkuutta tai aloita valmiista asetuksesta.
-• Liukusäätimien väriliu’ut havainnollistavat esimerkiksi värilämpötilan ja kylläisyyden säätöjä.
-• Emojit näkyvät nyt oikein tekstin rinnalla esikatselussa ja viedyissä videoissa.
-• Palauta pois leikatut kohdat vetämällä leikkeen vasenta reunakahvaa, vaikka olisit siirtänyt leikkeen aikajanan alkuun.
+• Hienosäädä vapaapiirtomaskeja muokattavilla pisteillä ja käyräkahvoilla. Pisteen napautus valitsee sen nyt poistamisen sijaan.
+• Zoomaa ja panoroi maskauksen ja muiden työkalujen käytön aikana. Zoomaus napsahtaa lähellä 100 %:n tasoa takaisin siihen, ja näkymän voi palauttaa nopeasti.
+• Piirto-ohjeet eivät enää peitä kuvaa, joten taivaan ja kuvan reunojen maskaus on helpompaa.
+• Maskin seuranta toimii tehokkaammin, ja lisätarkistukset auttavat ehkäisemään äkillisiä siirtymiä.
+• Kahdeksan uutta LUT-tyyliä: kolme maksutonta ja viisi Pro-tyyliä, selkeillä nimillä. Kokeile kaikkia tyylejä esikatselussa.

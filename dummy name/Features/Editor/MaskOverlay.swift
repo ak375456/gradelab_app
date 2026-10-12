@@ -14,9 +14,11 @@ import SwiftUI
 
 struct MaskOverlay: View {
     @ObservedObject var model: EditorViewModel
+    @Environment(\.previewMagnification) private var magnification
     /// The renderer returns the aspect-fitted picture as a rectangle in
     /// normalised view space, so the guide letterboxes exactly as Metal does.
     let displayedRect: () -> CGRect?
+    var isZooming = false
 
     private enum Handle: Equatable {
         case move
@@ -25,29 +27,28 @@ struct MaskOverlay: View {
         case rotate
         case feather
         case vertex(Int)
+        case tangent(Int, incoming: Bool)
     }
 
     @State private var active: Handle?
     @State private var start: MaskGeometry?
     @State private var startPoint: CGPoint?
-    /// Last vertex sampled while a freehand stroke is in flight. The old
-    /// implementation put a zero-distance drag and a tap recogniser on the
-    /// same view; the drag won, so the tap that was supposed to add a point
-    /// never arrived. Freehand input now lives in the drag recogniser itself,
-    /// which also lets a person trace a shape instead of having to tap every
-    /// vertex individually.
+    /// Pending input lives in the overlay until release. Native pinch/pan
+    /// cancellation can discard it without changing the document or Undo.
     @State private var lastDrawLocation: CGPoint?
+    @State private var stroke: [MaskPoint] = []
+    @State private var draft: MaskGeometry?
+    @GestureState private var isInteracting = false
 
     /// How close a finger has to be to grab a handle. A comfortable target
     /// without making the whole shape un-draggable on a small preview.
-    private let grabRadius: CGFloat = 26
+    private var grabRadius: CGFloat { 26 / max(magnification, 0.5) }
 
     var body: some View {
         GeometryReader { proxy in
             let picture = pictureRect(in: proxy.size)
             ZStack {
                 Canvas { context, _ in
-                    context.clip(to: Path(picture))
                     // Every other mask, faintly: placing one window while the
                     // others are invisible is how two masks end up on the same
                     // face without anyone noticing.
@@ -56,7 +57,10 @@ struct MaskOverlay: View {
                         draw(model.displayedMask(mask.id) ?? mask, in: picture, context: &context, selected: false)
                     }
                     if let mask = model.displayedSelectedMask {
-                        draw(mask, in: picture, context: &context, selected: true)
+                        var displayed = mask
+                        if let draft { displayed.geometry = draft }
+                        if !stroke.isEmpty { displayed.geometry.points += stroke }
+                        draw(displayed, in: picture, context: &context, selected: true)
                     }
                 }
                 .allowsHitTesting(false)
@@ -66,21 +70,13 @@ struct MaskOverlay: View {
                     .contentShape(Rectangle())
                     .allowsHitTesting(model.selectedMaskID.map { !model.isTrackingMask($0) } ?? true)
                     .gesture(dragGesture(in: picture))
-
-                if model.isDrawingMask,
-                   model.displayedSelectedMask?.geometry.shape == .freehand {
-                    Text("Tap points or drag around the subject")
-                        .font(.caption2.weight(.semibold))
-                        .foregroundStyle(.white)
-                        .padding(.horizontal, 10)
-                        .padding(.vertical, 6)
-                        .background(.black.opacity(0.72), in: Capsule())
-                        .position(x: picture.midX, y: picture.minY + 20)
-                        .allowsHitTesting(false)
-                        .accessibilityHidden(true)
-                }
             }
         }
+        .onChange(of: isZooming) { _, zooming in if zooming { discardInteraction() } }
+        .onChange(of: isInteracting) { _, interacting in if !interacting { discardInteraction() } }
+        .onChange(of: model.selectedMaskID) { _, _ in discardInteraction() }
+        .onChange(of: model.playheadTime) { _, _ in discardInteraction() }
+        .onDisappear { discardInteraction() }
         .accessibilityElement(children: .ignore)
         .accessibilityLabel(accessibilityLabel)
         .accessibilityHint("Drag the shape to move it, or its handles to resize, rotate and soften it.")
@@ -187,6 +183,9 @@ struct MaskOverlay: View {
 
     private func draw(_ mask: MaskedGradeLayer, in picture: CGRect,
                       context: inout GraphicsContext, selected: Bool) {
+        let unclipped = context
+        defer { context = unclipped }
+        context.clip(to: Path(picture))
         let geometry = mask.geometry.clamped
         let tint = selected ? AppColors.accent : AppColors.textSecondary
         let opacity = selected ? 1.0 : 0.35
@@ -205,9 +204,9 @@ struct MaskOverlay: View {
                          style: FillStyle(eoFill: true))
         }
 
-        context.stroke(outline, with: .color(.black.opacity(0.75)), lineWidth: 4)
+        context.stroke(outline, with: .color(.black.opacity(0.75)), lineWidth: 4 / magnification)
         context.stroke(outline, with: .color(tint.opacity(opacity)),
-                       style: StrokeStyle(lineWidth: 1.75, dash: geometry.isInverted ? [6, 4] : []))
+                       style: StrokeStyle(lineWidth: 1.75 / magnification, dash: geometry.isInverted ? [6, 4] : []))
 
         guard selected else { return }
 
@@ -218,32 +217,49 @@ struct MaskOverlay: View {
             for sign in [-1.0, 1.0] where geometry.shape != .linear || sign > 0 {
                 let band = path(for: geometry, inset: sign * soft, picture: picture)
                 context.stroke(band, with: .color(tint.opacity(0.45)),
-                               style: StrokeStyle(lineWidth: 1, dash: [3, 4]))
+                               style: StrokeStyle(lineWidth: 1 / magnification, dash: [3, 4]))
             }
             if geometry.shape == .linear {
                 let band = path(for: geometry, inset: -soft, picture: picture)
                 context.stroke(band, with: .color(tint.opacity(0.45)),
-                               style: StrokeStyle(lineWidth: 1, dash: [3, 4]))
+                               style: StrokeStyle(lineWidth: 1 / magnification, dash: [3, 4]))
             }
         }
 
+        // Handles at a sky/frame boundary can extend into the letterbox.
+        context = unclipped
         for handle in handlePositions(geometry, picture) {
             dot(at: handle.point, filled: handle.filled, tint: tint, context: &context)
         }
 
         if geometry.shape == .freehand {
-            for point in geometry.points {
+            if !model.isDrawingMask, let index = model.selectedMaskPointIndex,
+               geometry.points.indices.contains(index) {
+                let anchor = geometry.points[index]
+                let origin = vertexToView(anchor, geometry, picture)
+                for incoming in [true, false] {
+                    let tangent = geometry.suggestedTangent(at: index, incoming: incoming)
+                    let endpoint = vertexToView(MaskPoint(x: anchor.x + tangent.x, y: anchor.y + tangent.y), geometry, picture)
+                    var line = Path(); line.move(to: origin); line.addLine(to: endpoint)
+                    context.stroke(line, with: .color(.black.opacity(0.7)), lineWidth: 3 / magnification)
+                    context.stroke(line, with: .color(tint), lineWidth: 1 / magnification)
+                    dot(at: endpoint, filled: false, tint: tint, context: &context, radius: 6)
+                }
+            }
+            for (index, point) in geometry.points.enumerated() {
                 let view = vertexToView(point, geometry, picture)
-                dot(at: view, filled: true, tint: tint, context: &context, radius: 5)
+                let selected = model.selectedMaskPointIndex == index
+                dot(at: view, filled: selected, tint: tint, context: &context, radius: selected ? 7 : 5)
             }
         }
     }
 
     private func dot(at point: CGPoint, filled: Bool, tint: Color,
                      context: inout GraphicsContext, radius: CGFloat = 6) {
+        let radius = radius / max(magnification, 0.5)
         let rect = CGRect(x: point.x - radius, y: point.y - radius,
                           width: radius * 2, height: radius * 2)
-        context.fill(Path(ellipseIn: rect.insetBy(dx: -1.5, dy: -1.5)),
+        context.fill(Path(ellipseIn: rect.insetBy(dx: -1.5 / magnification, dy: -1.5 / magnification)),
                      with: .color(.black.opacity(0.7)))
         context.fill(Path(ellipseIn: rect), with: .color(filled ? tint : Color.white.opacity(0.9)))
     }
@@ -313,7 +329,7 @@ struct MaskOverlay: View {
                 let ry = sin(theta) * lx + cos(theta) * ly
                 return sourceToView(CGPoint(x: geometry.centerX + rx / a, y: geometry.centerY + ry), picture)
             }
-            for (index, point) in geometry.points.enumerated() {
+            for (index, point) in geometry.renderPoints.enumerated() {
                 let view = place(point)
                 if index == 0 { path.move(to: view) } else { path.addLine(to: view) }
             }
@@ -353,8 +369,10 @@ struct MaskOverlay: View {
 
     private func dragGesture(in picture: CGRect) -> some Gesture {
         DragGesture(minimumDistance: 0)
+            .updating($isInteracting) { _, state, _ in state = true }
             .onChanged { value in
-                guard let mask = model.displayedSelectedMask else { return }
+                guard !isZooming, let mask = model.displayedSelectedMask else { return }
+                if model.playback.isPlaying { model.playback.pause() }
                 if model.isDrawingMask, mask.geometry.shape == .freehand {
                     appendDrawPointIfNeeded(value.location, to: mask, in: picture)
                     return
@@ -363,53 +381,71 @@ struct MaskOverlay: View {
                     active = hitTest(value.startLocation, mask.geometry, picture)
                     start = mask.geometry
                     startPoint = value.startLocation
+                    if case .vertex(let index) = active { model.selectedMaskPointIndex = index }
                 }
-                guard let active, let start else { return }
+                guard let active, let start,
+                      hypot(value.translation.width, value.translation.height) >= 3 / magnification else { return }
                 apply(active, from: start, at: value.location, picture: picture, mask: mask, committing: false)
             }
             .onEnded { value in
+                defer { discardInteraction() }
+                guard !isZooming else { return }
                 if let mask = model.displayedSelectedMask,
                    model.isDrawingMask, mask.geometry.shape == .freehand {
+                    // Tap the first anchor to close without adding a duplicate.
+                    if stroke.count <= 1, mask.geometry.points.count >= 3,
+                       let first = mask.geometry.points.first {
+                        let view = vertexToView(first, mask.geometry, picture)
+                        if hypot(view.x - value.location.x, view.y - value.location.y) < 18 / magnification {
+                            model.finishDrawingMask(mask.id)
+                            return
+                        }
+                    }
                     appendDrawPointIfNeeded(value.location, to: mask, in: picture, force: true)
-                    lastDrawLocation = nil
+                    for point in stroke { model.appendMaskPoint(mask.id, point, immediate: false) }
                     model.flushGradeHistory()
                     return
                 }
-                if let active, let start, let mask = model.displayedSelectedMask {
+                if hypot(value.translation.width, value.translation.height) < 3 / magnification {
+                    if case .vertex(let index) = hitTest(value.location, model.displayedSelectedMask?.geometry ?? .default, picture) {
+                        model.selectedMaskPointIndex = index
+                    } else if case .tangent = active {
+                        // Keep the selected anchor while touching its handles.
+                    } else { model.selectedMaskPointIndex = nil }
+                } else if let active, let start, let mask = model.displayedSelectedMask {
                     apply(active, from: start, at: value.location, picture: picture, mask: mask, committing: true)
+                    model.flushGradeHistory()
                 }
-                // Treat a zero-distance drag as the tap it really is. This is
-                // also how an existing freehand vertex is removed after the
-                // competing tap recogniser was eliminated.
-                if hypot(value.translation.width, value.translation.height) < 5 {
-                    handleTap(value.location, in: picture)
-                }
-                active = nil; start = nil; startPoint = nil
-                // One gesture, one undo entry.
-                model.flushGradeHistory()
             }
     }
 
-    private func appendDrawPointIfNeeded(
-        _ location: CGPoint,
-        to mask: MaskedGradeLayer,
-        in picture: CGRect,
-        force: Bool = false
-    ) {
-        guard picture.contains(location) else { return }
+    private func discardInteraction() {
+        active = nil; start = nil; startPoint = nil
+        lastDrawLocation = nil; stroke = []; draft = nil
+        model.setMaskGeometryPreview(nil)
+    }
+
+    private func unplacedVertex(_ location: CGPoint, geometry: MaskGeometry, picture: CGRect) -> MaskPoint {
+        let local = toLocal(location, geometry, picture)
+        return MaskPoint(x: geometry.pivotX + local.x / (aspect(picture) * geometry.width),
+                         y: geometry.pivotY + local.y / geometry.height)
+    }
+
+    private func appendDrawPointIfNeeded(_ location: CGPoint, to mask: MaskedGradeLayer,
+                                        in picture: CGRect, force: Bool = false) {
+        guard picture.contains(location),
+              mask.geometry.points.count + stroke.count < MaskGeometry.maximumPoints else { return }
         if let lastDrawLocation {
-            let distance = hypot(location.x - lastDrawLocation.x,
-                                 location.y - lastDrawLocation.y)
-            // A modest view-space spacing keeps a traced edge smooth without
-            // exhausting the fixed-size GPU point pool on one short stroke.
-            let spacing = max(8, min(picture.width, picture.height) / 55)
+            let distance = hypot(location.x - lastDrawLocation.x, location.y - lastDrawLocation.y)
+            let spacing = max(8 / magnification, min(picture.width, picture.height) / 55)
             guard force || distance >= spacing else { return }
-            // Do not append the same endpoint twice when a drag's final changed
-            // event and ended event report the same location.
-            if force, distance < 2 { return }
+            if force, distance < 2 / magnification { return }
         }
-        model.appendMaskPoint(mask.id, normalized(location, picture), immediate: false)
+        stroke.append(unplacedVertex(location, geometry: mask.geometry, picture: picture).clamped)
         lastDrawLocation = location
+        var preview = mask.geometry
+        preview.points += stroke
+        model.setMaskGeometryPreview(preview)
     }
 
     /// The nearest handle within reach, or the whole shape. Returns nil when the
@@ -417,10 +453,21 @@ struct MaskOverlay: View {
     /// yanking the window across the picture.
     private func hitTest(_ point: CGPoint, _ geometry: MaskGeometry, _ picture: CGRect) -> Handle? {
         if geometry.shape == .freehand {
-            for (index, vertex) in geometry.points.enumerated() {
+            // Nearest wins: dense traced paths used to grab the first point
+            // within 26pt, even when a different point was directly under you.
+            var candidates: [(Handle, CGFloat)] = geometry.points.enumerated().map { index, vertex in
                 let view = vertexToView(vertex, geometry, picture)
-                if hypot(view.x - point.x, view.y - point.y) <= grabRadius { return .vertex(index) }
+                return (.vertex(index), hypot(view.x - point.x, view.y - point.y))
             }
+            if let index = model.selectedMaskPointIndex, geometry.points.indices.contains(index) {
+                let vertex = geometry.points[index]
+                for incoming in [true, false] {
+                    let tangent = geometry.suggestedTangent(at: index, incoming: incoming)
+                    let view = vertexToView(MaskPoint(x: vertex.x + tangent.x, y: vertex.y + tangent.y), geometry, picture)
+                    candidates.append((.tangent(index, incoming: incoming), hypot(view.x - point.x, view.y - point.y)))
+                }
+            }
+            if let nearest = candidates.min(by: { $0.1 < $1.1 }), nearest.1 <= grabRadius { return nearest.0 }
         }
         var best: (Handle, CGFloat)?
         for handle in handlePositions(geometry, picture) where handle.handle != .move {
@@ -438,68 +485,56 @@ struct MaskOverlay: View {
     private func apply(_ handle: Handle, from start: MaskGeometry, at point: CGPoint,
                        picture: CGRect, mask: MaskedGradeLayer, committing: Bool) {
         let id = mask.id
+        var edited = start
         switch handle {
         case .move:
             guard let startPoint else { return }
             let current = normalized(point, picture), initial = normalized(startPoint, picture)
-            let dx = current.x - initial.x, dy = current.y - initial.y
-            model.setMaskValue(id, .localMaskPositionX, start.centerX + dx, immediate: committing)
-            model.setMaskValue(id, .localMaskPositionY, start.centerY + dy, immediate: committing)
+            edited.centerX += current.x - initial.x
+            edited.centerY += current.y - initial.y
         case .resizeWidth(let sign):
-            let local = toLocal(point, start, picture)
-            let a = aspect(picture)
-            let width = max(abs(Double(local.x) * sign) * 2 / a, 0.01)
-            model.setMaskValue(id, .localMaskWidth, width, immediate: committing)
+            edited.width = max(abs(Double(toLocal(point, start, picture).x) * sign) * 2 / aspect(picture), 0.01)
         case .resizeHeight(let sign):
-            let local = toLocal(point, start, picture)
-            let height = max(abs(Double(local.y) * sign) * 2, 0.01)
-            model.setMaskValue(id, .localMaskHeight, height, immediate: committing)
+            edited.height = max(abs(Double(toLocal(point, start, picture).y) * sign) * 2, 0.01)
         case .rotate:
-            // Measured against the untilted mask, so the shape follows the
-            // finger rather than accumulating its own rotation.
-            var unrotated = start
-            unrotated.rotationDegrees = 0
+            var unrotated = start; unrotated.rotationDegrees = 0
             let local = toLocal(point, unrotated, picture)
-            let angle = atan2(Double(local.x), -Double(local.y)) * 180 / .pi
-            model.setMaskValue(id, .localMaskRotation, angle, immediate: committing)
+            edited.rotationDegrees = atan2(Double(local.x), -Double(local.y)) * 180 / .pi
         case .feather:
             let local = toLocal(point, start, picture)
             let half = halfSize(start, picture)
-            let distance: Double
-            let span: Double
-            switch start.shape {
-            case .linear:
-                distance = abs(Double(local.y)); span = 0.5
-            default:
-                distance = max(abs(Double(local.x)) - Double(half.width), 0)
-                span = max(Double(min(half.width, half.height)), 0.001)
-            }
-            model.setMaskValue(id, .localMaskFeather, min(distance / span, 1), immediate: committing)
+            let distance = start.shape == .linear ? abs(Double(local.y))
+                : max(abs(Double(local.x)) - Double(half.width), 0)
+            let span = start.shape == .linear ? 0.5 : max(Double(min(half.width, half.height)), 0.001)
+            edited.feather = min(distance / span, 1)
         case .vertex(let index):
-            let local = toLocal(point, mask.geometry, picture)
-            let vertex = MaskPoint(x: mask.geometry.pivotX + local.x / (aspect(picture) * mask.geometry.width),
-                                   y: mask.geometry.pivotY + local.y / mask.geometry.height)
-            model.moveMaskPoint(id, index: index, to: vertex, committing: committing)
+            guard edited.points.indices.contains(index) else { return }
+            let vertex = unplacedVertex(point, geometry: start, picture: picture).clamped
+            edited.points[index].x = vertex.x; edited.points[index].y = vertex.y
+            if committing { model.moveMaskPoint(id, index: index, to: vertex, committing: false); return }
+        case .tangent(let index, let incoming):
+            guard edited.points.indices.contains(index) else { return }
+            let location = unplacedVertex(point, geometry: start, picture: picture)
+            let vertex = start.points[index]
+            let tangent = MaskTangent(x: location.x - vertex.x, y: location.y - vertex.y).clamped
+            if incoming { edited.points[index].incoming = tangent }
+            else { edited.points[index].outgoing = tangent }
+            if committing {
+                model.setMaskTangent(id, index: index, incoming: incoming, to: tangent, committing: false)
+                return
+            }
         }
-    }
-
-    private func handleTap(_ location: CGPoint, in picture: CGRect) {
-        guard let mask = model.displayedSelectedMask else { return }
-        guard picture.contains(location) else { return }
-        if model.isDrawingMask, mask.geometry.shape == .freehand {
-            model.appendMaskPoint(mask.id, normalized(location, picture))
-            return
-        }
-        // Tapping an existing vertex removes it, which is the only sensible
-        // meaning a tap has once a path is closed.
-        if mask.geometry.shape == .freehand {
-            for (index, vertex) in mask.geometry.points.enumerated() {
-                let view = vertexToView(vertex, mask.geometry, picture)
-                if hypot(view.x - location.x, view.y - location.y) <= grabRadius {
-                    model.removeMaskPoint(mask.id, index: index)
-                    return
+        if committing {
+            for property in MaskedGradeLayer.geometryProperties {
+                let updated = MaskedGradeLayer(name: "", geometry: edited)
+                let original = MaskedGradeLayer(name: "", geometry: start)
+                if let value = updated.baseValue(of: property), value != original.baseValue(of: property) {
+                    model.setMaskValue(id, property, value, immediate: false)
                 }
             }
+        } else {
+            draft = edited.clamped
+            model.setMaskGeometryPreview(draft)
         }
     }
 }

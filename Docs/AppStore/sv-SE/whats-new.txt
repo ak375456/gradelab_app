@@ -1,10 +1,7 @@
-Nya ljudverktyg, Relight och förbättringar i redigeringen.
+Mer precisa masker, enklare zoomning och åtta nya utseenden.
 
-• Ljudkontroller: Justera volym, in- och uttoningar, stereobalans och EQ eller börja med en röstförinställning.
-• Kompressor: Dämpa starka ljud med en enkel styrkekontroll och avancerade inställningar.
-• Automatisk musikdämpning: Välj ett röstklipp så sänks musiken automatiskt när rösten hörs.
-• Kreativa ljudeffekter: Lägg till eko, reverb, distorsion och bitcrusher. Prova rumsförinställningar och följ nivån för varje klipp i realtid.
-• Relight: Lägg till virtuella ljus i videor du redan har filmat. Justera position, färg och styrka eller börja med en förinställning.
-• Färgtoningar i reglagen gör det lättare att justera färgtemperatur, toning, nyans och mättnad.
-• Emojier visas nu korrekt tillsammans med text i förhandsvisningar och exporter.
-• Återställ bortklippt material med vänster trimhandtag, även efter att du flyttat klippet till tidslinjens början.
+• Finjustera frihandsmasker med redigerbara punkter och kurvhandtag. Ett tryck på en punkt markerar den nu i stället för att ta bort den.
+• Zooma och panorera medan du maskar eller använder andra verktyg, med snäppning vid 100 % och snabb återställning.
+• Ritanvisningarna täcker inte längre bilden, så det blir lättare att maska himlen och bildens kanter.
+• Maskspårningen är effektivare, med extra kontroller som hjälper till att förhindra plötsliga hopp.
+• Åtta nya LUT-utseenden: tre gratis och fem för Pro, med tydligare namn. Prova alla utseenden i förhandsvisningen.

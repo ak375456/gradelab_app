@@ -88,19 +88,13 @@ struct EditorView: View {
         backgroundMode && (model.backgroundBrush != nil || model.isDrawingBackgroundLasso
                            || model.isPickingBackgroundColor)
     }
-    /// What the preview lets the user do with the picture.
-    ///
-    /// A cutout tool keeps the pinch, because tracing an edge is exactly when
-    /// magnification is worth the most; everything else that draws on the
-    /// picture — text and shape handles, mask windows, the eyedropper — still
-    /// holds the viewport at 1x so a drag cannot mean two things at once.
+    /// One finger belongs to the active tool; two fingers always navigate.
     private var previewInteraction: PreviewInteraction {
-        if backgroundToolArmed { return .pinchOnly }
-        let drawsOnPicture = model.selectedText != nil || model.selectedShape != nil
+        let drawsOnPicture = backgroundToolArmed || model.selectedText != nil || model.selectedShape != nil
             || model.evaluatedMediaOverlay != nil
             || model.isPickingCurveHue || model.isPickingWarpColor || model.isPickingMaskQualifier
             || maskMode || localMaskMode || maskedGradeMode || relightMode
-        return drawsOnPicture ? .off : .full
+        return drawsOnPicture ? .pinchOnly : .full
     }
     @State private var speedTool = false
     /// One-shot: the Speed tool was opened by the ramp shortcut, so it should
@@ -904,17 +898,18 @@ struct EditorView: View {
     }
 
     /// Armed eyedropper: a tap anywhere on the picture samples the graded
-    /// frame under it. Zoom is suspended while it is up, so the point the
-    /// finger lands on is the point that gets sampled.
+    /// frame under it. It shares the viewport transform so a zoomed tap still
+    /// samples the pixel directly under the finger.
     private var colorPickingLayer: some View {
         GeometryReader { proxy in
             Color.white.opacity(0.001)
                 .contentShape(Rectangle())
                 .onTapGesture { location in
+                    guard !previewPinching else { return }
                     let point = CGPoint(x: location.x / max(proxy.size.width, 1),
                                         y: location.y / max(proxy.size.height, 1))
                     // One armed eyedropper at a time, and the same layer
-                    // serves both: the tap, the hint and the suspended zoom are
+                    // serves both: the tap, the hint and the coordinates are
                     // identical whichever tool asked for the colour.
                     let picked = model.isPickingWarpColor
                         ? model.pickWarpColor(atViewPoint: point)
@@ -952,6 +947,7 @@ struct EditorView: View {
             Color.white.opacity(0.001)
                 .contentShape(Rectangle())
                 .onTapGesture { location in
+                    guard !previewPinching else { return }
                     let point = CGPoint(x: location.x / max(proxy.size.width, 1),
                                         y: location.y / max(proxy.size.height, 1))
                     guard let id = model.selectedMaskID else {
@@ -1005,7 +1001,8 @@ struct EditorView: View {
                     // open — otherwise moving an exposure slider for a face
                     // would give no sign of which face.
                     if maskedGradeMode && !model.showsOriginal {
-                        MaskOverlay(model: model, displayedRect: model.renderer.displayedVideoRect)
+                        MaskOverlay(model: model, displayedRect: model.renderer.displayedVideoRect,
+                                    isZooming: previewPinching)
                     }
                     if maskMode {
                         LayerMaskOverlay(model: model, displayedRect: model.renderer.displayedVideoRect)
@@ -1018,6 +1015,8 @@ struct EditorView: View {
                                                  displayedRect: model.renderer.displayedVideoRect,
                                                  isZooming: previewPinching)
                     }
+                    if model.isPickingCurveHue || model.isPickingWarpColor { colorPickingLayer }
+                    if model.isPickingMaskQualifier { qualifierPickingLayer }
                 }
             }
             if model.isPreparingTimeline || !model.hasMedia {
@@ -1031,8 +1030,6 @@ struct EditorView: View {
                     .padding(6)
                     .allowsHitTesting(false)
             }
-            if model.isPickingCurveHue || model.isPickingWarpColor { colorPickingLayer }
-            if model.isPickingMaskQualifier { qualifierPickingLayer }
             if model.showsOriginal {
                 Text("ORIGINAL").font(.caption2.weight(.semibold)).tracking(1.5)
                     .padding(10).background(.black.opacity(0.65), in: Capsule()).padding(14)
@@ -1072,7 +1069,7 @@ struct EditorView: View {
                     .contentShape(Capsule())
                     .animation(.easeOut(duration: 0.12), value: model.showsOriginal)
                     .gesture(DragGesture(minimumDistance: 0).updating($holdingOriginal) { _, held, _ in held = true })
-                } }.padding(12).accessibilityHidden(true)
+                } }.padding(12).padding(.bottom, 44).accessibilityHidden(true)
             if colorMode && model.hasMedia {
                 VStack { HStack { Spacer(); scopesButton } ; Spacer() }.padding(14)
             }
@@ -1091,6 +1088,21 @@ struct EditorView: View {
                 .accessibilityHidden(true)
             }
         }.background(.black).frame(maxWidth: .infinity, maxHeight: .infinity).contentShape(Rectangle())
+        .overlay(alignment: .bottomTrailing) {
+            if maskedGradeMode, model.isDrawingMask, let mask = model.selectedMask, !model.showsOriginal {
+                Button { model.finishDrawingMask(mask.id) } label: {
+                    Label("Done", systemImage: "checkmark")
+                        .font(.caption.weight(.semibold))
+                        .frame(minWidth: 88, minHeight: 44)
+                        .background(AppColors.accent, in: Capsule())
+                        .foregroundStyle(.black)
+                }
+                .buttonStyle(.plain)
+                .disabled(mask.geometry.points.count < 3)
+                .accessibilityLabel("Finish drawing mask")
+                .padding(10)
+            }
+        }
         .alert("Colour mode", isPresented: $colorInfo) {
             Button("OK", role: .cancel) {}
         } message: {

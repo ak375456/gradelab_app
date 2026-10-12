@@ -102,7 +102,7 @@ final class ProAccessPolicyTests: XCTestCase {
     // MARK: - Looks
 
     func testTheExpandedFreeLookSelectionShipsInTheBundle() {
-        XCTAssertEqual(ProAccessPolicy.freeLookIDs.count, 10)
+        XCTAssertEqual(ProAccessPolicy.freeLookIDs.count, 13)
         XCTAssertTrue(
             Set(LUTAsset.bundledCreativeLooks.map(\.id)).isSubset(of: ProAccessPolicy.freeLookIDs),
             "the original free looks must remain free")
@@ -134,6 +134,25 @@ final class ProAccessPolicyTests: XCTestCase {
         let premium = try XCTUnwrap(LUTAsset.bundledLooks.first { ProAccessPolicy.requiresPro($0) })
         let settings = grade { $0.lut = premium.id; $0.lutIntensity = 100 }
         XCTAssertEqual(ProAccessPolicy.gradeRequirement(settings), .premiumLook)
+    }
+
+    func testCuratedLooksHaveTheIntendedPhotoAndVideoAccess() throws {
+        let freeIDs: Set<String> = ["Daylight.cube", "Vivid_Cinema.cube", "Silver_Mono.cube"]
+        var photoConfiguration = ImageExportConfiguration()
+        photoConfiguration.format = .jpeg
+        XCTAssertEqual(LUTAsset.bundledCuratedLooks.count, 8)
+        for look in LUTAsset.bundledCuratedLooks {
+            let expected: ProFeature? = freeIDs.contains(look.id) ? nil : .premiumLook
+            let settings = grade { $0.lut = look.id; $0.lutIntensity = 100 }
+            XCTAssertEqual(ProAccessPolicy.requiresPro(look), expected != nil, look.name)
+            XCTAssertEqual(ProAccessPolicy.gradeRequirement(settings), expected, look.name)
+            XCTAssertEqual(
+                ProAccessPolicy.exportRequirement(withGrade(project(), settings), configuration: free),
+                expected, look.name)
+            XCTAssertEqual(
+                ProAccessPolicy.imageExportRequirement(imageProject(grade: settings), configuration: photoConfiguration),
+                expected, look.name)
+        }
     }
 
     /// A look identifier that is not in the bundle came off the user's device,

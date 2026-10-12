@@ -86,11 +86,20 @@ struct LUTAsset: Equatable, Sendable, Identifiable {
         }
     }
 
-    /// Both kinds of imported look take their display name from the filename,
-    /// with underscores read as spaces, so `Night_Market.cube` reads
-    /// "Night Market".
+    /// Clean up pack prefixes and filename formatting without changing the
+    /// identifier saved in projects or the file used to load the look.
     static func displayName(forResourceName name: String) -> String {
-        name.replacingOccurrences(of: "_", with: " ")
+        let cleaned = name
+            .replacingOccurrences(
+                of: "^(?i:FG|ON1)(?:[_\\s-]+|(?=[A-Z][a-z]))",
+                with: "", options: .regularExpression)
+            .replacingOccurrences(of: "_", with: " ")
+            .replacingOccurrences(
+                of: "([a-z0-9])([A-Z])", with: "$1 $2", options: .regularExpression)
+            .replacingOccurrences(of: "\\s*&\\s*", with: " & ", options: .regularExpression)
+            .replacingOccurrences(of: "\\s+", with: " ", options: .regularExpression)
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+        return cleaned.isEmpty ? name : cleaned
     }
 
     static func imported(resourceName: String) -> LUTAsset {
@@ -116,8 +125,8 @@ extension Bundle {
 }
 
 extension LUTAsset {
-    /// Looks that ship inside the app: the three curated ones first, then any
-    /// `.cube` dropped into `Resources/LUTs/Imported` before the build.
+    /// Looks that ship inside the app: original and curated looks first, then
+    /// camera conversions and any files discovered in the resources folder.
     ///
     /// Discovery is what makes that folder work — adding a file and rebuilding
     /// is enough, with no code change.
@@ -134,7 +143,7 @@ extension LUTAsset {
     ]
 
     static let bundledLooks: [LUTAsset] = {
-        let builtIn = bundledCreativeLooks + bundledLogConversions
+        let builtIn = bundledCreativeLooks + bundledCuratedLooks + bundledLogConversions
         let known = Set(builtIn.map(\.resourceName)).union(technicalTransformResourceNames)
         // The resource directory is listed directly. `urls(forResourcesWithExtension:)`
         // matches the extension case-sensitively, so asking it for "cube" silently
@@ -210,6 +219,83 @@ extension LUTAsset {
             summary: String(localized: "Soft, slightly faded look with lifted blacks, muted colour and smooth highlights."),
             inputColorSpace: "Rec.709 / working SDR",
             kind: .creative
+        )
+    ]
+
+    /// A small selection from the downloaded packs, with readable names and
+    /// intentional descriptions. Loaded on demand rather than at app launch.
+    static let bundledCuratedLooks: [LUTAsset] = [
+        LUTAsset(
+            name: "Daylight",
+            filename: "Daylight.cube",
+            category: "Cinematic",
+            summary: String(localized: "Bright, warm color for a sunlit feel. Lower the strength for a softer finish."),
+            inputColorSpace: "Rec.709 / working SDR",
+            kind: .creative,
+            origin: .bundled
+        ),
+        LUTAsset(
+            name: "Vivid Cinema",
+            filename: "Vivid_Cinema.cube",
+            category: "Cinematic",
+            summary: String(localized: "Rich color, deeper midtones and bold blue skies."),
+            inputColorSpace: "Rec.709 / working SDR",
+            kind: .creative,
+            origin: .bundled
+        ),
+        LUTAsset(
+            name: "Silver Mono",
+            filename: "Silver_Mono.cube",
+            category: "Black & White",
+            summary: String(localized: "Clean black-and-white with crisp contrast and bright midtones."),
+            inputColorSpace: "Rec.709 / working SDR",
+            kind: .creative,
+            origin: .bundled
+        ),
+        LUTAsset(
+            name: "Dramatic Cinema",
+            filename: "Dramatic_Cinema.cube",
+            category: "Cinematic",
+            summary: String(localized: "Warm highlights and cool blues for a stylized cinematic finish."),
+            inputColorSpace: "Rec.709 / working SDR",
+            kind: .creative,
+            origin: .bundled
+        ),
+        LUTAsset(
+            name: "Cool Cinema",
+            filename: "Cool_Cinema.cube",
+            category: "Cinematic",
+            summary: String(localized: "Restrained color with a cooler balance and gentle blue highlights."),
+            inputColorSpace: "Rec.709 / working SDR",
+            kind: .creative,
+            origin: .bundled
+        ),
+        LUTAsset(
+            name: "Vintage Chrome",
+            filename: "Vintage_Chrome.cube",
+            category: "Film-inspired",
+            summary: String(localized: "Golden midtones, muted greens and a nostalgic chrome palette."),
+            inputColorSpace: "Rec.709 / working SDR",
+            kind: .creative,
+            origin: .bundled
+        ),
+        LUTAsset(
+            name: "Film Print",
+            filename: "Film_Print.cube",
+            category: "Film-inspired",
+            summary: String(localized: "A film-print palette with warm skin tones and rich, clear blues."),
+            inputColorSpace: "Rec.709 / working SDR",
+            kind: .creative,
+            origin: .bundled
+        ),
+        LUTAsset(
+            name: "Studio Portrait",
+            filename: "Studio_Portrait.cube",
+            category: "Portrait",
+            summary: String(localized: "Subtle skin-tone shaping with restrained color for portraits."),
+            inputColorSpace: "Rec.709 / working SDR",
+            kind: .creative,
+            origin: .bundled
         )
     ]
 

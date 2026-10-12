@@ -1,0 +1,1198 @@
+[
+  {
+    "locale": "fr-FR",
+    "file": "ios_store_localizations/existing_gallery_1206x2622/fr-FR/01_Color_Grading_French_1206x2622.png",
+    "source": "store_localizations/sv-SE/sources/ios/01_color_grading.png",
+    "provenance": "localized marketing copy over preserved English artwork",
+    "pixels": [
+      1206,
+      2622
+    ],
+    "mode": "RGB",
+    "background_extension": [
+      6,
+      6
+    ],
+    "localized_copy": [
+      {
+        "text": "Étalonnage pro",
+        "size": 98,
+        "bounds": [
+          274.0,
+          145,
+          968.0,
+          258
+        ]
+      },
+      {
+        "text": "pour photo et vidéo",
+        "size": 114,
+        "bounds": [
+          104.0,
+          279,
+          1138.0,
+          387
+        ]
+      },
+      {
+        "text": "Des outils professionnels. Un flux de travail fluide.",
+        "size": 45,
+        "bounds": [
+          124.0,
+          430,
+          1118.0,
+          472
+        ]
+      }
+    ]
+  },
+  {
+    "locale": "fr-FR",
+    "file": "ios_store_localizations/existing_gallery_1206x2622/fr-FR/02_Cinematic_Looks_French_1206x2622.png",
+    "source": "store_localizations/sv-SE/sources/ios/02_looks.png",
+    "provenance": "localized marketing copy over preserved English artwork",
+    "pixels": [
+      1206,
+      2622
+    ],
+    "mode": "RGB",
+    "background_extension": [
+      6,
+      6
+    ],
+    "localized_copy": [
+      {
+        "text": "Des looks cinéma",
+        "size": 116,
+        "bounds": [
+          146.0,
+          145,
+          1096.0,
+          232
+        ]
+      },
+      {
+        "text": "en toute simplicité",
+        "size": 116,
+        "bounds": [
+          121.0,
+          275,
+          1121.0,
+          385
+        ]
+      },
+      {
+        "text": "Appliquez des préréglages et créez votre propre style.",
+        "size": 44,
+        "bounds": [
+          92.5,
+          425,
+          1149.5,
+          467
+        ]
+      }
+    ]
+  },
+  {
+    "locale": "fr-FR",
+    "file": "ios_store_localizations/existing_gallery_1206x2622/fr-FR/03_Color_Warper_French_1206x2622.png",
+    "source": "ios_store_localizations/color_warper/GradeLab_iOS_Color_Warper_French.png",
+    "provenance": "existing localized card",
+    "pixels": [
+      1206,
+      2622
+    ],
+    "mode": "RGB",
+    "background_extension": [
+      6,
+      6
+    ],
+    "localized_copy": []
+  },
+  {
+    "locale": "fr-FR",
+    "file": "ios_store_localizations/existing_gallery_1206x2622/fr-FR/04_Curves_and_Scopes_French_1206x2622.png",
+    "source": "store_localizations/sv-SE/sources/ios/03_curves.png",
+    "provenance": "localized marketing copy over preserved English artwork",
+    "pixels": [
+      1206,
+      2622
+    ],
+    "mode": "RGB",
+    "background_extension": [
+      6,
+      6
+    ],
+    "localized_copy": [
+      {
+        "text": "Courbes avancées",
+        "size": 116,
+        "bounds": [
+          115.0,
+          145,
+          1127.0,
+          232
+        ]
+      },
+      {
+        "text": "et scopes",
+        "size": 116,
+        "bounds": [
+          357.5,
+          280,
+          884.5,
+          381
+        ]
+      },
+      {
+        "text": "Affinez les couleurs avec des outils de mesure précis.",
+        "size": 43,
+        "bounds": [
+          109.0,
+          421,
+          1133.0,
+          461
+        ]
+      }
+    ]
+  },
+  {
+    "locale": "fr-FR",
+    "file": "ios_store_localizations/existing_gallery_1206x2622/fr-FR/05_Fine_Tune_French_1206x2622.png",
+    "source": "store_localizations/sv-SE/sources/ios/05_fine_tune.png",
+    "provenance": "localized marketing copy over preserved English artwork",
+    "pixels": [
+      1206,
+      2622
+    ],
+    "mode": "RGB",
+    "background_extension": [
+      6,
+      6
+    ],
+    "localized_copy": [
+      {
+        "text": "Affinez",
+        "size": 117,
+        "bounds": [
+          420.5,
+          122,
+          821.5,
+          211
+        ]
+      },
+      {
+        "text": "chaque couleur",
+        "size": 117,
+        "bounds": [
+          197.0,
+          260,
+          1045.0,
+          370
+        ]
+      },
+      {
+        "text": "Ajustez précisément la teinte, la saturation et la luminance.",
+        "size": 41,
+        "bounds": [
+          83.0,
+          415,
+          1159.0,
+          453
+        ]
+      }
+    ]
+  },
+  {
+    "locale": "fr-FR",
+    "file": "ios_store_localizations/existing_gallery_1206x2622/fr-FR/06_Pro_Effects_French_1206x2622.png",
+    "source": "store_localizations/sv-SE/sources/ios/06_effects.png",
+    "provenance": "localized marketing copy over preserved English artwork",
+    "pixels": [
+      1206,
+      2622
+    ],
+    "mode": "RGB",
+    "background_extension": [
+      6,
+      6
+    ],
+    "localized_copy": [
+      {
+        "text": "Finalisez votre look",
+        "size": 116,
+        "bounds": [
+          97.0,
+          128,
+          1145.0,
+          215
+        ]
+      },
+      {
+        "text": "avec les effets Pro",
+        "size": 112,
+        "bounds": [
+          137.5,
+          258,
+          1104.5,
+          343
+        ]
+      },
+      {
+        "text": "Ajoutez un effet mat, de la netteté et une lueur cinéma.",
+        "size": 42,
+        "bounds": [
+          99.5,
+          405,
+          1142.5,
+          445
+        ]
+      }
+    ]
+  },
+  {
+    "locale": "de-DE",
+    "file": "ios_store_localizations/existing_gallery_1206x2622/de-DE/01_Color_Grading_German_1206x2622.png",
+    "source": "store_localizations/sv-SE/sources/ios/01_color_grading.png",
+    "provenance": "localized marketing copy over preserved English artwork",
+    "pixels": [
+      1206,
+      2622
+    ],
+    "mode": "RGB",
+    "background_extension": [
+      6,
+      6
+    ],
+    "localized_copy": [
+      {
+        "text": "Profi-Farbkorrektur",
+        "size": 116,
+        "bounds": [
+          87.0,
+          145,
+          1155.0,
+          232
+        ]
+      },
+      {
+        "text": "für Fotos & Videos",
+        "size": 114,
+        "bounds": [
+          133.5,
+          279,
+          1108.5,
+          365
+        ]
+      },
+      {
+        "text": "Profi-Werkzeuge. Ein flüssiger Workflow.",
+        "size": 45,
+        "bounds": [
+          211.5,
+          430,
+          1030.5,
+          472
+        ]
+      }
+    ]
+  },
+  {
+    "locale": "de-DE",
+    "file": "ios_store_localizations/existing_gallery_1206x2622/de-DE/02_Cinematic_Looks_German_1206x2622.png",
+    "source": "store_localizations/sv-SE/sources/ios/02_looks.png",
+    "provenance": "localized marketing copy over preserved English artwork",
+    "pixels": [
+      1206,
+      2622
+    ],
+    "mode": "RGB",
+    "background_extension": [
+      6,
+      6
+    ],
+    "localized_copy": [
+      {
+        "text": "Filmische Looks",
+        "size": 116,
+        "bounds": [
+          184.0,
+          145,
+          1058.0,
+          232
+        ]
+      },
+      {
+        "text": "leicht gemacht",
+        "size": 116,
+        "bounds": [
+          216.0,
+          275,
+          1026.0,
+          386
+        ]
+      },
+      {
+        "text": "Wende Presets an und entwickle deinen eigenen Stil.",
+        "size": 44,
+        "bounds": [
+          101.5,
+          425,
+          1140.5,
+          467
+        ]
+      }
+    ]
+  },
+  {
+    "locale": "de-DE",
+    "file": "ios_store_localizations/existing_gallery_1206x2622/de-DE/03_Color_Warper_German_1206x2622.png",
+    "source": "ios_store_localizations/color_warper/GradeLab_iOS_Color_Warper_German.png",
+    "provenance": "existing localized card",
+    "pixels": [
+      1206,
+      2622
+    ],
+    "mode": "RGB",
+    "background_extension": [
+      6,
+      6
+    ],
+    "localized_copy": []
+  },
+  {
+    "locale": "de-DE",
+    "file": "ios_store_localizations/existing_gallery_1206x2622/de-DE/04_Curves_and_Scopes_German_1206x2622.png",
+    "source": "store_localizations/sv-SE/sources/ios/03_curves.png",
+    "provenance": "localized marketing copy over preserved English artwork",
+    "pixels": [
+      1206,
+      2622
+    ],
+    "mode": "RGB",
+    "background_extension": [
+      6,
+      6
+    ],
+    "localized_copy": [
+      {
+        "text": "Erweiterte Kurven",
+        "size": 116,
+        "bounds": [
+          128.0,
+          145,
+          1114.0,
+          232
+        ]
+      },
+      {
+        "text": "und Scopes",
+        "size": 116,
+        "bounds": [
+          301.0,
+          280,
+          941.0,
+          390
+        ]
+      },
+      {
+        "text": "Stimme Farben mit präzisen Analysewerkzeugen ab.",
+        "size": 43,
+        "bounds": [
+          120.5,
+          421,
+          1121.5,
+          461
+        ]
+      }
+    ]
+  },
+  {
+    "locale": "de-DE",
+    "file": "ios_store_localizations/existing_gallery_1206x2622/de-DE/05_Fine_Tune_German_1206x2622.png",
+    "source": "store_localizations/sv-SE/sources/ios/05_fine_tune.png",
+    "provenance": "localized marketing copy over preserved English artwork",
+    "pixels": [
+      1206,
+      2622
+    ],
+    "mode": "RGB",
+    "background_extension": [
+      6,
+      6
+    ],
+    "localized_copy": [
+      {
+        "text": "Jede Farbe",
+        "size": 117,
+        "bounds": [
+          314.0,
+          122,
+          928.0,
+          209
+        ]
+      },
+      {
+        "text": "fein abstimmen",
+        "size": 117,
+        "bounds": [
+          196.0,
+          260,
+          1046.0,
+          349
+        ]
+      },
+      {
+        "text": "Passe Farbton, Sättigung und Luminanz präzise an.",
+        "size": 43,
+        "bounds": [
+          133.0,
+          415,
+          1109.0,
+          455
+        ]
+      }
+    ]
+  },
+  {
+    "locale": "de-DE",
+    "file": "ios_store_localizations/existing_gallery_1206x2622/de-DE/06_Pro_Effects_German_1206x2622.png",
+    "source": "store_localizations/sv-SE/sources/ios/06_effects.png",
+    "provenance": "localized marketing copy over preserved English artwork",
+    "pixels": [
+      1206,
+      2622
+    ],
+    "mode": "RGB",
+    "background_extension": [
+      6,
+      6
+    ],
+    "localized_copy": [
+      {
+        "text": "Vollende deinen Look",
+        "size": 114,
+        "bounds": [
+          48.5,
+          128,
+          1193.5,
+          214
+        ]
+      },
+      {
+        "text": "mit Pro-Effekten",
+        "size": 112,
+        "bounds": [
+          185.5,
+          258,
+          1056.5,
+          343
+        ]
+      },
+      {
+        "text": "Matte Töne, Schärfe, Bloom und ein filmisches Finish.",
+        "size": 42,
+        "bounds": [
+          117.0,
+          405,
+          1125.0,
+          442
+        ]
+      }
+    ]
+  },
+  {
+    "locale": "it-IT",
+    "file": "ios_store_localizations/existing_gallery_1206x2622/it-IT/01_Color_Grading_Italian_1206x2622.png",
+    "source": "store_localizations/sv-SE/sources/ios/01_color_grading.png",
+    "provenance": "localized marketing copy over preserved English artwork",
+    "pixels": [
+      1206,
+      2622
+    ],
+    "mode": "RGB",
+    "background_extension": [
+      6,
+      6
+    ],
+    "localized_copy": [
+      {
+        "text": "Color grading Pro",
+        "size": 116,
+        "bounds": [
+          145.0,
+          145,
+          1097.0,
+          256
+        ]
+      },
+      {
+        "text": "per foto e video",
+        "size": 114,
+        "bounds": [
+          208.0,
+          279,
+          1034.0,
+          387
+        ]
+      },
+      {
+        "text": "Strumenti professionali. Un flusso di lavoro fluido.",
+        "size": 45,
+        "bounds": [
+          126.5,
+          430,
+          1115.5,
+          472
+        ]
+      }
+    ]
+  },
+  {
+    "locale": "it-IT",
+    "file": "ios_store_localizations/existing_gallery_1206x2622/it-IT/02_Cinematic_Looks_Italian_1206x2622.png",
+    "source": "store_localizations/sv-SE/sources/ios/02_looks.png",
+    "provenance": "localized marketing copy over preserved English artwork",
+    "pixels": [
+      1206,
+      2622
+    ],
+    "mode": "RGB",
+    "background_extension": [
+      6,
+      6
+    ],
+    "localized_copy": [
+      {
+        "text": "Look cinematografici",
+        "size": 115,
+        "bounds": [
+          51.0,
+          145,
+          1191.0,
+          254
+        ]
+      },
+      {
+        "text": "in tutta semplicità",
+        "size": 116,
+        "bounds": [
+          135.0,
+          275,
+          1107.0,
+          385
+        ]
+      },
+      {
+        "text": "Applica preset e crea il tuo stile.",
+        "size": 44,
+        "bounds": [
+          311.0,
+          425,
+          931.0,
+          467
+        ]
+      }
+    ]
+  },
+  {
+    "locale": "it-IT",
+    "file": "ios_store_localizations/existing_gallery_1206x2622/it-IT/03_Color_Warper_Italian_1206x2622.png",
+    "source": "ios_store_localizations/color_warper/GradeLab_iOS_Color_Warper_Italian.png",
+    "provenance": "existing localized card",
+    "pixels": [
+      1206,
+      2622
+    ],
+    "mode": "RGB",
+    "background_extension": [
+      6,
+      6
+    ],
+    "localized_copy": []
+  },
+  {
+    "locale": "it-IT",
+    "file": "ios_store_localizations/existing_gallery_1206x2622/it-IT/04_Curves_and_Scopes_Italian_1206x2622.png",
+    "source": "store_localizations/sv-SE/sources/ios/03_curves.png",
+    "provenance": "localized marketing copy over preserved English artwork",
+    "pixels": [
+      1206,
+      2622
+    ],
+    "mode": "RGB",
+    "background_extension": [
+      6,
+      6
+    ],
+    "localized_copy": [
+      {
+        "text": "Curve avanzate",
+        "size": 116,
+        "bounds": [
+          194.0,
+          145,
+          1048.0,
+          232
+        ]
+      },
+      {
+        "text": "e strumenti di analisi",
+        "size": 116,
+        "bounds": [
+          64.0,
+          280,
+          1178.0,
+          367
+        ]
+      },
+      {
+        "text": "Perfeziona i colori con strumenti di analisi precisi.",
+        "size": 43,
+        "bounds": [
+          154.0,
+          421,
+          1088.0,
+          461
+        ]
+      }
+    ]
+  },
+  {
+    "locale": "it-IT",
+    "file": "ios_store_localizations/existing_gallery_1206x2622/it-IT/05_Fine_Tune_Italian_1206x2622.png",
+    "source": "store_localizations/sv-SE/sources/ios/05_fine_tune.png",
+    "provenance": "localized marketing copy over preserved English artwork",
+    "pixels": [
+      1206,
+      2622
+    ],
+    "mode": "RGB",
+    "background_extension": [
+      6,
+      6
+    ],
+    "localized_copy": [
+      {
+        "text": "Perfeziona",
+        "size": 117,
+        "bounds": [
+          324.5,
+          122,
+          917.5,
+          211
+        ]
+      },
+      {
+        "text": "ogni colore",
+        "size": 117,
+        "bounds": [
+          315.5,
+          260,
+          926.5,
+          373
+        ]
+      },
+      {
+        "text": "Regola con precisione tonalità, saturazione e luminanza.",
+        "size": 43,
+        "bounds": [
+          88.5,
+          415,
+          1153.5,
+          455
+        ]
+      }
+    ]
+  },
+  {
+    "locale": "it-IT",
+    "file": "ios_store_localizations/existing_gallery_1206x2622/it-IT/06_Pro_Effects_Italian_1206x2622.png",
+    "source": "store_localizations/sv-SE/sources/ios/06_effects.png",
+    "provenance": "localized marketing copy over preserved English artwork",
+    "pixels": [
+      1206,
+      2622
+    ],
+    "mode": "RGB",
+    "background_extension": [
+      6,
+      6
+    ],
+    "localized_copy": [
+      {
+        "text": "Completa il look",
+        "size": 116,
+        "bounds": [
+          185.5,
+          128,
+          1056.5,
+          238
+        ]
+      },
+      {
+        "text": "con effetti Pro",
+        "size": 112,
+        "bounds": [
+          250.0,
+          258,
+          992.0,
+          343
+        ]
+      },
+      {
+        "text": "Aggiungi toni opachi, nitidezza e un bagliore cinematografico.",
+        "size": 39,
+        "bounds": [
+          84.5,
+          405,
+          1157.5,
+          442
+        ]
+      }
+    ]
+  },
+  {
+    "locale": "es-ES",
+    "file": "ios_store_localizations/existing_gallery_1206x2622/es-ES/01_Color_Grading_Spanish_Spain_1206x2622.png",
+    "source": "store_localizations/sv-SE/sources/ios/01_color_grading.png",
+    "provenance": "localized marketing copy over preserved English artwork",
+    "pixels": [
+      1206,
+      2622
+    ],
+    "mode": "RGB",
+    "background_extension": [
+      6,
+      6
+    ],
+    "localized_copy": [
+      {
+        "text": "Etalonaje Pro",
+        "size": 116,
+        "bounds": [
+          262.0,
+          145,
+          980.0,
+          255
+        ]
+      },
+      {
+        "text": "para fotos y vídeos",
+        "size": 114,
+        "bounds": [
+          116.0,
+          279,
+          1126.0,
+          387
+        ]
+      },
+      {
+        "text": "Herramientas profesionales. Un flujo de trabajo ágil.",
+        "size": 45,
+        "bounds": [
+          104.5,
+          430,
+          1137.5,
+          472
+        ]
+      }
+    ]
+  },
+  {
+    "locale": "es-ES",
+    "file": "ios_store_localizations/existing_gallery_1206x2622/es-ES/02_Cinematic_Looks_Spanish_Spain_1206x2622.png",
+    "source": "store_localizations/sv-SE/sources/ios/02_looks.png",
+    "provenance": "localized marketing copy over preserved English artwork",
+    "pixels": [
+      1206,
+      2622
+    ],
+    "mode": "RGB",
+    "background_extension": [
+      6,
+      6
+    ],
+    "localized_copy": [
+      {
+        "text": "Looks de cine",
+        "size": 116,
+        "bounds": [
+          248.5,
+          145,
+          993.5,
+          232
+        ]
+      },
+      {
+        "text": "sin complicaciones",
+        "size": 116,
+        "bounds": [
+          100.5,
+          275,
+          1141.5,
+          385
+        ]
+      },
+      {
+        "text": "Aplica ajustes predefinidos y crea tu propio estilo.",
+        "size": 44,
+        "bounds": [
+          136.5,
+          425,
+          1105.5,
+          467
+        ]
+      }
+    ]
+  },
+  {
+    "locale": "es-ES",
+    "file": "ios_store_localizations/existing_gallery_1206x2622/es-ES/03_Color_Warper_Spanish_Spain_1206x2622.png",
+    "source": "ios_store_localizations/color_warper/GradeLab_iOS_Color_Warper_Spanish_Spain.png",
+    "provenance": "existing localized card",
+    "pixels": [
+      1206,
+      2622
+    ],
+    "mode": "RGB",
+    "background_extension": [
+      6,
+      6
+    ],
+    "localized_copy": []
+  },
+  {
+    "locale": "es-ES",
+    "file": "ios_store_localizations/existing_gallery_1206x2622/es-ES/04_Curves_and_Scopes_Spanish_Spain_1206x2622.png",
+    "source": "store_localizations/sv-SE/sources/ios/03_curves.png",
+    "provenance": "localized marketing copy over preserved English artwork",
+    "pixels": [
+      1206,
+      2622
+    ],
+    "mode": "RGB",
+    "background_extension": [
+      6,
+      6
+    ],
+    "localized_copy": [
+      {
+        "text": "Curvas avanzadas",
+        "size": 116,
+        "bounds": [
+          120.5,
+          145,
+          1121.5,
+          232
+        ]
+      },
+      {
+        "text": "y herramientas de análisis",
+        "size": 94,
+        "bounds": [
+          46.5,
+          280,
+          1195.5,
+          368
+        ]
+      },
+      {
+        "text": "Afina el color con herramientas de análisis precisas.",
+        "size": 43,
+        "bounds": [
+          128.5,
+          421,
+          1113.5,
+          461
+        ]
+      }
+    ]
+  },
+  {
+    "locale": "es-ES",
+    "file": "ios_store_localizations/existing_gallery_1206x2622/es-ES/05_Fine_Tune_Spanish_Spain_1206x2622.png",
+    "source": "store_localizations/sv-SE/sources/ios/05_fine_tune.png",
+    "provenance": "localized marketing copy over preserved English artwork",
+    "pixels": [
+      1206,
+      2622
+    ],
+    "mode": "RGB",
+    "background_extension": [
+      6,
+      6
+    ],
+    "localized_copy": [
+      {
+        "text": "Afina",
+        "size": 117,
+        "bounds": [
+          474.5,
+          122,
+          767.5,
+          211
+        ]
+      },
+      {
+        "text": "cada color",
+        "size": 117,
+        "bounds": [
+          334.0,
+          260,
+          908.0,
+          347
+        ]
+      },
+      {
+        "text": "Ajusta con precisión el tono, la saturación y la luminancia.",
+        "size": 43,
+        "bounds": [
+          75.5,
+          415,
+          1166.5,
+          455
+        ]
+      }
+    ]
+  },
+  {
+    "locale": "es-ES",
+    "file": "ios_store_localizations/existing_gallery_1206x2622/es-ES/06_Pro_Effects_Spanish_Spain_1206x2622.png",
+    "source": "store_localizations/sv-SE/sources/ios/06_effects.png",
+    "provenance": "localized marketing copy over preserved English artwork",
+    "pixels": [
+      1206,
+      2622
+    ],
+    "mode": "RGB",
+    "background_extension": [
+      6,
+      6
+    ],
+    "localized_copy": [
+      {
+        "text": "Completa tu look",
+        "size": 116,
+        "bounds": [
+          158.5,
+          128,
+          1083.5,
+          238
+        ]
+      },
+      {
+        "text": "con efectos Pro",
+        "size": 112,
+        "bounds": [
+          211.5,
+          258,
+          1030.5,
+          343
+        ]
+      },
+      {
+        "text": "Añade tonos mate, nitidez y un resplandor cinematográfico.",
+        "size": 41,
+        "bounds": [
+          72.5,
+          405,
+          1169.5,
+          444
+        ]
+      }
+    ]
+  },
+  {
+    "locale": "sv-SE",
+    "file": "ios_store_localizations/existing_gallery_1206x2622/sv-SE/01_Color_Grading_Swedish_1206x2622.png",
+    "source": "store_localizations/sv-SE/ios/GradeLab_IOS_Swedish_01_color_grading.png",
+    "provenance": "existing localized card",
+    "pixels": [
+      1206,
+      2622
+    ],
+    "mode": "RGB",
+    "background_extension": [
+      6,
+      6
+    ],
+    "localized_copy": []
+  },
+  {
+    "locale": "sv-SE",
+    "file": "ios_store_localizations/existing_gallery_1206x2622/sv-SE/02_Cinematic_Looks_Swedish_1206x2622.png",
+    "source": "store_localizations/sv-SE/ios/GradeLab_IOS_Swedish_02_looks.png",
+    "provenance": "existing localized card",
+    "pixels": [
+      1206,
+      2622
+    ],
+    "mode": "RGB",
+    "background_extension": [
+      6,
+      6
+    ],
+    "localized_copy": []
+  },
+  {
+    "locale": "sv-SE",
+    "file": "ios_store_localizations/existing_gallery_1206x2622/sv-SE/03_Color_Warper_Swedish_1206x2622.png",
+    "source": "store_localizations/sv-SE/ios/GradeLab_IOS_Swedish_04_color_warper.png",
+    "provenance": "existing localized card",
+    "pixels": [
+      1206,
+      2622
+    ],
+    "mode": "RGB",
+    "background_extension": [
+      6,
+      6
+    ],
+    "localized_copy": []
+  },
+  {
+    "locale": "sv-SE",
+    "file": "ios_store_localizations/existing_gallery_1206x2622/sv-SE/04_Curves_and_Scopes_Swedish_1206x2622.png",
+    "source": "store_localizations/sv-SE/ios/GradeLab_IOS_Swedish_03_curves.png",
+    "provenance": "existing localized card",
+    "pixels": [
+      1206,
+      2622
+    ],
+    "mode": "RGB",
+    "background_extension": [
+      6,
+      6
+    ],
+    "localized_copy": []
+  },
+  {
+    "locale": "sv-SE",
+    "file": "ios_store_localizations/existing_gallery_1206x2622/sv-SE/05_Fine_Tune_Swedish_1206x2622.png",
+    "source": "store_localizations/sv-SE/ios/GradeLab_IOS_Swedish_05_fine_tune.png",
+    "provenance": "existing localized card",
+    "pixels": [
+      1206,
+      2622
+    ],
+    "mode": "RGB",
+    "background_extension": [
+      6,
+      6
+    ],
+    "localized_copy": []
+  },
+  {
+    "locale": "sv-SE",
+    "file": "ios_store_localizations/existing_gallery_1206x2622/sv-SE/06_Pro_Effects_Swedish_1206x2622.png",
+    "source": "store_localizations/sv-SE/ios/GradeLab_IOS_Swedish_06_effects.png",
+    "provenance": "existing localized card",
+    "pixels": [
+      1206,
+      2622
+    ],
+    "mode": "RGB",
+    "background_extension": [
+      6,
+      6
+    ],
+    "localized_copy": []
+  },
+  {
+    "locale": "fi-FI",
+    "file": "ios_store_localizations/existing_gallery_1206x2622/fi-FI/01_Color_Grading_Finnish_1206x2622.png",
+    "source": "store_localizations/fi-FI/ios/GradeLab_IOS_Finnish_01_color_grading.png",
+    "provenance": "existing localized card",
+    "pixels": [
+      1206,
+      2622
+    ],
+    "mode": "RGB",
+    "background_extension": [
+      6,
+      6
+    ],
+    "localized_copy": []
+  },
+  {
+    "locale": "fi-FI",
+    "file": "ios_store_localizations/existing_gallery_1206x2622/fi-FI/02_Cinematic_Looks_Finnish_1206x2622.png",
+    "source": "store_localizations/fi-FI/ios/GradeLab_IOS_Finnish_02_looks.png",
+    "provenance": "existing localized card",
+    "pixels": [
+      1206,
+      2622
+    ],
+    "mode": "RGB",
+    "background_extension": [
+      6,
+      6
+    ],
+    "localized_copy": []
+  },
+  {
+    "locale": "fi-FI",
+    "file": "ios_store_localizations/existing_gallery_1206x2622/fi-FI/03_Color_Warper_Finnish_1206x2622.png",
+    "source": "store_localizations/fi-FI/ios/GradeLab_IOS_Finnish_04_color_warper.png",
+    "provenance": "existing localized card",
+    "pixels": [
+      1206,
+      2622
+    ],
+    "mode": "RGB",
+    "background_extension": [
+      6,
+      6
+    ],
+    "localized_copy": []
+  },
+  {
+    "locale": "fi-FI",
+    "file": "ios_store_localizations/existing_gallery_1206x2622/fi-FI/04_Curves_and_Scopes_Finnish_1206x2622.png",
+    "source": "store_localizations/fi-FI/ios/GradeLab_IOS_Finnish_03_curves.png",
+    "provenance": "existing localized card",
+    "pixels": [
+      1206,
+      2622
+    ],
+    "mode": "RGB",
+    "background_extension": [
+      6,
+      6
+    ],
+    "localized_copy": []
+  },
+  {
+    "locale": "fi-FI",
+    "file": "ios_store_localizations/existing_gallery_1206x2622/fi-FI/05_Fine_Tune_Finnish_1206x2622.png",
+    "source": "store_localizations/fi-FI/ios/GradeLab_IOS_Finnish_05_fine_tune.png",
+    "provenance": "existing localized card",
+    "pixels": [
+      1206,
+      2622
+    ],
+    "mode": "RGB",
+    "background_extension": [
+      6,
+      6
+    ],
+    "localized_copy": []
+  },
+  {
+    "locale": "fi-FI",
+    "file": "ios_store_localizations/existing_gallery_1206x2622/fi-FI/06_Pro_Effects_Finnish_1206x2622.png",
+    "source": "store_localizations/fi-FI/ios/GradeLab_IOS_Finnish_06_effects.png",
+    "provenance": "existing localized card",
+    "pixels": [
+      1206,
+      2622
+    ],
+    "mode": "RGB",
+    "background_extension": [
+      6,
+      6
+    ],
+    "localized_copy": []
+  }
+]

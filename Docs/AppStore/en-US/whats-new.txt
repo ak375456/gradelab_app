@@ -1,10 +1,7 @@
-New audio tools, Relight, and editing improvements.
+More precise masking, easier zooming and eight new looks.
 
-• Audio controls: Adjust volume, fades, stereo pan, and EQ, or start with a voice preset.
-• Compressor: Tame loud moments with a simple Amount control and advanced settings.
-• Auto Ducking: Choose a voice clip and automatically lower the music while the voice is active.
-• Creative audio: Add echo, reverb, distortion, and bitcrusher. Try space presets and monitor each clip with a live level meter.
-• Relight: Add virtual lights to videos you've already shot. Adjust their position, color, and intensity, or start with a preset.
-• Color gradients make temperature, tint, hue, and saturation sliders easier to read.
-• Emoji now render correctly alongside text in previews and exports.
-• Recover trimmed footage with the left handle, even after moving a clip to the start of the timeline.
+• Refine freehand masks with editable points and curve handles. Tapping a point now selects it instead of removing it.
+• Zoom and pan while masking or using other editing tools, with snapping at 100% and a quick reset.
+• Drawing guidance now stays out of the picture, making skies and frame edges easier to mask.
+• More efficient mask tracking, with added checks to help prevent sudden jumps.
+• Eight new LUT looks: three free and five Pro, with clean names. Try every look in the preview.

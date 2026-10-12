@@ -126,7 +126,7 @@ struct LocalGradeUniforms: Sendable {
         // than widening the block.
         if geometry.shape == .freehand {
             maskC = SIMD4(Float(geometry.pivotX), Float(pointOffset),
-                          Float(geometry.points.count), Float(geometry.pivotY))
+                          Float(geometry.renderPoints.count), Float(geometry.pivotY))
         } else {
             maskC = SIMD4(Float(geometry.cornerRadius), 0, 0, 0)
         }
@@ -206,7 +206,7 @@ struct LocalGradeStack: Sendable {
             var offset = 0
             if geometry.shape == .freehand {
                 offset = points.count
-                points.append(contentsOf: geometry.points.map { SIMD2(Float($0.x), Float($0.y)) })
+                points.append(contentsOf: geometry.renderPoints.map { SIMD2(Float($0.x), Float($0.y)) })
             }
             if case .layer(let id) = matte, id == layer.id { matteIndex = Float(index + 1) }
             layerWords.append(contentsOf: LocalGradeUniforms(
@@ -243,7 +243,7 @@ struct LocalGradeStack: Sendable {
         var usedPoints = 0
         var result: [MaskedGradeLayer] = []
         for layer in layers.renderable {
-            let needed = layer.geometry.shape == .freehand ? layer.geometry.points.count : 0
+            let needed = layer.geometry.shape == .freehand ? layer.geometry.renderPoints.count : 0
             guard usedPoints + needed <= maximumPoints else { continue }
             usedPoints += needed
             result.append(layer)

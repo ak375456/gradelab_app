@@ -143,12 +143,10 @@ struct ImageEditorView: View {
         model.imageTool == .background &&
         (model.backgroundBrush != nil || model.isDrawingBackgroundLasso || model.isPickingBackgroundColor)
     }
-    /// The cutout tools keep the pinch so an edge can be traced magnified; the
-    /// mask window and the eyedropper hold the picture at 1x, as before.
+    /// Tools keep their one-finger input while two fingers navigate.
     private var previewInteraction: PreviewInteraction {
-        if backgroundToolArmed { return .pinchOnly }
-        return model.isPickingCurveHue || model.isPickingWarpColor
-            || model.selectedPanel == .mask ? .off : .full
+        return backgroundToolArmed || model.isPickingCurveHue || model.isPickingWarpColor
+            || model.selectedPanel == .mask ? .pinchOnly : .full
     }
 
     // MARK: - Header
@@ -222,13 +220,13 @@ struct ImageEditorView: View {
                                                       displayedRect: model.renderer.displayedVideoRect,
                                                       isZooming: previewPinching)
                     }
+                    if model.isPickingCurveHue || model.isPickingWarpColor { colorPickingLayer }
                 }
             }
             if model.isPreparing {
                 Color.black
                 ProgressView().frame(maxWidth: .infinity, maxHeight: .infinity)
             }
-            if model.isPickingCurveHue || model.isPickingWarpColor { colorPickingLayer }
             if model.showsOriginal {
                 Text("ORIGINAL").font(.caption2.weight(.semibold)).tracking(1.5)
                     .padding(10).background(.black.opacity(0.65), in: Capsule()).padding(14)
@@ -249,7 +247,7 @@ struct ImageEditorView: View {
                         .gesture(DragGesture(minimumDistance: 0)
                             .updating($holdingOriginal) { _, held, _ in held = true })
                 }
-            }.padding(12).accessibilityHidden(true)
+            }.padding(12).padding(.bottom, 44).accessibilityHidden(true)
             if let status = model.statusMessage {
                 VStack {
                     Spacer()
@@ -285,6 +283,7 @@ struct ImageEditorView: View {
             Color.white.opacity(0.001)
                 .contentShape(Rectangle())
                 .onTapGesture { location in
+                    guard !previewPinching else { return }
                     let point = CGPoint(x: location.x / max(proxy.size.width, 1),
                                         y: location.y / max(proxy.size.height, 1))
                     let picked = model.isPickingWarpColor

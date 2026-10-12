@@ -85,7 +85,7 @@ struct MaskTrackingCoordinates: Sendable {
         }
         let points: [CGPoint]
         if g.shape == .freehand {
-            points = g.points.map { Self.placedVertex($0, geometry: g, aspect: aspect) }
+            points = g.renderPoints.map { Self.placedVertex($0, geometry: g, aspect: aspect) }
         } else {
             // Sample the actual ellipse; rectangle bounds include its rotated corners.
             let local: [CGPoint] = g.shape == .ellipse ? (0..<128).map {
@@ -117,6 +117,19 @@ struct MaskTrackingCoordinates: Sendable {
     static func isValid(_ box: CGRect) -> Bool {
         !box.isNull && [box.minX, box.minY, box.width, box.height].allSatisfy(\.isFinite) &&
             box.width > 0.00001 && box.height > 0.00001
+    }
+
+    /// High confidence alone can still attach to a different object at a cut.
+    /// Reject abrupt jumps/collapse before writing a bad key; allow more travel
+    /// between widely spaced VFR samples than between adjacent 60fps frames.
+    static func isContinuous(_ box: CGRect, after previous: CGRect, elapsed: Double) -> Bool {
+        guard isValid(box), isValid(previous), elapsed.isFinite, elapsed > 0 else { return false }
+        let travel = hypot(box.midX - previous.midX, box.midY - previous.midY)
+        let permittedTravel = max(0.08, min(0.75, elapsed * 2), max(previous.width, previous.height) * 0.6)
+        let permittedScale = max(1.35, pow(4, min(elapsed, 1)))
+        let sx = box.width / previous.width, sy = box.height / previous.height
+        return travel <= permittedTravel && sx >= 1 / permittedScale && sx <= permittedScale
+            && sy >= 1 / permittedScale && sy <= permittedScale
     }
 
     private static func corners(_ r: CGRect) -> [CGPoint] {

@@ -182,8 +182,8 @@ enum MaskTrackingMotion {
     }
 
     private static func errorWeights(_ g: MaskGeometry) -> SIMD4<Double> {
-        guard g.shape == .freehand, let first = g.points.first else { return SIMD4(repeating: 1) }
-        let xs = g.points.map(\.x), ys = g.points.map(\.y)
+        guard g.shape == .freehand, let first = g.renderPoints.first else { return SIMD4(repeating: 1) }
+        let xs = g.renderPoints.map(\.x), ys = g.renderPoints.map(\.y)
         return SIMD4(1, 1, max(0.01, (xs.max() ?? first.x) - (xs.min() ?? first.x)),
                      max(0.01, (ys.max() ?? first.y) - (ys.min() ?? first.y)))
     }

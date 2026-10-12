@@ -1,10 +1,7 @@
-Nouveaux outils audio, Relight et améliorations du montage.
+Des masques plus précis, un zoom plus pratique et huit nouveaux looks.
 
-• Réglages audio : ajustez le volume, les fondus, la balance stéréo et l’égalisation, ou partez d’un préréglage vocal.
-• Compresseur : atténuez les passages trop forts avec un réglage d’intensité simple et des paramètres avancés.
-• Ducking automatique : choisissez un clip vocal pour baisser automatiquement la musique lorsque la voix est audible.
-• Effets audio créatifs : ajoutez écho, réverbération, distorsion et bitcrusher. Essayez les préréglages d’ambiance et suivez le niveau de chaque clip en temps réel.
-• Relight : ajoutez des lumières virtuelles à des vidéos déjà tournées. Réglez leur position, leur couleur et leur intensité, ou partez d’un préréglage.
-• Les dégradés des curseurs facilitent les réglages de température, de teinte et de saturation.
-• Les emojis s’affichent désormais correctement avec le texte dans les aperçus et les exports.
-• Récupérez les images retirées avec la poignée gauche, même après avoir déplacé le clip au début de la timeline.
+• Affinez vos masques à main levée avec des points modifiables et des poignées de courbe. Toucher un point le sélectionne désormais au lieu de le supprimer.
+• Zoomez et déplacez l’image pendant le masquage ou avec d’autres outils, avec un retour automatique à 100 % à proximité de cette valeur et une réinitialisation rapide.
+• Les indications de dessin ne recouvrent plus l’image, pour masquer plus facilement le ciel et les bords du cadre.
+• Le suivi des masques est plus efficace, avec des contrôles supplémentaires pour limiter les déplacements brusques.
+• Huit nouveaux looks LUT : trois gratuits et cinq Pro, avec des noms plus clairs. Essayez chaque look dans l’aperçu.

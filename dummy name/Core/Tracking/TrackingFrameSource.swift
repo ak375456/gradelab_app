@@ -47,6 +47,10 @@ struct TrackingFrame {
 /// flat Log footage usable without requiring a color-managed export conversion.
 final class TrackingLuminance {
     private var lookup = Array(0...255).map { UInt8($0) }
+    private var pixelPool: CVPixelBufferPool?
+    private var poolSize: CGSize = .zero
+    private var mapped = Data()
+    private var alpha = Data()
 
     func setReference(_ frame: TrackingFrame) {
         var histogram = [Int](repeating: 0, count: 256)
@@ -86,25 +90,61 @@ final class TrackingLuminance {
     }
 
     func pixelBuffer(_ frame: TrackingFrame) throws -> CVPixelBuffer {
-        var buffer: CVPixelBuffer?
-        let status = CVPixelBufferCreate(kCFAllocatorDefault, frame.width, frame.height, kCVPixelFormatType_32BGRA,
-                                        [kCVPixelBufferIOSurfacePropertiesKey: [:]] as CFDictionary, &buffer)
-        guard status == kCVReturnSuccess, let buffer else {
+        guard frame.width > 0, frame.height > 0,
+              frame.luma.count == frame.width * frame.height else {
+            throw MaskTrackingError.message(String(localized: "The tracking frame has invalid dimensions."))
+        }
+        let size = CGSize(width: frame.width, height: frame.height)
+        if pixelPool == nil || size != poolSize {
+            var pool: CVPixelBufferPool?
+            let status = CVPixelBufferPoolCreate(kCFAllocatorDefault, nil, [
+                kCVPixelBufferWidthKey: frame.width,
+                kCVPixelBufferHeightKey: frame.height,
+                kCVPixelBufferPixelFormatTypeKey: kCVPixelFormatType_32BGRA,
+                kCVPixelBufferIOSurfacePropertiesKey: [:]
+            ] as CFDictionary, &pool)
+            guard status == kCVReturnSuccess, let pool else {
+                throw MaskTrackingError.message(String(localized: "There is not enough memory for a tracking frame."))
+            }
+            pixelPool = pool; poolSize = size
+            mapped = Data(count: frame.luma.count)
+            alpha = Data(repeating: 255, count: frame.luma.count)
+        }
+        guard let pixelPool else { throw MaskTrackingError.message("Tracking buffer is unavailable.") }
+        var allocated: CVPixelBuffer?
+        let status = CVPixelBufferPoolCreatePixelBuffer(kCFAllocatorDefault, pixelPool, &allocated)
+        guard status == kCVReturnSuccess, let buffer = allocated else {
             throw MaskTrackingError.message(String(localized: "There is not enough memory for a tracking frame."))
         }
         CVPixelBufferLockBaseAddress(buffer, [])
         defer { CVPixelBufferUnlockBaseAddress(buffer, []) }
-        let base = CVPixelBufferGetBaseAddress(buffer)!.assumingMemoryBound(to: UInt8.self)
-        let stride = CVPixelBufferGetBytesPerRow(buffer)
-        frame.luma.withUnsafeBytes { raw in
-            let input = raw.bindMemory(to: UInt8.self)
-            for y in 0..<frame.height {
-                for x in 0..<frame.width {
-                    let v = lookup[Int(input[y * frame.width + x])]
-                    let offset = y * stride + x * 4
-                    base[offset] = v; base[offset + 1] = v; base[offset + 2] = v; base[offset + 3] = 255
+        // Vectorized lookup and interleave replace millions of scalar byte
+        // assignments per frame. Pooling reuses buffers only after Vision has
+        // released them, so consecutive observations never share live storage.
+        let error = frame.luma.withUnsafeBytes { input in
+            mapped.withUnsafeMutableBytes { output in
+                alpha.withUnsafeMutableBytes { alphaBytes in
+                    lookup.withUnsafeBufferPointer { table -> vImage_Error in
+                        var source = vImage_Buffer(data: UnsafeMutableRawPointer(mutating: input.baseAddress!),
+                            height: vImagePixelCount(frame.height), width: vImagePixelCount(frame.width), rowBytes: frame.width)
+                        var plane = vImage_Buffer(data: output.baseAddress!, height: source.height,
+                            width: source.width, rowBytes: frame.width)
+                        var opacity = vImage_Buffer(data: alphaBytes.baseAddress!, height: source.height,
+                            width: source.width, rowBytes: frame.width)
+                        var destination = vImage_Buffer(data: CVPixelBufferGetBaseAddress(buffer)!,
+                            height: source.height, width: source.width, rowBytes: CVPixelBufferGetBytesPerRow(buffer))
+                        let result = vImageTableLookUp_Planar8(&source, &plane, table.baseAddress!, vImage_Flags(kvImageNoFlags))
+                        guard result == kvImageNoError else { return result }
+                        // ARGB interleave with [luma,luma,luma,alpha] produces
+                        // BGRA bytes: all three colour channels are identical.
+                        return vImageConvert_Planar8toARGB8888(&plane, &plane, &plane, &opacity,
+                            &destination, vImage_Flags(kvImageNoFlags))
+                    }
                 }
             }
+        }
+        guard error == kvImageNoError else {
+            throw MaskTrackingError.message(String(localized: "The tracking frame could not be converted."))
         }
         return buffer
     }

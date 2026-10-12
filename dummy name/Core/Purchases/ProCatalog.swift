@@ -248,7 +248,7 @@ enum ProAccessPolicy {
 
     // MARK: - Looks
 
-    /// Ten free looks spanning cinematic, film, portrait and cooler styles.
+    /// Free looks spanning cinematic, film, portrait and black-and-white styles.
     ///
     /// Written as the free list rather than the Pro list on purpose. Any
     /// `.cube` dropped into `Resources/LUTs/Imported` before a build is
@@ -258,7 +258,8 @@ enum ProAccessPolicy {
         "Warm_Cinema.cube", "Teal_Orange.cube", "Soft_Film.cube",
         "Cinematic.cube", "Vintage_Fox.cube", "Portrait_160.cube",
         "Moody_Aqua.cube", "Palm_Springs.cube", "Bold_Film.cube",
-        "Serenity.CUBE"
+        "Serenity.CUBE",
+        "Daylight.cube", "Vivid_Cinema.cube", "Silver_Mono.cube"
     ]
 
     /// A camera conversion is never Pro.
