@@ -28,7 +28,7 @@ struct LiveTransformPanel: View {
                 HStack {
                     Picker("Blend", selection: Binding(get: { model.selectedClip?.blendMode ?? .normal },
                                                        set: { mode in model.changeVisual("Blend", immediate: true) { $0.blendMode = mode } })) {
-                        ForEach(VisualBlendMode.allCases, id: \.self) { Text($0.rawValue.capitalized).tag($0) }
+                        ForEach(VisualBlendMode.allCases, id: \.self) { Text($0.title).tag($0) }
                     }.pickerStyle(.menu)
                     Spacer()
                     Button("Reset") {

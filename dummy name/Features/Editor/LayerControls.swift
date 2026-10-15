@@ -108,7 +108,7 @@ struct VideoTransformPanel: View {
                     value(String(localized: "Rotation"), $clip.transform.rotationDegrees, -180...180)
                     value(String(localized: "Opacity"), $clip.opacity, 0...1)
                     Picker("Blend", selection: $clip.blendMode) {
-                        ForEach(VisualBlendMode.allCases, id: \.self) { Text($0.rawValue.capitalized).tag($0) }
+                        ForEach(VisualBlendMode.allCases, id: \.self) { Text($0.title).tag($0) }
                     }
                 }
                 Section {

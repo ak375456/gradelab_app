@@ -1,7 +1,0 @@
-Máscaras más precisas, un zoom más cómodo y ocho nuevos looks.
-
-• Perfecciona las máscaras a mano alzada con puntos editables y tiradores de curva. Ahora, tocar un punto lo selecciona en lugar de eliminarlo.
-• Amplía y desplaza la imagen al crear máscaras o usar otras herramientas, con ajuste automático cerca del 100 % y restablecimiento rápido.
-• Las indicaciones de dibujo ya no tapan la imagen, para que sea más fácil enmascarar el cielo y los bordes del fotograma.
-• El seguimiento de máscaras es más eficiente, con comprobaciones adicionales para ayudar a evitar saltos bruscos.
-• Ocho nuevos looks LUT: tres gratuitos y cinco Pro, con nombres más claros. Prueba todos los looks en la vista previa.

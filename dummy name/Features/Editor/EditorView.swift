@@ -183,7 +183,7 @@ struct EditorView: View {
                                 .frame(width: mediaBinWidth(geometry.size))
                             WorkspaceDivider(
                                 orientation: .vertical,
-                                label: "Resize the media bin",
+                                label: String(localized: "Resize the media bin"),
                                 onResize: { delta in
                                     // The handle is on the bin's trailing edge,
                                     // so dragging right widens it.
@@ -198,7 +198,7 @@ struct EditorView: View {
                             if scopesVisible {
                                 WorkspaceDivider(
                                     orientation: .horizontal,
-                                    label: "Resize the scopes",
+                                    label: String(localized: "Resize the scopes"),
                                     onResize: { delta in
                                         setScopeHeight(scopeHeight(geometry.size, regular: true) - delta,
                                                        in: geometry.size)
@@ -218,7 +218,7 @@ struct EditorView: View {
                             if showsTimeline {
                                 WorkspaceDivider(
                                     orientation: .horizontal,
-                                    label: "Resize the timeline",
+                                    label: String(localized: "Resize the timeline"),
                                     onResize: { delta in
                                         // The handle sits above the bottom
                                         // block, so dragging up gives the
@@ -234,7 +234,7 @@ struct EditorView: View {
                         }.frame(maxWidth: .infinity)
                         WorkspaceDivider(
                             orientation: .vertical,
-                            label: "Resize the tools panel",
+                            label: String(localized: "Resize the tools panel"),
                             onResize: { delta in
                                 // The handle is on the panel's leading edge:
                                 // dragging left widens it.
@@ -263,7 +263,7 @@ struct EditorView: View {
                     preview.frame(height: previewHeight(geometry.size))
                     WorkspaceDivider(
                         orientation: .horizontal,
-                        label: "Resize the preview",
+                        label: String(localized: "Resize the preview"),
                         onResize: { delta in
                             setPreviewHeight(previewHeight(geometry.size) + delta, in: geometry.size)
                         },
@@ -273,7 +273,7 @@ struct EditorView: View {
                     if scopesVisible {
                         WorkspaceDivider(
                             orientation: .horizontal,
-                            label: "Resize the scopes",
+                            label: String(localized: "Resize the scopes"),
                             onResize: { delta in
                                 setScopeHeight(scopeHeight(geometry.size, regular: false) - delta,
                                                in: geometry.size)
@@ -294,7 +294,7 @@ struct EditorView: View {
                         // reach a control below it is actually asking for.
                         WorkspaceDivider(
                             orientation: .horizontal,
-                            label: "Resize the timeline",
+                            label: String(localized: "Resize the timeline"),
                             onResize: { delta in
                                 setCompactTimelineHeight(compactTimelineHeight(geometry.size) + delta,
                                                          in: geometry.size)
@@ -717,7 +717,7 @@ struct EditorView: View {
         }
         .sheet(isPresented: $help) {
             VStack(alignment: .leading, spacing: 24) {
-                Label(model.selectedPanel.rawValue, systemImage: model.selectedPanel.symbol).font(.title2.weight(.semibold))
+                Label(model.selectedPanel.title, systemImage: model.selectedPanel.symbol).font(.title2.weight(.semibold))
                 Text(model.selectedPanel.help).font(.body).foregroundStyle(AppColors.textSecondary)
                 Button("Got it") { help = false }.buttonStyle(.borderedProminent).tint(AppColors.accent)
             }.padding(28).presentationDetents([.medium]).presentationDragIndicator(.visible).preferredColorScheme(.dark)
@@ -1688,7 +1688,7 @@ struct EditorView: View {
             if colorMode {
                 Button { help = true } label: {
                     Image(systemName: "questionmark.circle").frame(width: 38, height: 44)
-                }.accessibilityLabel("How to use \(model.selectedPanel.rawValue)")
+                }.accessibilityLabel("How to use \(model.selectedPanel.title)")
                 GradeActionsMenu(model: model, onSaveGrade: { savingPreset = true })
                 Button("Reset", action: model.resetPanel)
                     .font(.caption.weight(.medium)).frame(minWidth: 40, minHeight: 44)

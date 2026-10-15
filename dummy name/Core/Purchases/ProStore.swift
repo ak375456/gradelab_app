@@ -117,9 +117,9 @@ final class ProStore: ObservableObject {
         do {
             products = try await Product.products(for: ProPlan.allCases.map(\.id))
             if products.count != ProPlan.allCases.count {
-                message = "Some plans are unavailable from the App Store. Please try again later."
+                message = String(localized: "Some plans are unavailable from the App Store. Please try again later.")
             }
-        } catch { message = "Couldn’t load prices. Check your connection and try again." }
+        } catch { message = String(localized: "Couldn’t load prices. Check your connection and try again.") }
     }
     func refreshAccess() async {
         var current: Set<String> = []
@@ -147,13 +147,13 @@ final class ProStore: ObservableObject {
     func purchase(_ product: Product) async {
         guard !isPurchasing, !isRestoring, !hasLifetime else { return }
         guard ProConfiguration.legalLinksReady else {
-            message = "Purchases aren’t available in this build yet."
+            message = String(localized: "Purchases aren’t available in this build yet.")
             return
         }
         // Subscription members manage their existing subscription instead of
         // accidentally buying a second way of accessing the same Pro tier.
         guard !hasSubscription else {
-            message = "You already have Pro. Use Manage Subscription to review your plan."
+            message = String(localized: "You already have Pro. Use Manage Subscription to review your plan.")
             return
         }
         isPurchasing = true
@@ -163,16 +163,16 @@ final class ProStore: ObservableObject {
             switch try await product.purchase() {
             case .success(let result):
                 guard case .verified(let transaction) = result else {
-                    message = "The purchase couldn’t be verified. Try Restore Purchases."
+                    message = String(localized: "The purchase couldn’t be verified. Try Restore Purchases.")
                     return
                 }
                 await refreshAccess()
                 await transaction.finish()
-            case .pending: message = "Your purchase is awaiting approval. Pro will unlock when Apple confirms it."
+            case .pending: message = String(localized: "Your purchase is awaiting approval. Pro will unlock when Apple confirms it.")
             case .userCancelled: break
-            @unknown default: message = "The purchase hasn’t completed. Please try again."
+            @unknown default: message = String(localized: "The purchase hasn’t completed. Please try again.")
             }
-        } catch { message = "The purchase couldn’t be completed. \(error.localizedDescription)" }
+        } catch { message = String(localized: "The purchase couldn’t be completed. \(error.localizedDescription)") }
     }
     func restore() async {
         guard !isPurchasing, !isRestoring else { return }
@@ -181,7 +181,7 @@ final class ProStore: ObservableObject {
         do {
             try await AppStore.sync()
             await refreshAccess()
-            message = hasPro ? "Your Pro access has been restored." : "No Pro purchase was found for this Apple Account."
-        } catch { message = "Purchases couldn’t be restored. Please try again." }
+            message = hasPro ? String(localized: "Your Pro access has been restored.") : String(localized: "No Pro purchase was found for this Apple Account.")
+        } catch { message = String(localized: "Purchases couldn’t be restored. Please try again.") }
     }
 }

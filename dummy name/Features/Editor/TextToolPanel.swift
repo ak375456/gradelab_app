@@ -93,8 +93,8 @@ struct TextToolPanel: View {
                         toggle(String(localized: "Underline"), symbol: "underline", \.style.isUnderlined)
                     }
                     Text("Bold and Italic are available only when this font includes that variation.").font(.caption2).foregroundStyle(.secondary)
-                    Picker("Capitalization", selection: binding(\.style.caseMode)) { ForEach(TextStyle.CaseMode.allCases, id: \.self) { Text($0.rawValue.capitalized).tag($0) } }
-                    Picker("Alignment", selection: binding(\.style.alignment)) { ForEach(TextStyle.Alignment.allCases, id: \.self) { Text($0.rawValue.capitalized).tag($0) } }
+                    Picker("Capitalization", selection: binding(\.style.caseMode)) { ForEach(TextStyle.CaseMode.allCases, id: \.self) { Text($0.displayName).tag($0) } }
+                    Picker("Alignment", selection: binding(\.style.alignment)) { ForEach(TextStyle.Alignment.allCases, id: \.self) { Text($0.displayName).tag($0) } }
                     keyframeHeader
                     animated(.characterSpacing, -20...100)
                     animated(.lineSpacing, 0...300)
@@ -116,7 +116,7 @@ struct TextToolPanel: View {
                     number(String(localized: "Anchor X"), value(\.transform.anchorX), 0...1, reset: 0.5)
                     number(String(localized: "Anchor Y"), value(\.transform.anchorY), 0...1, reset: 0.5)
                     animated(.opacity, 0...1)
-                    Picker("Blend", selection: binding(\.blendMode)) { ForEach(VisualBlendMode.allCases, id: \.self) { Text($0.rawValue.capitalized).tag($0) } }
+                    Picker("Blend", selection: binding(\.blendMode)) { ForEach(VisualBlendMode.allCases, id: \.self) { Text($0.title).tag($0) } }
                     // Written out twice rather than as a ternary inside `Text`:
                     // only a plain literal is reliably extracted for translation.
                     if model.selectedTextCount > 1 {

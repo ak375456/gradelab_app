@@ -34,9 +34,9 @@ struct OnboardingPage: Identifiable {
             aspectRatio: 864.0 / 1080.0,
             // "BEFORE" is doing work beyond labelling: it promises an after,
             // which is the whole reason anyone reaches the second page.
-            eyebrow: "BEFORE",
-            title: "Straight out of the camera",
-            message: "Flat sky, dull greens, no depth.",
+            eyebrow: String(localized: "BEFORE"),
+            title: String(localized: "Straight out of the camera"),
+            message: String(localized: "Flat sky, dull greens, no depth."),
             actionTitle: "Next",
             glow: Color(red: 0.42, green: 0.46, blue: 0.52),
             glowStrength: 0.14
@@ -45,9 +45,9 @@ struct OnboardingPage: Identifiable {
             id: 1,
             resourceName: "onboarding-2-after",
             aspectRatio: 864.0 / 1080.0,
-            eyebrow: "AFTER",
-            title: "The same clip, graded",
-            message: "Nothing reshot, nothing replaced. Only the color changed.",
+            eyebrow: String(localized: "AFTER"),
+            title: String(localized: "The same clip, graded"),
+            message: String(localized: "Nothing reshot, nothing replaced. Only the color changed."),
             actionTitle: "Next",
             glow: Color(red: 0.24, green: 0.62, blue: 0.92),
             // Deliberately the strongest of the three. The room brightening as
@@ -58,9 +58,9 @@ struct OnboardingPage: Identifiable {
             id: 2,
             resourceName: "onboarding-3-gradelab",
             aspectRatio: 720.0 / 1454.0,
-            eyebrow: "IN GRADELAB",
-            title: "Now do it to yours",
-            message: "Looks, curves, wheels and LUTs on your own footage. Then export.",
+            eyebrow: String(localized: "IN GRADELAB"),
+            title: String(localized: "Now do it to yours"),
+            message: String(localized: "Looks, curves, wheels and LUTs on your own footage. Then export."),
             actionTitle: "Start Grading",
             glow: AppColors.accent,
             glowStrength: 0.20

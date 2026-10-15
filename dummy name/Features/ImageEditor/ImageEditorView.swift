@@ -63,7 +63,7 @@ struct ImageEditorView: View {
             .sheet(isPresented: $infoSheet) { ImageSourceInfoView(project: model.project) }
             .sheet(isPresented: $help) {
                 VStack(alignment: .leading, spacing: 24) {
-                    Label(model.selectedPanel.rawValue, systemImage: model.selectedPanel.symbol)
+                    Label(model.selectedPanel.title, systemImage: model.selectedPanel.symbol)
                         .font(.title2.weight(.semibold))
                     Text(model.selectedPanel.help).font(.body).foregroundStyle(AppColors.textSecondary)
                     Button("Got it") { help = false }.buttonStyle(.borderedProminent).tint(AppColors.accent)
@@ -85,7 +85,7 @@ struct ImageEditorView: View {
                             preview
                             if scopesVisible {
                                 WorkspaceDivider(
-                                    orientation: .horizontal, label: "Resize the scopes",
+                                    orientation: .horizontal, label: String(localized: "Resize the scopes"),
                                     onResize: { delta in
                                         setScopeHeight(scopeHeight(geometry.size, regular: true) - delta, in: geometry.size)
                                     },
@@ -96,7 +96,7 @@ struct ImageEditorView: View {
                             }
                         }.frame(maxWidth: .infinity)
                         WorkspaceDivider(
-                            orientation: .vertical, label: "Resize the tools panel",
+                            orientation: .vertical, label: String(localized: "Resize the tools panel"),
                             onResize: { delta in
                                 setInspectorWidth(inspectorWidth(geometry.size) - delta, in: geometry.size)
                             },
@@ -108,13 +108,13 @@ struct ImageEditorView: View {
                 } else {
                     preview.frame(height: previewHeight(geometry.size))
                     WorkspaceDivider(
-                        orientation: .horizontal, label: "Resize the preview",
+                        orientation: .horizontal, label: String(localized: "Resize the preview"),
                         onResize: { delta in setPreviewHeight(previewHeight(geometry.size) + delta, in: geometry.size) },
                         onBegin: beginWorkspaceResize, onEnd: endWorkspaceResize,
                         onReset: { storedPreviewHeight = 0 })
                     if scopesVisible {
                         WorkspaceDivider(
-                            orientation: .horizontal, label: "Resize the scopes",
+                            orientation: .horizontal, label: String(localized: "Resize the scopes"),
                             onResize: { delta in
                                 setScopeHeight(scopeHeight(geometry.size, regular: false) - delta, in: geometry.size)
                             },
@@ -337,7 +337,7 @@ struct ImageEditorView: View {
             Spacer()
             if model.imageTool == .color { Button { help = true } label: {
                 Image(systemName: "questionmark.circle").frame(width: 44, height: 44)
-            }.accessibilityLabel("How to use \(model.selectedPanel.rawValue)") }
+            }.accessibilityLabel("How to use \(model.selectedPanel.title)") }
             if model.imageTool == .color { GradeActionsMenu(model: model, onSaveGrade: { savingPreset = true }) }
             Button { comparePinned.toggle() } label: {
                 Image(systemName: "square.on.square").frame(width: 44, height: 44)

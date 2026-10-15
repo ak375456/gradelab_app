@@ -181,7 +181,7 @@ struct LUTPanel<Model: GradingModel>: View {
     var body: some View {
         VStack(spacing: 14) {
             Picker("Section", selection: $section) {
-                ForEach(LookSection.allCases) { Text($0.rawValue).tag($0) }
+                ForEach(LookSection.allCases) { Text(LocalizedStringKey($0.rawValue)).tag($0) }
             }.pickerStyle(.segmented)
             switch section {
             case .looks: sdrBody

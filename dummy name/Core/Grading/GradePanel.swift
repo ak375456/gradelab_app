@@ -28,6 +28,26 @@ enum GradePanel: String, CaseIterable, Identifiable, Sendable {
 
     var id: String { rawValue }
 
+    /// Display text is localized separately from the stable tool identifier.
+    var title: String {
+        switch self {
+        case .light: String(localized: "Light")
+        case .color: String(localized: "Color")
+        case .curves: String(localized: "Curves")
+        case .hsl: String(localized: "HSL")
+        case .warper: String(localized: "Warper")
+        case .noise: String(localized: "Noise")
+        case .relight: String(localized: "Relight")
+        case .wheels: String(localized: "Wheels")
+        case .match: String(localized: "Match")
+        case .masks: String(localized: "Masks")
+        case .mask: String(localized: "Local")
+        case .vignette: String(localized: "Vignette")
+        case .effects: String(localized: "Effects")
+        case .lut: String(localized: "Look")
+        }
+    }
+
     /// The tools a masked local grade can actually carry.
     ///
     /// The vignette, the finishing effects and the creative look are missing on

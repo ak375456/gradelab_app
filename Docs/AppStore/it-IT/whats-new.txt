@@ -1,7 +1,0 @@
-Maschere più precise, zoom più pratico e otto nuovi look.
-
-• Rifinisci le maschere a mano libera con punti modificabili e maniglie delle curve. Ora un tocco seleziona il punto invece di rimuoverlo.
-• Usa zoom e panoramica mentre crei maschere o utilizzi altri strumenti, con aggancio al 100% e ripristino rapido.
-• Le indicazioni di disegno non coprono più l’immagine, rendendo più semplice mascherare il cielo e i bordi del fotogramma.
-• Il tracciamento delle maschere è più efficiente, con controlli aggiuntivi per evitare spostamenti improvvisi.
-• Otto nuovi look LUT: tre gratuiti e cinque Pro, con nomi più chiari. Prova ogni look nell’anteprima.

@@ -137,7 +137,7 @@ extension CurveType {
     var outputLabel: String {
         switch self {
         case .master, .red, .green, .blue, .saturationVsSaturation: "Out"
-        case .hueVsHue: "Shift"
+        case .hueVsHue: String(localized: "Shift")
         case .hueVsSaturation, .lumaVsSaturation: "Sat"
         case .hueVsLuma, .saturationVsLuma: "Luma"
         }

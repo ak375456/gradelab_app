@@ -78,7 +78,7 @@ struct ShapeToolPanel: View {
                     number(String(localized: "Anchor Y"), value(\.transform.anchorY), 0...1, reset: 0.5)
                     animated(.opacity, 0...1)
                     Picker("Blend", selection: binding(\.blendMode)) {
-                        ForEach(VisualBlendMode.allCases, id: \.self) { Text($0.rawValue.capitalized).tag($0) }
+                        ForEach(VisualBlendMode.allCases, id: \.self) { Text($0.title).tag($0) }
                     }
                     // Written out twice rather than as a ternary inside `Text`:
                     // only a plain literal is reliably extracted for translation.

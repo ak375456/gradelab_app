@@ -73,9 +73,9 @@ struct AudioToolPanel: View {
                 .foregroundStyle(settings.isMuted ? AppColors.warning : AppColors.accent)
                 .accessibilityLabel(settings.isMuted ? "Unmute clip" : "Mute clip")
             }
-            row("Volume", value: settings.volume * 100, range: 0...100, reset: 100,
+            row(String(localized: "Volume"), value: settings.volume * 100, range: 0...100, reset: 100,
                 format: { "\(Int($0.rounded()))%" }) { model.changeAudio(volume: $0 / 100) }
-            row("Pan", value: model.audioProcessing.pan * 100, range: -100...100,
+            row(String(localized: "Pan"), value: model.audioProcessing.pan * 100, range: -100...100,
                 format: Self.panLabel) { value in model.changeAudioProcessing { $0.pan = value / 100 } }
             if model.audioFadeLimit > 0 {
                 HStack(spacing: 16) {
@@ -111,16 +111,16 @@ struct AudioToolPanel: View {
                     .font(.caption2).foregroundStyle(AppColors.textSecondary)
                     .fixedSize(horizontal: false, vertical: true)
                 VStack(spacing: 8) {
-                    toneRow("Bass", path: \.bass)
-                    toneRow("Mids", path: \.mid)
-                    toneRow("Treble", path: \.treble)
+                    toneRow(String(localized: "Bass"), path: \.bass)
+                    toneRow(String(localized: "Mids"), path: \.mid)
+                    toneRow(String(localized: "Treble"), path: \.treble)
                     DisclosureGroup("Advanced", isExpanded: $advancedExpanded) {
                         VStack(spacing: 8) {
-                            row("Low cut", value: model.audioProcessing.lowCut, range: AudioProcessingSettings.lowCutRange,
+                            row(String(localized: "Low cut"), value: model.audioProcessing.lowCut, range: AudioProcessingSettings.lowCutRange,
                                 format: { $0 < 20 ? String(localized: "Off") : "\(Int($0)) Hz" }) { value in
                                 model.changeAudioProcessing { $0.lowCut = value }
                             }
-                            row("High cut", value: model.audioProcessing.highCut, range: AudioProcessingSettings.highCutRange,
+                            row(String(localized: "High cut"), value: model.audioProcessing.highCut, range: AudioProcessingSettings.highCutRange,
                                 reset: 20_000, format: { $0 >= 20_000 ? String(localized: "Off") : String(format: "%.1f kHz", $0 / 1_000) }) { value in
                                 model.changeAudioProcessing { $0.highCut = value }
                             }
@@ -156,26 +156,26 @@ struct AudioToolPanel: View {
             Text("Even out loud and quiet moments. Start with Amount, then fine-tune if needed.")
                 .font(.caption2).foregroundStyle(AppColors.textSecondary).fixedSize(horizontal: false, vertical: true)
             VStack(spacing: 8) {
-                row("Amount", value: c.amount * 100, range: 0...100, reset: 50, format: Self.percent) { value in
+                row(String(localized: "Amount"), value: c.amount * 100, range: 0...100, reset: 50, format: Self.percent) { value in
                     editEffect(\.compressor, fallback: .init()) { $0.setAmount(value / 100) }
                 }
                 DisclosureGroup("Advanced", isExpanded: $compressorAdvanced) {
                     VStack(spacing: 8) {
-                        row("Threshold", value: c.threshold, range: -60...0, reset: -21, format: Self.decibels) { value in
+                        row(String(localized: "Threshold"), value: c.threshold, range: -60...0, reset: -21, format: Self.decibels) { value in
                             editEffect(\.compressor, fallback: .init()) { $0.threshold = value }
                         }
-                        row("Ratio", value: c.ratio, range: 1...12, reset: 4.5, format: { String(format: "%.1f:1", $0) }) { value in
+                        row(String(localized: "Ratio"), value: c.ratio, range: 1...12, reset: 4.5, format: { String(format: "%.1f:1", $0) }) { value in
                             editEffect(\.compressor, fallback: .init()) { $0.ratio = value }
                         }
                         HStack(spacing: 16) {
-                            row("Attack", value: c.attack, range: 1...100, reset: 15, format: Self.milliseconds) { value in
+                            row(String(localized: "Attack"), value: c.attack, range: 1...100, reset: 15, format: Self.milliseconds) { value in
                                 editEffect(\.compressor, fallback: .init()) { $0.attack = value }
                             }
-                            row("Release", value: c.release, range: 20...1_000, reset: 180, format: Self.milliseconds) { value in
+                            row(String(localized: "Release"), value: c.release, range: 20...1_000, reset: 180, format: Self.milliseconds) { value in
                                 editEffect(\.compressor, fallback: .init()) { $0.release = value }
                             }
                         }
-                        row("Makeup", value: c.makeup, range: 0...12, format: Self.decibels) { value in
+                        row(String(localized: "Makeup"), value: c.makeup, range: 0...12, format: Self.decibels) { value in
                             editEffect(\.compressor, fallback: .init()) { $0.makeup = value }
                         }
                     }.padding(.top, 8)
@@ -213,18 +213,18 @@ struct AudioToolPanel: View {
                         .font(.caption2).foregroundStyle(AppColors.warning)
                 }
                 VStack(spacing: 8) {
-                    row("Reduction", value: d.reduction, range: 0...30, reset: 12, format: { String(format: "−%.1f dB", $0) }) { value in
+                    row(String(localized: "Reduction"), value: d.reduction, range: 0...30, reset: 12, format: { String(format: "−%.1f dB", $0) }) { value in
                         editEffect(\.ducking, fallback: .init()) { $0.reduction = value }
                     }
                     HStack(spacing: 16) {
-                        row("Lower before", value: d.attack, range: 0.02...1, reset: 0.15, format: Self.seconds) { value in
+                        row(String(localized: "Lower before"), value: d.attack, range: 0.02...1, reset: 0.15, format: Self.seconds) { value in
                             editEffect(\.ducking, fallback: .init()) { $0.attack = value }
                         }
-                        row("Recover", value: d.release, range: 0.1...3, reset: 0.6, format: Self.seconds) { value in
+                        row(String(localized: "Recover"), value: d.release, range: 0.1...3, reset: 0.6, format: Self.seconds) { value in
                             editEffect(\.ducking, fallback: .init()) { $0.release = value }
                         }
                     }
-                    row("Voice threshold", value: d.threshold, range: -55 ... -10, reset: -35, format: Self.decibels) { value in
+                    row(String(localized: "Voice threshold"), value: d.threshold, range: -55 ... -10, reset: -35, format: Self.decibels) { value in
                         editEffect(\.ducking, fallback: .init()) { $0.threshold = value }
                     }
                     Text("Lower the threshold for quiet speech. Raise it if background noise keeps the music low.")
@@ -253,14 +253,14 @@ struct AudioToolPanel: View {
             } label: { Label("Space presets", systemImage: "sparkles").font(.caption.weight(.medium)).frame(minHeight: 44) }
             effectSwitch("Echo on", path: \.echo, fallback: .init())
             VStack(spacing: 8) {
-                row("Echo mix", value: e.mix * 100, range: 0...80, reset: 25, format: Self.percent) { value in
+                row(String(localized: "Echo mix"), value: e.mix * 100, range: 0...80, reset: 25, format: Self.percent) { value in
                     editEffect(\.echo, fallback: .init()) { $0.mix = value / 100 }
                 }
                 HStack(spacing: 16) {
                     row("Time", value: e.time, range: 0.04...1.5, reset: 0.3, format: Self.seconds) { value in
                         editEffect(\.echo, fallback: .init()) { $0.time = value }
                     }
-                    row("Feedback", value: e.feedback * 100, range: 0...80, reset: 35, format: Self.percent) { value in
+                    row(String(localized: "Feedback"), value: e.feedback * 100, range: 0...80, reset: 35, format: Self.percent) { value in
                         editEffect(\.echo, fallback: .init()) { $0.feedback = value / 100 }
                     }
                 }
@@ -268,14 +268,14 @@ struct AudioToolPanel: View {
             Divider().overlay(AppColors.border)
             effectSwitch("Reverb on", path: \.reverb, fallback: .init())
             VStack(spacing: 8) {
-                row("Reverb mix", value: r.mix * 100, range: 0...80, reset: 20, format: Self.percent) { value in
+                row(String(localized: "Reverb mix"), value: r.mix * 100, range: 0...80, reset: 20, format: Self.percent) { value in
                     editEffect(\.reverb, fallback: .init()) { $0.mix = value / 100 }
                 }
                 HStack(spacing: 16) {
                     row("Size", value: r.size * 100, range: 0...100, reset: 50, format: Self.percent) { value in
                         editEffect(\.reverb, fallback: .init()) { $0.size = value / 100 }
                     }
-                    row("Damping", value: r.damping * 100, range: 0...100, reset: 50, format: Self.percent) { value in
+                    row(String(localized: "Damping"), value: r.damping * 100, range: 0...100, reset: 50, format: Self.percent) { value in
                         editEffect(\.reverb, fallback: .init()) { $0.damping = value / 100 }
                     }
                 }
@@ -291,10 +291,10 @@ struct AudioToolPanel: View {
                           expanded: $textureExpanded) {
             effectSwitch("Texture on", path: \.texture, fallback: .init())
             VStack(spacing: 8) {
-                row("Distortion", value: t.distortion * 100, range: 0...100, format: Self.percent) { value in
+                row(String(localized: "Distortion"), value: t.distortion * 100, range: 0...100, format: Self.percent) { value in
                     editEffect(\.texture, fallback: .init()) { $0.distortion = value / 100 }
                 }
-                row("Bitcrusher", value: t.crush * 100, range: 0...100, format: Self.percent) { value in
+                row(String(localized: "Bitcrusher"), value: t.crush * 100, range: 0...100, format: Self.percent) { value in
                     editEffect(\.texture, fallback: .init()) { $0.crush = value / 100 }
                 }
             }.disabled(!t.isEnabled || model.audioProcessing.texture == nil)
@@ -423,7 +423,7 @@ private struct AudioClipLevelMeter: View {
                 HStack {
                     Text("Clip level").font(.caption.weight(.medium))
                     Spacer()
-                    Text(reading.peak > 1 ? "Clipping · lower volume"
+                    Text(reading.peak > 1 ? String(localized: "Clipping · lower volume")
                          : reading.peak > 0.001 ? String(format: "%.1f dBFS", reading.decibels)
                          : String(localized: "Silent"))
                         .font(.caption2.monospacedDigit())

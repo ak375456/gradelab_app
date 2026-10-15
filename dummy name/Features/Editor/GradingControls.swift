@@ -37,7 +37,7 @@ struct GradingControls<Model: GradingModel>: View {
                                     .overlay(alignment: .topTrailing) {
                                         GradeAnimationDot(model: model, panel: panel).offset(x: 5, y: -1)
                                     }
-                                Text(panel.rawValue).font(.caption.weight(.medium))
+                                Text(panel.title).font(.caption.weight(.medium))
                             }.frame(width: 58, height: 44)
                                 .foregroundStyle(model.selectedPanel == panel ? AppColors.textPrimary : AppColors.textSecondary)
                                 .background(model.selectedPanel == panel ? AppColors.surfaceRaised : .clear, in: RoundedRectangle(cornerRadius: 12))

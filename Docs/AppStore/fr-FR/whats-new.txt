@@ -1,7 +1,0 @@
-Des masques plus précis, un zoom plus pratique et huit nouveaux looks.
-
-• Affinez vos masques à main levée avec des points modifiables et des poignées de courbe. Toucher un point le sélectionne désormais au lieu de le supprimer.
-• Zoomez et déplacez l’image pendant le masquage ou avec d’autres outils, avec un retour automatique à 100 % à proximité de cette valeur et une réinitialisation rapide.
-• Les indications de dessin ne recouvrent plus l’image, pour masquer plus facilement le ciel et les bords du cadre.
-• Le suivi des masques est plus efficace, avec des contrôles supplémentaires pour limiter les déplacements brusques.
-• Huit nouveaux looks LUT : trois gratuits et cinq Pro, avec des noms plus clairs. Essayez chaque look dans l’aperçu.

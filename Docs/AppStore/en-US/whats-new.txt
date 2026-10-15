@@ -1,7 +1,0 @@
-More precise masking, easier zooming and eight new looks.
-
-• Refine freehand masks with editable points and curve handles. Tapping a point now selects it instead of removing it.
-• Zoom and pan while masking or using other editing tools, with snapping at 100% and a quick reset.
-• Drawing guidance now stays out of the picture, making skies and frame edges easier to mask.
-• More efficient mask tracking, with added checks to help prevent sudden jumps.
-• Eight new LUT looks: three free and five Pro, with clean names. Try every look in the preview.

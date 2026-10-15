@@ -1,50 +1,99 @@
 # GradeLab
 
-The non-linear editor supports **additional videos, image/video overlays, layer visibility/locks/order, transforms/blending, markers, beat-aware audio, text and shape layers** alongside non-destructive per-clip grading. Separate linked sound or import MP3/M4A/AAC/WAV/AIFF; trim, split, move, copy/cut/paste, duplicate and delete audio on waveform tracks. The Audio tab offers volume/mute, fades, stereo pan, a three-band EQ, low/high cuts, Warm Voice/Telephone/Muffled/Bright Voice presets, Tone bypass, a soft-knee compressor, voice-source auto ducking, echo/reverb with space presets, distortion, bitcrusher and a live clip-level meter, with a shared preview/export processor. See [Audio tools and testing](Docs/AUDIO_TOOLS.md). Text clips support multiline typography, bundled/custom TTF fonts, presets, color, stroke, background, shadow, glow, curve and export rendering. **Shape layers** draw rectangles, ellipses, triangles, stars, polygons, arrows and capsule lines with a flat or gradient fill, stroke, corner radius, star waist, shadow and glow. Text and shapes are one concept in the code — a drawn overlay — so they share placement, trimming, splitting, the canvas handles and all three compositing paths (SDR, HDR and Apple Log) rather than each having its own. **Keyframe animation** covers text transform and appearance properties, shape geometry and appearance (size, corner radius, star waist, fill, stroke, shadow and glow), video/image transforms, and **colour grading** — light, colour, all twenty-four HSL values, the three colour wheels, the vignette, look strength, the finishing effects and all ten curves — with Linear/Hold/Ease curves evaluated identically in preview and export — see [the keyframe system](Docs/KEYFRAME_SYSTEM.md). Grading animation is one more consumer of that engine rather than a second one: a grading parameter is an ordinary animatable property whose storage is `GradeSettings`, so it inherits clip-relative timing, trim/split/retime behaviour, undo and persistence unchanged. Masked local grades animate through the same tracks. See [migration design and checkpoint](Docs/TIMELINE_MIGRATION.md). Animated audio volume, discrete (step) animation of font/bold/alignment, a graph editor, a master audio limiter and voice isolation remain future work.
+Native SwiftUI video and photo color grading for iPhone, iPad and Mac Catalyst.
+UI/UX is the priority: keep the picture usable, reuse the shared controls and
+design tokens, and check both compact and wide layouts when changing the editor.
 
-GradeLab is a native iOS and Mac Catalyst video color-grading app built with SwiftUI, AVFoundation, Metal, VideoToolbox, ImageIO, PhotosUI, and Photos. It implements one complete workflow: import a real video, inspect its metadata, grade decoded frames on the GPU during playback, export those frames through the same grading function, then inspect, save, or share the generated movie.
+## Open and verify
 
-**Replace clip** swaps a timeline video or image using existing media or a new import. Open it from the selected clip's toolbar or clip options. The sheet previews the source and offers **Keep duration** (choose the starting frame; a shorter video holds its last frame with silence) or **Use full clip** (following clips move by the duration change). Main-track replacements also move later text, shapes, overlays and markers; standalone audio stays in place. Clip identity, grades, transforms, masks, compatible speed settings and keyframes carry over, with animation scaled when duration changes. Source-dependent cutouts must be redone, and the sheet flags transitions that lose their source handles. The replacement and its ripple form one undo step; cancelling leaves the project unchanged and releases unused staged imports.
-
-**Still photographs** go through the same grading system. Importing a photo opens a workspace with the picture, the Color tab and the scopes — no timeline, no transport, no duration — and every control is the one video uses, writing into the same `GradeSettings`, so a preset or a copied grade crosses between a clip and a photograph in either direction. The picture is decoded once with ImageIO into the Rec.709 working space, graded by the same Metal functions through the same renderer, and exported at the source's own resolution as JPEG, HEIC or PNG. Full-resolution export renders in tiles with frame-absolute coordinates and a halo blurred once over the whole picture, so the exported file matches what was on screen; `Scripts/ValidateStillImage.swift` proves that on the GPU. Photographs carrying an HDR gain map — nearly every recent iPhone photo — are graded as the SDR picture the file is built around, with the import stating that the gain map is not carried through. Raw files, and images whose primary data is PQ/HLG-encoded, are refused with a reason rather than flattened.
-
-## Open and run
-
-Open `dummy name.xcodeproj`, select the shared **GradeLab** scheme, and run on iOS 18 or later, or choose **My Mac (Mac Catalyst)** for macOS 15 or later on an Apple silicon Mac (M1 or later). Intel Macs are not supported. Mac imports open the system file browser; Photos remains available from Home. See [Mac setup and release steps](Docs/MAC_RELEASE.md). The project container retains the starter project’s filename, but the app target, product, module, bundle display name, and shared scheme are all named GradeLab.
-
-Command-line verification:
+Open `dummy name.xcodeproj` and select the shared **GradeLab** scheme. The app
+targets iOS 18+ and macOS 15+ through Mac Catalyst on Apple silicon. The starter
+container name is retained; the app target, product and module are GradeLab.
+Read version/build numbers from the project settings instead of release notes.
 
 ```sh
+# Compile the app and tests for iOS; this does not execute device tests.
 xcodebuild -project "dummy name.xcodeproj" -scheme GradeLab \
-  -destination 'generic/platform=iOS' CODE_SIGNING_ALLOWED=NO build
+  -destination 'generic/platform=iOS' CODE_SIGNING_ALLOWED=NO \
+  SWIFT_EMIT_LOC_STRINGS=NO build-for-testing
 
+# Example focused test run on this Mac; select tests relevant to the change.
 xcodebuild -project "dummy name.xcodeproj" -scheme GradeLab \
-  -destination 'generic/platform=iOS' CODE_SIGNING_ALLOWED=NO build-for-testing
+  -destination 'platform=macOS,variant=Mac Catalyst' CODE_SIGNING_ALLOWED=NO \
+  SWIFT_EMIT_LOC_STRINGS=NO \
+  -only-testing:GradeLabTests/MaskViewportTests test
 ```
 
-## Video colour and export support
+`SWIFT_EMIT_LOC_STRINGS=NO` prevents validation builds from rewriting the string
+catalog. Unsigned builds verify compilation; signing, physical-device gestures,
+playback/export performance and App Store validation require their own checks.
+`Scripts/` contains host regression harnesses for grading, LUTs, curves,
+Apple Log, sequences, shot matching, noise reduction and audio.
 
-GradeLab has validated grading paths for tagged 8-bit Rec.709 SDR, higher-precision Rec.709 SDR, 10-bit HLG/BT.2020 HDR, and Apple Log. Apple Log is identified from the file's Log transfer-function metadata, decoded with Apple's published curve into scene-linear BT.2020 for grading, and rendered to Rec.709 for preview and 10-bit Rec.709 export. Preview can explicitly interpret an 8-bit source with incomplete colour tags as Rec.709, but export remains blocked until the stream declares the colour properties needed to verify the result.
+## Code map
 
-Apple Log 2 is identified separately and deliberately remains unsupported. It uses a different transfer curve and Apple Gamut primaries, so GradeLab never sends it through the original Apple Log/BT.2020 transform. PQ/HDR10, Dolby Vision metadata preservation, unknown camera Log profiles, unverified bit depth or colour metadata, source tracks whose format changes mid-stream, and files containing multiple embedded video tracks are also rejected rather than silently converted through the wrong colour pipeline.
+| Location | Responsibility |
+| --- | --- |
+| `dummy name/App/` | App coordination, imports and editor/project lifecycle |
+| `dummy name/Features/Editor/` | Video workspace, tool panels, timeline UI, preview gestures and editor transactions |
+| `dummy name/Features/ImageEditor/` | Photo workspace and export UI |
+| `dummy name/UI/` | Shared design system, controls, layout and keyboard shortcuts |
+| `dummy name/Core/Projects/`, `Core/Images/` | Video/photo documents, persistence and still-image decoding |
+| `dummy name/Core/Timeline/` | Tracks, clips, compositing, keyframes, speed, transitions, text/shapes and audio scheduling |
+| `dummy name/Core/Grading/`, `Core/Rendering/`, `dummy name/Metal/` | Grade models, uniforms, Metal preview and shared shader stages |
+| `dummy name/Core/Tracking/`, `Core/BackgroundRemoval/`, `Core/NoiseReduction/`, `Core/Relight/` | Analysis, tracking, cached mattes/depth and temporal processing |
+| `dummy name/Core/Import/`, `Core/Video/`, `Core/Playback/`, `Core/Export/` | Media inspection, decoding, playback and export |
+| `dummy name/Core/LUT/`, `Core/Purchases/` | LUT parsing/catalog/import and StoreKit access policy |
+| `GradeLabTests/` | Model, rendering, media/export and UI layout regression tests |
+| `Scripts/`, `Tools/LUTGenerator/` | Validation and resource generation tools |
+| `LUTSources/`, `SoundSources/` | Master resource inputs; preserve alongside compiled app resources |
+| `gradelab-site/` | Support, privacy and terms website source; URLs are used by the app |
 
-Export offers hardware HEVC Main/Main 10 or H.264 High in MOV/MP4, plus ProRes 422 and ProRes 422 HQ in MOV on compatible devices. Available codecs depend on the source colour mode and device capabilities. Original/720p/1080p/4K/custom-long-edge sizing, original or 24/25/30/50/60 FPS, three quality levels, and optional average bitrate are supported where applicable. Resizing preserves aspect ratio; custom FPS drops/repeats frames without changing speed. Original settings retain geometry and timestamps. Rotation and readable audio tracks are retained; audio is re-encoded as AAC. For iPhone camera files containing normal and Spatial Audio presentations, only enabled audio tracks are exported. Native PCM samples are passed through to the AAC encoder without a sample conversion. Contradictory mono/stereo PCM channel-layout metadata is removed from the writer format hint; valid layouts are retained. No lossless or universal-format claim is made.
+Paths beginning with `Core/` in the table are relative to `dummy name/`.
+Xcode uses synchronized groups for `dummy name/` and `GradeLabTests/`; files
+placed inside those trees may become app/test inputs automatically.
 
-## Editor revision
+## Implementation boundaries
 
-The Color workspace has ten tools: Light, Color, Curves, HSL (eight hue ranges), Wheels (shadows/midtones/highlights), Match, Local, Vignette, Effects, and Look. **Local** is a soft ellipse or rectangle that limits a clip's creative grade without changing its transparency. The editor also has a separate top-level **Mask** tool beside Transform. That mask changes the selected video or image layer's alpha, so clips on lower tracks become visible through an ellipse, rectangle, or infinite Linear/Split mask; it includes direct preview dragging, position, size, rotation, feather, inversion, and per-property keyframes. Linear Position X keyframes produce a standard swipe transition. Color → Local position, size, rotation, feather, and opacity use the same keyframe engine. **Curves** covers ten control-point curves — Master, Red, Green and Blue for tone, and Hue vs Hue, Hue vs Saturation, Hue vs Luma, Luma vs Saturation, Saturation vs Saturation and Saturation vs Luma for colour — with monotone cubic interpolation, an eyedropper that samples the graded frame to build a three-point hue selection, and correct wrapping across the red 0°/360° boundary. See [Architecture](Docs/ARCHITECTURE.md) for the interpolation, LUT layout and pipeline position. Look applies one of three bundled creative LUTs — Warm Cinema, Teal Orange, Soft Film — at an adjustable strength; the look runs before the other tools, so they adjust its result. The LUTs are original 33-point `.cube` files generated by `Tools/LUTGenerator` for Rec.709/SDR footage, not camera or colour-space conversions. Your own 3D `.cube` looks can be shipped with the app by dropping them into `LUTSources/Imported/` and running `Scripts/compile-luts.sh` — the app discovers every bundled look at launch, so no code change is needed — or imported on the device from Files via **Look → Import**, which validates them, stores them in Application Support, and lets them be removed again. Bundled looks ship compiled: `.cube` text is the source, and the `.gclut` the compiler writes holds the same 16-bit samples the GPU uploads, which is bit-identical to parsing the text and about 79% smaller. See that folder's `HOW_TO_ADD_LUTS.md` for which downloads work and which do not. Every numeric grading control carries the same keyframe diamond the Transform tools use, and each of the ten curves keyframes as a whole snapshot rather than per control point: two snapshots need not share a topology, because the blend samples both curves and interpolates the heights. Hue values take the shortest path around the circle, so a wheel animating from 350° to 10° passes through red rather than unwinding through cyan. Copy Grade and Save as Preset stay static: they carry the base grade, never clip-relative keyframes. Each tool includes a usage guide and panel reset. Hold the preview for Original; release for Edited, or toggle the compare button. Paused display ticks retry late decoded frames/drawables while skipping unchanged GPU work.
+- Video and photos share `GradeSettings` and Metal grading functions. Preserve
+  preview/export parity across direct rendering and SDR, HDR and Apple Log layer
+  compositors; a UI-only result is insufficient for an effect change.
+- `VideoProject` owns the timeline and assets; `ImageProject` owns photo editing.
+  Preserve Codable compatibility, clip-relative keyframes, undo/redo and autosave.
+- Color masks apply local grades; layer masks change transparency. They are
+  different tools. Freehand edits use a transient draft and commit once per
+  gesture; point selection must not delete an anchor.
+- Preview zoom is inspection state, separate from clip transforms. Tools and
+  eyedroppers share its coordinate transform. Mask handles keep their screen
+  size while zoomed; guidance belongs outside the picture.
+- Tagged Rec.709 SDR, HLG/BT.2020 and original Apple Log have explicit color
+  paths. Keep unsupported/ambiguous inputs explicit; do not silently reinterpret
+  Apple Log 2, PQ/HDR10 or missing export metadata.
+- LUT filenames are persisted identities. Clean display names without renaming
+  existing identities. `LUTAsset` and `ProCatalog` define catalog/access; all
+  looks can be previewed and Pro restrictions are checked for export.
+- Some older bundled `.gclut` files have no matching text source. The compiler
+  removes orphan outputs: **do not run a full LUT rebuild into the shared resource
+  folder blindly**. Compile additions to a temporary directory and copy their
+  outputs. See [curated LUT provenance and procedure](LUTSources/Curated/README.md).
+- Use `AppPlatform.isMac` for Mac-only behavior. `usesDesktopWorkspace` includes
+  iPad. Native Objective-C gesture handlers should use GradeLab-specific selector
+  names to avoid collisions with UIKit selectors during upload validation.
 
-**Shot Match** brings one shot closer to another. Pick a reference — another clip on the timeline, or an image imported from Files — and GradeLab measures both pictures and solves for the grade that moves the current shot toward it: exposure, white balance, contrast, the tonal range, saturation, and the tint of the shadows, midtones and highlights, plus an optional residual master curve. What it produces is **ordinary values in the ordinary controls**: Exposure moves because the match moved it, the shadow wheel carries a real hue and strength, and every one of them is still a slider the colorist drags afterwards. There is no second render stage and no baked frame, so preview and export cannot disagree about a matched clip. `ShotMatchSettings.baseGrade` keeps the clip's grade from the instant before the match landed, which is what makes Match Strength, the component switches and Remove Match exact rather than reconstructed — a strength of zero is byte-for-byte the grade that was there before. Shot mode matches exposure and neutral balance as closely as the footage allows; Look mode carries tone, palette and saturation across and deliberately declines to relight the scene. Replace rebuilds on the grade under the last match; Add keeps everything currently on the clip, hand edits included, and matches on top.
+## Detailed context
 
-Both pictures are measured in one space — Rec.709-encoded, Rec.709 primaries, diffuse white at 1.0 — reached through the same transforms the preview uses, so an Apple Log clip, a 10-bit HLG clip, an 8-bit Rec.709 clip and a Display P3 JPEG can be compared as pictures rather than as encodings. HDR content above diffuse white is counted as headroom rather than measured as clipping. Analysis runs on a 512-pixel proxy off the main thread, with the reference's measurement cached so a run of clips matched to one reference analyses that reference once; the grade it yields is then applied by the ordinary pipeline at full resolution. The solver is a forward model with re-measurement rather than a closed-form inversion of each control in isolation — contrast moves the median exposure just matched, and the wheels' tonal weights are read from a luminance saturation has already changed — and `Scripts/validate-shot-match.sh` proves that model agrees with the real `applyGradeCore` on the GPU, stage by stage, before it checks that the solver actually matches pictures. Every control carries a deadband and a limit well short of its own travel, so a shot matched to itself is left alone and a reference from a different world is damped and reported as low confidence instead of obeyed.
+- [Freehand masks, preview zoom, tracking and device acceptance](Docs/MASK_EDITING.md)
+- [Audio processing, preview/export behavior and tests](Docs/AUDIO_TOOLS.md)
+- [Relight architecture, models, limitations and validation](Docs/RELIGHT.md)
+- [Mac workspace, platform distinctions, shortcuts and release procedure](Docs/MAC_RELEASE.md)
+- [LUT import format and naming](LUTSources/Imported/HOW_TO_ADD_LUTS.md)
+- [LUT generator implementation](Tools/LUTGenerator/README.md)
 
-**Noise Reduction** is two engines under one tool, and they fail in different ways, which is why they are separate controls rather than one amount. **Temporal** reduction looks at the frames either side of the one on screen: the same scene point is sampled several times, the noise differs in every sample and the picture does not, so combining them removes the grain and leaves the detail. It is much the better of the two, and it is why the stage begins with motion rather than ending with it — every neighbouring frame is aligned to the current one by a pyramidal, per-pixel motion search before anything is combined, both directions of that search have to agree about what moved, and any sample that fails is discarded rather than averaged in. That forward/backward consistency test is what stops a hand crossing the frame from leaving a trail, and a scene cut needs no special case to survive it: at a cut every pixel fails at once. Clip boundaries are enforced earlier still, from the timeline, and a hard cut inside one clip is caught by comparing coarse luminance signatures before the frames ever reach the GPU. **Spatial** reduction works inside the single frame — a fast guided filter on luminance and a luminance-guided bilateral on colour — and finishes what the temporal pass could not: the first frame of a shot, a fast movement, anything that only appears once. Luma and chroma are held apart throughout, because colour noise takes far more cleaning than luminance noise before anything shows. **Detail Recovery** is not a sharpen: it measures what the reduction removed, discards the part small enough to have been noise, and returns the rest only where the *denoised* picture still has structure to return it to.
+## Marketing files
 
-Everything the engine needs beyond the sliders is measured from the footage rather than stored: a per-tile noise floor, taken as the quietest quarter of each block and then eroded across neighbouring blocks so that a region of hair reports the noise of the wall behind it rather than the energy of the hair. That floor is what makes the strengths adapt — hard on a flat shadow, barely at all on texture — and it is computed on the GPU, per frame, so it never reaches the CPU and the same frame with the same settings always produces the same pixels. Noise reduction runs after the input transform and before the creative grade, which is the only defensible place for it: noise belongs to the signal the camera produced, and lifting a Log shadow two stops before removing it means removing noise that has already been stretched. Preview and export run the identical stage, and Quality changes only the resolution motion is estimated at. `Scripts/validate-noise-reduction.sh` is the harness: it builds the shipping shaders on this machine's GPU and drives the shipping stage with synthetic frames whose noise, motion and detail are known exactly, then measures what came out — how much noise five frames removed, whether a bar crossing the frame left a trail, whether fine texture and a hard edge survived, whether colour speckle went while luminance stayed, whether two consecutive frames land in the same place, and whether two runs are bit-identical. Noise reduction is applied on the direct preview and export path; a project whose structure needs the layer compositor — transforms, several tracks, transitions, animation — renders and exports without it, consistently in both, and the panel says so.
-
-**Relight** adds virtual lights — directional, point and spot, up to six per clip — that react to the apparent shape of the scene rather than painting gradients over it. Each clip is analysed once, in the background and starting at the playhead: a relative depth map and a per-pixel confidence are estimated on keyframes (by a Core ML depth model when one is bundled, otherwise by built-in scene geometry from Vision's people, object and face analysis), carried between keyframes along the same forward/backward-checked motion field noise reduction uses, and stored per source frame in Caches — never in the project. The render stage upsamples that depth against the frame being drawn, derives edge-aware surface normals and adds light in linear light as stops, with a smooth highlight shoulder rather than a clamp, so SDR, HLG and Apple Log all behave. It sits after noise reduction and before the grade on every path — direct preview, export and the layer compositor — and moving a light changes only uniforms. Lights are keyframed by the project's keyframe engine, can be limited to one of the clip's own masks, and are dragged directly on the picture. See [Relight](Docs/RELIGHT.md) for the architecture, how to add the Depth Anything V2 Core ML model, limitations and the test checklist.
-
-No simulator is needed for the current manual acceptance pass. `build-for-testing` only compiles the tests. `Scripts/ValidateGrade.swift` is a host Metal regression harness for grading math and model compatibility; it does not test iPhone playback or hardware export. `Scripts/ValidateLUT.swift` is the equivalent harness for the look stage: it compiles the real shader, uploads the real `.cube` files, and checks identity round-tripping, stored-entry accuracy, strength blending, endpoints, bypass and persistence on the GPU. `Scripts/ValidateShotMatch.swift` is the harness for Shot Match: it runs the solver's forward model and the real `applyGrade` over the same colours on this machine's GPU and requires them to agree stage by stage, then checks that the solver recovers a known grade, leaves a shot matched to itself alone, respects its component switches, and damps a reference from an unrelated scene. `Scripts/ValidateCurves.swift` does the same for the curve stage: interpolation behaviour, exactness of the legacy tone-curve migration, hue continuity across the 0°/360° seam, and each of the ten curves through the real `applyGrade` on the GPU. See the device checklist for those tests.
-
-See [what the app has today](Docs/APP_OVERVIEW.md) for a full feature inventory, [Architecture](Docs/ARCHITECTURE.md) and the [physical-device checklist](Docs/PHYSICAL_DEVICE_TEST_CHECKLIST.md) for implementation details and acceptance testing.
-# gradelab_app
+Finished App Store images, social carousel, previews and brand references live
+outside this repository at **`/Users/aftab/Desktop/GradeLab Marketing/`**. Its
+README indexes the assets. Keep generated marketing exports and per-release
+promotional copy there so this workspace stays focused on the app and technical
+context. Old release drafts, duplicate exports and legacy tool caches were
+removed from the working tree; tracked history remains available in Git.

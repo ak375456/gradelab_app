@@ -46,3 +46,13 @@ app.*.map.json
 
 # LUT generator build products
 Tools/LUTGenerator/.build/
+
+# Xcode validation outputs and local AI/editor session state
+DerivedData/
+*.xcresult/
+*.xcuserstate
+xcuserdata/
+.claude/worktrees/
+:memory:.ses
+__pycache__/
+.metadata

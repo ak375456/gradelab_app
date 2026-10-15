@@ -54,7 +54,7 @@ struct ExportView: View {
                 case .cancelled:
                     statusView(
                         icon: "xmark.circle",
-                        title: "Export Cancelled",
+                        title: String(localized: "Export Cancelled"),
                         message: "No incomplete output was kept.",
                         actionTitle: "Back to Settings",
                         action: model.resetAfterFailure
@@ -205,7 +205,7 @@ struct ExportView: View {
                     .font(.caption).foregroundStyle(.secondary)
                 Picker("Size", selection: $model.configuration.resolution) {
                     ForEach(ExportConfiguration.Resolution.allCases, id: \.self) { resolution in
-                        Text(optionLabel(resolution == .original ? "Canvas size" : resolution.rawValue,
+                        Text(optionLabel(resolution == .original ? String(localized: "Canvas size") : resolution == .custom ? String(localized: "Custom") : resolution.rawValue,
                                          needsPro: resolutionNeedsPro(resolution))).tag(resolution)
                     }
                 }.disabled(model.followsCanvas)
@@ -218,7 +218,7 @@ struct ExportView: View {
                     .font(.caption).foregroundStyle(.secondary)
                 Picker("Frame rate", selection: $model.configuration.frameRate) {
                     ForEach(ExportConfiguration.FrameRate.allCases, id: \.self) { rate in
-                        Text(optionLabel(rate == .original ? "Canvas frame rate" : "\(rate.rawValue) fps",
+                        Text(optionLabel(rate == .original ? String(localized: "Canvas frame rate") : "\(rate.rawValue) fps",
                                          needsPro: frameRateNeedsPro(rate))).tag(rate)
                     }
                 }.disabled(model.followsCanvas)
@@ -238,14 +238,14 @@ struct ExportView: View {
                     if let rate = model.configuration.videoBitRate {
                         HStack {
                             Text("Bitrate"); Spacer()
-                            NumericEntryLabel(title: "Bitrate (Mbps)", text: "\(rate / 1_000_000) Mbps",
+                            NumericEntryLabel(title: String(localized: "Bitrate (Mbps)"), text: "\(rate / 1_000_000) Mbps",
                                               value: Double(rate) / 1_000_000, range: 2...240) { typed in
                                 model.configuration.videoBitRate = Int(typed.rounded()) * 1_000_000
                             }
                         }
                         ResettableSlider(value: Binding(get: { Double(model.configuration.videoBitRate ?? 30_000_000) / 1_000_000 },
                                                         set: { model.configuration.videoBitRate = Int($0) * 1_000_000 }),
-                                         range: 2...240, resetValue: 30, label: "Video bitrate in megabits per second")
+                                         range: 2...240, resetValue: 30, label: String(localized: "Video bitrate in megabits per second"))
                     }
                     Text("Higher bitrate uses more storage. Quality presets choose an average target automatically; actual file size varies.")
                         .font(.caption).foregroundStyle(.secondary)

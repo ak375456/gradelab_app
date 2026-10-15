@@ -1,7 +1,0 @@
-Präzisere Masken, einfacheres Zoomen und acht neue Looks.
-
-• Verfeinere Freihandmasken mit bearbeitbaren Punkten und Kurvengriffen. Ein Tipp auf einen Punkt wählt ihn jetzt aus, statt ihn zu entfernen.
-• Zoome und verschiebe das Bild beim Maskieren und mit anderen Werkzeugen. Nahe 100 % rastet der Zoom ein; mit Zurücksetzen gelangst du schnell zur Ausgangsansicht.
-• Zeichenhinweise verdecken das Bild nicht mehr. So lassen sich Himmel und Bildränder leichter maskieren.
-• Die Maskenverfolgung arbeitet effizienter. Zusätzliche Prüfungen helfen, plötzliche Sprünge zu vermeiden.
-• Acht neue LUT-Looks: drei kostenlos und fünf für Pro, mit übersichtlichen Namen. Probiere jeden Look in der Vorschau aus.

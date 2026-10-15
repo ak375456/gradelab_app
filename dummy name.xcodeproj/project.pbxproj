@@ -150,6 +150,7 @@
 				fi,
 				fr,
 				it,
+				ja,
 				sv,
 				Base,
 			);
@@ -393,7 +394,7 @@
 				"CODE_SIGN_ENTITLEMENTS[sdk=macosx*]" = "Config/GradeLab-Mac.entitlements";
 				CODE_SIGN_IDENTITY = "Apple Development";
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 19;
+				CURRENT_PROJECT_VERSION = 21;
 				DERIVE_MACCATALYST_PRODUCT_BUNDLE_IDENTIFIER = NO;
 				DEVELOPMENT_TEAM = 93KLT465W3;
 				ENABLE_APP_SANDBOX = YES;
@@ -414,7 +415,7 @@
 					"@executable_path/Frameworks",
 				);
 				MACOSX_DEPLOYMENT_TARGET = 15.0;
-				MARKETING_VERSION = 1.1.8;
+				MARKETING_VERSION = 1.2.0;
 				PRODUCT_BUNDLE_IDENTIFIER = com.aftab.gradelab;
 				PRODUCT_NAME = GradeLab;
 				PROVISIONING_PROFILE_SPECIFIER = "";
@@ -438,7 +439,7 @@
 				"CODE_SIGN_ENTITLEMENTS[sdk=macosx*]" = "Config/GradeLab-Mac.entitlements";
 				CODE_SIGN_IDENTITY = "Apple Development";
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 19;
+				CURRENT_PROJECT_VERSION = 21;
 				DERIVE_MACCATALYST_PRODUCT_BUNDLE_IDENTIFIER = NO;
 				DEVELOPMENT_TEAM = 93KLT465W3;
 				ENABLE_APP_SANDBOX = YES;
@@ -459,7 +460,7 @@
 					"@executable_path/Frameworks",
 				);
 				MACOSX_DEPLOYMENT_TARGET = 15.0;
-				MARKETING_VERSION = 1.1.8;
+				MARKETING_VERSION = 1.2.0;
 				PRODUCT_BUNDLE_IDENTIFIER = com.aftab.gradelab;
 				PRODUCT_NAME = GradeLab;
 				PROVISIONING_PROFILE_SPECIFIER = "";

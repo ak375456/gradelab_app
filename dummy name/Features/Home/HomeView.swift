@@ -54,7 +54,7 @@ struct HomeView: View {
                 if let source = sources.first { coordinator.importImage(from: source) }
             } else { coordinator.importVideos(from: sources) }
         }, onFailure: { error in
-            coordinator.alert = .init(title: "Couldn’t Import", message: error.localizedDescription)
+            coordinator.alert = .init(title: String(localized: "Couldn’t Import"), message: error.localizedDescription)
         }))
         // Catches the grade of someone who set it and then left without closing
         // the panel, which the close handler alone would lose.

@@ -1,7 +1,0 @@
-Mer precisa masker, enklare zoomning och åtta nya utseenden.
-
-• Finjustera frihandsmasker med redigerbara punkter och kurvhandtag. Ett tryck på en punkt markerar den nu i stället för att ta bort den.
-• Zooma och panorera medan du maskar eller använder andra verktyg, med snäppning vid 100 % och snabb återställning.
-• Ritanvisningarna täcker inte längre bilden, så det blir lättare att maska himlen och bildens kanter.
-• Maskspårningen är effektivare, med extra kontroller som hjälper till att förhindra plötsliga hopp.
-• Åtta nya LUT-utseenden: tre gratis och fem för Pro, med tydligare namn. Prova alla utseenden i förhandsvisningen.

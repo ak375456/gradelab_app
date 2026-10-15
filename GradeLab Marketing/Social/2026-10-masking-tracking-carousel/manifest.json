@@ -1,0 +1,80 @@
+[
+  {
+    "platform": "Instagram",
+    "slide": 1,
+    "topic": "Masking",
+    "file": "Instagram_1080x1350/01_Masking.png",
+    "pixels": [
+      1080,
+      1350
+    ],
+    "mode": "RGB",
+    "generator": "built-in image_gen",
+    "master": "sources/Instagram_01_Masking.png"
+  },
+  {
+    "platform": "Instagram",
+    "slide": 2,
+    "topic": "Tracking_Zoom",
+    "file": "Instagram_1080x1350/02_Tracking_Zoom.png",
+    "pixels": [
+      1080,
+      1350
+    ],
+    "mode": "RGB",
+    "generator": "built-in image_gen",
+    "master": "sources/Instagram_02_Tracking_Zoom.png"
+  },
+  {
+    "platform": "Instagram",
+    "slide": 3,
+    "topic": "New_Looks",
+    "file": "Instagram_1080x1350/03_New_Looks.png",
+    "pixels": [
+      1080,
+      1350
+    ],
+    "mode": "RGB",
+    "generator": "built-in image_gen",
+    "master": "sources/Instagram_03_New_Looks.png"
+  },
+  {
+    "platform": "TikTok",
+    "slide": 1,
+    "topic": "Masking",
+    "file": "TikTok_1080x1920/01_Masking.png",
+    "pixels": [
+      1080,
+      1920
+    ],
+    "mode": "RGB",
+    "generator": "built-in image_gen",
+    "master": "sources/TikTok_01_Masking.png"
+  },
+  {
+    "platform": "TikTok",
+    "slide": 2,
+    "topic": "Tracking_Zoom",
+    "file": "TikTok_1080x1920/02_Tracking_Zoom.png",
+    "pixels": [
+      1080,
+      1920
+    ],
+    "mode": "RGB",
+    "generator": "built-in image_gen",
+    "master": "sources/TikTok_02_Tracking_Zoom.png"
+  },
+  {
+    "platform": "TikTok",
+    "slide": 3,
+    "topic": "New_Looks",
+    "file": "TikTok_1080x1920/03_New_Looks.png",
+    "pixels": [
+      1080,
+      1920
+    ],
+    "mode": "RGB",
+    "generator": "built-in image_gen",
+    "master": "sources/TikTok_03_New_Looks.png"
+  }
+]

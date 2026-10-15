@@ -33,9 +33,9 @@ struct PaywallView: View {
                             .font(.caption)
                             .foregroundStyle(.white.opacity(0.55))
                             .frame(maxWidth: .infinity, alignment: .center)
-                        Text(store.hasPro ? "You’re ready to create." : feature.title)
+                        Text(store.hasPro ? String(localized: "You’re ready to create.") : feature.title)
                             .font(.system(.largeTitle, design: .rounded, weight: .bold)).fixedSize(horizontal: false, vertical: true)
-                        Text(store.hasPro ? (store.hasLifetime ? "Lifetime Pro is yours. Thank you for supporting GradeLab." : "Your subscription unlocks every Pro feature.") : feature.detail)
+                        Text(store.hasPro ? (store.hasLifetime ? String(localized: "Lifetime Pro is yours. Thank you for supporting GradeLab.") : String(localized: "Your subscription unlocks every Pro feature.")) : feature.detail)
                             .font(.body).foregroundStyle(.white.opacity(0.7)).fixedSize(horizontal: false, vertical: true)
                     }
                     VStack(alignment: .leading, spacing: 16) {
@@ -220,7 +220,7 @@ struct PaywallView: View {
                                 .foregroundStyle(.white.opacity(0.45))
                                 .strikethrough(true, color: ProStyle.gold)
                         }
-                        Text(product?.displayPrice ?? (store.isLoading ? "…" : "Unavailable"))
+                        Text(product?.displayPrice ?? (store.isLoading ? "…" : String(localized: "Unavailable")))
                             .font(standard == nil ? .headline : .title3.weight(.bold))
                         // Every subscription also priced by the week, so the
                         // plans can be compared without doing arithmetic.

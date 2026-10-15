@@ -114,12 +114,12 @@ enum CurveType: String, Codable, CaseIterable, Identifiable, Sendable {
         case .red: "R"
         case .green: "G"
         case .blue: "B"
-        case .hueVsHue: "Hue vs Hue"
-        case .hueVsSaturation: "Hue vs Sat"
-        case .hueVsLuma: "Hue vs Luma"
-        case .lumaVsSaturation: "Luma vs Sat"
-        case .saturationVsSaturation: "Sat vs Sat"
-        case .saturationVsLuma: "Sat vs Luma"
+        case .hueVsHue: String(localized: "Hue vs Hue")
+        case .hueVsSaturation: String(localized: "Hue vs Sat")
+        case .hueVsLuma: String(localized: "Hue vs Luma")
+        case .lumaVsSaturation: String(localized: "Luma vs Sat")
+        case .saturationVsSaturation: String(localized: "Sat vs Sat")
+        case .saturationVsLuma: String(localized: "Sat vs Luma")
         }
     }
 

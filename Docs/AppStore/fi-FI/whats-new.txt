@@ -1,7 +1,0 @@
-Tarkemmat maskit, helpompi zoomaus ja kahdeksan uutta LUT-tyyliä.
-
-• Hienosäädä vapaapiirtomaskeja muokattavilla pisteillä ja käyräkahvoilla. Pisteen napautus valitsee sen nyt poistamisen sijaan.
-• Zoomaa ja panoroi maskauksen ja muiden työkalujen käytön aikana. Zoomaus napsahtaa lähellä 100 %:n tasoa takaisin siihen, ja näkymän voi palauttaa nopeasti.
-• Piirto-ohjeet eivät enää peitä kuvaa, joten taivaan ja kuvan reunojen maskaus on helpompaa.
-• Maskin seuranta toimii tehokkaammin, ja lisätarkistukset auttavat ehkäisemään äkillisiä siirtymiä.
-• Kahdeksan uutta LUT-tyyliä: kolme maksutonta ja viisi Pro-tyyliä, selkeillä nimillä. Kokeile kaikkia tyylejä esikatselussa.

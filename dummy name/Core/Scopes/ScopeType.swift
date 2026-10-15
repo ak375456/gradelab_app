@@ -12,10 +12,10 @@ enum ScopeType: String, CaseIterable, Identifiable, Sendable {
     /// Short enough for a segmented control on a phone.
     var title: String {
         switch self {
-        case .histogram: "Histogram"
-        case .waveform: "Waveform"
-        case .rgbParade: "Parade"
-        case .vectorscope: "Vector"
+        case .histogram: String(localized: "Histogram")
+        case .waveform: String(localized: "Waveform")
+        case .rgbParade: String(localized: "Parade")
+        case .vectorscope: String(localized: "Vector")
         }
     }
 
@@ -92,7 +92,7 @@ enum ScopeColorSpace: Sendable {
     var axisLabel: String {
         switch self {
         case .rec709: "Rec.709"
-        case .hlgBT2020: "HLG signal"
+        case .hlgBT2020: String(localized: "HLG signal")
         }
     }
 }

@@ -1,0 +1,74 @@
+[
+  {
+    "platform": "Instagram",
+    "slide": 1,
+    "topic": "Masking",
+    "source": "/Users/aftab/.codex/generated_images/01a13165-4873-79f3-93da-e11354f6c347/exec-80b8c8a8-33b3-445b-9b5b-212134cdeccb.png",
+    "master": "sources/Instagram_01_Masking.png",
+    "output": "Instagram_1080x1350/01_Masking.png",
+    "pixels": [
+      1080,
+      1350
+    ]
+  },
+  {
+    "platform": "Instagram",
+    "slide": 2,
+    "topic": "Tracking_Zoom",
+    "source": "/Users/aftab/.codex/generated_images/01a13165-4873-79f3-93da-e11354f6c347/exec-b0b2f649-1b37-43de-a061-8d04db118bcc.png",
+    "master": "sources/Instagram_02_Tracking_Zoom.png",
+    "output": "Instagram_1080x1350/02_Tracking_Zoom.png",
+    "pixels": [
+      1080,
+      1350
+    ]
+  },
+  {
+    "platform": "Instagram",
+    "slide": 3,
+    "topic": "New_Looks",
+    "source": "/Users/aftab/.codex/generated_images/01a13165-4873-79f3-93da-e11354f6c347/exec-3bcffc80-4db0-4084-a31c-c1352856d42f.png",
+    "master": "sources/Instagram_03_New_Looks.png",
+    "output": "Instagram_1080x1350/03_New_Looks.png",
+    "pixels": [
+      1080,
+      1350
+    ]
+  },
+  {
+    "platform": "TikTok",
+    "slide": 1,
+    "topic": "Masking",
+    "source": "/Users/aftab/.codex/generated_images/01a13165-4873-79f3-93da-e11354f6c347/exec-dd10873b-d472-4087-a21f-a1bb1366c7fc.png",
+    "master": "sources/TikTok_01_Masking.png",
+    "output": "TikTok_1080x1920/01_Masking.png",
+    "pixels": [
+      1080,
+      1920
+    ]
+  },
+  {
+    "platform": "TikTok",
+    "slide": 2,
+    "topic": "Tracking_Zoom",
+    "source": "/Users/aftab/.codex/generated_images/01a13165-4873-79f3-93da-e11354f6c347/exec-da07b7bb-5ff8-4fb3-a27b-6d2cb1fade5f.png",
+    "master": "sources/TikTok_02_Tracking_Zoom.png",
+    "output": "TikTok_1080x1920/02_Tracking_Zoom.png",
+    "pixels": [
+      1080,
+      1920
+    ]
+  },
+  {
+    "platform": "TikTok",
+    "slide": 3,
+    "topic": "New_Looks",
+    "source": "/Users/aftab/.codex/generated_images/01a13165-4873-79f3-93da-e11354f6c347/exec-be9f876d-56ab-4920-8776-12b7293fc464.png",
+    "master": "sources/TikTok_03_New_Looks.png",
+    "output": "TikTok_1080x1920/03_New_Looks.png",
+    "pixels": [
+      1080,
+      1920
+    ]
+  }
+]

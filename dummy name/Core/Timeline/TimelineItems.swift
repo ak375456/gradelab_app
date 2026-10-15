@@ -75,6 +75,19 @@ struct VisualTransform: Codable, Equatable, Sendable {
 // Only implemented modes are representable/exposed at this checkpoint.
 enum VisualBlendMode: String, Codable, Sendable, CaseIterable {
     case normal, multiply, screen, overlay, softLight, hardLight, darken, lighten
+
+    var title: String {
+        switch self {
+        case .normal: String(localized: "Normal")
+        case .multiply: String(localized: "Multiply")
+        case .screen: String(localized: "Screen")
+        case .overlay: String(localized: "Overlay")
+        case .softLight: String(localized: "Soft Light")
+        case .hardLight: String(localized: "Hard Light")
+        case .darken: String(localized: "Darken")
+        case .lighten: String(localized: "Lighten")
+        }
+    }
 }
 
 /// A geometric alpha mask on one visual layer. Unlike `GradeMask`, this changes
@@ -88,7 +101,13 @@ enum LayerMaskShape: String, Codable, CaseIterable, Identifiable, Sendable {
     case linear
 
     var id: String { rawValue }
-    var title: String { rawValue.capitalized }
+    var title: String {
+        switch self {
+        case .ellipse: String(localized: "Ellipse")
+        case .rectangle: String(localized: "Rectangle")
+        case .linear: String(localized: "Linear")
+        }
+    }
 }
 
 struct LayerMask: Codable, Equatable, Sendable {
@@ -471,8 +490,28 @@ struct TextDecoration: Codable, Equatable, Sendable {
 }
 
 struct TextStyle: Codable, Equatable, Sendable {
-    enum CaseMode: String, Codable, Sendable, CaseIterable { case original, uppercase, lowercase, title }
-    enum Alignment: String, Codable, Sendable, CaseIterable { case left, center, right, justified }
+    enum CaseMode: String, Codable, Sendable, CaseIterable {
+        case original, uppercase, lowercase, title
+        var displayName: String {
+            switch self {
+            case .original: String(localized: "Original")
+            case .uppercase: String(localized: "Uppercase")
+            case .lowercase: String(localized: "Lowercase")
+            case .title: String(localized: "Title Case")
+            }
+        }
+    }
+    enum Alignment: String, Codable, Sendable, CaseIterable {
+        case left, center, right, justified
+        var displayName: String {
+            switch self {
+            case .left: String(localized: "Left")
+            case .center: String(localized: "Center")
+            case .right: String(localized: "Right")
+            case .justified: String(localized: "Justified")
+            }
+        }
+    }
     // Stable PostScript font identifier; nil selects the system font.
     var fontName: String?
     // Typographic units in project canvas space, never SwiftUI view coordinates.
@@ -500,11 +539,11 @@ struct TextStylePreset: Codable, Equatable, Identifiable, Sendable {
     var backgroundOpacity: Double
     var gradient: GradientFill? = nil
     static let builtIn: [TextStylePreset] = [
-        .init(id: "clean", name: "Clean", style: .init(), color: .white, strokeColor: .black, strokeWidth: 0, backgroundColor: .black, backgroundOpacity: 0),
-        .init(id: "label", name: "Label", style: .init(fontSize: 48, isBold: true), color: .white, strokeColor: .black, strokeWidth: 2, backgroundColor: .black, backgroundOpacity: 0.65),
-        .init(id: "outline", name: "White + black stroke", style: .init(fontSize: 64, isBold: true), color: .white, strokeColor: .black, strokeWidth: 5, backgroundColor: .black, backgroundOpacity: 0),
-        .init(id: "inverse-outline", name: "Black + white stroke", style: .init(fontSize: 64, isBold: true), color: .black, strokeColor: .white, strokeWidth: 5, backgroundColor: .black, backgroundOpacity: 0),
-        .init(id: "subtitle", name: "Subtitle", style: .init(fontSize: 48, isBold: true), color: .white, strokeColor: .black, strokeWidth: 2, backgroundColor: .black, backgroundOpacity: 0.7)
+        .init(id: "clean", name: String(localized: "Clean"), style: .init(), color: .white, strokeColor: .black, strokeWidth: 0, backgroundColor: .black, backgroundOpacity: 0),
+        .init(id: "label", name: String(localized: "Label"), style: .init(fontSize: 48, isBold: true), color: .white, strokeColor: .black, strokeWidth: 2, backgroundColor: .black, backgroundOpacity: 0.65),
+        .init(id: "outline", name: String(localized: "White + black stroke"), style: .init(fontSize: 64, isBold: true), color: .white, strokeColor: .black, strokeWidth: 5, backgroundColor: .black, backgroundOpacity: 0),
+        .init(id: "inverse-outline", name: String(localized: "Black + white stroke"), style: .init(fontSize: 64, isBold: true), color: .black, strokeColor: .white, strokeWidth: 5, backgroundColor: .black, backgroundOpacity: 0),
+        .init(id: "subtitle", name: String(localized: "Subtitle"), style: .init(fontSize: 48, isBold: true), color: .white, strokeColor: .black, strokeWidth: 2, backgroundColor: .black, backgroundOpacity: 0.7)
     ] + [
         ("yellow", RGBAColor(red: 1, green: 0.9, blue: 0)),
         ("orange", RGBAColor(red: 1, green: 0.45, blue: 0)),
