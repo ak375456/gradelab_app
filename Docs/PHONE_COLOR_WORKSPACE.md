@@ -8,6 +8,13 @@ existing workspace sizes and controls; switching does not overwrite them.
 Compact is gated on the phone idiom and excluded from Mac. iPad, Mac, the
 timeline, the main mode bar and other editing tools keep their existing layout.
 
+- On first opening a ready Compact Color workspace, a small alert explains the
+  top ••• menu → Settings → iPhone Color workspace path ("Editor settings" in
+  photos). Open Settings goes directly to that screen; Got it continues editing.
+  Either action remembers the acknowledgment across projects, photo/video
+  editors and launches. Classic, iPad and Mac do not trigger it. Existing sheets,
+  error dialogs and media preparation take priority; the notice waits until the
+  Compact workspace is available.
 - A single Color tool menu replaces the tool strip. Light and Color parameters
   show the active adjustment's name (for example Exposure or Temperature) in
   their selector. Each has its own symbol and a small color accent; native

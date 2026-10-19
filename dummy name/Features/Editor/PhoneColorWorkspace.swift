@@ -6,6 +6,7 @@ enum PhoneColorLayout: String, CaseIterable, Identifiable {
     case compact, classic
 
     static let preferenceKey = "editor.phoneColorLayout"
+    static let introductionSeenKey = "editor.phoneColorLayout.introductionSeen"
     var id: String { rawValue }
 
     var title: String {
@@ -21,6 +22,46 @@ enum PhoneColorLayout: String, CaseIterable, Identifiable {
 
     var isActiveOnThisDevice: Bool {
         Self.usesCompact(self, idiom: UIDevice.current.userInterfaceIdiom, isMac: AppPlatform.isMac)
+    }
+}
+
+/// One acknowledgment per installation, shared by photo and video editors.
+/// The host waits for a usable Compact workspace with no other presentation.
+private struct PhoneColorLayoutIntroduction: ViewModifier {
+    let isActive: Bool
+    let canPresent: Bool
+    let settingsMenuTitle: String
+    let onOpenSettings: () -> Void
+    @AppStorage(PhoneColorLayout.introductionSeenKey) private var hasSeenIntroduction = false
+    @State private var isPresented = false
+
+    func body(content: Content) -> some View {
+        content.background {
+            // Own presentation branch so this alert does not replace the
+            // editor's error alert or its sheets.
+            Color.clear
+                .alert("New Compact Color layout", isPresented: $isPresented) {
+                    Button("Open Settings") {
+                        hasSeenIntroduction = true
+                        onOpenSettings()
+                    }
+                    Button("Got it", role: .cancel) { hasSeenIntroduction = true }
+                } message: {
+                    Text("You can switch between Compact and Classic anytime. Open the ••• menu at the top of the editor → \(settingsMenuTitle) → iPhone Color workspace.")
+                }
+                .onChange(of: isActive && canPresent && !hasSeenIntroduction, initial: true) { _, ready in
+                    isPresented = ready
+                }
+        }
+    }
+}
+
+extension View {
+    func phoneColorLayoutIntroduction(isActive: Bool, canPresent: Bool,
+                                      settingsMenuTitle: String,
+                                      onOpenSettings: @escaping () -> Void) -> some View {
+        modifier(PhoneColorLayoutIntroduction(isActive: isActive, canPresent: canPresent,
+                                             settingsMenuTitle: settingsMenuTitle, onOpenSettings: onOpenSettings))
     }
 }
 

@@ -42,6 +42,13 @@ struct ImageEditorView: View {
             .preferredColorScheme(.dark)
             .buttonStyle(.plain)
             .numericEntryHost()
+            .phoneColorLayoutIntroduction(
+                isActive: usesCompactColorWorkspace && model.canGrade,
+                canPresent: scenePhase == .active && !model.isPreparing && !model.showsExport
+                    && !settingsSheet && !help && !savingPreset && !infoSheet
+                    && !confirmsResetAll && model.editError == nil,
+                settingsMenuTitle: String(localized: "Editor settings"),
+                onOpenSettings: { settingsSheet = true })
             .onChange(of: holdingOriginal) { _, value in model.setOriginalVisible(value || comparePinned) }
             .onChange(of: comparePinned) { _, value in model.setOriginalVisible(value || holdingOriginal) }
             .onChange(of: model.project) { _, project in onSettingsChanged(project, false) }

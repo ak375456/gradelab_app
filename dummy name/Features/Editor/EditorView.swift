@@ -699,6 +699,11 @@ struct EditorView: View {
 
     var body: some View {
         editorInputs
+        .phoneColorLayoutIntroduction(
+            isActive: usesCompactColorWorkspace && model.canGrade,
+            canPresent: scenePhase == .active && shortcutsEnabled && !model.isPreparingTimeline && !model.isImporting,
+            settingsMenuTitle: String(localized: "Settings"),
+            onOpenSettings: { settingsSheet = true })
         .onChange(of: colorMode) { _, active in if !active { colorControlsExpanded = false } }
         .onChange(of: phoneColorLayout) { _, _ in colorControlsExpanded = false }
         .onChange(of: model.selectedPanel) { _, _ in colorControlsExpanded = false }
