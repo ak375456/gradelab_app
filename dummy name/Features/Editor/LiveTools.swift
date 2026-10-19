@@ -607,6 +607,9 @@ struct EditorSettings: View {
     var body: some View {
         NavigationStack {
             Form {
+                if !AppPlatform.isMac && UIDevice.current.userInterfaceIdiom == .phone {
+                    PhoneColorLayoutSettings()
+                }
                 Section {
                     Picker("Frames per press", selection: $frameStep) {
                         ForEach([1, 2, 5, 10, 20, 30], id: \.self) { Text("\($0) frames").tag($0) }

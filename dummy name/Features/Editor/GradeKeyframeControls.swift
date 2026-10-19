@@ -119,12 +119,14 @@ struct GradeAnimationDot<Model: GradingModel>: View {
 /// first-run hint, the out-of-range notice, and Remove All.
 struct GradeKeyframeHeader<Model: GradingModel>: View {
     @ObservedObject var model: Model
+    var isCompact = false
     @State private var help = false
     @State private var confirmsRemoveAll = false
 
     var body: some View {
         if let editor = model.keyframeHost {
-            KeyframeSectionHeader(model: editor, help: $help, confirmsRemoveAll: $confirmsRemoveAll)
+            KeyframeSectionHeader(model: editor, help: $help, confirmsRemoveAll: $confirmsRemoveAll,
+                                  isCompact: isCompact)
                 .sheet(isPresented: $help) { KeyframeHelp() }
                 .confirmationDialog("Remove all animation from this clip?",
                                     isPresented: $confirmsRemoveAll, titleVisibility: .visible) {

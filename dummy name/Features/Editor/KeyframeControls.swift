@@ -516,19 +516,23 @@ struct KeyframeSectionHeader: View {
     @ObservedObject var model: EditorViewModel
     @Binding var help: Bool
     @Binding var confirmsRemoveAll: Bool
+    var isCompact = false
     var body: some View {
         VStack(spacing: 2) {
-            KeyframeHint()
+            if !isCompact { KeyframeHint() }
             if !model.isPlayheadInsideSelection { KeyframeOutOfRangeNotice(model: model) }
-            HStack(spacing: 4) {
-                Text("Animation").font(.caption2.weight(.semibold)).foregroundStyle(AppColors.textSecondary)
-                Button { help = true } label: {
-                    Image(systemName: "questionmark.circle").font(.caption2).frame(width: 32, height: 32).contentShape(Rectangle())
-                }.buttonStyle(.plain).accessibilityLabel("How keyframes work")
-                Spacer(minLength: 0)
-                if model.selectionIsAnimated {
-                    Button("Remove all", role: .destructive) { confirmsRemoveAll = true }
-                        .font(.caption2).frame(minHeight: 32)
+            if !isCompact || model.selectionIsAnimated {
+                HStack(spacing: 4) {
+                    Text("Animation").font(.caption2.weight(.semibold)).foregroundStyle(AppColors.textSecondary)
+                    Button { help = true } label: {
+                        Image(systemName: "questionmark.circle").font(.caption2)
+                            .frame(width: isCompact ? 44 : 32, height: isCompact ? 44 : 32).contentShape(Rectangle())
+                    }.buttonStyle(.plain).accessibilityLabel("How keyframes work")
+                    Spacer(minLength: 0)
+                    if model.selectionIsAnimated {
+                        Button("Remove all", role: .destructive) { confirmsRemoveAll = true }
+                            .font(.caption2).frame(minHeight: isCompact ? 44 : 32)
+                    }
                 }
             }
         }

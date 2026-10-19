@@ -13,6 +13,9 @@ struct EditorView: View {
     @Environment(\.scenePhase) private var scenePhase
     @Environment(\.verticalSizeClass) private var verticalSizeClass
     @State private var colorMode = false
+    @AppStorage(PhoneColorLayout.preferenceKey) private var phoneColorLayout = PhoneColorLayout.compact
+    @State private var colorControlsExpanded = false
+    private var usesCompactColorWorkspace: Bool { colorMode && phoneColorLayout.isActiveOnThisDevice }
     @State private var textMode = false
     @State private var textSection = "Style"
     @State private var textAppearance = "Fill"
@@ -198,18 +201,21 @@ struct EditorView: View {
                         VStack(spacing: 0) {
                             preview
                             if scopesVisible {
-                                WorkspaceDivider(
-                                    orientation: .horizontal,
-                                    label: String(localized: "Resize the scopes"),
-                                    onResize: { delta in
-                                        setScopeHeight(scopeHeight(geometry.size, regular: true) - delta,
-                                                       in: geometry.size)
-                                    },
-                                    onBegin: beginWorkspaceResize,
-                                    onEnd: endWorkspaceResize,
-                                    onReset: { resetSize(.scope) })
+                                if !usesCompactColorWorkspace {
+                                    WorkspaceDivider(
+                                        orientation: .horizontal,
+                                        label: String(localized: "Resize the scopes"),
+                                        onResize: { delta in
+                                            setScopeHeight(scopeHeight(geometry.size, regular: true) - delta,
+                                                           in: geometry.size)
+                                        },
+                                        onBegin: beginWorkspaceResize,
+                                        onEnd: endWorkspaceResize,
+                                        onReset: { resetSize(.scope) })
+                                }
                                 ScopePanel(model: model, isRegularWidth: true,
-                                           traceHeight: scopeHeight(geometry.size, regular: true))
+                                           traceHeight: usesCompactColorWorkspace ? ScopeLayout.compactTraceHeight : scopeHeight(geometry.size, regular: true),
+                                           usesCompactLayout: usesCompactColorWorkspace)
                             }
                             // iPad has enough room to keep the editing context
                             // visible beside every inspector, like a desktop
@@ -258,6 +264,8 @@ struct EditorView: View {
                     // — the one place the extra width was worth the most. Across
                     // the window every tool is one click away, with its name.
                     if spansModeBar(geometry.size) { modeBar }
+                } else if usesCompactColorWorkspace {
+                    compactColorWorkspace
                 } else {
                     // Tall layout: one edge, between the picture and everything
                     // below it. Dragging up is how a tool panel that needs the
@@ -313,6 +321,18 @@ struct EditorView: View {
         .background(AppColors.background.ignoresSafeArea()).foregroundStyle(AppColors.textPrimary)
         .preferredColorScheme(.dark)
         .buttonStyle(.plain)
+    }
+
+    private var compactColorWorkspace: some View {
+        PhoneColorWorkspace(
+            showsScopes: scopesVisible, isExpanded: colorControlsExpanded,
+            scopeHeight: ScopeLayout.compactHeight,
+            transportHeight: EditorWorkspaceBudget.transport,
+            footerHeight: EditorWorkspaceBudget.modeButtons + (warmup.isReady ? 0 : EditorWorkspaceBudget.warmupNotice),
+            preview: { preview },
+            scope: { ScopePanel(model: model, isRegularWidth: false,
+                                traceHeight: ScopeLayout.compactTraceHeight, usesCompactLayout: true) },
+            transport: { transport }, controls: { inspector }, footer: { modeBar })
     }
 
     // MARK: - Workspace sizing
@@ -678,6 +698,12 @@ struct EditorView: View {
 
     var body: some View {
         editorInputs
+        .onChange(of: colorMode) { _, active in if !active { colorControlsExpanded = false } }
+        .onChange(of: phoneColorLayout) { _, _ in colorControlsExpanded = false }
+        .onChange(of: model.selectedPanel) { _, _ in colorControlsExpanded = false }
+        .onChange(of: verticalSizeClass) { _, value in
+            if value == .compact { colorControlsExpanded = false }
+        }
         .onChange(of: holdingOriginal) { _, value in model.setOriginalVisible(value || comparePinned) }
         .onChange(of: comparePinned) { _, value in model.setOriginalVisible(value || holdingOriginal) }
         .animation(.easeInOut(duration: 0.18), value: model.statusMessage)
@@ -884,16 +910,22 @@ struct EditorView: View {
     /// nobody is acting on.
     private var scopesVisible: Bool {
         colorMode && model.scopeSettings.isEnabled && model.hasMedia && !typingText
+            && !(usesCompactColorWorkspace && colorControlsExpanded)
     }
 
     private var scopesButton: some View {
-        Button { model.setScopesEnabled(!model.scopeSettings.isEnabled) } label: {
+        Button {
+            if usesCompactColorWorkspace && colorControlsExpanded {
+                colorControlsExpanded = false
+                model.setScopesEnabled(true)
+            } else { model.setScopesEnabled(!model.scopeSettings.isEnabled) }
+        } label: {
             PreviewToolbarLabel(title: "Scopes", symbol: "waveform",
-                                isSelected: model.scopeSettings.isEnabled)
+                                isSelected: scopesVisible)
         }
         .buttonStyle(.plain)
-        .accessibilityLabel(model.scopeSettings.isEnabled ? "Hide scopes" : "Show scopes")
-        .accessibilityAddTraits(model.scopeSettings.isEnabled ? .isSelected : [])
+        .accessibilityLabel(scopesVisible ? "Hide scopes" : "Show scopes")
+        .accessibilityAddTraits(scopesVisible ? .isSelected : [])
     }
 
     /// Armed eyedropper: a tap anywhere on the picture samples the graded
@@ -1848,7 +1880,11 @@ struct EditorView: View {
 
     private var controls: some View {
         GradingControls(model: model, onSaveGrade: { savingPreset = true },
-                        scrollPosition: $gradeScrollPosition)
+                        scrollPosition: $gradeScrollPosition,
+                        usesCompactLayout: usesCompactColorWorkspace,
+                        isExpanded: colorControlsExpanded,
+                        onToggleExpanded: usesCompactColorWorkspace && verticalSizeClass != .compact
+                            ? { colorControlsExpanded.toggle() } : nil)
     }
 
     private func openTextTool() {

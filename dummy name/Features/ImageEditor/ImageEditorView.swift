@@ -1,4 +1,5 @@
 import SwiftUI
+import UIKit
 
 /// The still-image workspace: a picture, the Color tab, scopes, and export.
 ///
@@ -17,14 +18,21 @@ struct ImageEditorView: View {
     let onSettingsChanged: (ImageProject, Bool) -> Void
 
     @Environment(\.scenePhase) private var scenePhase
+    @Environment(\.verticalSizeClass) private var verticalSizeClass
     @State private var help = false
     @State private var comparePinned = false
     @State private var savingPreset = false
     @State private var infoSheet = false
+    @State private var settingsSheet = false
     @State private var confirmsResetAll = false
     @AppStorage("imageEditor.previewHeight") private var storedPreviewHeight: Double = 0
     @AppStorage("imageEditor.inspectorWidth") private var storedInspectorWidth: Double = 0
     @AppStorage("imageEditor.scopeHeight") private var storedScopeHeight: Double = 0
+    @AppStorage(PhoneColorLayout.preferenceKey) private var phoneColorLayout = PhoneColorLayout.compact
+    @State private var colorControlsExpanded = false
+    private var usesCompactColorWorkspace: Bool {
+        model.imageTool == .color && phoneColorLayout.isActiveOnThisDevice
+    }
     @State private var holdingOriginal = false
 
     var body: some View {
@@ -37,6 +45,12 @@ struct ImageEditorView: View {
             .onChange(of: holdingOriginal) { _, value in model.setOriginalVisible(value || comparePinned) }
             .onChange(of: comparePinned) { _, value in model.setOriginalVisible(value || holdingOriginal) }
             .onChange(of: model.project) { _, project in onSettingsChanged(project, false) }
+            .onChange(of: phoneColorLayout) { _, _ in colorControlsExpanded = false }
+            .onChange(of: model.imageTool) { _, _ in colorControlsExpanded = false }
+            .onChange(of: model.selectedPanel) { _, _ in colorControlsExpanded = false }
+            .onChange(of: verticalSizeClass) { _, value in
+                if value == .compact { colorControlsExpanded = false }
+            }
             .animation(.easeInOut(duration: 0.18), value: model.statusMessage)
             .onChange(of: scenePhase) { _, phase in
                 model.handleScenePhase(active: phase == .active)
@@ -61,6 +75,7 @@ struct ImageEditorView: View {
             .sheet(isPresented: $savingPreset) { SaveGradePresetSheet(model: model) }
             .sheet(isPresented: $model.showsExport) { ImageExportView(project: model.project) }
             .sheet(isPresented: $infoSheet) { ImageSourceInfoView(project: model.project) }
+            .sheet(isPresented: $settingsSheet) { EditorSettings() }
             .sheet(isPresented: $help) {
                 VStack(alignment: .leading, spacing: 24) {
                     Label(model.selectedPanel.title, systemImage: model.selectedPanel.symbol)
@@ -84,15 +99,18 @@ struct ImageEditorView: View {
                         VStack(spacing: 0) {
                             preview
                             if scopesVisible {
-                                WorkspaceDivider(
-                                    orientation: .horizontal, label: String(localized: "Resize the scopes"),
-                                    onResize: { delta in
-                                        setScopeHeight(scopeHeight(geometry.size, regular: true) - delta, in: geometry.size)
-                                    },
-                                    onBegin: beginWorkspaceResize, onEnd: endWorkspaceResize,
-                                    onReset: { storedScopeHeight = 0 })
+                                if !usesCompactColorWorkspace {
+                                    WorkspaceDivider(
+                                        orientation: .horizontal, label: String(localized: "Resize the scopes"),
+                                        onResize: { delta in
+                                            setScopeHeight(scopeHeight(geometry.size, regular: true) - delta, in: geometry.size)
+                                        },
+                                        onBegin: beginWorkspaceResize, onEnd: endWorkspaceResize,
+                                        onReset: { storedScopeHeight = 0 })
+                                }
                                 ScopePanel(model: model, isRegularWidth: true,
-                                           traceHeight: scopeHeight(geometry.size, regular: true))
+                                           traceHeight: usesCompactColorWorkspace ? ScopeLayout.compactTraceHeight : scopeHeight(geometry.size, regular: true),
+                                           usesCompactLayout: usesCompactColorWorkspace)
                             }
                         }.frame(maxWidth: .infinity)
                         WorkspaceDivider(
@@ -105,6 +123,14 @@ struct ImageEditorView: View {
                         VStack(spacing: 0) { inspector; toolBar }
                             .frame(width: inspectorWidth(geometry.size))
                     }
+                } else if usesCompactColorWorkspace {
+                    PhoneColorWorkspace(
+                        showsScopes: scopesVisible, isExpanded: colorControlsExpanded,
+                        scopeHeight: ScopeLayout.compactHeight, transportHeight: 0, footerHeight: 44,
+                        preview: { preview },
+                        scope: { ScopePanel(model: model, isRegularWidth: false,
+                                            traceHeight: ScopeLayout.compactTraceHeight, usesCompactLayout: true) },
+                        transport: { EmptyView() }, controls: { inspector }, footer: { toolBar })
                 } else {
                     preview.frame(height: previewHeight(geometry.size))
                     WorkspaceDivider(
@@ -130,7 +156,10 @@ struct ImageEditorView: View {
         }
     }
 
-    private var scopesVisible: Bool { model.scopeSettings.isEnabled && !model.isPreparing }
+    private var scopesVisible: Bool {
+        model.scopeSettings.isEnabled && !model.isPreparing
+            && !(usesCompactColorWorkspace && colorControlsExpanded)
+    }
     /// True while the preview is being pinched, so the cutout tools can tell a
     /// zoom from a stroke.
     @State private var previewPinching = false
@@ -174,7 +203,7 @@ struct ImageEditorView: View {
             Spacer(minLength: 0)
             if AppPlatform.supportsWorkspaceShortcuts {
                 WorkspaceShortcutMenu(shortcuts: workspaceShortcuts,
-                    isEnabled: !model.showsExport && !savingPreset && !infoSheet && !help
+                    isEnabled: !model.showsExport && !savingPreset && !infoSheet && !help && !settingsSheet
                         && !confirmsResetAll && model.editError == nil)
             }
             Button(action: model.undo) { Image(systemName: "arrow.uturn.backward").frame(width: 36, height: 44) }
@@ -183,6 +212,9 @@ struct ImageEditorView: View {
                 .disabled(!model.canRedo).accessibilityLabel("Redo")
             Menu {
                 Button("Image information", systemImage: "info.circle") { infoSheet = true }
+                if !AppPlatform.isMac && UIDevice.current.userInterfaceIdiom == .phone {
+                    Button("Editor settings", systemImage: "gearshape") { settingsSheet = true }
+                }
                 // Confirmed, like every other action in the app that throws
                 // work away. Disabled rather than confirmed-then-ignored when
                 // the grade is already neutral, which is what `resetAll` does.
@@ -252,12 +284,17 @@ struct ImageEditorView: View {
     }
 
     private var scopesButton: some View {
-        Button { model.setScopesEnabled(!model.scopeSettings.isEnabled) } label: {
+        Button {
+            if usesCompactColorWorkspace && colorControlsExpanded {
+                colorControlsExpanded = false
+                model.setScopesEnabled(true)
+            } else { model.setScopesEnabled(!model.scopeSettings.isEnabled) }
+        } label: {
             PreviewToolbarLabel(title: "Scopes", symbol: "waveform",
-                                isSelected: model.scopeSettings.isEnabled)
+                                isSelected: scopesVisible)
         }
-        .accessibilityLabel(model.scopeSettings.isEnabled ? "Hide scopes" : "Show scopes")
-        .accessibilityAddTraits(model.scopeSettings.isEnabled ? .isSelected : [])
+        .accessibilityLabel(scopesVisible ? "Hide scopes" : "Show scopes")
+        .accessibilityAddTraits(scopesVisible ? .isSelected : [])
     }
 
     private var colorPickingLayer: some View {
@@ -298,7 +335,13 @@ struct ImageEditorView: View {
     private var inspector: some View {
         Group {
             if model.imageTool == .background { ImageBackgroundRemovalPanel(model: model) }
-            else { GradingControls(model: model, onSaveGrade: { savingPreset = true }) }
+            else {
+                GradingControls(model: model, onSaveGrade: { savingPreset = true },
+                                usesCompactLayout: usesCompactColorWorkspace,
+                                isExpanded: colorControlsExpanded,
+                                onToggleExpanded: usesCompactColorWorkspace && verticalSizeClass != .compact
+                                    ? { colorControlsExpanded.toggle() } : nil)
+            }
         }
     }
 

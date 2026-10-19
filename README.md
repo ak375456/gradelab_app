@@ -82,6 +82,7 @@ placed inside those trees may become app/test inputs automatically.
 
 ## Detailed context
 
+- [iPhone Color workspace, Compact/Classic preference and acceptance](Docs/PHONE_COLOR_WORKSPACE.md)
 - [Freehand masks, preview zoom, tracking and device acceptance](Docs/MASK_EDITING.md)
 - [Audio processing, preview/export behavior and tests](Docs/AUDIO_TOOLS.md)
 - [Relight architecture, models, limitations and validation](Docs/RELIGHT.md)

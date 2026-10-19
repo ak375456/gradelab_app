@@ -12,6 +12,9 @@ import UIKit
 
 struct CurvesPanel<Model: GradingModel>: View {
     @ObservedObject var model: Model
+    var usesCompactLayout = false
+    var isExpanded = false
+    private var usesMacCurves: Bool { AppPlatform.isMac && !usesCompactLayout }
     /// Open the first time someone reaches this panel, and remembered after
     /// that: a guide that has been read once should not keep taking up the
     /// space the graph wants.
@@ -29,13 +32,13 @@ struct CurvesPanel<Model: GradingModel>: View {
         // graph shapes the curve rather than scrolling the panel, so anything
         // the user has to be able to reach has to sit above it.
         VStack(spacing: AppSpacing.compact) {
-            if AppPlatform.isMac { macCurves } else { compactCurves }
+            if usesMacCurves { macCurves } else { compactCurves }
 
             VStack(alignment: .leading, spacing: AppSpacing.small) {
                 // Describes whichever curve the section above it is showing:
                 // on Mac that is the colour curve, since the four tone curves
                 // are all on screen at once.
-                Text(AppPlatform.isMac ? colorType.help : type.help)
+                Text(usesMacCurves ? colorType.help : type.help)
                     .font(AppTypography.caption)
                     .foregroundStyle(AppColors.textTertiary)
                     .fixedSize(horizontal: false, vertical: true)
@@ -64,7 +67,7 @@ struct CurvesPanel<Model: GradingModel>: View {
             if ProAccessPolicy.curveRequiresPro(type) {
                 ProPanelNotice(feature: .colorCurves)
             }
-            editor(type)
+            editor(type, height: usesCompactLayout && isExpanded ? 250 : 178)
         }
     }
 

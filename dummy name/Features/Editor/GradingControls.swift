@@ -13,106 +13,41 @@ struct GradingControls<Model: GradingModel>: View {
     /// Opens the "Save Grade as Preset" sheet, which the host presents.
     var onSaveGrade: () -> Void = {}
     @Binding private var scrollPosition: ScrollPosition
+    var usesCompactLayout: Bool
+    var isExpanded: Bool
+    var onToggleExpanded: (() -> Void)?
 
     @State private var selectedParameter: GradeParameter = .exposure
+    @State private var showsKeyframeHelp = false
 
     init(model: Model, onSaveGrade: @escaping () -> Void = {},
-         scrollPosition: Binding<ScrollPosition> = .constant(ScrollPosition(y: 0))) {
+         scrollPosition: Binding<ScrollPosition> = .constant(ScrollPosition(y: 0)),
+         usesCompactLayout: Bool = false, isExpanded: Bool = false,
+         onToggleExpanded: (() -> Void)? = nil) {
         self.model = model
         self.onSaveGrade = onSaveGrade
         self._scrollPosition = scrollPosition
+        self.usesCompactLayout = usesCompactLayout
+        self.isExpanded = isExpanded
+        self.onToggleExpanded = onToggleExpanded
     }
 
     var body: some View {
         VStack(spacing: 0) {
             if let name = model.editingMaskName { maskContextBar(name) }
-            ScrollView(.horizontal) {
-                HStack(spacing: 4) {
-                    ForEach(model.availablePanels) { panel in
-                        Button { model.selectedPanel = panel } label: {
-                            VStack(spacing: 3) {
-                                Image(systemName: panel.symbol).font(.system(size: 14))
-                                    // Says the tool holds animation. The
-                                    // diamonds inside it say which parameter.
-                                    .overlay(alignment: .topTrailing) {
-                                        GradeAnimationDot(model: model, panel: panel).offset(x: 5, y: -1)
-                                    }
-                                Text(panel.title).font(.caption.weight(.medium))
-                            }.frame(width: 58, height: 44)
-                                .foregroundStyle(model.selectedPanel == panel ? AppColors.textPrimary : AppColors.textSecondary)
-                                .background(model.selectedPanel == panel ? AppColors.surfaceRaised : .clear, in: RoundedRectangle(cornerRadius: 12))
-                                // The whole 58x44 tile takes the click. An
-                                // unselected tab's background is `.clear`,
-                                // which SwiftUI does not hit-test, so without
-                                // this only the glyph and the word themselves
-                                // answered — a pointer a pixel off either one
-                                // hit nothing at all.
-                                .contentShape(RoundedRectangle(cornerRadius: 12))
-                        }.buttonStyle(.plain).accessibilityAddTraits(model.selectedPanel == panel ? .isSelected : [])
-                    }
-                }.padding(.horizontal, 12)
-            }.frame(height: 44).scrollIndicators(.hidden)
+            if usesCompactLayout { compactToolBar }
+            else { classicPanelStrip }
             ScrollView {
-                VStack(spacing: 20) {
+                VStack(spacing: usesCompactLayout ? 12 : 20) {
                     // The keyframe hint and the "playhead is outside the clip"
                     // notice, shown above whichever tool offers animation. The
                     // two mask tools carry their own.
                     if ![.mask, .masks].contains(model.selectedPanel) {
-                        GradeKeyframeHeader(model: model)
+                        GradeKeyframeHeader(model: model, isCompact: usesCompactLayout)
                     }
                     switch model.selectedPanel {
-                    case .light, .color:
-                        // A Mac window has the height to show every slider in
-                        // the group at once, which is how a desktop grading
-                        // panel reads: Temperature, Tint, Saturation and
-                        // Vibrance together, not one at a time behind a chip.
-                        // Phone and iPad keep the chips — there the picture
-                        // would lose the room.
-                        if AppPlatform.isMac {
-                            ForEach(model.visibleParameters) { parameter in
-                                if let property = AnimatableProperty.light(parameter) {
-                                    GradeSlider(model: model, property: property,
-                                                title: parameter.title,
-                                                range: parameter.range, step: parameter.step,
-                                                valueFormatter: AdjustmentValueFormatters.signed(
-                                                    fractionDigits: parameter == .exposure ? 2 : 0))
-                                }
-                            }
-                        } else {
-                        ScrollView(.horizontal) {
-                            HStack(spacing: 8) {
-                                ForEach(model.visibleParameters) { parameter in
-                                    Button { selectedParameter = parameter } label: {
-                                        HStack(spacing: 5) {
-                                            Text(parameter.title).font(.subheadline)
-                                            // One chip is visible at a time, so
-                                            // without this an animating exposure
-                                            // is hidden behind whichever
-                                            // parameter is open.
-                                            if let property = AnimatableProperty.light(parameter),
-                                               model.keyframeHost?.keyframeState(property) != .off,
-                                               model.keyframeHost != nil {
-                                                Circle().fill(AppColors.accent).frame(width: 5, height: 5)
-                                            }
-                                        }
-                                        .padding(.horizontal, 14).frame(height: 40)
-                                        .background(selectedParameter == parameter ? AppColors.surfaceRaised : .clear, in: Capsule())
-                                        // Same reason as the panel strip: an
-                                        // unselected chip is clear, so the
-                                        // whole capsule has to be asked for.
-                                        .contentShape(Capsule())
-                                    }.foregroundStyle(selectedParameter == parameter ? AppColors.textPrimary : AppColors.textSecondary)
-                                }
-                            }
-                        }.frame(height: 44).scrollIndicators(.hidden)
-                        if let property = AnimatableProperty.light(selectedParameter) {
-                            GradeSlider(model: model, property: property, title: selectedParameter.title,
-                                        range: selectedParameter.range, step: selectedParameter.step,
-                                        valueFormatter: AdjustmentValueFormatters.signed(
-                                            fractionDigits: selectedParameter == .exposure ? 2 : 0))
-                        }
-                        }
-                    case .curves: CurvesPanel(model: model)
+                    case .light, .color: lightControls
+                    case .curves: CurvesPanel(model: model, usesCompactLayout: usesCompactLayout, isExpanded: isExpanded)
                     case .warper: ColorWarperPanel(model: model)
                     case .noise: NoiseReductionPanel(model: model)
                     case .relight:
@@ -144,7 +79,7 @@ struct GradingControls<Model: GradingModel>: View {
                         vignette("Feather", .gradeVignetteFeather, 0...100, 70)
                     case .effects: FilmEffectsPanel(model: model)
                     }
-                }.padding(.horizontal, 20).padding(.bottom, 24)
+                }.padding(.horizontal, 20).padding(.top, usesCompactLayout ? 12 : 0).padding(.bottom, 24)
             }
             .scrollPosition($scrollPosition)
             .scrollIndicators(.visible)
@@ -152,6 +87,157 @@ struct GradingControls<Model: GradingModel>: View {
         .onChange(of: model.selectedPanel, initial: true) { _, panel in
             selectedParameter = panel == .color ? .temperature : .exposure
         }
+        .sheet(isPresented: $showsKeyframeHelp) { KeyframeHelp() }
+    }
+
+    private var classicPanelStrip: some View {
+        ScrollView(.horizontal) {
+            HStack(spacing: 4) {
+                ForEach(model.availablePanels) { panel in
+                    Button { model.selectedPanel = panel } label: {
+                        VStack(spacing: 3) {
+                            Image(systemName: panel.symbol).font(.system(size: 14))
+                                // Says the tool holds animation. The
+                                // diamonds inside it say which parameter.
+                                .overlay(alignment: .topTrailing) {
+                                    GradeAnimationDot(model: model, panel: panel).offset(x: 5, y: -1)
+                                }
+                            Text(panel.title).font(.caption.weight(.medium))
+                        }.frame(width: 58, height: 44)
+                            .foregroundStyle(model.selectedPanel == panel ? AppColors.textPrimary : AppColors.textSecondary)
+                            .background(model.selectedPanel == panel ? AppColors.surfaceRaised : .clear, in: RoundedRectangle(cornerRadius: 12))
+                            // The whole 58x44 tile takes the click. An
+                            // unselected tab's background is `.clear`,
+                            // which SwiftUI does not hit-test, so without
+                            // this only the glyph and the word themselves
+                            // answered — a pointer a pixel off either one
+                            // hit nothing at all.
+                            .contentShape(RoundedRectangle(cornerRadius: 12))
+                    }.buttonStyle(.plain).accessibilityAddTraits(model.selectedPanel == panel ? .isSelected : [])
+                }
+            }.padding(.horizontal, 12)
+        }.frame(height: 44).scrollIndicators(.hidden)
+    }
+
+    @ViewBuilder
+    private var lightControls: some View {
+        // A Mac window has the height to show every slider in
+        // the group at once, which is how a desktop grading
+        // panel reads: Temperature, Tint, Saturation and
+        // Vibrance together, not one at a time behind a chip.
+        // Phone and iPad keep the chips — there the picture
+        // would lose the room.
+        if AppPlatform.isMac && !usesCompactLayout {
+            ForEach(model.visibleParameters) { parameter in
+                if let property = AnimatableProperty.light(parameter) {
+                    GradeSlider(model: model, property: property,
+                                title: parameter.title,
+                                range: parameter.range, step: parameter.step,
+                                valueFormatter: AdjustmentValueFormatters.signed(
+                                    fractionDigits: parameter == .exposure ? 2 : 0))
+                }
+            }
+        } else {
+            if !usesCompactLayout { parameterStrip }
+
+            if let property = AnimatableProperty.light(selectedParameter) {
+                GradeSlider(model: model, property: property, title: selectedParameter.title,
+                            range: selectedParameter.range, step: selectedParameter.step,
+                            valueFormatter: AdjustmentValueFormatters.signed(
+                                fractionDigits: selectedParameter == .exposure ? 2 : 0))
+            }
+        }
+    }
+
+    private var parameterStrip: some View {
+        ScrollView(.horizontal) {
+            HStack(spacing: 8) {
+                ForEach(model.visibleParameters) { parameter in
+                    Button { selectedParameter = parameter } label: {
+                        HStack(spacing: 5) {
+                            Text(parameter.title).font(.subheadline)
+                            // One chip is visible at a time, so
+                            // without this an animating exposure
+                            // is hidden behind whichever
+                            // parameter is open.
+                            if let property = AnimatableProperty.light(parameter),
+                               model.keyframeHost?.keyframeState(property) != .off,
+                               model.keyframeHost != nil {
+                                Circle().fill(AppColors.accent).frame(width: 5, height: 5)
+                            }
+                        }
+                        .padding(.horizontal, 14).frame(height: 40)
+                        .background(selectedParameter == parameter ? AppColors.surfaceRaised : .clear, in: Capsule())
+                        // Same reason as the panel strip: an
+                        // unselected chip is clear, so the
+                        // whole capsule has to be asked for.
+                        .contentShape(Capsule())
+                    }.foregroundStyle(selectedParameter == parameter ? AppColors.textPrimary : AppColors.textSecondary)
+                }
+            }
+        }.frame(height: 44).scrollIndicators(.hidden)
+    }
+
+    /// One row replaces the tool strip and parameter strip. The controls below
+    /// remain the same grade bindings, numeric entry and keyframe lanes.
+    private var compactToolBar: some View {
+        HStack(spacing: 8) {
+            Menu {
+                ForEach(model.availablePanels) { panel in
+                    Button { model.selectedPanel = panel } label: {
+                        Label(panel.title, systemImage: model.selectedPanel == panel ? "checkmark" : panel.symbol)
+                    }
+                }
+                if model.keyframeHost != nil {
+                    Divider()
+                    Button("How keyframes work", systemImage: "diamond") { showsKeyframeHelp = true }
+                }
+            } label: {
+                HStack(spacing: 6) {
+                    Image(systemName: model.selectedPanel.symbol).font(.callout)
+                        .overlay(alignment: .topTrailing) {
+                            GradeAnimationDot(model: model, panel: model.selectedPanel).offset(x: 4, y: -3)
+                        }
+                    Text(model.selectedPanel.title).font(AppTypography.bodyEmphasized).lineLimit(1)
+                    Image(systemName: "chevron.down").font(.caption2.weight(.semibold))
+                }
+                .frame(minHeight: 44).contentShape(Rectangle())
+            }
+            .accessibilityLabel("Color tool")
+            .accessibilityValue(model.selectedPanel.title)
+            .accessibilityIdentifier("color.toolSelector")
+
+            Spacer(minLength: 0)
+            if [.light, .color].contains(model.selectedPanel) {
+                Menu {
+                    ForEach(model.visibleParameters) { parameter in
+                        Button { selectedParameter = parameter } label: {
+                            Label(parameter.title, systemImage: selectedParameter == parameter ? "checkmark" : "slider.horizontal.3")
+                        }
+                    }
+                } label: {
+                    HStack(spacing: 5) {
+                        Text("Adjust").font(AppTypography.callout)
+                        Image(systemName: "chevron.down").font(.caption2.weight(.semibold))
+                    }
+                    .frame(minHeight: 44).contentShape(Rectangle())
+                }
+                .accessibilityLabel("Choose adjustment")
+                .accessibilityValue(selectedParameter.title)
+            }
+            if let onToggleExpanded {
+                Button(action: onToggleExpanded) {
+                    Image(systemName: isExpanded ? "arrow.down.right.and.arrow.up.left" : "arrow.up.left.and.arrow.down.right")
+                        .frame(width: 44, height: 44)
+                }
+                .accessibilityLabel(isExpanded ? "Restore Color workspace" : "Expand Color controls")
+                .accessibilityHint("Changes the tool area without changing the image zoom")
+            }
+        }
+        .foregroundStyle(AppColors.textPrimary)
+        .padding(.leading, 16).padding(.trailing, 4)
+        .background(AppColors.surface)
+        .overlay(alignment: .bottom) { AppDivider() }
     }
 
     /// The context indicator. Deliberately unmissable and always in the same
