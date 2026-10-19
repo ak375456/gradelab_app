@@ -157,10 +157,35 @@ struct TimelineTrack: Codable, Equatable, Identifiable, Sendable {
     }
 }
 
+enum TimelineMarkerColor: String, Codable, CaseIterable, Sendable {
+    case yellow, red, green, blue, purple
+}
+
 struct TimelineMarker: Codable, Equatable, Identifiable, Sendable {
     let id: UUID
     var time: TimelineTime
     var label: String = ""
+    var color: TimelineMarkerColor = .yellow
+
+    init(id: UUID, time: TimelineTime, label: String = "", color: TimelineMarkerColor = .yellow) {
+        self.id = id
+        self.time = time
+        self.label = label
+        self.color = color
+    }
+
+    private enum CodingKeys: String, CodingKey { case id, time, label, color }
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        id = try container.decode(UUID.self, forKey: .id)
+        time = try container.decode(TimelineTime.self, forKey: .time)
+        label = try container.decodeIfPresent(String.self, forKey: .label) ?? ""
+        // Existing documents have yellow markers without a color key. A future
+        // palette entry also falls back safely when opened in this version.
+        color = (try container.decodeIfPresent(String.self, forKey: .color))
+            .flatMap(TimelineMarkerColor.init(rawValue:)) ?? .yellow
+    }
 }
 
 struct Timeline: Codable, Equatable, Sendable {

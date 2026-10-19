@@ -934,6 +934,34 @@ final class EditorViewModel: ObservableObject, GradingModel {
         (evaluatedSelectedClip?.gradeSettings.advanced ?? .neutral).resolvedMask
     }
 
+    /// The legacy grade window is evaluated in encoded UVs, just like power
+    /// windows. Its guide must follow orientation and the evaluated layer too.
+    var gradeMaskSourceToPictureTransform: CGAffineTransform {
+        guard let clip = evaluatedSelectedClip,
+              let asset = project.assets.first(where: { $0.id == clip.assetID }) else { return .identity }
+        let size: CGSize
+        let preferred: CGAffineTransform
+        if let still = asset.stillImage {
+            size = CGSize(width: still.width, height: still.height)
+            preferred = .identity
+        } else if let metadata = asset.videoMetadata {
+            size = metadata.encodedSize
+            preferred = metadata.preferredTransform.cgTransform
+        } else { return .identity }
+        guard let coordinates = try? MaskTrackingCoordinates(encodedSize: size, preferredTransform: preferred) else {
+            return .identity
+        }
+        if maskOverlayUsesCanvas {
+            return coordinates.sourceToCanvasTransform(clip.transform,
+                canvas: CGSize(width: project.canvas.width, height: project.canvas.height))
+        }
+        let bounds = coordinates.displayBounds
+        return CGAffineTransform(scaleX: size.width, y: size.height)
+            .concatenating(preferred)
+            .concatenating(.init(translationX: -bounds.minX, y: -bounds.minY))
+            .concatenating(.init(scaleX: 1 / bounds.width, y: 1 / bounds.height))
+    }
+
     func layerMaskBinding<T>(_ keyPath: WritableKeyPath<LayerMask, T>) -> Binding<T> {
         Binding(
             get: { [weak self] in self?.selectedLayerMask[keyPath: keyPath] ?? LayerMask.disabled[keyPath: keyPath] },
@@ -1037,17 +1065,47 @@ final class EditorViewModel: ObservableObject, GradingModel {
             playback.seekPrecisely(to: target.cmTime)
         } catch { editError = error.localizedDescription }
     }
-    func toggleMarker() {
-        commit("Marker") { project in
+    var markerAtPlayhead: TimelineMarker? {
+        guard let time = try? TimelineEditing.snapped(.seconds(timelineTime), frame: project.canvas.frameDuration) else { return nil }
+        let tolerance = (project.canvas.frameDuration?.seconds ?? 0.01) / 2
+        return project.timeline.markers.first { abs($0.time.seconds - time.seconds) < tolerance }
+    }
+
+    /// On-screen Add is idempotent at the playhead and never presents an editor.
+    @discardableResult
+    func addMarker() -> TimelineMarker? {
+        guard !isPreparingTimeline else { return nil }
+        if let markerAtPlayhead { return markerAtPlayhead }
+        let id = UUID()
+        commit("Add marker", rebuildsSequence: false, preservingSelection: true) { project in
             let time = try TimelineEditing.snapped(.seconds(self.timelineTime), frame: project.canvas.frameDuration)
-            if let index = project.timeline.markers.firstIndex(where: { abs($0.time.seconds-time.seconds) < (project.canvas.frameDuration?.seconds ?? 0.01)/2 }) {
-                project.timeline.markers.remove(at: index)
-            } else { project.timeline.markers.append(.init(id: UUID(), time: time)) }
+            project.timeline.markers.append(.init(id: id, time: time))
+            return self.selectedClipID
+        }
+        return project.timeline.markers.first { $0.id == id }
+    }
+
+    func toggleMarker() {
+        guard !isPreparingTimeline else { return }
+        if let markerAtPlayhead { deleteMarker(markerAtPlayhead.id) }
+        else { addMarker() }
+    }
+
+    func setMarkerColor(_ id: UUID, to color: TimelineMarkerColor) {
+        guard !isPreparingTimeline,
+              let marker = project.timeline.markers.first(where: { $0.id == id }), marker.color != color else { return }
+        commit("Marker color", rebuildsSequence: false, preservingSelection: true) { project in
+            guard let index = project.timeline.markers.firstIndex(where: { $0.id == id }) else { return self.selectedClipID }
+            project.timeline.markers[index].color = color
             return self.selectedClipID
         }
     }
     func deleteMarker(_ id: UUID) {
-        commit("Delete marker") { project in project.timeline.markers.removeAll { $0.id == id }; return self.selectedClipID }
+        guard !isPreparingTimeline, project.timeline.markers.contains(where: { $0.id == id }) else { return }
+        commit("Remove marker", rebuildsSequence: false, preservingSelection: true) { project in
+            project.timeline.markers.removeAll { $0.id == id }
+            return self.selectedClipID
+        }
     }
 
     var clips: [VideoClip] { (try? TimelineEditing.clips(in: project)) ?? [] }
@@ -2279,6 +2337,7 @@ final class EditorViewModel: ObservableObject, GradingModel {
     }
 
     func commit(_ name: String, seekToSelection: Bool = false, rebuildsSequence: Bool = true,
+                preservingSelection: Bool = false,
                 edit: (inout VideoProject) throws -> UUID?) {
         flushGradeHistory()
         do {
@@ -2293,15 +2352,20 @@ final class EditorViewModel: ObservableObject, GradingModel {
             _ = try TimelineEditing.clips(in: after)
             guard before.timeline != after.timeline || before.canvas != after.canvas
                     || before.assets != after.assets else {
-                selectedClipID = selection
-                selectedClipIDs = Set(selection.map { [$0] } ?? [])
+                if !preservingSelection {
+                    selectedClipID = selection
+                    selectedClipIDs = Set(selection.map { [$0] } ?? [])
+                }
                 return
             }
             after.updatedAt = .now
             history.record(name, before: before, after: after)
-            project = after; selectedClipID = selection
-            selectedClipIDs = Set(selection.map { [$0] } ?? [])
-            if let selection, let item = after.timeline.item(id: selection) { selectedTrackID = item.placement.trackID }
+            project = after
+            if !preservingSelection {
+                selectedClipID = selection
+                selectedClipIDs = Set(selection.map { [$0] } ?? [])
+                if let selection, let item = after.timeline.item(id: selection) { selectedTrackID = item.placement.trackID }
+            }
             if rebuildsSequence,
                before.timeline.tracks != after.timeline.tracks ||
                before.timeline.transitions != after.timeline.transitions ||

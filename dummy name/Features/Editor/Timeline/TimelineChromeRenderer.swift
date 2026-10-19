@@ -96,16 +96,21 @@ struct TimelineChromeRenderer {
 
     // MARK: - Markers and transitions
 
-    func drawMarker(at x: CGFloat) {
-        guard x >= contentLeft else { return }
-        let y = TimelineMetrics.rulerHeight - 22
-        context.setFillColor(TimelineTheme.markerFill.cgColor)
-        context.move(to: CGPoint(x: x, y: y))
-        context.addLine(to: CGPoint(x: x + 5, y: y + 5))
-        context.addLine(to: CGPoint(x: x, y: y + 10))
-        context.addLine(to: CGPoint(x: x - 5, y: y + 5))
+    func drawMarker(at x: CGFloat, color: TimelineMarkerColor) {
+        guard x >= contentLeft, x <= canvas.width else { return }
+        let y = TimelineMetrics.markerCenterY
+        let radius = TimelineMetrics.markerRadius
+        context.saveGState()
+        context.setFillColor(color.uiColor.cgColor)
+        context.setStrokeColor(TimelineTheme.background.cgColor)
+        context.setLineWidth(1)
+        context.move(to: CGPoint(x: x, y: y - radius))
+        context.addLine(to: CGPoint(x: x + radius, y: y))
+        context.addLine(to: CGPoint(x: x, y: y + radius))
+        context.addLine(to: CGPoint(x: x - radius, y: y))
         context.closePath()
-        context.fillPath()
+        context.drawPath(using: .fillStroke)
+        context.restoreGState()
     }
 
     func drawTransition(at point: CGPoint, isSelected: Bool) {

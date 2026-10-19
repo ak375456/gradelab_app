@@ -2,9 +2,11 @@
 
 A tap selects a completed freehand anchor and reveals two curve handles. It does not change the outline. Drag a handle to curve the adjacent edge, or use Point Type → Smooth Point / Corner Point in the mask inspector. Delete Point is explicit and keeps at least three anchors. Point selection is editor state and clears when changing masks or clips.
 
-During drawing, tap the first anchor to close the outline or use Done at the bottom right of the preview. Drawing guidance lives in the inspector so it cannot cover a sky or an edge of the picture.
+During drawing, tap the first anchor to close the outline or use Done in the bar below the preview. Drawing guidance lives in the inspector so it cannot cover a sky or an edge of the picture.
 
-Pinch about any point to zoom, and use two fingers to pan while a tool is active. Preview navigation stays available across tools. The bottom-left controls provide zoom out/in, zoom presets and reset. Fit is the 100% reference; releasing a pinch within 6% of Fit snaps to 100%. Zoom spans 50–800% and is inspection state only. Eyedroppers share the picture transform. Mask handles and their touch targets retain their screen size while zoomed.
+Pinch about any point to zoom, and use two fingers to pan while a tool is active. Preview navigation stays available across tools. A dedicated bar below the picture contains the zoom menu (zoom out/in, presets and Fit), Scopes and Compare. Tap Compare to toggle the original or hold it for a temporary comparison. These controls never cover the picture or zoom with it. Fit is the 100% reference; releasing a pinch within 6% of Fit snaps to 100%. Zoom spans 50–800% and is inspection state only. Eyedroppers share the picture transform. Mask handles and their touch targets retain their screen size while zoomed.
+
+Color → Local uses the legacy normalized-source mask geometry. Its outline rotates in source UVs before aspect fit and follows source orientation and evaluated layer placement, matching the existing preview/export shader without changing saved masks. The outer outline is the shape boundary; the inner dashed outline shows full coverage when feathered.
 
 Freehand gestures render a transient project copy and commit on release, as one undo step. Starting viewport navigation discards the pending gesture; it cannot leave extra vertices, change existing animation or autosave a partial stroke. The renderer, overlay and tracking bounds use the same tessellated curve, capped at the existing 64-point budget. Tessellation is cached independently of animated position and scale, with bounded, synchronized storage. Optional incoming/outgoing handle offsets preserve old project decoding.
 

@@ -46,7 +46,6 @@ enum TimelineTheme {
     static let playheadBubble = UIColor(red: 0.31, green: 0.69, blue: 0.96, alpha: 1)
     static let playheadLine = UIColor(white: 1, alpha: 0.95)
 
-    static let markerFill = UIColor.systemYellow
     static let lockedTint = UIColor.systemOrange
 
     // MARK: - Symbols
@@ -122,6 +121,11 @@ enum TimelineMetrics {
     /// rather than simply enlarged.
     static let headerControlSize: CGFloat = 26
     static let minimumTouchTarget: CGFloat = 44
+
+    /// Keep marker targets inside the ruler so they never steal clip gestures.
+    static let markerHitSlop: CGFloat = minimumTouchTarget / 2
+    static let markerCenterY: CGFloat = 25
+    static let markerRadius: CGFloat = 5.5
 
     /// Filmstrip cell width for a given picture height, at 16:9. Thumbnails
     /// laid out at their own aspect read as continuous footage rather than as

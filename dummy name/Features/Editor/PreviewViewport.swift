@@ -18,56 +18,59 @@ enum PreviewInteraction: Equatable {
 /// Inspection only: picture and tool overlays share one native zoom surface.
 /// UIScrollView owns pinch and two-finger pan, so drawing recognizers cannot
 /// steal zoom, and panning does not depend on changing the pinch distance.
-struct PreviewViewport<Content: View>: View {
+struct PreviewViewport<Content: View, Controls: View>: View {
     var interaction: PreviewInteraction = .full
     var onPinchChanged: (Bool) -> Void = { _ in }
     @ViewBuilder let content: () -> Content
+    @ViewBuilder let controls: () -> Controls
     @State private var zoom: CGFloat = 1
     @State private var command = PreviewZoomCommand(scale: 1, reset: true)
 
     var body: some View {
-        NativePreviewViewport(content: content().environment(\.previewMagnification, zoom), interaction: interaction,
-                              command: command, zoom: $zoom, onNavigationChanged: onPinchChanged)
-            .overlay(alignment: .bottomLeading) { zoomControls.padding(10) }
-            .accessibilityAction(named: "Reset preview zoom") { reset() }
+        VStack(spacing: 0) {
+            NativePreviewViewport(content: content().environment(\.previewMagnification, zoom), interaction: interaction,
+                                  command: command, zoom: $zoom, onNavigationChanged: onPinchChanged)
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                .accessibilityAction(named: "Reset preview zoom") { reset() }
+            HStack(spacing: AppSpacing.small) {
+                zoomControls
+                Spacer(minLength: 0)
+                controls()
+            }
+            .padding(.horizontal, AppSpacing.small)
+            .frame(height: PreviewToolbarMetrics.height)
+            .background(AppColors.editorBackground)
+            .overlay(alignment: .top) { AppDivider() }
+        }
     }
 
     private var zoomControls: some View {
-        HStack(spacing: 0) {
-            Button { setZoom(zoom / 1.25) } label: {
-                Image(systemName: "minus").frame(width: 44, height: 44)
+        Menu {
+            Button("Fit · 100%", systemImage: "arrow.counterclockwise", action: reset)
+            Divider()
+            Button("Zoom in", systemImage: "plus.magnifyingglass") { setZoom(zoom * 1.25) }
+                .disabled(zoom >= PreviewZoom.maximum)
+            Button("Zoom out", systemImage: "minus.magnifyingglass") { setZoom(zoom / 1.25) }
+                .disabled(zoom <= PreviewZoom.minimum)
+            Divider()
+            ForEach([50, 200, 400, 800], id: \.self) { percent in
+                Button("\(percent)%") { setZoom(CGFloat(percent) / 100) }
             }
-            .disabled(zoom <= PreviewZoom.minimum)
-            .accessibilityLabel("Zoom out")
-            Menu {
-                Button("Fit · 100%") { reset() }
-                ForEach([50, 200, 400, 800], id: \.self) { percent in
-                    Button("\(percent)%") { setZoom(CGFloat(percent) / 100) }
-                }
-            } label: {
+        } label: {
+            HStack(spacing: 6) {
+                Image(systemName: "viewfinder")
                 Text("\(Int((zoom * 100).rounded()))%")
-                    .monospacedDigit().frame(minWidth: 56, minHeight: 44)
+                    .monospacedDigit()
+                Image(systemName: "chevron.down").font(.system(size: 8, weight: .semibold))
             }
-            .accessibilityLabel("Preview zoom, \(Int((zoom * 100).rounded())) percent")
-            .help("Zoom relative to Fit. Pinch anywhere to zoom; use two fingers to pan.")
-            Button { setZoom(zoom * 1.25) } label: {
-                Image(systemName: "plus").frame(width: 44, height: 44)
-            }
-            .disabled(zoom >= PreviewZoom.maximum)
-            .accessibilityLabel("Zoom in")
-            Rectangle().fill(.white.opacity(0.18)).frame(width: 1, height: 16)
-            Button(action: reset) {
-                Image(systemName: "arrow.counterclockwise").frame(width: 44, height: 44)
-            }
-            .accessibilityLabel("Reset preview to Fit, 100 percent")
-            .help("Reset preview zoom and position")
+            .font(AppTypography.caption.weight(.medium))
+            .foregroundStyle(AppColors.textSecondary)
+            .frame(minWidth: 88, minHeight: PreviewToolbarMetrics.height)
+            .contentShape(Rectangle())
         }
-        .font(.system(size: 12, weight: .semibold))
-        .foregroundStyle(.white)
         .buttonStyle(.plain)
-        .background(.black.opacity(0.78), in: Capsule())
-        .overlay(Capsule().strokeBorder(.white.opacity(0.12), lineWidth: 1))
-        .accessibilityElement(children: .contain)
+        .accessibilityLabel("Preview zoom, \(Int((zoom * 100).rounded())) percent")
+        .help("Zoom relative to Fit. Pinch anywhere to zoom; use two fingers to pan.")
     }
 
     private func setZoom(_ value: CGFloat) {
@@ -75,6 +78,70 @@ struct PreviewViewport<Content: View>: View {
     }
 
     private func reset() { command = PreviewZoomCommand(scale: 1, reset: true) }
+}
+
+extension PreviewViewport where Controls == EmptyView {
+    init(interaction: PreviewInteraction = .full,
+         onPinchChanged: @escaping (Bool) -> Void = { _ in },
+         @ViewBuilder content: @escaping () -> Content) {
+        self.interaction = interaction
+        self.onPinchChanged = onPinchChanged
+        self.content = content
+        self.controls = { EmptyView() }
+    }
+}
+
+enum PreviewToolbarMetrics {
+    static let height: CGFloat = 44
+}
+
+/// Preview furniture lives below the image, outside its zoom and hit regions.
+struct PreviewToolbarLabel: View {
+    let title: LocalizedStringKey
+    let symbol: String
+    var isSelected = false
+
+    var body: some View {
+        Label(title, systemImage: symbol)
+            .font(AppTypography.caption.weight(.medium))
+            .lineLimit(1)
+            .padding(.horizontal, AppSpacing.small)
+            .frame(minWidth: 44, minHeight: PreviewToolbarMetrics.height)
+            .foregroundStyle(isSelected ? AppColors.accent : AppColors.textSecondary)
+            .background(isSelected ? AppColors.accentMuted : .clear,
+                        in: RoundedRectangle(cornerRadius: AppCornerRadius.small))
+            .contentShape(Rectangle())
+    }
+}
+
+/// Tap to pin the original, or hold for a momentary comparison. The hold owns
+/// its gesture only after recognition, leaving ordinary Button taps intact.
+struct PreviewCompareButton: View {
+    @Binding var isPinned: Bool
+    var showsOriginal: Bool
+    var onHoldChanged: (Bool) -> Void
+    @GestureState private var isHolding = false
+
+    var body: some View {
+        Button { isPinned.toggle() } label: {
+            PreviewToolbarLabel(title: showsOriginal ? "Original" : "Compare",
+                                symbol: "square.on.square", isSelected: showsOriginal)
+        }
+        .buttonStyle(.plain)
+        .highPriorityGesture(
+            LongPressGesture(minimumDuration: 0.25)
+                .sequenced(before: DragGesture(minimumDistance: 0))
+                .updating($isHolding) { value, held, _ in
+                    if case .second(true, _) = value { held = true }
+                }
+        )
+        .onChange(of: isHolding) { _, held in onHoldChanged(held) }
+        .onDisappear { onHoldChanged(false) }
+        .accessibilityLabel(isPinned ? "Show edited" : "Compare with original")
+        .accessibilityValue(showsOriginal ? "Original" : "Edited")
+        .accessibilityHint("Tap to toggle, or hold to compare temporarily")
+        .help("Tap to toggle, or hold to compare temporarily")
+    }
 }
 
 /// Fit is the stable 100% reference on every device, including while a tool is

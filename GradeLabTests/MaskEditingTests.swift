@@ -186,6 +186,8 @@ final class MaskViewportTests: XCTestCase {
         XCTAssertEqual(viewport.panGestureRecognizer.minimumNumberOfTouches, 2)
         XCTAssertTrue(try XCTUnwrap(viewport.pinchGestureRecognizer).isEnabled)
         XCTAssertEqual(viewport.contentSize.width, 640, accuracy: 1)
+        XCTAssertEqual(viewport.bounds.height, 400 - PreviewToolbarMetrics.height, accuracy: 1,
+                       "Preview controls must have their own space outside the picture")
         viewport.setZoomScale(2, animated: false)
         viewport.layoutIfNeeded()
         XCTAssertEqual(viewport.zoomScale, 2, accuracy: 0.001)
@@ -194,7 +196,7 @@ final class MaskViewportTests: XCTestCase {
         viewport.layoutIfNeeded()
         let picture = try XCTUnwrap(viewport.delegate?.viewForZooming?(in: viewport))
         XCTAssertEqual(picture.center.x, 320, accuracy: 1)
-        XCTAssertEqual(picture.center.y, 200, accuracy: 1)
+        XCTAssertEqual(picture.center.y, viewport.bounds.midY, accuracy: 1)
     }
 
     func testMaskControlsFitCompactAndWidePreviews() async throws {

@@ -72,6 +72,7 @@ struct TimelineView: UIViewRepresentable {
     let onSelect: (UUID?) -> Void
     let onSelectMany: (Set<UUID>) -> Void
     let onSelectTransition: (UUID) -> Void
+    let onSelectMarker: (TimelineMarker, UnitPoint) -> Void
     let onDragSelect: (UUID) -> Void
     let onOptions: (UUID) -> Void
     /// A media-bin drag let go over the timeline: the asset and the second it
@@ -117,6 +118,7 @@ struct TimelineView: UIViewRepresentable {
         view.onSelect = onSelect; view.onBeginSeek = onBeginSeek
         view.onSelectMany = onSelectMany
         view.onSelectTransition = onSelectTransition
+        view.onSelectMarker = onSelectMarker
         view.onSeek = onSeek; view.onEndSeek = onEndSeek
         view.applyExternalZoom(pixelsPerSecond)
         view.updateTrackControls()
@@ -200,6 +202,7 @@ final class TimelineCanvas: UIView, UIScrollViewDelegate, UIGestureRecognizerDel
     var onSelect: ((UUID?) -> Void)?
     var onSelectMany: ((Set<UUID>) -> Void)?
     var onSelectTransition: ((UUID) -> Void)?
+    var onSelectMarker: ((TimelineMarker, UnitPoint) -> Void)?
     var onDragSelect: ((UUID) -> Void)?
     var onOptions: ((UUID) -> Void)?
     var onDropAsset: ((UUID, Double) -> Void)?
@@ -372,6 +375,8 @@ final class TimelineCanvas: UIView, UIScrollViewDelegate, UIGestureRecognizerDel
         accessibilityTraits = .adjustable
         accessibilityHint = String(localized: "Swipe up or down to seek one second. Pinch to zoom. Hold a clip and drag sideways to move it or vertically to move it to another layer.")
         accessibilityCustomActions = [
+            UIAccessibilityCustomAction(name: String(localized: "Edit marker at playhead"), target: self,
+                                        selector: #selector(gradeLabEditMarkerAtPlayhead)),
             UIAccessibilityCustomAction(name: String(localized: "Select clip"), target: self, selector: #selector(selectClip)),
             UIAccessibilityCustomAction(name: String(localized: "Deselect clip"), target: self, selector: #selector(deselectClip)),
             UIAccessibilityCustomAction(name: String(localized: "Zoom in"), target: self, selector: #selector(zoomIn)),
@@ -487,15 +492,38 @@ final class TimelineCanvas: UIView, UIScrollViewDelegate, UIGestureRecognizerDel
     }
 
     @objc private func tapped(_ recognizer: UITapGestureRecognizer) {
-        let point = recognizer.location(in: self)
+        handleTap(at: recognizer.location(in: self))
+    }
+
+    /// Marker editing is a separate tap route: opening it must not seek,
+    /// select/deselect a clip, or start a trim/move transaction.
+    func handleTap(at point: CGPoint) {
+        guard !interacting, !pinching, ghost == nil else { return }
         // The header column is a control panel, not timeline content.
         guard point.x >= contentLeft else { return }
-        if point.y < TimelineMetrics.rulerHeight {
+        if let marker = hitMarker(at: point) {
+            let anchor = UnitPoint(x: viewport.x(for: marker.time.seconds) / max(1, bounds.width),
+                                   y: TimelineMetrics.markerCenterY / max(1, bounds.height))
+            onSelectMarker?(marker, anchor)
+        } else if point.y < TimelineMetrics.rulerHeight {
             seek(to: viewport.seconds(at: point.x, duration: duration))
         } else if let transition = hitTransition(at: point) {
             onSelectTransition?(transition.id)
         } else {
             onSelect?(hitClip(at: point)?.id)
+        }
+    }
+
+    func hitMarker(at point: CGPoint) -> TimelineMarker? {
+        guard point.x >= contentLeft, point.x <= bounds.width,
+              point.y >= 0, point.y < TimelineMetrics.rulerHeight else { return nil }
+        // Nearest wins when zoomed-out markers share a touch target. The list
+        // remains available for markers too tightly packed to tap individually.
+        return markers.filter {
+            let x = viewport.x(for: $0.time.seconds)
+            return x >= contentLeft && x <= bounds.width && abs(x - point.x) <= TimelineMetrics.markerHitSlop
+        }.min {
+            abs(viewport.x(for: $0.time.seconds) - point.x) < abs(viewport.x(for: $1.time.seconds) - point.x)
         }
     }
     /// A secondary click on a clip opens its options. On empty timeline or on
@@ -551,6 +579,11 @@ final class TimelineCanvas: UIView, UIScrollViewDelegate, UIGestureRecognizerDel
     }
     override func accessibilityIncrement() { seek(to: currentTime + 1) }
     override func accessibilityDecrement() { seek(to: currentTime - 1) }
+    @objc private func gradeLabEditMarkerAtPlayhead() -> Bool {
+        guard let marker = markers.first(where: { abs($0.time.seconds - currentTime) < minimumDuration / 2 }) else { return false }
+        onSelectMarker?(marker, UnitPoint(x: 0.5, y: TimelineMetrics.markerCenterY / max(1, bounds.height)))
+        return true
+    }
     @objc private func selectClip() -> Bool {
         let atPlayhead = clips.first { $0.placement.timelineStart.seconds <= currentTime && currentTime < ((try? $0.placement.range.end.seconds) ?? 0) }
         onSelect?(atPlayhead?.id ?? clips.first?.id); return true
@@ -631,7 +664,7 @@ final class TimelineCanvas: UIView, UIScrollViewDelegate, UIGestureRecognizerDel
         // scrolled up can never bleed into it.
         chrome.drawRuler(scale: TimelineRulerScale(pixelsPerSecond: zoom, frameDuration: minimumDuration),
                          duration: duration)
-        for marker in markers { chrome.drawMarker(at: geometry.x(for: marker.time.seconds)) }
+        for marker in markers { chrome.drawMarker(at: geometry.x(for: marker.time.seconds), color: marker.color) }
         if let boundary = snappedBoundary ?? playheadSnap {
             chrome.drawSnapIndicator(at: geometry.x(for: boundary))
         }
@@ -881,6 +914,7 @@ final class TimelineCanvas: UIView, UIScrollViewDelegate, UIGestureRecognizerDel
         let top = TimelineMetrics.rowsTop + rowOffset(clip)
         let height = clipHeight(trackID: clip.placement.trackID)
         guard point.x >= contentLeft,
+              point.y >= TimelineMetrics.rulerHeight,
               ((top - 6)...(top + height + 6)).contains(point.y),
               !isLocked(clip) else { return nil }
         let left = viewport.x(for: clip.placement.timelineStart.seconds)

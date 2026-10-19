@@ -70,28 +70,6 @@ struct LayerControls: View {
     }
 }
 
-struct MarkerControls: View {
-    @ObservedObject var model: EditorViewModel
-    @Environment(\.dismiss) private var dismiss
-    var body: some View {
-        NavigationStack {
-            List {
-                Button("Add / remove at playhead") { model.toggleMarker() }
-                ForEach(model.project.timeline.markers.sorted { $0.time < $1.time }) { marker in
-                    HStack {
-                        Button { model.seekTimeline(to: marker.time.seconds, finishing: true); dismiss() } label: {
-                            Label(String(format: "%.3f s", locale: .current, marker.time.seconds), systemImage: "bookmark.fill")
-                        }
-                        Spacer()
-                        Button(role: .destructive) { model.deleteMarker(marker.id) } label: { Image(systemName: "trash").frame(width: 44, height: 44) }.accessibilityLabel("Delete marker")
-                    }
-                }
-            }.buttonStyle(.plain).navigationTitle("Markers").navigationBarTitleDisplayMode(.inline)
-                .toolbar { Button("Done") { dismiss() } }
-        }.preferredColorScheme(.dark)
-    }
-}
-
 struct VideoTransformPanel: View {
     @State var clip: VideoClip
     let apply: (VideoClip) -> Void

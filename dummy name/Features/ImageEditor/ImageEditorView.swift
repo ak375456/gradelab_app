@@ -25,7 +25,7 @@ struct ImageEditorView: View {
     @AppStorage("imageEditor.previewHeight") private var storedPreviewHeight: Double = 0
     @AppStorage("imageEditor.inspectorWidth") private var storedInspectorWidth: Double = 0
     @AppStorage("imageEditor.scopeHeight") private var storedScopeHeight: Double = 0
-    @GestureState private var holdingOriginal = false
+    @State private var holdingOriginal = false
 
     var body: some View {
         layout
@@ -213,7 +213,8 @@ struct ImageEditorView: View {
                         redrawTime: 0, frameUpdateID: 0,
                         isActive: scenePhase == .active && !model.showsExport)
                     if model.selectedPanel == .mask && !model.showsOriginal {
-                        GradeMaskOverlay(model: model, displayedRect: model.renderer.displayedVideoRect)
+                        GradeMaskOverlay(model: model, displayedRect: model.renderer.displayedVideoRect,
+                                         isZooming: previewPinching)
                     }
                     if backgroundInteractionActive && !model.showsOriginal {
                         ImageBackgroundRemovalOverlay(model: model,
@@ -222,32 +223,16 @@ struct ImageEditorView: View {
                     }
                     if model.isPickingCurveHue || model.isPickingWarpColor { colorPickingLayer }
                 }
+            } controls: {
+                scopesButton
+                PreviewCompareButton(isPinned: $comparePinned, showsOriginal: model.showsOriginal,
+                                     onHoldChanged: { holdingOriginal = $0 })
+                    .disabled(model.isPreparing)
             }
             if model.isPreparing {
                 Color.black
                 ProgressView().frame(maxWidth: .infinity, maxHeight: .infinity)
             }
-            if model.showsOriginal {
-                Text("ORIGINAL").font(.caption2.weight(.semibold)).tracking(1.5)
-                    .padding(10).background(.black.opacity(0.65), in: Capsule()).padding(14)
-                    .allowsHitTesting(false)
-            }
-            VStack { HStack { Spacer(); scopesButton }; Spacer() }.padding(14)
-            VStack {
-                Spacer()
-                HStack {
-                    Spacer()
-                    // Label stays put — the ORIGINAL badge above states the
-                    // state, and this pill sits under the thumb holding it.
-                    Text("Hold to compare")
-                        .font(.caption2).foregroundStyle(.white.opacity(model.showsOriginal ? 0.35 : 0.8))
-                        .padding(8).background(.black.opacity(model.showsOriginal ? 0.2 : 0.4), in: Capsule())
-                        .contentShape(Capsule())
-                        .animation(.easeOut(duration: 0.12), value: model.showsOriginal)
-                        .gesture(DragGesture(minimumDistance: 0)
-                            .updating($holdingOriginal) { _, held, _ in held = true })
-                }
-            }.padding(12).padding(.bottom, 44).accessibilityHidden(true)
             if let status = model.statusMessage {
                 VStack {
                     Spacer()
@@ -268,11 +253,8 @@ struct ImageEditorView: View {
 
     private var scopesButton: some View {
         Button { model.setScopesEnabled(!model.scopeSettings.isEnabled) } label: {
-            Image(systemName: "waveform.badge.magnifyingglass")
-                .font(.system(size: 13, weight: .medium))
-                .padding(.horizontal, 10).padding(.vertical, 7)
-                .background(.black.opacity(0.65), in: Capsule())
-                .foregroundStyle(model.scopeSettings.isEnabled ? AppColors.accent : AppColors.textSecondary)
+            PreviewToolbarLabel(title: "Scopes", symbol: "waveform",
+                                isSelected: model.scopeSettings.isEnabled)
         }
         .accessibilityLabel(model.scopeSettings.isEnabled ? "Hide scopes" : "Show scopes")
         .accessibilityAddTraits(model.scopeSettings.isEnabled ? .isSelected : [])
@@ -339,12 +321,7 @@ struct ImageEditorView: View {
                 Image(systemName: "questionmark.circle").frame(width: 44, height: 44)
             }.accessibilityLabel("How to use \(model.selectedPanel.title)") }
             if model.imageTool == .color { GradeActionsMenu(model: model, onSaveGrade: { savingPreset = true }) }
-            Button { comparePinned.toggle() } label: {
-                Image(systemName: "square.on.square").frame(width: 44, height: 44)
-                    .foregroundStyle(comparePinned ? AppColors.accent : AppColors.textSecondary)
-            }
-            .accessibilityLabel(comparePinned ? "Show edited image" : "Compare with original")
-            .accessibilityValue(comparePinned ? "Original" : "Edited")
+
             if model.imageTool == .color {
                 Button("Reset", action: model.resetPanel).font(.caption).frame(minWidth: 44, minHeight: 44)
             }

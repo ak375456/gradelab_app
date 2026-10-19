@@ -131,6 +131,8 @@ struct EditorView: View {
     /// once, when the handle is let go.
     @State private var liveSizes: [WorkspacePane: Double] = [:]
     @State private var markers = false
+    @State private var editingMarker: TimelineMarker?
+    @State private var markerAnchor: UnitPoint = .center
     @State private var help = false
     @State private var comparePinned = false
     /// Timeline zoom in points per second, and whether the magnet is on. Both
@@ -155,7 +157,7 @@ struct EditorView: View {
     /// The isolated one-clip project waiting to be exported, if any. A separate
     /// document from the open one: exporting a clip never edits the timeline.
     @State private var clipExport: GradeProject?
-    @GestureState private var holdingOriginal = false
+    @State private var holdingOriginal = false
 
     private var editorLayout: some View {
         GeometryReader { geometry in
@@ -666,7 +668,7 @@ struct EditorView: View {
             }
         }
         .sheet(isPresented: $settingsSheet) { EditorSettings() }
-        .sheet(isPresented: $markers) { MarkerControls(model: model).presentationDetents([.medium]) }
+        .sheet(isPresented: $markers) { MarkerControls(model: model).presentationDetents([.medium, .large]) }
         .sheet(isPresented: $soundEffects) {
             SoundEffectBrowser { url in audioURL = url }
                 .presentationDetents([.large])
@@ -738,7 +740,7 @@ struct EditorView: View {
 
     private var shortcutsEnabled: Bool {
         !typingText && !model.showsExport && clipExport == nil && !savingPreset && !help
-            && !settingsSheet && !layers && !markers && !soundEffects && !showsFileImporter && !mediaPicker
+            && !settingsSheet && !layers && !markers && editingMarker == nil && !soundEffects && !showsFileImporter && !mediaPicker
             && !clipOptions && replacementClipID == nil && !confirmsResetAll && !colorInfo && model.editError == nil
     }
 
@@ -886,11 +888,8 @@ struct EditorView: View {
 
     private var scopesButton: some View {
         Button { model.setScopesEnabled(!model.scopeSettings.isEnabled) } label: {
-            Image(systemName: "waveform.badge.magnifyingglass")
-                .font(.system(size: 13, weight: .medium))
-                .padding(.horizontal, 10).padding(.vertical, 7)
-                .background(.black.opacity(0.65), in: Capsule())
-                .foregroundStyle(model.scopeSettings.isEnabled ? AppColors.accent : AppColors.textSecondary)
+            PreviewToolbarLabel(title: "Scopes", symbol: "waveform",
+                                isSelected: model.scopeSettings.isEnabled)
         }
         .buttonStyle(.plain)
         .accessibilityLabel(model.scopeSettings.isEnabled ? "Hide scopes" : "Show scopes")
@@ -994,7 +993,8 @@ struct EditorView: View {
                     }
                     if !typingText { OverlayCanvasControls(model: model, editContent: { typingText = true }) }
                     if localMaskMode && !model.showsOriginal {
-                        GradeMaskOverlay(model: model, displayedRect: model.renderer.displayedVideoRect)
+                        GradeMaskOverlay(model: model, displayedRect: model.renderer.displayedVideoRect,
+                            sourceToPicture: { model.gradeMaskSourceToPictureTransform }, isZooming: previewPinching)
                     }
                     // Power windows. Shown whenever a mask is the grading
                     // context, not only while the Masks tool happens to be
@@ -1018,6 +1018,8 @@ struct EditorView: View {
                     if model.isPickingCurveHue || model.isPickingWarpColor { colorPickingLayer }
                     if model.isPickingMaskQualifier { qualifierPickingLayer }
                 }
+            } controls: {
+                previewControls
             }
             if model.isPreparingTimeline || !model.hasMedia {
                 Color.black
@@ -1030,11 +1032,7 @@ struct EditorView: View {
                     .padding(6)
                     .allowsHitTesting(false)
             }
-            if model.showsOriginal {
-                Text("ORIGINAL").font(.caption2.weight(.semibold)).tracking(1.5)
-                    .padding(10).background(.black.opacity(0.65), in: Capsule()).padding(14)
-                    .allowsHitTesting(false)
-            } else if model.previewStatus.projectMode.isAppleLog {
+            if !model.showsOriginal && model.previewStatus.projectMode.isAppleLog {
                 // Log footage that has been correctly managed looks like an
                 // ordinary picture, which is the point — but it also means
                 // nothing on screen says the source is Log. The badge says it,
@@ -1046,7 +1044,7 @@ struct EditorView: View {
                         .foregroundStyle(AppColors.accent)
                 }.buttonStyle(.plain).padding(14)
                     .accessibilityLabel("Source is Apple Log. Tap for details.")
-            } else if model.previewStatus.projectMode.isHDR {
+            } else if !model.showsOriginal && model.previewStatus.projectMode.isHDR {
                 let _ = model.displayStateID
                 Button { colorInfo = true } label: {
                     Text(model.previewStatus.badge).font(.caption2.weight(.semibold)).tracking(1.2)
@@ -1058,20 +1056,6 @@ struct EditorView: View {
             }
             if !model.playback.isReady && model.playback.errorMessage == nil {
                 ProgressView().frame(maxWidth: .infinity, maxHeight: .infinity)
-            }
-            // The label stays put while the original is on screen: the
-            // ORIGINAL badge above already says which picture this is, and this
-            // pill is under the thumb holding it. It recedes instead, so the
-            // state is stated once rather than twice.
-            VStack { Spacer(); HStack { Spacer(); Text("Hold to compare")
-                    .font(.caption2).foregroundStyle(.white.opacity(model.showsOriginal ? 0.35 : 0.8))
-                    .padding(8).background(.black.opacity(model.showsOriginal ? 0.2 : 0.4), in: Capsule())
-                    .contentShape(Capsule())
-                    .animation(.easeOut(duration: 0.12), value: model.showsOriginal)
-                    .gesture(DragGesture(minimumDistance: 0).updating($holdingOriginal) { _, held, _ in held = true })
-                } }.padding(12).padding(.bottom, 44).accessibilityHidden(true)
-            if colorMode && model.hasMedia {
-                VStack { HStack { Spacer(); scopesButton } ; Spacer() }.padding(14)
             }
             if let status = model.statusMessage {
                 VStack {
@@ -1088,21 +1072,6 @@ struct EditorView: View {
                 .accessibilityHidden(true)
             }
         }.background(.black).frame(maxWidth: .infinity, maxHeight: .infinity).contentShape(Rectangle())
-        .overlay(alignment: .bottomTrailing) {
-            if maskedGradeMode, model.isDrawingMask, let mask = model.selectedMask, !model.showsOriginal {
-                Button { model.finishDrawingMask(mask.id) } label: {
-                    Label("Done", systemImage: "checkmark")
-                        .font(.caption.weight(.semibold))
-                        .frame(minWidth: 88, minHeight: 44)
-                        .background(AppColors.accent, in: Capsule())
-                        .foregroundStyle(.black)
-                }
-                .buttonStyle(.plain)
-                .disabled(mask.geometry.points.count < 3)
-                .accessibilityLabel("Finish drawing mask")
-                .padding(10)
-            }
-        }
         .alert("Colour mode", isPresented: $colorInfo) {
             Button("OK", role: .cancel) {}
         } message: {
@@ -1128,6 +1097,22 @@ struct EditorView: View {
                       !model.isImporting, warmup.isReady else { return false }
                 return acceptCanvasDrop(providers)
             }
+    }
+
+    @ViewBuilder
+    private var previewControls: some View {
+        if maskedGradeMode, model.isDrawingMask, let mask = model.selectedMask {
+            Button { model.finishDrawingMask(mask.id) } label: {
+                PreviewToolbarLabel(title: "Done", symbol: "checkmark", isSelected: true)
+            }
+            .disabled(mask.geometry.points.count < 3)
+            .accessibilityLabel("Finish drawing mask")
+        } else {
+            if colorMode && model.hasMedia { scopesButton }
+            PreviewCompareButton(isPinned: $comparePinned, showsOriginal: model.showsOriginal,
+                                 onHoldChanged: { holdingOriginal = $0 })
+                .disabled(model.isPreparingTimeline || !model.hasMedia)
+        }
     }
 
     private func acceptCanvasDrop(_ providers: [NSItemProvider]) -> Bool {
@@ -1198,11 +1183,6 @@ struct EditorView: View {
                 } else {
                     timelineActionsMenu
                 }
-                Button { comparePinned.toggle() } label: {
-                    Image(systemName: "square.on.square").frame(width: 44, height: 44)
-                        .foregroundStyle(comparePinned ? AppColors.accent : AppColors.textSecondary)
-                }.accessibilityLabel(comparePinned ? "Show edited video" : "Compare with original")
-                    .accessibilityValue(comparePinned ? "Original" : "Edited")
             }.padding(.horizontal, 8)
             if let error = model.playback.errorMessage { Text(error).font(.caption).foregroundStyle(AppColors.warning).padding(8) }
         }
@@ -1306,7 +1286,8 @@ struct EditorView: View {
             Divider()
             Button("Paste", systemImage: "doc.on.clipboard", action: model.pasteClip)
                 .disabled(model.clipboard == nil)
-            Button("Add or remove marker", systemImage: "bookmark", action: model.toggleMarker)
+            Button("Add marker at playhead", systemImage: "bookmark", action: addMarkerAtPlayhead)
+            Button("Show all markers", systemImage: "list.bullet") { markers = true }
             if model.selectedClipID != nil {
                 if model.selectedClipIDs.count == 1 {
                     Menu("Clip options", systemImage: "ellipsis") { clipOptionActions }
@@ -1438,6 +1419,10 @@ struct EditorView: View {
                         else { activate(.timeline) }
                     },
                     onSelectTransition: { id in openTransitionTool(id: id) },
+                    onSelectMarker: { marker, anchor in
+                        markerAnchor = anchor
+                        editingMarker = marker
+                    },
                     onDragSelect: { model.selectClip(id: $0, seek: false) },
                     onOptions: { model.selectClip(id: $0, seek: false); clipOptions = true },
                     onDropAsset: { assetID, time in model.placeAsset(assetID, as: .overlay(at: time)) },
@@ -1455,6 +1440,9 @@ struct EditorView: View {
                     onEndSeek: { model.seekTimeline(to: $0, finishing: true) })
                     .frame(height: max(60, height - TimelineToolbar<EmptyView>.height))
                     .allowsHitTesting(!model.isPreparingTimeline)
+                    .popover(item: $editingMarker, attachmentAnchor: .point(markerAnchor), arrowEdge: .bottom) { marker in
+                        MarkerEditor(model: model, markerID: marker.id)
+                    }
             TimelineToolbar(
                 pixelsPerSecond: $timelineZoom,
                 isSnappingEnabled: $timelineSnapping,
@@ -1466,6 +1454,10 @@ struct EditorView: View {
                 Text("Filmstrip unavailable · seeking still works").font(.caption2).foregroundStyle(.secondary)
             }
         }
+    }
+
+    private func addMarkerAtPlayhead() {
+        model.addMarker()
     }
 
     private var modeBar: some View {
@@ -1814,9 +1806,25 @@ struct EditorView: View {
                             Button(role: .destructive) { model.deleteClip() } label: { Image(systemName: "trash").frame(width: 44, height: 44) }
                                 .accessibilityLabel(model.selectedAudio == nil ? "Delete clip and close gaps" : "Delete audio clip").disabled(!model.canEditSelection)
                         }
-                        Button { model.toggleMarker() } label: { Image(systemName: "bookmark").frame(width: 44, height: 44) }
-                            .accessibilityLabel("Add or remove marker at playhead")
-                            .contextMenu { Button("Show / delete markers") { markers = true } }
+                        let playheadMarker = model.markerAtPlayhead
+                        Button(action: addMarkerAtPlayhead) {
+                            Image(systemName: playheadMarker == nil ? "bookmark" : "bookmark.fill")
+                                .foregroundStyle(playheadMarker?.color.tint ?? AppColors.textPrimary)
+                                .overlay(alignment: .topTrailing) {
+                                    if playheadMarker == nil {
+                                        Image(systemName: "plus.circle.fill")
+                                            .font(.system(size: 10, weight: .bold))
+                                            .symbolRenderingMode(.palette)
+                                            .foregroundStyle(AppColors.background, AppColors.textPrimary)
+                                            .offset(x: 5, y: -4)
+                                            .accessibilityHidden(true)
+                                    }
+                                }
+                                .frame(width: 44, height: 44)
+                        }
+                        .accessibilityLabel("Add marker at playhead")
+                        .accessibilityHint("Tap a marker in the timeline to change its color or remove it")
+                        .contextMenu { Button("Show all markers", systemImage: "list.bullet") { markers = true } }
                         Menu {
                             clipOptionActions
                         } label: { Image(systemName: "ellipsis").frame(width: 44, height: 44) }
