@@ -35,7 +35,7 @@ final class PhoneColorWorkspaceTests: XCTestCase {
                     let preview = PhoneColorWorkspaceBudget.previewHeight(
                         height: height, scopeHeight: ScopeLayout.compactHeight,
                         transportHeight: transport, footerHeight: footer, isExpanded: false)
-                    let controls = height - preview - ScopeLayout.compactHeight - transport - footer
+                    let controls = height - preview - ScopeLayout.compactHeight - transport - footer - WorkspaceDivider.thickness
                     XCTAssertGreaterThanOrEqual(controls, 200)
                     XCTAssertGreaterThanOrEqual(preview, 100)
                     XCTAssertLessThan(preview, height)
@@ -53,7 +53,57 @@ final class PhoneColorWorkspaceTests: XCTestCase {
         let expanded = PhoneColorWorkspaceBudget.previewHeight(
             height: height, scopeHeight: 0, transportHeight: 44, footerHeight: 52, isExpanded: true)
         XCTAssertLessThan(expanded, normal)
-        XCTAssertGreaterThan(height - expanded - 44 - 52, 400)
+        XCTAssertGreaterThan(height - expanded - 44 - 52 - WorkspaceDivider.thickness, 400)
+    }
+
+    func testRememberedPreviewProportionsClampWhenScopesAndScreenSizeChange() {
+        for height in [CGFloat(603), 715, 804] {
+            for scope in [CGFloat(0), ScopeLayout.compactHeight] {
+                for fraction in [0.01, 0.4, 0.7, 1.5, Double.nan] {
+                    let available = PhoneColorWorkspaceBudget.movableHeight(
+                        height: height, scopeHeight: scope, transportHeight: 44, footerHeight: 52)
+                    let range = PhoneColorWorkspaceBudget.previewRange(available: available)
+                    let preview = PhoneColorWorkspaceBudget.previewHeight(
+                        height: height, scopeHeight: scope, transportHeight: 44, footerHeight: 52,
+                        isExpanded: true, preferredFraction: fraction)
+                    XCTAssertTrue(preview.isFinite)
+                    XCTAssertTrue(range.contains(preview))
+                    XCTAssertGreaterThanOrEqual(available - preview, PhoneColorWorkspaceBudget.minimumControls)
+                }
+            }
+        }
+        let enlarged = PhoneColorWorkspaceBudget.previewHeight(
+            height: 715, scopeHeight: 0, transportHeight: 44, footerHeight: 52,
+            isExpanded: true, preferredFraction: 0.6)
+        XCTAssertGreaterThan(enlarged, 350, "an expanded single slider must let the user reclaim room for the viewer")
+    }
+
+    func testCompactSizingPreferencesStaySeparateFromEachOtherAndClassic() throws {
+        let name = "GradeLab.PhoneColorSizingTests.\(UUID())"
+        let defaults = try XCTUnwrap(UserDefaults(suiteName: name))
+        defer { defaults.removePersistentDomain(forName: name) }
+        defaults.set(310.0, forKey: "editor.previewHeight")
+        let normal = AppStorage(wrappedValue: 0.0, PhoneColorWorkspaceBudget.previewFractionKey, store: defaults)
+        let expanded = AppStorage(wrappedValue: 0.0, PhoneColorWorkspaceBudget.expandedPreviewFractionKey, store: defaults)
+        normal.wrappedValue = 0.55
+        expanded.wrappedValue = 0.38
+        let reopened = AppStorage(wrappedValue: 0.0, PhoneColorWorkspaceBudget.previewFractionKey, store: defaults)
+        XCTAssertEqual(reopened.wrappedValue, 0.55)
+        expanded.wrappedValue = 0 // double-tap reset only affects the active preset
+        XCTAssertEqual(defaults.double(forKey: PhoneColorWorkspaceBudget.previewFractionKey), 0.55)
+        XCTAssertEqual(defaults.double(forKey: PhoneColorWorkspaceBudget.expandedPreviewFractionKey), 0)
+        XCTAssertEqual(defaults.double(forKey: "editor.previewHeight"), 310)
+    }
+
+    func testEveryAdjustmentHasADistinctAvailableSymbol() {
+        let symbols = GradeParameter.allCases.map { $0.compactAppearance.symbol }
+        XCTAssertEqual(Set(symbols).count, GradeParameter.allCases.count)
+        for parameter in GradeParameter.allCases {
+            XCTAssertNotNil(UIImage(systemName: parameter.compactAppearance.symbol), parameter.title)
+        }
+        for panel in GradePanel.allCases {
+            XCTAssertNotNil(UIImage(systemName: panel.compactAppearance.symbol), panel.title)
+        }
     }
 
     func testIPhone15ScopesAndExposureFitWithoutDisplacingTheFooter() throws {
@@ -68,6 +118,16 @@ final class PhoneColorWorkspaceTests: XCTestCase {
     func testExpandedCurvesKeepThePreviewAndNavigationOnScreen() throws {
         try render(size: CGSize(width: 393, height: 715), panel: .curves,
                    expanded: true, name: "iphone15-color-curves-expanded")
+    }
+
+    func testExpandedExposureCanGiveMoreRoomBackToTheViewer() throws {
+        try render(size: CGSize(width: 393, height: 715), panel: .light,
+                   expanded: true, preferredFraction: 0.6, name: "iphone15-color-resized-exposure")
+    }
+
+    func testTemperatureSelectorFitsSmallPhoneAndLargerText() throws {
+        try render(size: CGSize(width: 320, height: 603), panel: .color,
+                   textSize: .accessibility3, name: "small-phone-temperature-selector")
     }
 
     func testColorControlsAndScopesFitAFullWidthLandscapeInspector() throws {
@@ -150,7 +210,7 @@ final class PhoneColorWorkspaceTests: XCTestCase {
     }
 
     private func render(size: CGSize, panel: GradePanel, textSize: DynamicTypeSize = .large,
-                        expanded: Bool = false, name: String) throws {
+                        expanded: Bool = false, preferredFraction: Double = 0, name: String) throws {
         let model = try makeModel()
         model.selectedPanel = panel
         let savedScopes = model.scopeSettings
@@ -198,7 +258,7 @@ final class PhoneColorWorkspaceTests: XCTestCase {
             .environment(\.dynamicTypeSize, textSize)
             .background(AppColors.background).foregroundStyle(AppColors.textPrimary)
             .preferredColorScheme(.dark).buttonStyle(.plain)
-        try host(root, size: size, name: name) { view in
+        try host(root, size: size, name: name, previewFraction: preferredFraction) { view in
             let footer = try XCTUnwrap(measurements.frames["footer"])
             let controls = try XCTUnwrap(measurements.frames["controls"])
             let preview = try XCTUnwrap(measurements.frames["preview"])
@@ -206,6 +266,9 @@ final class PhoneColorWorkspaceTests: XCTestCase {
             XCTAssertGreaterThanOrEqual(footer.minY, controls.maxY - 1)
             XCTAssertGreaterThanOrEqual(controls.height, 200)
             XCTAssertGreaterThan(preview.height, 80)
+            if preferredFraction == 0.6 {
+                XCTAssertGreaterThan(preview.height, 350)
+            }
             if !expanded {
                 XCTAssertEqual(try XCTUnwrap(measurements.frames["scope"]).height,
                                ScopeLayout.compactHeight, accuracy: 1)
@@ -230,8 +293,15 @@ final class PhoneColorWorkspaceTests: XCTestCase {
     }
 
     private func host<V: View>(_ root: V, size: CGSize, name: String,
+                               previewFraction: Double = 0,
                                check: (UIView) throws -> Void) throws {
-        let controller = UIHostingController(rootView: root.frame(width: size.width, height: size.height).ignoresSafeArea())
+        let domain = "GradeLab.PhoneColorRenderTests.\(UUID())"
+        let defaults = try XCTUnwrap(UserDefaults(suiteName: domain))
+        defer { defaults.removePersistentDomain(forName: domain) }
+        defaults.set(previewFraction, forKey: PhoneColorWorkspaceBudget.previewFractionKey)
+        defaults.set(previewFraction, forKey: PhoneColorWorkspaceBudget.expandedPreviewFractionKey)
+        let controller = UIHostingController(rootView: root.defaultAppStorage(defaults)
+            .frame(width: size.width, height: size.height).ignoresSafeArea())
         let scene = UIApplication.shared.connectedScenes.first as? UIWindowScene
         let window = scene.map { UIWindow(windowScene: $0) } ?? UIWindow(frame: .zero)
         window.frame = CGRect(origin: .zero, size: size)

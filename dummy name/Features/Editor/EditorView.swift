@@ -329,6 +329,7 @@ struct EditorView: View {
             scopeHeight: ScopeLayout.compactHeight,
             transportHeight: EditorWorkspaceBudget.transport,
             footerHeight: EditorWorkspaceBudget.modeButtons + (warmup.isReady ? 0 : EditorWorkspaceBudget.warmupNotice),
+            onResizeBegin: beginWorkspaceResize, onResizeEnd: endWorkspaceResize,
             preview: { preview },
             scope: { ScopePanel(model: model, isRegularWidth: false,
                                 traceHeight: ScopeLayout.compactTraceHeight, usesCompactLayout: true) },

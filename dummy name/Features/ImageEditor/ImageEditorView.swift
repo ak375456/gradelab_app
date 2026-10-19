@@ -127,6 +127,7 @@ struct ImageEditorView: View {
                     PhoneColorWorkspace(
                         showsScopes: scopesVisible, isExpanded: colorControlsExpanded,
                         scopeHeight: ScopeLayout.compactHeight, transportHeight: 0, footerHeight: 44,
+                        onResizeBegin: beginWorkspaceResize, onResizeEnd: endWorkspaceResize,
                         preview: { preview },
                         scope: { ScopePanel(model: model, isRegularWidth: false,
                                             traceHeight: ScopeLayout.compactTraceHeight, usesCompactLayout: true) },

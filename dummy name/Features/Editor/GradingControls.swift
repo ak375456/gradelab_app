@@ -181,63 +181,106 @@ struct GradingControls<Model: GradingModel>: View {
     /// One row replaces the tool strip and parameter strip. The controls below
     /// remain the same grade bindings, numeric entry and keyframe lanes.
     private var compactToolBar: some View {
-        HStack(spacing: 8) {
-            Menu {
-                ForEach(model.availablePanels) { panel in
-                    Button { model.selectedPanel = panel } label: {
-                        Label(panel.title, systemImage: model.selectedPanel == panel ? "checkmark" : panel.symbol)
-                    }
+        ViewThatFits(in: .horizontal) {
+            HStack(spacing: 8) {
+                compactPanelSelector.fixedSize(horizontal: true, vertical: false)
+                Spacer(minLength: 0)
+                if hasCompactParameterSelector {
+                    compactParameterSelector.fixedSize(horizontal: true, vertical: false)
                 }
-                if model.keyframeHost != nil {
-                    Divider()
-                    Button("How keyframes work", systemImage: "diamond") { showsKeyframeHelp = true }
-                }
-            } label: {
-                HStack(spacing: 6) {
-                    Image(systemName: model.selectedPanel.symbol).font(.callout)
-                        .overlay(alignment: .topTrailing) {
-                            GradeAnimationDot(model: model, panel: model.selectedPanel).offset(x: 4, y: -3)
-                        }
-                    Text(model.selectedPanel.title).font(AppTypography.bodyEmphasized).lineLimit(1)
-                    Image(systemName: "chevron.down").font(.caption2.weight(.semibold))
-                }
-                .frame(minHeight: 44).contentShape(Rectangle())
+                compactExpandButton
             }
-            .accessibilityLabel("Color tool")
-            .accessibilityValue(model.selectedPanel.title)
-            .accessibilityIdentifier("color.toolSelector")
-
-            Spacer(minLength: 0)
-            if [.light, .color].contains(model.selectedPanel) {
-                Menu {
-                    ForEach(model.visibleParameters) { parameter in
-                        Button { selectedParameter = parameter } label: {
-                            Label(parameter.title, systemImage: selectedParameter == parameter ? "checkmark" : "slider.horizontal.3")
-                        }
-                    }
-                } label: {
-                    HStack(spacing: 5) {
-                        Text("Adjust").font(AppTypography.callout)
-                        Image(systemName: "chevron.down").font(.caption2.weight(.semibold))
-                    }
-                    .frame(minHeight: 44).contentShape(Rectangle())
+            // Long translations and larger text get a second row rather than
+            // hiding the active adjustment behind a truncated label.
+            VStack(spacing: 0) {
+                HStack(spacing: 8) {
+                    compactPanelSelector
+                    Spacer(minLength: 0)
+                    compactExpandButton
                 }
-                .accessibilityLabel("Choose adjustment")
-                .accessibilityValue(selectedParameter.title)
-            }
-            if let onToggleExpanded {
-                Button(action: onToggleExpanded) {
-                    Image(systemName: isExpanded ? "arrow.down.right.and.arrow.up.left" : "arrow.up.left.and.arrow.down.right")
-                        .frame(width: 44, height: 44)
+                if hasCompactParameterSelector {
+                    HStack { compactParameterSelector; Spacer(minLength: 0) }
                 }
-                .accessibilityLabel(isExpanded ? "Restore Color workspace" : "Expand Color controls")
-                .accessibilityHint("Changes the tool area without changing the image zoom")
             }
         }
         .foregroundStyle(AppColors.textPrimary)
-        .padding(.leading, 16).padding(.trailing, 4)
+        .padding(.leading, 12).padding(.trailing, 4)
         .background(AppColors.surface)
         .overlay(alignment: .bottom) { AppDivider() }
+    }
+
+    private var hasCompactParameterSelector: Bool {
+        [.light, .color].contains(model.selectedPanel)
+    }
+
+    private var compactPanelSelector: some View {
+        let appearance = model.selectedPanel.compactAppearance
+        return Menu {
+            Picker("Color tool", selection: $model.selectedPanel) {
+                ForEach(model.availablePanels) { panel in
+                    Label { Text(panel.title) } icon: { panel.compactAppearance.menuIcon }
+                        .tag(panel)
+                }
+            }.pickerStyle(.inline)
+            if model.keyframeHost != nil {
+                Divider()
+                Button("How keyframes work", systemImage: "diamond") { showsKeyframeHelp = true }
+            }
+        } label: {
+            HStack(spacing: 6) {
+                Image(systemName: appearance.symbol).font(.callout)
+                    .foregroundStyle(appearance.tint)
+                    .frame(width: 28, height: 28)
+                    .background(appearance.tint.opacity(0.12), in: RoundedRectangle(cornerRadius: 8))
+                    .overlay(alignment: .topTrailing) {
+                        GradeAnimationDot(model: model, panel: model.selectedPanel).offset(x: 3, y: -2)
+                    }
+                Text(model.selectedPanel.title).font(AppTypography.bodyEmphasized).lineLimit(2)
+                Image(systemName: "chevron.down").font(.caption2.weight(.semibold))
+                    .foregroundStyle(AppColors.textSecondary)
+            }
+            .frame(minHeight: 44).contentShape(Rectangle())
+        }
+        .accessibilityLabel("Color tool")
+        .accessibilityValue(model.selectedPanel.title)
+        .accessibilityIdentifier("color.toolSelector")
+    }
+
+    private var compactParameterSelector: some View {
+        let appearance = selectedParameter.compactAppearance
+        return Menu {
+            Picker("Adjustment", selection: $selectedParameter) {
+                ForEach(model.visibleParameters) { parameter in
+                    Label { Text(parameter.title) } icon: { parameter.compactAppearance.menuIcon }
+                        .tag(parameter)
+                }
+            }.pickerStyle(.inline)
+        } label: {
+            HStack(spacing: 6) {
+                Image(systemName: appearance.symbol).font(.callout)
+                    .foregroundStyle(appearance.tint)
+                Text(selectedParameter.title).font(AppTypography.callout.weight(.medium)).lineLimit(2)
+                Image(systemName: "chevron.down").font(.caption2.weight(.semibold))
+                    .foregroundStyle(AppColors.textSecondary)
+            }
+            .padding(.horizontal, 8)
+            .frame(minHeight: 44).contentShape(Rectangle())
+        }
+        .accessibilityLabel("Choose adjustment")
+        .accessibilityValue(selectedParameter.title)
+        .accessibilityIdentifier("color.adjustmentSelector")
+    }
+
+    @ViewBuilder
+    private var compactExpandButton: some View {
+        if let onToggleExpanded {
+            Button(action: onToggleExpanded) {
+                Image(systemName: isExpanded ? "arrow.down.right.and.arrow.up.left" : "arrow.up.left.and.arrow.down.right")
+                    .frame(width: 44, height: 44)
+            }
+            .accessibilityLabel(isExpanded ? "Restore Color workspace" : "Expand Color controls")
+            .accessibilityHint("Drag the divider to fine-tune the preview and tool area")
+        }
     }
 
     /// The context indicator. Deliberately unmissable and always in the same
