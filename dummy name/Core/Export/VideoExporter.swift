@@ -515,7 +515,7 @@ final class VideoExporter: @unchecked Sendable {
         // Still normalize timestamps: AVFoundation can emit an extra sample at
         // an edit/gap boundary even when the composition has a fixed cadence.
         let sampler = ExportFrameSampler(output: pipeline.videoOutput, range: source.videoTimeRange,
-            fps: configuration.frameRate.value)
+            fps: configuration.frameRate.value, frameDuration: source.videoComposition?.frameDuration)
         prepareNoiseReduction(settings: settings, source: source)
         prepareRelight(source: source)
 

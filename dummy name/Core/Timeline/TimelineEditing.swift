@@ -63,7 +63,8 @@ enum TimelineEditing {
         let insertion = remaining.firstIndex {
             time.seconds < $0.placement.timelineStart.seconds + $0.placement.duration.seconds / 2
         } ?? remaining.count
-        if ordered.firstIndex(where: { $0.id == id }) == insertion { return }
+        // Keeping the same order can still close a gap left by a layer lift.
+        // Compare the resulting clips below instead of treating that as a no-op.
         let oldEnd = try moving.placement.range.end
         var shifted = try remaining.map { original -> VideoClip in
             var clip = original
@@ -90,8 +91,9 @@ enum TimelineEditing {
 
     /// Moves one visual clip between layers. Passing no destination creates a new
     /// overlay row at `newOverlayIndex`, which is the gesture used when a clip is
-    /// pulled out of the main timeline. The edit is assembled on a copy so a
-    /// locked target or an overlap can never leave the source track half-edited.
+    /// pulled out of the main timeline. Layer moves preserve every other clip's
+    /// timeline position, including gaps on the main row. The edit is assembled
+    /// on a copy so a locked target or an overlap never leaves a track half-edited.
     static func moveToVideoLayer(
         _ id: UUID,
         destinationTrackID: UUID?,
@@ -116,9 +118,6 @@ enum TimelineEditing {
             throw TimelineError.invalid(String(localized: "Clip not found on its layer."))
         }
         candidate.timeline.tracks[sourceIndex].items.remove(at: sourceItemIndex)
-        if candidate.timeline.tracks[sourceIndex].kind == .mainVideo {
-            try pack(trackAt: sourceIndex, in: &candidate)
-        }
 
         // Empty overlay rows disappear, just like CapCut's temporary overlay
         // lanes. The main row is permanent even when its last clip is lifted.
@@ -160,9 +159,6 @@ enum TimelineEditing {
         moving.placement.timelineStart = try snapped(max(.zero, time), frame: candidate.canvas.frameDuration)
         candidate.timeline.tracks[destinationIndex].items.append(.video(moving))
 
-        if destinationKind == .mainVideo {
-            try pack(trackAt: destinationIndex, in: &candidate)
-        }
         _ = try clips(in: candidate)
         project = candidate
     }
@@ -216,9 +212,8 @@ enum TimelineEditing {
     /// Moves one item to another row of its own kind, or to a new row of that
     /// kind when no destination is given.
     ///
-    /// Video keeps its own path below: the main row packs from zero and its
-    /// overlays have stacking rules. Audio, text and shapes all behave the same
-    /// way — a plain non-overlapping sequence per row — so they share one body.
+    /// Video keeps its own path above, including its overlay stacking rules.
+    /// Audio, text and shapes share a plain non-overlapping sequence per row.
     static func moveToLayer(_ id: UUID, destinationTrackID: UUID?, newTrackIndex: Int? = nil,
                             at time: TimelineTime, in project: inout VideoProject) throws {
         guard let item = project.timeline.item(id: id) else {
@@ -383,6 +378,10 @@ enum TimelineEditing {
         guard let track = project.timeline.tracks.firstIndex(where: { $0.id == original.placement.trackID }),
               let index = project.timeline.tracks[track].items.firstIndex(where: { $0.id == id }) else { return }
         project.timeline.tracks[track].items.replaceSubrange(index...index, with: clips.map(TimelineItem.video))
+        if project.timeline.tracks[track].kind == .videoOverlay,
+           project.timeline.tracks[track].items.isEmpty {
+            project.timeline.tracks.remove(at: track)
+        }
         // Removing a clip that another layer used as its track matte clears that
         // relationship here, in the same mutation, so nothing downstream ever
         // sees — or refuses — a reference to a clip that is gone.

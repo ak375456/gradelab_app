@@ -96,7 +96,7 @@ final class LookPreviewRenderer: @unchecked Sendable {
         // A look tile shows the look itself, not a clip's local grades, so the
         // stack is bound empty rather than left unpopulated.
         LocalGradeStack.empty.bind(encoder)
-        encoder.dispatchThreads(
+        encoder.dispatchPreviewThreads(
             MTLSize(width: source.width, height: source.height, depth: 1),
             threadsPerThreadgroup: MTLSize(width: 8, height: 8, depth: 1)
         )

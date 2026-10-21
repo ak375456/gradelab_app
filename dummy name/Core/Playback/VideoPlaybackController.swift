@@ -164,13 +164,25 @@ final class VideoPlaybackController: ObservableObject {
         statusObservation = nil
         player.currentItem?.remove(output)
         let item = AVPlayerItem(asset: sequence.source.asset)
+        var videoComposition = sequence.source.videoComposition
+        #if targetEnvironment(simulator)
+        // Device Hub's standard video compositor fails with -12784 even for a
+        // single SDR clip. The track already contains this clip's trim/timing;
+        // its source frames can go straight to the existing Metal grade preview.
+        // Keep layers, gaps/multiple clips, HDR and shipping platforms on their
+        // full composition paths.
+        if sequence.layerState == nil, sequence.clips.count == 1,
+           sequence.clips[0].placement.timelineStart == .zero, sequence.source.colorMode == .sdr {
+            videoComposition = nil
+        }
+        #endif
         // Always built at the project's resolution: playback drops to a reduced
         // copy only once it starts, and comes back here when it stops.
-        fullVideoComposition = sequence.source.videoComposition
-        playbackVideoCompositions = sequence.source.playbackVideoCompositions
-        appliedVideoComposition = sequence.source.videoComposition
+        fullVideoComposition = videoComposition
+        playbackVideoCompositions = videoComposition == nil ? [:] : sequence.source.playbackVideoCompositions
+        appliedVideoComposition = videoComposition
         isPreviewReduced = false
-        item.videoComposition = sequence.source.videoComposition
+        item.videoComposition = videoComposition
         item.audioMix = sequence.source.audioMix
         // Retimed audio keeps its pitch unless a clip asked for the opposite.
         // Scaling the track alone shifts pitch with rate, which is not what
@@ -443,6 +455,9 @@ final class VideoPlaybackController: ObservableObject {
                         self.frameUpdateID &+= 1
                     case .failed:
                         self.isReady = false
+                        #if DEBUG
+                        if let error = item.error { print("Playback preparation failed: \(error as NSError)") }
+                        #endif
                         self.errorMessage = "This video could not be prepared for playback."
                         self.pause()
                     case .unknown:

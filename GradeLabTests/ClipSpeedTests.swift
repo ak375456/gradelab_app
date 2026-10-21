@@ -574,9 +574,13 @@ final class RetimedCompositionTests: XCTestCase {
             let composition = try XCTUnwrap(sequence.source.asset as? AVComposition)
             let video = composition.tracks(withMediaType: .video)
             XCTAssertEqual(video.count, 2, "smoothing needs the source and its shifted partner")
-            let mains = sequence.source.compositionVideoTracks?.map(\.trackID) ?? []
+            // Reader tracks include both sources and blend partners. The
+            // instructions identify which role each decoder track owns.
+            let layers = sequence.source.videoComposition?.instructions.compactMap { $0 as? LayerInstruction } ?? []
+            let mains = Set(layers.flatMap { $0.trackIDs.values })
+            let partners = Set(layers.flatMap { $0.blendTrackIDs.values })
             let picture = try XCTUnwrap(video.first { mains.contains($0.trackID) })
-            let partner = try XCTUnwrap(video.first { !mains.contains($0.trackID) })
+            let partner = try XCTUnwrap(video.first { partners.contains($0.trackID) })
             XCTAssertTrue(CMTimeCompare(partner.timeRange.end, picture.timeRange.end) <= 0,
                           "at \(speed)x the partner runs to \(partner.timeRange.end.seconds), past a picture ending at \(picture.timeRange.end.seconds); anything beyond the last instruction invalidates the whole video composition")
             // Being a frame short at the tail is expected and harmless: with no

@@ -42,8 +42,8 @@ struct TimelineView: UIViewRepresentable {
     let tracks: [TimelineTrack]
     let markers: [TimelineMarker]
     let transitions: [TimelineTransition]
-    /// Timeline seconds of the selected clip's keyframes. Only the selection is annotated,
-    /// so an ordinary timeline stays uncluttered.
+    /// Selected clip's keyframes used for playhead snapping. Visible diamonds
+    /// come from each display clip, including clips outside the selection.
     let keyframeTimes: [Double]
     let assets: [ProjectMediaAsset]
     let assetFrames: [UUID: [UIImage]]
@@ -716,7 +716,6 @@ final class TimelineCanvas: UIView, UIScrollViewDelegate, UIGestureRecognizerDel
             title: title,
             duration: max(0, end - start))
         presentation.isSelected = selectedIDs.contains(clip.id) || marqueeSelection.contains(clip.id)
-        presentation.isFocused = selectedID == clip.id && selectedIDs.count == 1 && marqueeOrigin == nil
         presentation.showsTrimHandles = selectedIDs.contains(clip.id) && marqueeOrigin == nil
         presentation.isLocked = isLocked(clip)
         presentation.isDimmed = track?.isEnabled == false
@@ -737,7 +736,8 @@ final class TimelineCanvas: UIView, UIScrollViewDelegate, UIGestureRecognizerDel
             presentation.waveformScale = track?.resolvedWaveformSize.scale ?? 1
         }
         presentation.fade = clip.fade
-        if presentation.isFocused { presentation.keyframeTimes = keyframeTimes }
+        let keyframeShift = start - clip.placement.timelineStart.seconds - trimOffset
+        presentation.keyframeTimes = clip.keyframeTimes.map { $0 + keyframeShift }
         return presentation
     }
 
@@ -1210,8 +1210,8 @@ final class TimelineCanvas: UIView, UIScrollViewDelegate, UIGestureRecognizerDel
             snappedBoundary = destination == target ? nil : destination
             setNeedsDisplay(); return
         }
-        // The main video track packs from zero whatever the magnet button says:
-        // a gap in it is not representable, so the slot is the edit, not a snap.
+        // Horizontal moves within the main row explicitly reorder whole clips.
+        // Layer moves use updateLayerDrag instead, preserving absolute timing.
         let others = clips.filter { $0.id != ghost.clip.id && $0.placement.trackID == ghost.clip.placement.trackID }
         let next = others.first { target < $0.placement.timelineStart.seconds + $0.placement.duration.seconds/2 }
         let slot = next?.placement.timelineStart.seconds ?? ((try? others.last?.placement.range.end.seconds) ?? 0)
@@ -1234,9 +1234,8 @@ final class TimelineCanvas: UIView, UIScrollViewDelegate, UIGestureRecognizerDel
         guard kind == .videoOverlay
             ? (track.kind == .mainVideo || track.kind == .videoOverlay)
             : track.kind == kind else { return false }
-        // The main row packs from zero: a clip dropped on it is inserted between
-        // its neighbours rather than laid over them, so nothing there is busy.
-        guard track.kind != .mainVideo else { return true }
+        // Layer transfers keep their drop time on the main row too. A busy row
+        // offers a new layer instead of shifting the clips already on it.
         let end = start + clip.placement.duration.seconds
         return !track.items.contains { item in
             guard item.id != clip.id else { return false }

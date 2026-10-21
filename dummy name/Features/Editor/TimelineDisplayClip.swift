@@ -23,6 +23,8 @@ struct TimelineDisplayClip: Identifiable {
     /// The speed varies within the clip, which the clip's chip says.
     let isRamped: Bool
     let isReversed: Bool
+    /// Every visible keyframe in timeline coordinates, independent of selection.
+    let keyframeTimes: [Double]
     /// Fade lengths as they will actually be heard, so the timeline draws the
     /// same thing the mix applies.
     let fade: (rise: Double, fall: Double)
@@ -31,6 +33,7 @@ struct TimelineDisplayClip: Identifiable {
         placement = item.placement
         switch item {
         case .video(let c):
+            keyframeTimes = c.allVisibleKeyframeSeconds
             assetID = c.assetID; sourceRange = c.sourceRange; isAudio = false; isText = false; isShape = false
             isMuted = c.embeddedAudio?.isMuted ?? false; embeddedAudio = c.embeddedAudio
             speed = c.speed
@@ -41,18 +44,21 @@ struct TimelineDisplayClip: Identifiable {
                 AudioFade.resolved(duration: c.placement.duration.seconds, fadeIn: $0.fadeIn, fadeOut: $0.fadeOut)
             } ?? (0, 0)
         case .audio(let c):
+            keyframeTimes = []
             assetID = c.assetID; sourceRange = c.sourceRange; isAudio = true; isText = false; isShape = false
             isMuted = c.isMuted; embeddedAudio = nil
             speed = 1; timeMap = nil; isRamped = false; isReversed = false
             fade = AudioFade.resolved(duration: c.placement.duration.seconds,
                                       fadeIn: c.fadeIn, fadeOut: c.fadeOut)
         case .text(let c):
+            keyframeTimes = c.visibleKeyframeSeconds
             assetID = c.id; sourceRange = .init(start: .zero, duration: c.placement.duration)
             isAudio = false; isText = true; isShape = false
             title = c.text.isEmpty ? "Text" : c.text.replacingOccurrences(of: "\n", with: " ")
             isMuted = false; embeddedAudio = nil; speed = 1; fade = (0, 0)
             timeMap = nil; isRamped = false; isReversed = false
         case .shape(let c):
+            keyframeTimes = c.visibleKeyframeSeconds
             assetID = c.id; sourceRange = .init(start: .zero, duration: c.placement.duration)
             isAudio = false; isText = false; isShape = true
             title = c.kind.title

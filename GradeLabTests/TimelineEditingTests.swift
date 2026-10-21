@@ -47,10 +47,138 @@ final class TimelineEditingTests: XCTestCase {
                        project.timeline.tracks.first?.id)
         XCTAssertEqual(project.timeline.videoClip(id: lifted)?.placement.timelineStart,
                        try .seconds(1))
-        // Removing a clip from the magnetic main timeline closes its old gap.
+        // A layer move leaves every other clip at its existing timeline time.
         XCTAssertEqual(project.timeline.videoClip(id: first)?.placement.timelineStart, .zero)
         XCTAssertEqual(project.timeline.duration, try .seconds(6))
         _ = try TimelineEditing.clips(in: project)
+    }
+
+    func testLiftingMiddleThirdLeavesFollowingClipAtSixSeconds() throws {
+        let (before, ids) = try threeClips()
+        var project = before
+        let (first, middle, last) = (ids[0], ids[1], ids[2])
+
+        try TimelineEditing.moveToLayer(middle, destinationTrackID: nil, newTrackIndex: 0,
+                                       at: .seconds(3), in: &project)
+
+        XCTAssertEqual(project.timeline.videoClip(id: first), before.timeline.videoClip(id: first))
+        XCTAssertEqual(project.timeline.videoClip(id: last), before.timeline.videoClip(id: last))
+        XCTAssertEqual(project.timeline.videoClip(id: last)?.placement.timelineStart, try .seconds(6))
+        XCTAssertEqual(project.timeline.videoClip(id: middle)?.placement.timelineStart, try .seconds(3))
+        XCTAssertNotEqual(project.timeline.videoClip(id: middle)?.placement.trackID,
+                          project.timeline.videoClip(id: first)?.placement.trackID)
+        XCTAssertEqual(project.timeline.duration, try .seconds(9))
+        _ = try TimelineEditing.clips(in: project)
+    }
+
+    func testLayerLiftsPreserveLockedNeighborsOnNewAndExistingLayers() throws {
+        for position in 0..<3 {
+            for existingLayer in [false, true] {
+                var (project, ids) = try threeClips()
+                let movingID = ids[position]
+                for id in ids where id != movingID {
+                    var clip = try XCTUnwrap(project.timeline.videoClip(id: id))
+                    clip.placement.isLocked = true
+                    try TimelineEditing.replace(id, with: [clip], in: &project)
+                }
+                let destination = existingLayer ? UUID() : nil
+                if let destination {
+                    project.timeline.tracks.insert(.init(id: destination, name: "Overlay",
+                                                         kind: .videoOverlay), at: 0)
+                }
+                let before = project
+                var expected = try XCTUnwrap(before.timeline.videoClip(id: movingID))
+                let start = try expected.placement.timelineStart.adding(.seconds(1))
+
+                try TimelineEditing.moveToLayer(movingID, destinationTrackID: destination,
+                                               newTrackIndex: 0, at: start, in: &project)
+
+                for id in ids where id != movingID {
+                    XCTAssertEqual(project.timeline.videoClip(id: id), before.timeline.videoClip(id: id))
+                }
+                let moved = try XCTUnwrap(project.timeline.videoClip(id: movingID))
+                expected.placement.trackID = moved.placement.trackID
+                expected.placement.timelineStart = start
+                XCTAssertEqual(moved, expected, "Only the moved clip's layer and requested time may change.")
+                if let destination { XCTAssertEqual(moved.placement.trackID, destination) }
+                _ = try TimelineEditing.clips(in: project)
+            }
+        }
+    }
+
+    func testMainClipCanBeExplicitlyDraggedToCloseGapAfterLayerLift() throws {
+        var (project, ids) = try threeClips()
+        try TimelineEditing.moveToLayer(ids[1], destinationTrackID: nil,
+                                       at: .seconds(3), in: &project)
+        let before = project
+
+        try TimelineEditing.insertMove(ids[2], to: .seconds(3), in: &project)
+
+        XCTAssertEqual(project.timeline.videoClip(id: ids[0]), before.timeline.videoClip(id: ids[0]))
+        XCTAssertEqual(project.timeline.videoClip(id: ids[1]), before.timeline.videoClip(id: ids[1]))
+        XCTAssertEqual(project.timeline.videoClip(id: ids[2])?.placement.timelineStart, try .seconds(3))
+        XCTAssertEqual(project.timeline.videoClip(id: ids[2])?.sourceRange,
+                       before.timeline.videoClip(id: ids[2])?.sourceRange)
+        _ = try TimelineEditing.clips(in: project)
+    }
+
+    func testReturningToMainPreservesGapAndRequestedDropTime() throws {
+        for dropTime in [3.0, 10.0] {
+            var (project, ids) = try threeClips()
+            let mainID = try XCTUnwrap(project.timeline.videoClip(id: ids[0])).placement.trackID
+            try TimelineEditing.moveToLayer(ids[1], destinationTrackID: nil,
+                                           at: .seconds(3), in: &project)
+            let beforeReturn = project
+            let main = try XCTUnwrap(project.timeline.tracks.first { $0.id == mainID })
+            let moving = try XCTUnwrap(TimelineDisplayClip(try XCTUnwrap(project.timeline.item(id: ids[1]))))
+            XCTAssertTrue(TimelineCanvas.canDrop(moving, kind: .videoOverlay, on: main, startingAt: dropTime))
+            XCTAssertFalse(TimelineCanvas.canDrop(moving, kind: .videoOverlay, on: main, startingAt: 1))
+
+            try TimelineEditing.moveToLayer(ids[1], destinationTrackID: mainID,
+                                           at: .seconds(dropTime), in: &project)
+
+            XCTAssertEqual(project.timeline.videoClip(id: ids[0]), beforeReturn.timeline.videoClip(id: ids[0]))
+            XCTAssertEqual(project.timeline.videoClip(id: ids[2]), beforeReturn.timeline.videoClip(id: ids[2]))
+            XCTAssertEqual(project.timeline.videoClip(id: ids[1])?.placement.timelineStart, try .seconds(dropTime))
+            XCTAssertEqual(project.timeline.videoClip(id: ids[1])?.placement.trackID, mainID)
+            XCTAssertEqual(project.timeline.tracks.count, 1, "The emptied overlay row disappears.")
+            let reopened = try JSONDecoder().decode(VideoProject.self, from: JSONEncoder().encode(project))
+            XCTAssertEqual(reopened, project)
+            _ = try TimelineEditing.clips(in: reopened)
+        }
+    }
+
+    func testReturningOverAnOccupiedMainClipRefusesAtomically() throws {
+        var (project, ids) = try threeClips()
+        let mainID = try XCTUnwrap(project.timeline.videoClip(id: ids[0])).placement.trackID
+        try TimelineEditing.moveToLayer(ids[1], destinationTrackID: nil,
+                                       at: .seconds(3), in: &project)
+        let before = project
+
+        XCTAssertThrowsError(try TimelineEditing.moveToLayer(ids[1], destinationTrackID: mainID,
+                                                           at: .seconds(1), in: &project))
+        XCTAssertEqual(project, before)
+    }
+
+    @MainActor
+    func testLayerMoveAndItsGapUndoAndRedoInOneStep() throws {
+        let (project, ids) = try threeClips()
+        let model = try EditorViewModel(project: project)
+        model.suspendPreviewForExport()
+
+        model.moveClipToLayer(ids[1], target: .newTrack(kind: .videoOverlay, index: 0), seconds: 3)
+
+        XCTAssertNil(model.editError)
+        XCTAssertEqual(model.history.undoEntries.count, 1)
+        XCTAssertEqual(model.selectedClipID, ids[1])
+        XCTAssertEqual(model.project.timeline.videoClip(id: ids[2])?.placement.timelineStart, try .seconds(6))
+        let lifted = model.project.timeline
+        model.undo()
+        XCTAssertEqual(model.project.timeline, project.timeline)
+        XCTAssertTrue(model.history.undoEntries.isEmpty)
+        model.redo()
+        XCTAssertEqual(model.project.timeline, lifted)
+        XCTAssertEqual(model.history.undoEntries.count, 1)
     }
 
     func testMovingBetweenLayersIsAtomicWhenDestinationOverlaps() throws {
@@ -137,9 +265,17 @@ final class TimelineEditingTests: XCTestCase {
         )
     }
 
-    private func project() -> VideoProject {
+    private func threeClips() throws -> (VideoProject, [UUID]) {
+        var project = project(duration: 9)
+        let first = try XCTUnwrap(project.timeline.firstVideoClip).id
+        let middle = try TimelineEditing.split(first, at: .seconds(3), in: &project)
+        let last = try TimelineEditing.split(middle, at: .seconds(6), in: &project)
+        return (project, [first, middle, last])
+    }
+
+    private func project(duration: Double = 10) -> VideoProject {
         VideoProject(sourceURL: URL(fileURLWithPath: "/tmp/source.mov"), displayName: "Editing",
-                     metadata: makeVideoMetadata(durationSeconds: 10))
+                     metadata: makeVideoMetadata(durationSeconds: duration))
     }
 
     func testSplitHasIndependentGradesAndExactRanges() throws {

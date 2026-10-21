@@ -8,7 +8,7 @@ struct ContentView: View {
 
     var body: some View {
         ZStack {
-            workspace
+            workspace.adaptivePhoneWorkspace()
             if !onboardingCompleted {
                 // Above the workspace rather than in place of it, so the app
                 // behind has already loaded its projects by the time the last

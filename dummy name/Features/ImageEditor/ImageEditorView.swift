@@ -19,6 +19,8 @@ struct ImageEditorView: View {
 
     @Environment(\.scenePhase) private var scenePhase
     @Environment(\.verticalSizeClass) private var verticalSizeClass
+    @Environment(\.horizontalSizeClass) private var horizontalSizeClass
+    @Environment(\.workspaceHeaderClearance) private var headerClearance
     @State private var help = false
     @State private var comparePinned = false
     @State private var savingPreset = false
@@ -32,6 +34,7 @@ struct ImageEditorView: View {
     @State private var colorControlsExpanded = false
     private var usesCompactColorWorkspace: Bool {
         model.imageTool == .color && phoneColorLayout.isActiveOnThisDevice
+            && !AdaptiveWorkspaceLayout.hasExpandedPhoneSpace(horizontal: horizontalSizeClass, vertical: verticalSizeClass)
     }
     @State private var holdingOriginal = false
 
@@ -99,9 +102,11 @@ struct ImageEditorView: View {
 
     private var layout: some View {
         GeometryReader { geometry in
+            let size = AdaptiveWorkspaceLayout.budgetSize(geometry.size, headerHeight: headerClearance.height)
             VStack(spacing: 0) {
-                header
-                if geometry.size.width > geometry.size.height {
+                header.reservedRegionHeader()
+                if AdaptiveWorkspaceLayout.usesColumns(size: geometry.size, horizontalSizeClass: horizontalSizeClass,
+                                                       idiom: UIDevice.current.userInterfaceIdiom, isMac: AppPlatform.isMac) {
                     HStack(spacing: 0) {
                         VStack(spacing: 0) {
                             preview
@@ -110,25 +115,25 @@ struct ImageEditorView: View {
                                     WorkspaceDivider(
                                         orientation: .horizontal, label: String(localized: "Resize the scopes"),
                                         onResize: { delta in
-                                            setScopeHeight(scopeHeight(geometry.size, regular: true) - delta, in: geometry.size)
+                                            setScopeHeight(scopeHeight(size, regular: true) - delta, in: size)
                                         },
                                         onBegin: beginWorkspaceResize, onEnd: endWorkspaceResize,
                                         onReset: { storedScopeHeight = 0 })
                                 }
                                 ScopePanel(model: model, isRegularWidth: true,
-                                           traceHeight: usesCompactColorWorkspace ? ScopeLayout.compactTraceHeight : scopeHeight(geometry.size, regular: true),
+                                           traceHeight: usesCompactColorWorkspace ? ScopeLayout.compactTraceHeight : scopeHeight(size, regular: true),
                                            usesCompactLayout: usesCompactColorWorkspace)
                             }
                         }.frame(maxWidth: .infinity)
                         WorkspaceDivider(
                             orientation: .vertical, label: String(localized: "Resize the tools panel"),
                             onResize: { delta in
-                                setInspectorWidth(inspectorWidth(geometry.size) - delta, in: geometry.size)
+                                setInspectorWidth(inspectorWidth(size) - delta, in: size)
                             },
                             onBegin: beginWorkspaceResize, onEnd: endWorkspaceResize,
                             onReset: { storedInspectorWidth = 0 })
                         VStack(spacing: 0) { inspector; toolBar }
-                            .frame(width: inspectorWidth(geometry.size))
+                            .frame(width: inspectorWidth(size))
                     }
                 } else if usesCompactColorWorkspace {
                     PhoneColorWorkspace(
@@ -140,22 +145,22 @@ struct ImageEditorView: View {
                                             traceHeight: ScopeLayout.compactTraceHeight, usesCompactLayout: true) },
                         transport: { EmptyView() }, controls: { inspector }, footer: { toolBar })
                 } else {
-                    preview.frame(height: previewHeight(geometry.size))
+                    preview.frame(height: previewHeight(size))
                     WorkspaceDivider(
                         orientation: .horizontal, label: String(localized: "Resize the preview"),
-                        onResize: { delta in setPreviewHeight(previewHeight(geometry.size) + delta, in: geometry.size) },
+                        onResize: { delta in setPreviewHeight(previewHeight(size) + delta, in: size) },
                         onBegin: beginWorkspaceResize, onEnd: endWorkspaceResize,
                         onReset: { storedPreviewHeight = 0 })
                     if scopesVisible {
                         WorkspaceDivider(
                             orientation: .horizontal, label: String(localized: "Resize the scopes"),
                             onResize: { delta in
-                                setScopeHeight(scopeHeight(geometry.size, regular: false) - delta, in: geometry.size)
+                                setScopeHeight(scopeHeight(size, regular: false) - delta, in: size)
                             },
                             onBegin: beginWorkspaceResize, onEnd: endWorkspaceResize,
                             onReset: { storedScopeHeight = 0 })
                         ScopePanel(model: model, isRegularWidth: false,
-                                   traceHeight: scopeHeight(geometry.size, regular: false))
+                                   traceHeight: scopeHeight(size, regular: false))
                     }
                     inspector
                     toolBar
@@ -356,7 +361,7 @@ struct ImageEditorView: View {
     private var toolBar: some View {
         HStack(spacing: 8) {
             Button { model.imageTool = .color } label: {
-                Label("Color", systemImage: "camera.filters").font(.caption.weight(.medium)).frame(minHeight: 44)
+                toolbarLabel("Color", systemImage: "camera.filters")
                     .foregroundStyle(model.imageTool == .color ? AppColors.accent : AppColors.textSecondary)
             }
             Button {
@@ -364,7 +369,7 @@ struct ImageEditorView: View {
                 model.isPickingCurveHue = false
                 model.isPickingWarpColor = false
             } label: {
-                Label("Remove BG", systemImage: "person.crop.rectangle").font(.caption.weight(.medium)).frame(minHeight: 44)
+                toolbarLabel("Remove BG", systemImage: "person.crop.rectangle")
                     .foregroundStyle(model.imageTool == .background ? AppColors.accent : AppColors.textSecondary)
             }
             Spacer()
@@ -378,6 +383,16 @@ struct ImageEditorView: View {
             }
         }
         .frame(height: 44).padding(.horizontal, 12)
+    }
+
+    private func toolbarLabel(_ title: LocalizedStringKey, systemImage: String) -> some View {
+        ViewThatFits(in: .horizontal) {
+            Label(title, systemImage: systemImage).fixedSize(horizontal: true, vertical: false)
+            Image(systemName: systemImage).frame(minWidth: 44)
+        }
+        .font(.caption.weight(.medium))
+        .frame(minWidth: 44, minHeight: 44)
+        .accessibilityLabel(Text(title))
     }
 
     // MARK: - Workspace sizing

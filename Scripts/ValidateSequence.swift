@@ -31,6 +31,7 @@ struct ValidateSequence {
         let library = try await device.makeLibrary(source: shader, options: nil)
         let context = try MetalContext(library: library)
         let exporter = try VideoExporter(context: context)
+        try await validateLayerLiftTiming(asset: asset, context: context, exporter: exporter, root: root)
         try await validateExportScheduling(asset: asset, context: context, exporter: exporter, root: root)
         var configuration = ExportConfiguration(codec: .h264)
         configuration.container = .mp4
@@ -567,6 +568,99 @@ struct ValidateSequence {
         let smoothDuration = try await AVURLAsset(url: smoothURL).load(.duration)
         precondition(abs(smoothDuration.seconds - 6) < 0.05, "Reusing a retimed track changed the timeline duration")
         log("PASS: 11 cuts share one decoder; 60 fps composition exports 90 frames at 30 fps with per-cut grades; overlaps, transitions and smoothed retiming preserve their source frames and duration")
+    }
+
+    static func validateLayerLiftTiming(asset: VideoAsset, context: MetalContext,
+                                        exporter: VideoExporter, root: URL) async throws {
+        // The three-second RGB fixture is the same edit as lifting the middle
+        // third of a nine-second clip, with one second per section.
+        var project = VideoProject(sourceURL: asset.url, displayName: "Layer lift timing",
+                                   metadata: asset.metadata, sourceRange: asset.sourceRange,
+                                   frameDuration: asset.frameDuration)
+        let first = project.timeline.firstVideoClip!.id
+        let middle = try TimelineEditing.split(first, at: .seconds(1), in: &project)
+        let last = try TimelineEditing.split(middle, at: .seconds(2), in: &project)
+        try TimelineEditing.moveToLayer(middle, destinationTrackID: nil,
+                                       at: .seconds(1), in: &project)
+        let lastStart = try TimelineTime.seconds(2)
+        precondition(project.timeline.videoClip(id: last)?.placement.timelineStart == lastStart,
+                     "Lifting a clip must not ripple its following neighbor")
+        let preview = try await SequenceComposition.build(project: project, forExport: false, context: context)
+        precondition(abs(preview.source.duration.seconds - 3) < 0.001)
+        let live = AVAssetImageGenerator(asset: preview.source.asset)
+        live.videoComposition = preview.source.videoComposition
+        let output = try await exporter.export(asset: asset, settings: .neutral,
+            configuration: .init(codec: .h264), project: project,
+            outputURL: root.appendingPathComponent("layer-lift.mov"))
+        let exported = AVURLAsset(url: output)
+        let duration = try await exported.load(.duration)
+        precondition(abs(duration.seconds - 3) < 0.05)
+        let delivery = AVAssetImageGenerator(asset: exported)
+        for (time, dominant) in [(0.5, 0), (1.5, 2), (2.5, 1)] {
+            let previewPixel = try await pixel(live, time: time)
+            let exportPixel = try await pixel(delivery, time: time)
+            for sampled in [previewPixel, exportPixel] {
+                precondition(sampled[dominant] > 0.5 &&
+                             (0..<3).filter { $0 != dominant }.allSatisfy { sampled[$0] < 0.3 },
+                             "Layer lift changed the picture's timeline time at \(time)")
+            }
+            let audio = try await audioRMS(exported, at: time)
+            precondition(audio > 0.03, "Layer lift lost linked audio at \(time)")
+        }
+        print("PASS: lifted middle clip preserves all three source sections, preview/export timing, duration and linked audio")
+        let overlayID = project.timeline.videoClip(id: middle)!.placement.trackID
+        try TimelineEditing.deleteClosingGaps(middle, in: &project)
+        precondition(!project.timeline.tracks.contains { $0.id == overlayID },
+                     "Deleting the last overlay clip must remove its row")
+        let afterDelete = try await SequenceComposition.build(project: project, forExport: false, context: context)
+        let gapReader = AVAssetImageGenerator(asset: afterDelete.source.asset)
+        gapReader.videoComposition = afterDelete.source.videoComposition
+        let previewGap = try await pixel(gapReader, time: 1.5)
+        precondition(previewGap.prefix(3).allSatisfy { $0 < 0.04 })
+        let deletedURL = try await exporter.export(asset: asset, settings: .neutral,
+            configuration: .init(codec: .h264), project: project,
+            outputURL: root.appendingPathComponent("layer-deleted.mov"))
+        let deletedAsset = AVURLAsset(url: deletedURL)
+        let deletedReader = AVAssetImageGenerator(asset: deletedAsset)
+        let exportedGap = try await pixel(deletedReader, time: 1.5)
+        let retainedLast = try await pixel(deletedReader, time: 2.5)
+        let silentGap = try await audioRMS(deletedAsset, at: 1.5)
+        precondition(exportedGap.prefix(3).allSatisfy { $0 < 0.04 } && silentGap < 0.005)
+        precondition(retainedLast[1] > 0.5 && retainedLast[0] < 0.3 && retainedLast[2] < 0.3)
+        try await checkCadence(deletedAsset, step: CMTime(value: 1, timescale: 30), count: 90)
+
+        // Original-rate export must retain a rational canvas cadence exactly;
+        // treating 29.97 as an integer 29 would silently change timing.
+        let ntscStep = CMTime(value: 1001, timescale: 30_000)
+        project.canvas.frameDuration = try TimelineTime(ntscStep)
+        let ntscURL = try await exporter.export(asset: asset, settings: .neutral,
+            configuration: .init(codec: .h264), project: project,
+            outputURL: root.appendingPathComponent("layer-deleted-ntsc.mov"))
+        let ntscAsset = AVURLAsset(url: ntscURL)
+        try await checkCadence(ntscAsset, step: ntscStep, count: 90)
+        let ntscGap = try await pixel(AVAssetImageGenerator(asset: ntscAsset), time: 1.5)
+        precondition(ntscGap.prefix(3).allSatisfy { $0 < 0.04 })
+        print("PASS: deleting the last overlay removes its row while preview/export retain the gap, linked silence and following clip timing")
+        print("PASS: original-rate gap exports contain every scheduled frame at 30 fps and exact 30000/1001 fps")
+    }
+
+    static func checkCadence(_ asset: AVAsset, step: CMTime, count: Int) async throws {
+        let track = try await asset.loadTracks(withMediaType: .video).first!
+        let reader = try AVAssetReader(asset: asset)
+        let output = AVAssetReaderTrackOutput(track: track, outputSettings: [
+            kCVPixelBufferPixelFormatTypeKey as String: kCVPixelFormatType_32BGRA])
+        reader.add(output)
+        precondition(reader.startReading())
+        var times: [Double] = []
+        while let sample = output.copyNextSampleBuffer() {
+            times.append(CMSampleBufferGetPresentationTimeStamp(sample).seconds)
+        }
+        precondition(reader.status == .completed && times.count == count,
+                     "Expected \(count) decoded frames, got \(times.count); reader status \(reader.status.rawValue)")
+        for (index, time) in times.sorted().enumerated() {
+            precondition(abs(time - Double(index) * step.seconds) < 0.00001,
+                         "Missing frame or incorrect original-rate export cadence")
+        }
     }
 
     static func generateSource(_ url: URL, portraitPattern: Bool = false) async throws {

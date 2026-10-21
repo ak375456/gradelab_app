@@ -363,7 +363,7 @@ final class MetalVideoRenderer: NSObject, MTKViewDelegate, @unchecked Sendable {
         encoder.setBytes(&grade, length: MemoryLayout<GradeUniforms>.stride, index: 0)
         locals.bind(encoder)
         let threadWidth = max(1, min(pipeline.threadExecutionWidth, size.width))
-        encoder.dispatchThreads(
+        encoder.dispatchPreviewThreads(
             MTLSize(width: size.width, height: size.height, depth: 1),
             threadsPerThreadgroup: MTLSize(
                 width: threadWidth,
@@ -836,7 +836,7 @@ final class MetalVideoRenderer: NSObject, MTKViewDelegate, @unchecked Sendable {
         encoder.setTexture(context.warps.texture(for: nil), index: 12)
         encoder.setBytes(&grade, length: MemoryLayout<GradeUniforms>.stride, index: 0)
         LocalGradeStack.empty.bind(encoder)
-        encoder.dispatchThreads(
+        encoder.dispatchPreviewThreads(
             MTLSize(width: output.width, height: output.height, depth: 1),
             threadsPerThreadgroup: MTLSize(width: 8, height: 8, depth: 1))
         encoder.endEncoding()
@@ -1365,7 +1365,7 @@ final class MetalVideoRenderer: NSObject, MTKViewDelegate, @unchecked Sendable {
         encoder.setBytes(&grade, length: MemoryLayout<GradeUniforms>.stride, index: 0)
         program.locals.bind(encoder)
         let threadWidth = max(1, min(pipeline.threadExecutionWidth, width))
-        encoder.dispatchThreads(
+        encoder.dispatchPreviewThreads(
             MTLSize(width: width, height: height, depth: 1),
             threadsPerThreadgroup: MTLSize(
                 width: threadWidth,

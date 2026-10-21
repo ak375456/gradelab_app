@@ -293,7 +293,7 @@ final class ScopeAnalyzer: @unchecked Sendable {
     ) {
         let threadWidth = max(1, min(pipeline.threadExecutionWidth, width))
         let threadHeight = max(1, min(pipeline.maxTotalThreadsPerThreadgroup / threadWidth, height))
-        encoder.dispatchThreads(
+        encoder.dispatchPreviewThreads(
             MTLSize(width: max(1, width), height: max(1, height), depth: 1),
             threadsPerThreadgroup: MTLSize(width: threadWidth, height: threadHeight, depth: 1))
     }

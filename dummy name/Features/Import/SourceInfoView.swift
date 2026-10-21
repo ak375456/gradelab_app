@@ -29,7 +29,7 @@ struct SourceInfoView: View {
 
     var body: some View {
         VStack(spacing: 0) {
-            topBar
+            topBar.reservedRegionHeader()
             GeometryReader { proxy in
                 let isTwoColumn = AppPlatform.isMac && proxy.size.width >= Self.twoColumnMinimum
                 ScrollView {

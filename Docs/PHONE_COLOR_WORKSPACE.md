@@ -8,6 +8,24 @@ existing workspace sizes and controls; switching does not overwrite them.
 Compact is gated on the phone idiom and excluded from Mac. iPad, Mac, the
 timeline, the main mode bar and other editing tools keep their existing layout.
 
+On a phone window with regular horizontal and vertical size classes (including
+the unfolded iPhone Duo), video and
+photo editors use the full Color inspector. Portrait keeps the canvas above
+the controls, matching iPad; a wider-than-tall window places them side by side. Returning
+to a compact width restores the saved Compact/Classic preference. iPad and Mac
+keep their existing layout decisions. On iOS 27.1, corner reserved regions on
+either phone display keep headers clear of the camera and status area while
+allowing content below them to use the full display width. Unknown, centered
+or full-edge obstructions retain the
+system safe area. `AdaptiveWorkspaceLayoutTests` covers these layout boundaries.
+
+Device Hub verification also uses simulator-only compatibility paths: bounded
+preview kernels dispatch padded threadgroups, and a single SDR clip plays its
+composed track directly because the simulator's standard video compositor can
+fail with AVFoundation error -12784. Device/Catalyst playback and exports keep
+their existing rendering paths. `PreviewComputeDispatchTests` checks decoding
+the bundled clip and rendering odd-sized thumbnails through the last pixel.
+
 - On first opening a ready Compact Color workspace, a small alert explains the
   top ••• menu → Settings → iPhone Color workspace path ("Editor settings" in
   photos). Open Settings goes directly to that screen; Got it continues editing.

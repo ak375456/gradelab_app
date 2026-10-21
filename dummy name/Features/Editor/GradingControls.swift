@@ -91,32 +91,39 @@ struct GradingControls<Model: GradingModel>: View {
     }
 
     private var classicPanelStrip: some View {
-        ScrollView(.horizontal) {
-            HStack(spacing: 4) {
-                ForEach(model.availablePanels) { panel in
-                    Button { model.selectedPanel = panel } label: {
-                        VStack(spacing: 3) {
-                            Image(systemName: panel.symbol).font(.system(size: 14))
-                                // Says the tool holds animation. The
-                                // diamonds inside it say which parameter.
-                                .overlay(alignment: .topTrailing) {
-                                    GradeAnimationDot(model: model, panel: panel).offset(x: 5, y: -1)
-                                }
-                            Text(panel.title).font(.caption.weight(.medium))
-                        }.frame(width: 58, height: 44)
-                            .foregroundStyle(model.selectedPanel == panel ? AppColors.textPrimary : AppColors.textSecondary)
-                            .background(model.selectedPanel == panel ? AppColors.surfaceRaised : .clear, in: RoundedRectangle(cornerRadius: 12))
-                            // The whole 58x44 tile takes the click. An
-                            // unselected tab's background is `.clear`,
-                            // which SwiftUI does not hit-test, so without
-                            // this only the glyph and the word themselves
-                            // answered — a pointer a pixel off either one
-                            // hit nothing at all.
-                            .contentShape(RoundedRectangle(cornerRadius: 12))
-                    }.buttonStyle(.plain).accessibilityAddTraits(model.selectedPanel == panel ? .isSelected : [])
-                }
-            }.padding(.horizontal, 12)
-        }.frame(height: 44).scrollIndicators(.hidden)
+        ScrollViewReader { proxy in
+            ScrollView(.horizontal) {
+                HStack(spacing: 4) {
+                    ForEach(model.availablePanels) { panel in
+                        Button { model.selectedPanel = panel } label: {
+                            VStack(spacing: 3) {
+                                Image(systemName: panel.symbol).font(.system(size: 14))
+                                    // Says the tool holds animation. The
+                                    // diamonds inside it say which parameter.
+                                    .overlay(alignment: .topTrailing) {
+                                        GradeAnimationDot(model: model, panel: panel).offset(x: 5, y: -1)
+                                    }
+                                Text(panel.title).font(.caption.weight(.medium))
+                                    .lineLimit(1).minimumScaleFactor(0.8)
+                            }.frame(width: 58, height: 44)
+                                .foregroundStyle(model.selectedPanel == panel ? AppColors.textPrimary : AppColors.textSecondary)
+                                .background(model.selectedPanel == panel ? AppColors.surfaceRaised : .clear, in: RoundedRectangle(cornerRadius: 12))
+                                // The whole 58x44 tile takes the click. An
+                                // unselected tab's background is `.clear`,
+                                // which SwiftUI does not hit-test, so without
+                                // this only the glyph and the word themselves
+                                // answered — a pointer a pixel off either one
+                                // hit nothing at all.
+                                .contentShape(RoundedRectangle(cornerRadius: 12))
+                        }.buttonStyle(.plain).accessibilityAddTraits(model.selectedPanel == panel ? .isSelected : [])
+                            .id(panel.id)
+                    }
+                }.padding(.horizontal, 12)
+            }.frame(height: 44).scrollIndicators(.hidden)
+            .onChange(of: model.selectedPanel, initial: true) { _, panel in
+                proxy.scrollTo(panel.id, anchor: .center)
+            }
+        }
     }
 
     @ViewBuilder

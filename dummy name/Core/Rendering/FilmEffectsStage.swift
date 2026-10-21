@@ -240,7 +240,7 @@ final class FilmEffectsStage: @unchecked Sendable {
     ) {
         let threadWidth = max(1, min(pipeline.threadExecutionWidth, width))
         let threadHeight = max(1, min(pipeline.maxTotalThreadsPerThreadgroup / threadWidth, height))
-        encoder.dispatchThreads(
+        encoder.dispatchPreviewThreads(
             MTLSize(width: width, height: height, depth: 1),
             threadsPerThreadgroup: MTLSize(width: threadWidth, height: threadHeight, depth: 1))
     }

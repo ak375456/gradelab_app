@@ -12,10 +12,17 @@ struct EditorView: View {
     let onSettingsChanged: (VideoProject, Bool) -> Void
     @Environment(\.scenePhase) private var scenePhase
     @Environment(\.verticalSizeClass) private var verticalSizeClass
+    @Environment(\.horizontalSizeClass) private var horizontalSizeClass
+    @Environment(\.workspaceHeaderClearance) private var headerClearance
     @State private var colorMode = false
     @AppStorage(PhoneColorLayout.preferenceKey) private var phoneColorLayout = PhoneColorLayout.compact
     @State private var colorControlsExpanded = false
-    private var usesCompactColorWorkspace: Bool { colorMode && phoneColorLayout.isActiveOnThisDevice }
+    private var hasExpandedPhoneSpace: Bool {
+        AdaptiveWorkspaceLayout.hasExpandedPhoneSpace(horizontal: horizontalSizeClass, vertical: verticalSizeClass)
+    }
+    private var usesCompactColorWorkspace: Bool {
+        colorMode && phoneColorLayout.isActiveOnThisDevice && !hasExpandedPhoneSpace
+    }
     @State private var textMode = false
     @State private var textSection = "Style"
     @State private var textAppearance = "Fill"
@@ -164,9 +171,11 @@ struct EditorView: View {
 
     private var editorLayout: some View {
         GeometryReader { geometry in
+            let size = AdaptiveWorkspaceLayout.budgetSize(geometry.size, headerHeight: headerClearance.height)
             VStack(spacing: 0) {
-                header
-                if geometry.size.width > geometry.size.height {
+                header.reservedRegionHeader()
+                if AdaptiveWorkspaceLayout.usesColumns(size: geometry.size, horizontalSizeClass: horizontalSizeClass,
+                                                       idiom: UIDevice.current.userInterfaceIdiom, isMac: AppPlatform.isMac) {
                     // Wide layout: preview and timeline on the left, tools on
                     // the right, with a draggable edge on each boundary.
                     HStack(spacing: 0) {
@@ -175,7 +184,7 @@ struct EditorView: View {
                         // phone in landscape, an iPad sharing the screen — do
                         // not, and a third column there would cost the picture
                         // more than the list is worth.
-                        if mediaBinVisible(geometry.size) {
+                        if mediaBinVisible(size) {
                             MediaBinPanel(
                                 assets: model.project.assets,
                                 usageCounts: model.assetUsageCounts,
@@ -185,14 +194,14 @@ struct EditorView: View {
                                 onPlace: { model.placeAsset($0, as: $1) },
                                 onImportFiles: { urls in Task { await model.importIntoBin(urls) } })
                                 .equatable()
-                                .frame(width: mediaBinWidth(geometry.size))
+                                .frame(width: mediaBinWidth(size))
                             WorkspaceDivider(
                                 orientation: .vertical,
                                 label: String(localized: "Resize the media bin"),
                                 onResize: { delta in
                                     // The handle is on the bin's trailing edge,
                                     // so dragging right widens it.
-                                    setMediaBinWidth(mediaBinWidth(geometry.size) + delta, in: geometry.size)
+                                    setMediaBinWidth(mediaBinWidth(size) + delta, in: size)
                                 },
                                 onBegin: beginWorkspaceResize,
                                 onEnd: endWorkspaceResize,
@@ -206,22 +215,22 @@ struct EditorView: View {
                                         orientation: .horizontal,
                                         label: String(localized: "Resize the scopes"),
                                         onResize: { delta in
-                                            setScopeHeight(scopeHeight(geometry.size, regular: true) - delta,
-                                                           in: geometry.size)
+                                            setScopeHeight(scopeHeight(size, regular: true) - delta,
+                                                           in: size)
                                         },
                                         onBegin: beginWorkspaceResize,
                                         onEnd: endWorkspaceResize,
                                         onReset: { resetSize(.scope) })
                                 }
                                 ScopePanel(model: model, isRegularWidth: true,
-                                           traceHeight: usesCompactColorWorkspace ? ScopeLayout.compactTraceHeight : scopeHeight(geometry.size, regular: true),
+                                           traceHeight: usesCompactColorWorkspace ? ScopeLayout.compactTraceHeight : scopeHeight(size, regular: true),
                                            usesCompactLayout: usesCompactColorWorkspace)
                             }
                             // iPad has enough room to keep the editing context
                             // visible beside every inspector, like a desktop
                             // NLE. Phone landscape keeps the compact behaviour
                             // so its preview is not squeezed by two panels.
-                            let showsTimeline = AppPlatform.usesDesktopWorkspace
+                            let showsTimeline = AppPlatform.usesDesktopWorkspace || hasExpandedPhoneSpace
                                 || (!colorMode && !transforms && !canvasTool && !speedTool && !backgroundMode)
                             if showsTimeline {
                                 WorkspaceDivider(
@@ -231,14 +240,14 @@ struct EditorView: View {
                                         // The handle sits above the bottom
                                         // block, so dragging up gives the
                                         // timeline the space.
-                                        setTimelineHeight(timelineHeight(geometry.size) - delta, in: geometry.size)
+                                        setTimelineHeight(timelineHeight(size) - delta, in: size)
                                     },
                                     onBegin: beginWorkspaceResize,
                                     onEnd: endWorkspaceResize,
                                     onReset: { resetSize(.timeline) })
                             }
                             transport
-                            if showsTimeline { timeline(height: timelineHeight(geometry.size)) }
+                            if showsTimeline { timeline(height: timelineHeight(size)) }
                         }.frame(maxWidth: .infinity)
                         WorkspaceDivider(
                             orientation: .vertical,
@@ -246,7 +255,7 @@ struct EditorView: View {
                             onResize: { delta in
                                 // The handle is on the panel's leading edge:
                                 // dragging left widens it.
-                                setInspectorWidth(inspectorWidth(geometry.size) - delta, in: geometry.size)
+                                setInspectorWidth(inspectorWidth(size) - delta, in: size)
                             },
                             onBegin: beginWorkspaceResize,
                             onEnd: endWorkspaceResize,
@@ -255,27 +264,27 @@ struct EditorView: View {
                             inspector
                             // On Mac the bar spans the window instead (below),
                             // where twelve tools fit without scrolling.
-                            if !spansModeBar(geometry.size) { modeBar }
+                            if !spansModeBar(size) { modeBar }
                         }
-                        .frame(width: inspectorWidth(geometry.size))
+                        .frame(width: inspectorWidth(size))
                     }
                     // A desktop window is wider than the tool bar needs, and the
                     // bar was being folded into a 360-point column and scrolled
                     // — the one place the extra width was worth the most. Across
                     // the window every tool is one click away, with its name.
-                    if spansModeBar(geometry.size) { modeBar }
+                    if spansModeBar(size) { modeBar }
                 } else if usesCompactColorWorkspace {
                     compactColorWorkspace
                 } else {
                     // Tall layout: one edge, between the picture and everything
                     // below it. Dragging up is how a tool panel that needs the
                     // room - curves especially - gets it.
-                    preview.frame(height: previewHeight(geometry.size))
+                    preview.frame(height: previewHeight(size))
                     WorkspaceDivider(
                         orientation: .horizontal,
                         label: String(localized: "Resize the preview"),
                         onResize: { delta in
-                            setPreviewHeight(previewHeight(geometry.size) + delta, in: geometry.size)
+                            setPreviewHeight(previewHeight(size) + delta, in: size)
                         },
                         onBegin: beginWorkspaceResize,
                         onEnd: endWorkspaceResize,
@@ -285,18 +294,18 @@ struct EditorView: View {
                             orientation: .horizontal,
                             label: String(localized: "Resize the scopes"),
                             onResize: { delta in
-                                setScopeHeight(scopeHeight(geometry.size, regular: false) - delta,
-                                               in: geometry.size)
+                                setScopeHeight(scopeHeight(size, regular: false) - delta,
+                                               in: size)
                             },
                             onBegin: beginWorkspaceResize,
                             onEnd: endWorkspaceResize,
                             onReset: { resetSize(.scope) })
                         ScopePanel(model: model, isRegularWidth: false,
-                                   traceHeight: scopeHeight(geometry.size, regular: false))
+                                   traceHeight: scopeHeight(size, regular: false))
                     }
                     transport
                     if showsTimelineInTallLayout {
-                        timeline(height: compactTimelineHeight(geometry.size))
+                        timeline(height: compactTimelineHeight(size))
                         // The handle sits UNDER the timeline here, where the
                         // wide layout puts it above: dragging down gives the
                         // timeline the room and dragging up hands it to the tool
@@ -306,8 +315,8 @@ struct EditorView: View {
                             orientation: .horizontal,
                             label: String(localized: "Resize the timeline"),
                             onResize: { delta in
-                                setCompactTimelineHeight(compactTimelineHeight(geometry.size) + delta,
-                                                         in: geometry.size)
+                                setCompactTimelineHeight(compactTimelineHeight(size) + delta,
+                                                         in: size)
                             },
                             onBegin: beginWorkspaceResize,
                             onEnd: endWorkspaceResize,

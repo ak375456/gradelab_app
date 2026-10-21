@@ -240,15 +240,17 @@ final class LayerDropPolicyTests: XCTestCase {
         XCTAssertTrue(TimelineCanvas.canDrop(moving, kind: .audio, on: row([], id: id), startingAt: 0))
     }
 
-    /// The main row packs from zero, so a clip dropped on it is inserted
-    /// between its neighbours — nothing there is ever "busy".
-    func testTheMainRowIsAlwaysOpenToAVideoClip() throws {
+    func testMainRowOnlyAcceptsLayerDropsInFreeTime() throws {
         let id = UUID()
         let sitting = VideoClip(placement: .init(id: UUID(), trackID: id, timelineStart: .zero, duration: try .seconds(8)),
                                 assetID: UUID(), sourceRange: .init(start: .zero, duration: try .seconds(8)))
         let main = row([.video(sitting)], kind: .mainVideo, id: id)
-        let moving = try XCTUnwrap(TimelineDisplayClip(.video(sitting)))
-        XCTAssertTrue(TimelineCanvas.canDrop(moving, kind: .videoOverlay, on: main, startingAt: 2))
+        var lifted = sitting
+        lifted.placement = .init(id: UUID(), trackID: UUID(), timelineStart: .zero,
+                                 duration: try .seconds(3))
+        let moving = try XCTUnwrap(TimelineDisplayClip(.video(lifted)))
+        XCTAssertFalse(TimelineCanvas.canDrop(moving, kind: .videoOverlay, on: main, startingAt: 2))
+        XCTAssertTrue(TimelineCanvas.canDrop(moving, kind: .videoOverlay, on: main, startingAt: 8))
     }
 
     func testNewRowsAreKeptOnTheCorrectSideOfThePicture() {

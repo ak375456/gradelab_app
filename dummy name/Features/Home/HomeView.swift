@@ -19,26 +19,35 @@ struct HomeView: View {
     /// install rather than once per launch.
     @AppStorage("home.screenGrade.discovered") private var hasFoundScreenGrade = false
     @Environment(\.scenePhase) private var scenePhase
+    @Environment(\.workspaceHeaderClearance) private var headerClearance
 
     var body: some View {
-        ScrollView {
-            VStack(alignment: .leading, spacing: AppSpacing.xLarge) {
+        VStack(spacing: 0) {
+            if headerClearance.isActive {
                 header
-                if isGradingScreen {
-                    ScreenGradePanel(grade: $grade, onClose: toggleScreenGrade)
-                        .transition(.scale(scale: 0.96, anchor: .top).combined(with: .opacity))
-                }
-                unlockPro
-                importHero
-                recentProjects
+                    .padding(.horizontal, AppSpacing.standard)
+                    .padding(.top, AppSpacing.large)
+                    .reservedRegionHeader()
             }
-            .padding(.horizontal, AppSpacing.standard)
-            .padding(.top, AppSpacing.large)
-            .padding(.bottom, AppSpacing.xLarge)
-            .frame(maxWidth: AppPlatform.isMac ? 1000 : .infinity)
-            .frame(maxWidth: .infinity)
+            ScrollView {
+                VStack(alignment: .leading, spacing: AppSpacing.xLarge) {
+                    if !headerClearance.isActive { header }
+                    if isGradingScreen {
+                        ScreenGradePanel(grade: $grade, onClose: toggleScreenGrade)
+                            .transition(.scale(scale: 0.96, anchor: .top).combined(with: .opacity))
+                    }
+                    unlockPro
+                    importHero
+                    recentProjects
+                }
+                .padding(.horizontal, AppSpacing.standard)
+                .padding(.top, AppSpacing.large)
+                .padding(.bottom, AppSpacing.xLarge)
+                .frame(maxWidth: AppPlatform.isMac ? 1000 : .infinity)
+                .frame(maxWidth: .infinity)
+            }
+            .scrollIndicators(.hidden)
         }
-        .scrollIndicators(.hidden)
         .background(grade.background.ignoresSafeArea())
         .preferredColorScheme(.dark)
         .environment(\.homeScreenGrade, grade)
