@@ -37,6 +37,7 @@ Apple Log, sequences, shot matching, noise reduction and audio.
 | `dummy name/App/` | App coordination, imports and editor/project lifecycle |
 | `dummy name/Features/Editor/` | Video workspace, tool panels, timeline UI, preview gestures and editor transactions |
 | `dummy name/Features/ImageEditor/` | Photo workspace and export UI |
+| `dummy name/Features/Camera/`, `Core/Camera/` | Camera controls, live grading preview, original recording and recovery receipts |
 | `dummy name/UI/` | Shared design system, controls, layout and keyboard shortcuts |
 | `dummy name/Core/Projects/`, `Core/Images/` | Video/photo documents, persistence and still-image decoding |
 | `dummy name/Core/Timeline/` | Tracks, clips, compositing, keyframes, speed, transitions, text/shapes and audio scheduling |
@@ -85,6 +86,7 @@ placed inside those trees may become app/test inputs automatically.
 - [iPhone Color workspace, Compact/Classic preference and acceptance](Docs/PHONE_COLOR_WORKSPACE.md)
 - [Freehand masks, preview zoom, tracking and device acceptance](Docs/MASK_EDITING.md)
 - [Audio processing, preview/export behavior and tests](Docs/AUDIO_TOOLS.md)
+- [Camera capture, capability limits, recovery and device acceptance](Docs/CAMERA.md)
 - [Relight architecture, models, limitations and validation](Docs/RELIGHT.md)
 - [Mac workspace, platform distinctions, shortcuts and release procedure](Docs/MAC_RELEASE.md)
 - [LUT import format and naming](LUTSources/Imported/HOW_TO_ADD_LUTS.md)

@@ -18,3 +18,10 @@ Three looks are free and five use the existing Pro export policy. All can be pre
 App resources are compiled `.cube.gclut` files in `dummy name/Resources/LUTs`. They use the same quantization as the GPU upload, avoiding runtime text parsing. Compile this directory to a temporary output directory with `Scripts/CompileLUTs.swift`, then copy its eight outputs to the resources directory. Compiling a subset directly into the shared resources directory would remove other looks as orphans.
 
 The existing resource directory also contains older compiled looks whose text sources are absent. Preserve those resources when compiling this collection.
+
+## Sunset collection, 2026-10-28
+
+Six additional creative 32³/33³ looks from the user’s local download are indexed
+in [SunsetCollection/README.md](SunsetCollection/README.md), including the user’s
+separate redistribution authorization, source mapping and regeneration procedure.
+The original eight above and their identifiers are unchanged.

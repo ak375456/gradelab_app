@@ -8,6 +8,12 @@ import XCTest
 /// here either gives away the product or blocks a paying customer, and neither
 /// shows up in a build log — so every rule in the feature table gets a case.
 final class ProAccessPolicyTests: XCTestCase {
+    func testCameraRecordingRequiresAnActiveProEntitlement() {
+        XCTAssertEqual(ProAccessPolicy.cameraRecordingRequirement(hasPro: false), .cameraRecording)
+        XCTAssertNil(ProAccessPolicy.cameraRecordingRequirement(hasPro: true))
+        XCTAssertFalse(ProFeature.cameraRecording.title.isEmpty)
+        XCTAssertFalse(ProFeature.cameraRecording.detail.isEmpty)
+    }
 
     // MARK: - Fixtures
 

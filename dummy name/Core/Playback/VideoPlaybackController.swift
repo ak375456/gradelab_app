@@ -120,6 +120,10 @@ final class VideoPlaybackController: ObservableObject {
             // reports. Asking for 4:2:2 rather than 4:2:0 avoids resampling the
             // chroma of a ProRes source on the way in.
             return [
+                // Explicitly convert tagged P3 sources as well as Rec.709 into
+                // the SDR working primaries. Preview and export request the
+                // identical transfer; native Rec.709 remains an identity.
+                AVVideoColorPropertiesKey: ExportMediaSettings.rec709ColorProperties,
                 kCVPixelBufferPixelFormatTypeKey as String:
                     kCVPixelFormatType_422YpCbCr10BiPlanarVideoRange,
                 kCVPixelBufferMetalCompatibilityKey as String: true

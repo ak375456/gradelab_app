@@ -679,7 +679,7 @@ final class MetalVideoRenderer: NSObject, MTKViewDelegate, @unchecked Sendable {
         scopeSettings = settings
         if settings.isEnabled {
             if scopeAnalyzerStorage == nil {
-                scopeAnalyzerStorage = ScopeAnalyzer(context: context, colorSpace: ScopeColorSpace(colorMode))
+                scopeAnalyzerStorage = ScopeAnalyzer(context: context, colorSpace: ScopeColorSpace(colorMode), colorMode: colorMode)
             }
         } else {
             scopeAnalyzerStorage?.release()
@@ -754,7 +754,7 @@ final class MetalVideoRenderer: NSObject, MTKViewDelegate, @unchecked Sendable {
                 locals: locals,
                 yuv: YUVUniforms.make(for: pixelBuffer, fallbackMatrix: fallbackMatrix),
                 hdr: HDRDisplayUniforms(), intensity: intensity, lut: lut, curveLUT: curveLUT,
-                warpField: warpField)
+                warpField: warpField, renderingLUT: appleLogRenderingLUT)
         }
         stateLock.lock()
         if analyzed || !attempted {

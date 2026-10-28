@@ -9,6 +9,7 @@ struct HomeView: View {
     @State private var importFromFiles = AppPlatform.isMac
     @State private var settings = false
     @State private var pendingDeletion: RecentProject?
+    @State private var pendingCameraDeletion: CameraRecording?
     @ObservedObject private var store = ProStore.shared
     @State private var paywall = false
 
@@ -38,6 +39,7 @@ struct HomeView: View {
                     }
                     unlockPro
                     importHero
+                    pendingCaptures
                     recentProjects
                 }
                 .padding(.horizontal, AppSpacing.standard)
@@ -193,6 +195,29 @@ struct HomeView: View {
             }
 
             VStack(spacing: AppSpacing.small) {
+                #if !targetEnvironment(macCatalyst)
+                if !AppPlatform.isMac {
+                    Button(action: coordinator.showCamera) {
+                        HStack(spacing: 12) {
+                            Image(systemName: "camera.fill").font(.system(size: 22))
+                            VStack(alignment: .leading, spacing: 3) {
+                                Text("Open Camera").font(AppTypography.bodyEmphasized)
+                                Text("Manual controls. Live looks. Editable originals.")
+                                    .font(AppTypography.caption).foregroundStyle(AppColors.textSecondary)
+                                    .fixedSize(horizontal: false, vertical: true)
+                            }
+                            Spacer(minLength: 0)
+                            Image(systemName: "chevron.right").font(AppTypography.caption)
+                        }
+                        .foregroundStyle(AppColors.textPrimary)
+                        .padding(AppSpacing.standard)
+                        .frame(maxWidth: .infinity, minHeight: 64, alignment: .leading)
+                        .appSurface(fill: grade.surfaceRaised)
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityHint("Record a video with an editable GradeLab look")
+                }
+                #endif
                 Button { showImport(images: false) } label: {
                     Label("Import Videos", systemImage: "plus")
                         .font(AppTypography.bodyEmphasized)
@@ -252,6 +277,34 @@ struct HomeView: View {
         .overlay {
             RoundedRectangle(cornerRadius: AppCornerRadius.prominent, style: .continuous)
                 .strokeBorder(AppColors.border, lineWidth: 1)
+        }
+    }
+
+    @ViewBuilder private var pendingCaptures: some View {
+        if !coordinator.pendingCameraRecordings.isEmpty {
+            VStack(alignment: .leading, spacing: AppSpacing.compact) {
+                Label("Recordings ready to open", systemImage: "camera.badge.ellipsis")
+                    .font(AppTypography.headline)
+                Text("Your originals are kept here until a project is saved.")
+                    .font(AppTypography.caption).foregroundStyle(AppColors.textSecondary)
+                ForEach(coordinator.pendingCameraRecordings) { recording in
+                    PendingCameraRecordingRow(recording: recording,
+                        originalURL: coordinator.cameraRecordingStore.mediaURL(for: recording),
+                        isDeleting: coordinator.deletingCameraRecordings.contains(recording.id),
+                        onOpen: { coordinator.openCameraRecording(recording) },
+                        onDelete: { pendingCameraDeletion = recording })
+                }
+            }.padding(AppSpacing.standard).appSurface()
+                .confirmationDialog("Delete recording?", isPresented: Binding(
+                    get: { pendingCameraDeletion != nil }, set: { if !$0 { pendingCameraDeletion = nil } }),
+                    titleVisibility: .visible, presenting: pendingCameraDeletion) { recording in
+                        Button("Delete Recording", role: .destructive) {
+                            Task { await coordinator.deleteCameraRecording(recording) }
+                        }
+                        Button("Cancel", role: .cancel) { pendingCameraDeletion = nil }
+                    } message: { _ in
+                        Text("This removes the recording from GradeLab and deletes its original video unless a saved project uses it. This cannot be undone.")
+                    }
         }
     }
 

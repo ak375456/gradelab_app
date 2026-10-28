@@ -39,6 +39,7 @@ struct PaywallView: View {
                             .font(.body).foregroundStyle(.white.opacity(0.7)).fixedSize(horizontal: false, vertical: true)
                     }
                     VStack(alignment: .leading, spacing: 16) {
+                        benefit(String(localized: "Pro camera recording"), String(localized: "Record on iPhone and iPad with live LUT previews and manual focus, white balance and exposure. Camera previews and controls stay free."), "camera.fill")
                         benefit(String(localized: "Color with character"), String(localized: "Premium cinematic looks and your own LUTs"), "camera.filters")
                         benefit(String(localized: "A professional finish"), String(localized: "4K and original-resolution export, your own frame rate and bitrate, and ProRes where supported"), "film.stack")
                         benefit(String(localized: "Make it personal"), String(localized: "Import custom fonts for your titles"), "textformat")

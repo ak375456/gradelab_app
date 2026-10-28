@@ -4,6 +4,11 @@ import Foundation
 import VideoToolbox
 
 enum ExportMediaSettings {
+    static var rec709ColorProperties: [String: String] {
+        [AVVideoColorPrimariesKey: AVVideoColorPrimaries_ITU_R_709_2,
+         AVVideoTransferFunctionKey: AVVideoTransferFunction_ITU_R_709_2,
+         AVVideoYCbCrMatrixKey: AVVideoYCbCrMatrix_ITU_R_709_2]
+    }
     static func validate(_ configuration: ExportConfiguration) throws {
         guard configuration.resolution != .custom || (64...7680).contains(configuration.customLongEdge) else {
             throw GradeLabError.unsupportedExport(String(localized: "Enter a longest edge from 64 to 7680 pixels."))
@@ -123,6 +128,7 @@ enum ExportMediaSettings {
             // reports. Asking for 4:2:2 rather than 4:2:0 avoids resampling the
             // chroma of a ProRes source on the way in.
             return [
+                AVVideoColorPropertiesKey: rec709ColorProperties,
                 kCVPixelBufferPixelFormatTypeKey as String:
                     kCVPixelFormatType_422YpCbCr10BiPlanarVideoRange,
                 kCVPixelBufferMetalCompatibilityKey as String: true,

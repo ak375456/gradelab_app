@@ -234,6 +234,7 @@ enum ExportSourceInspector {
                     )
                 }
             case .sdrWide:
+                if try validateP3SDR(description) { continue }
                 // Same Rec.709 requirements as 8-bit SDR; only the precision
                 // differs, and it is carried rather than reduced.
                 try validateRec709(description)
@@ -314,7 +315,7 @@ enum ExportSourceInspector {
         let extensionDescription = String(describing: extensions)
         let codec = fourCC(CMFormatDescriptionGetMediaSubType(description)).lowercased()
 
-        guard codec == "hvc1" || codec == "hev1" else {
+        guard ["hvc1", "hev1", "apch", "apcn", "apcs", "apco"].contains(codec) else {
             throw GradeLabError.unsupportedExport(
                 String(localized: "HDR export requires an HEVC source; this one is \(codec.uppercased()).")
             )
@@ -339,6 +340,22 @@ enum ExportSourceInspector {
                     contains: "ITU_R_2020", property: "colour primaries")
         try require(extensions[kCMFormatDescriptionExtension_YCbCrMatrix],
                     contains: "ITU_R_2020", property: "the YCbCr matrix")
+    }
+
+    /// Only the explicitly tagged SDR P3 variant may use AVFoundation's P3 →
+    /// Rec.709 conversion. Missing tags, PQ and other wide gamuts stay blocked.
+    private static func validateP3SDR(_ description: CMFormatDescription) throws -> Bool {
+        let extensions = CMFormatDescriptionGetExtensions(description).map { $0 as NSDictionary } ?? NSDictionary()
+        guard extensions[kCMFormatDescriptionExtension_ColorPrimaries].map({ String(describing: $0) }) == kCMFormatDescriptionColorPrimaries_P3_D65 as String else { return false }
+        let transfer = extensions[kCMFormatDescriptionExtension_TransferFunction].map { String(describing: $0) }
+        let matrix = extensions[kCMFormatDescriptionExtension_YCbCrMatrix].map { String(describing: $0) }
+        guard [kCMFormatDescriptionTransferFunction_ITU_R_709_2 as String, kCMFormatDescriptionTransferFunction_sRGB as String].contains(transfer ?? ""),
+              matrix == kCMFormatDescriptionYCbCrMatrix_ITU_R_709_2 as String,
+              extensions[kCMFormatDescriptionExtension_LogTransferFunction] == nil,
+              !String(describing: extensions).localizedCaseInsensitiveContains("DolbyVision") else {
+            throw GradeLabError.unsupportedExport(String(localized: "This P3 source does not have supported SDR color tags. The original has been kept."))
+        }
+        return true
     }
 
     private static func validateRec709(

@@ -22,6 +22,7 @@ enum ColorPipelineSupport: Equatable, Sendable {
     /// Rec.709 SDR carried at more than 8 bits — ProRes, 10-bit HEVC. Same
     /// colour handling as `.supported`; the pipeline just keeps the precision.
     case sdrWideSupported(bitDepth: Int)
+    case displayP3Supported
     /// Apple Log, decoded through Apple's published transfer function into
     /// scene-linear BT.2020 and graded there.
     case appleLogSupported
@@ -49,6 +50,9 @@ enum ColorPipelineSupport: Equatable, Sendable {
         // through another's transform.
         let profile = SourceColorProfile.detect(metadata: metadata)
         switch profile {
+        case .displayP3:
+            self = .displayP3Supported
+            return
         case .appleLog:
             self = .appleLogSupported
             return
@@ -127,7 +131,7 @@ enum ColorPipelineSupport: Equatable, Sendable {
     /// Whether the grading tools may be used.
     var allowsGrading: Bool {
         switch self {
-        case .supported, .assumedRec709, .hdrSupported, .sdrWideSupported,
+        case .supported, .assumedRec709, .hdrSupported, .sdrWideSupported, .displayP3Supported,
              .appleLogSupported, .appleLog2Supported: true
         case .unsupported, .recognizedUnsupported: false
         }
@@ -137,7 +141,7 @@ enum ColorPipelineSupport: Equatable, Sendable {
     /// `allowsGrading`: an HLG source can be viewed before it can be graded.
     var allowsEditor: Bool {
         switch self {
-        case .supported, .assumedRec709, .hdrSupported, .sdrWideSupported,
+        case .supported, .assumedRec709, .hdrSupported, .sdrWideSupported, .displayP3Supported,
              .appleLogSupported, .appleLog2Supported: true
         case .unsupported, .recognizedUnsupported: false
         }
@@ -147,7 +151,7 @@ enum ColorPipelineSupport: Equatable, Sendable {
     var colorMode: ProjectColorMode {
         switch self {
         case .hdrSupported: .hdrHLG
-        case .sdrWideSupported: .sdrWide
+        case .sdrWideSupported, .displayP3Supported: .sdrWide
         case .appleLogSupported: .appleLog
         case .appleLog2Supported: .appleLog2
         case .supported, .assumedRec709, .unsupported, .recognizedUnsupported: .sdr
@@ -180,6 +184,8 @@ enum ColorPipelineSupport: Equatable, Sendable {
             String(localized: "\(transfer) HDR is decoded, previewed and graded at full 10-bit precision. HDR export is still being validated and stays disabled until then — this source is never converted to SDR without you choosing it.")
         case .sdrWideSupported(let depth):
             String(localized: "This \(depth)-bit Rec.709 source is decoded, graded and exported at full precision — the colour handling is the same as any SDR clip, and nothing is reduced to 8-bit along the way.")
+        case .displayP3Supported:
+            String(localized: "The P3 original is preserved. GradeLab converts its colors to Rec.709 at 10-bit precision for consistent editing and export.")
         case .appleLogSupported:
             String(localized: "Apple Log is decoded with Apple's published transfer function into scene light, graded there, and delivered as Rec.709. The log encoding is never graded directly.")
         case .appleLog2Supported:

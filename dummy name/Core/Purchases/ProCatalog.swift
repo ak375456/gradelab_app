@@ -176,6 +176,7 @@ enum ProFeature: String, Identifiable, Sendable {
     case filmEffects
     case gradePresets
     case scopes
+    case cameraRecording
 
     var id: String { rawValue }
 
@@ -195,13 +196,14 @@ enum ProFeature: String, Identifiable, Sendable {
         case .filmEffects: String(localized: "Give it the texture of film.")
         case .gradePresets: String(localized: "Keep the look you built.")
         case .scopes: String(localized: "Read the picture, don't guess.")
+        case .cameraRecording: String(localized: "Unlock camera recording.")
         }
     }
 
     var detail: String {
         switch self {
         case .membership:
-            String(localized: "Unlock premium looks, custom imports and full-resolution delivery.")
+            String(localized: "Unlock camera recording on iPhone and iPad, premium looks, custom imports and full-resolution delivery.")
         case .premiumLook:
             String(localized: "Preview Pro looks freely. Unlock Pro to export them, or remove the look to keep exporting free.")
         case .lutImport:
@@ -227,12 +229,14 @@ enum ProFeature: String, Identifiable, Sendable {
         case .gradePresets:
             String(localized: "Save a grade you like and bring it to any other project.")
         case .scopes:
-            String(localized: "Waveform, RGB parade and vectorscope. The histogram stays free.")
+            String(localized: "Waveform, RGB parade and vectorscope in the editor. Camera monitoring and the histogram stay free.")
+        case .cameraRecording:
+            String(localized: "Preview LUTs and adjust focus, white balance, ISO and exposure for free. Upgrade to GradeLab Pro to record video on iPhone and iPad.")
         }
     }
 }
 
-/// One policy shared by previews, photo export, whole timelines and clip export.
+/// One policy shared by previews, camera recording, photo export and video export.
 ///
 /// Nearly every rule here answers the same question — *would writing this file
 /// use something Pro?* — because that is where the paywall sits. Free users can
@@ -241,10 +245,15 @@ enum ProFeature: String, Identifiable, Sendable {
 /// they want on their own clip has a far better reason to buy than someone who
 /// met a locked button.
 ///
-/// The scopes are the one exception, and they have to be: a scope never reaches
-/// the exported file, so there is no export to gate. They are shown behind an
-/// obscuring layer instead — the trace is there, but not readable.
+/// Camera setup stays free; starting a take is its paid file-writing boundary.
+/// Editor scopes are gated while viewing because they never reach an export.
+/// Camera scopes stay free as part of the pre-recording preview.
 enum ProAccessPolicy {
+    /// Camera setup and monitoring are free. Writing a take requires Pro,
+    /// independently of its format, resolution or chosen preview look.
+    static func cameraRecordingRequirement(hasPro: Bool) -> ProFeature? {
+        hasPro ? nil : .cameraRecording
+    }
 
     // MARK: - Looks
 

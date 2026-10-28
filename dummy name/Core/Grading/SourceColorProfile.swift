@@ -28,6 +28,8 @@ enum SourceColorProfile: Equatable, Sendable {
     case rec709Wide(bitDepth: Int)
     /// HLG / BT.2020, 10-bit.
     case hlgBT2020
+    /// Tagged D65 P3 SDR; edited through an explicit Rec.709 conversion.
+    case displayP3
     /// Apple Log, `com.apple.rec2020.apple-log`: BT.2020 primaries with Apple's
     /// Log transfer curve.
     case appleLog
@@ -49,7 +51,7 @@ enum SourceColorProfile: Equatable, Sendable {
     var isLog: Bool {
         switch self {
         case .appleLog, .appleLog2, .otherLog: true
-        case .rec709, .rec709Wide, .hlgBT2020, .unknown: false
+        case .rec709, .rec709Wide, .displayP3, .hlgBT2020, .unknown: false
         }
     }
 
@@ -59,6 +61,7 @@ enum SourceColorProfile: Equatable, Sendable {
         case .rec709: "Rec.709"
         case .rec709Wide(let depth): "Rec.709 · \(depth)-bit"
         case .hlgBT2020: "HLG · BT.2020"
+        case .displayP3: "P3 D65 · SDR"
         case .appleLog: "Apple Log"
         case .appleLog2: "Apple Log 2"
         case .otherLog(let identifier): Self.readableLogName(identifier)
@@ -78,6 +81,7 @@ enum SourceColorProfile: Equatable, Sendable {
         // to prevent.
         case .appleLog2: "Apple Wide Gamut"
         case .hlgBT2020: "BT.2020"
+        case .displayP3: "Display P3"
         case .rec709, .rec709Wide: "BT.709"
         case .otherLog, .unknown: nil
         }
@@ -88,7 +92,7 @@ enum SourceColorProfile: Equatable, Sendable {
         switch self {
         case .appleLog, .appleLog2, .otherLog: String(localized: "Log (scene-referred)")
         case .hlgBT2020: "HDR"
-        case .rec709, .rec709Wide: "SDR"
+        case .rec709, .rec709Wide, .displayP3: "SDR"
         case .unknown: String(localized: "Unknown")
         }
     }
@@ -115,6 +119,7 @@ enum SourceColorProfile: Equatable, Sendable {
         if metadata.transferFunction == "HLG", let depth = metadata.bitDepth, depth >= 10 {
             return .hlgBT2020
         }
+        if isSupportedP3(metadata) { return .displayP3 }
         if let depth = metadata.bitDepth, depth > 8,
            ProjectColorMode.usesWidePrecisionSDR(for: metadata) {
             return .rec709Wide(bitDepth: depth)
@@ -125,6 +130,13 @@ enum SourceColorProfile: Equatable, Sendable {
             return .rec709
         }
         return .unknown
+    }
+
+    static func isSupportedP3(_ metadata: VideoMetadata) -> Bool {
+        metadata.logTransferFunction == nil && metadata.logProfileIdentifier == nil
+            && metadata.colorPrimaries == "Display P3" && metadata.isHDR != true
+            && ["BT.709", "sRGB"].contains(metadata.transferFunction ?? "")
+            && metadata.yCbCrMatrix == "BT.709" && [8, 10, 12].contains(metadata.bitDepth ?? 0)
     }
 
     /// Maps an official Log identifier onto a profile.

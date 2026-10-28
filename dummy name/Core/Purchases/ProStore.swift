@@ -35,7 +35,7 @@ final class ProStore: ObservableObject {
                 await self.refreshAccess()
                 await transaction.finish()
             }
-        }
+        } 
         Task { await refreshAccess() }
     }
     deinit { updatesTask?.cancel(); expiryTask?.cancel() }

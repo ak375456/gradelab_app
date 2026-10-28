@@ -91,7 +91,7 @@ struct LUTAsset: Equatable, Sendable, Identifiable {
     static func displayName(forResourceName name: String) -> String {
         let cleaned = name
             .replacingOccurrences(
-                of: "^(?i:FG|ON1)(?:[_\\s-]+|(?=[A-Z][a-z]))",
+                of: "^(?i:FG|ON1|IWLTBAP)(?:[_\\s-]+|(?=[A-Z][a-z]))",
                 with: "", options: .regularExpression)
             .replacingOccurrences(of: "_", with: " ")
             .replacingOccurrences(
@@ -143,7 +143,7 @@ extension LUTAsset {
     ]
 
     static let bundledLooks: [LUTAsset] = {
-        let builtIn = bundledCreativeLooks + bundledCuratedLooks + bundledLogConversions
+        let builtIn = bundledCreativeLooks + bundledCuratedLooks + bundledSunsetLooks + bundledLogConversions
         let known = Set(builtIn.map(\.resourceName)).union(technicalTransformResourceNames)
         // The resource directory is listed directly. `urls(forResourcesWithExtension:)`
         // matches the extension case-sensitively, so asking it for "cube" silently
@@ -296,6 +296,42 @@ extension LUTAsset {
             inputColorSpace: "Rec.709 / working SDR",
             kind: .creative,
             origin: .bundled
+        )
+    ]
+
+    /// Standard-profile creative cubes from the user's downloaded collection.
+    /// Source attribution/provenance is kept in LUTSources/Curated; the app
+    /// uses concise names. Compiled 32³/33³ textures load only when selected.
+    static let bundledSunsetLooks: [LUTAsset] = [
+        LUTAsset(
+            name: "Desert Sunset", filename: "Desert_Sunset.cube", category: "Cinematic",
+            summary: String(localized: "Sunset warmth with amber highlights and turquoise blues."),
+            inputColorSpace: "Rec.709 / working SDR", kind: .creative, origin: .bundled
+        ),
+        LUTAsset(
+            name: "Evergreen Chrome", filename: "Evergreen_Chrome.cube", category: "Film-inspired",
+            summary: String(localized: "Deep cyan greens, rich blues and warm film-like skin tones."),
+            inputColorSpace: "Rec.709 / working SDR", kind: .creative, origin: .bundled
+        ),
+        LUTAsset(
+            name: "Amber Grove", filename: "Amber_Grove.cube", category: "Cinematic",
+            summary: String(localized: "Golden foliage and warm earth tones with crisp, saturated blues."),
+            inputColorSpace: "Rec.709 / working SDR", kind: .creative, origin: .bundled
+        ),
+        LUTAsset(
+            name: "Soft Bloom", filename: "Soft_Bloom.cube", category: "Film-inspired",
+            summary: String(localized: "Gentle contrast, soft warmth and mellow teal shadows."),
+            inputColorSpace: "Rec.709 / working SDR", kind: .creative, origin: .bundled
+        ),
+        LUTAsset(
+            name: "Azure Film", filename: "Azure_Film.cube", category: "Film-inspired",
+            summary: String(localized: "Faded cool shadows, warm skin and a soft blue film palette."),
+            inputColorSpace: "Rec.709 / working SDR", kind: .creative, origin: .bundled
+        ),
+        LUTAsset(
+            name: "Azure Film Deep", filename: "Azure_Film_Deep.cube", category: "Cinematic",
+            summary: String(localized: "Deep blacks, vivid blue skies and warm, punchy midtones."),
+            inputColorSpace: "Rec.709 / working SDR", kind: .creative, origin: .bundled
         )
     ]
 

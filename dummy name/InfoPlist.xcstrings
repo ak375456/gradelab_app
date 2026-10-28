@@ -41,13 +41,13 @@
             "value" : "GradeLab"
           }
         },
-        "sv" : {
+        "ja" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "GradeLab"
           }
         },
-        "ja" : {
+        "sv" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "GradeLab"
@@ -69,6 +69,112 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "GradeLab"
+          }
+        }
+      }
+    },
+    "NSCameraUsageDescription" : {
+      "comment" : "Privacy - Camera Usage Description",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "GradeLab verwendet die Kamera für Videoaufnahmen mit manueller Steuerung und live bearbeitbaren Looks."
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "GradeLab uses the camera to record videos with manual controls and live, editable looks."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "GradeLab usa la cámara para grabar videos con controles manuales y looks editables en directo."
+          }
+        },
+        "fi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "GradeLab käyttää kameraa videoiden tallentamiseen käsisäädöillä ja reaaliaikaisilla, muokattavilla tyyleillä."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "GradeLab utilise la caméra pour enregistrer des vidéos avec des commandes manuelles et des looks modifiables en direct."
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "GradeLab usa la fotocamera per registrare video con controlli manuali e look modificabili in tempo reale."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "GradeLabはカメラを使用して、手動コントロールとライブで編集可能なルックを使った動画を録画します。"
+          }
+        },
+        "sv" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "GradeLab använder kameran för att spela in video med manuella kontroller och redigerbara lookar i realtid."
+          }
+        }
+      }
+    },
+    "NSMicrophoneUsageDescription" : {
+      "comment" : "Privacy - Microphone Usage Description",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "GradeLab verwendet das Mikrofon, um Ton zu deinen Kameraaufnahmen aufzuzeichnen."
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "GradeLab uses the microphone to record audio with your camera videos."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "GradeLab usa el micrófono para grabar audio en los videos de la cámara."
+          }
+        },
+        "fi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "GradeLab käyttää mikrofonia äänen tallentamiseen kameravideoihin."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "GradeLab utilise le microphone pour enregistrer le son de vos vidéos."
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "GradeLab usa il microfono per registrare l’audio dei video della fotocamera."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "GradeLabはマイクを使用して、カメラで撮影する動画の音声を録音します。"
+          }
+        },
+        "sv" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "GradeLab använder mikrofonen för att spela in ljud till dina kameravideor."
           }
         }
       }
@@ -113,16 +219,16 @@
             "value" : "GradeLab ha bisogno dell'autorizzazione per salvare in Foto il tuo video o la tua foto con il grading applicato."
           }
         },
-        "sv" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "GradeLab behöver tillstånd för att spara din gradade video eller bild till Bilder."
-          }
-        },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "カラー調整した動画や写真を「写真」に保存するために、GradeLabによる写真の追加を許可してください。"
+          }
+        },
+        "sv" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "GradeLab behöver tillstånd för att spara din gradade video eller bild till Bilder."
           }
         }
       }

@@ -37,6 +37,7 @@ final class ScopeAnalyzer: @unchecked Sendable {
 
     private let context: MetalContext
     private let colorSpace: ScopeColorSpace
+    private let colorMode: ProjectColorMode
     private let lock = NSLock()
 
     private var samplePipelines: [String: MTLComputePipelineState] = [:]
@@ -53,9 +54,10 @@ final class ScopeAnalyzer: @unchecked Sendable {
     private var inFlight = false
     var onUpdate: (@Sendable () -> Void)?
 
-    init?(context: MetalContext, colorSpace: ScopeColorSpace) {
+    init?(context: MetalContext, colorSpace: ScopeColorSpace, colorMode: ProjectColorMode = .sdr) {
         self.context = context
         self.colorSpace = colorSpace
+        self.colorMode = colorMode
         guard let peak = context.device.makeBuffer(length: MemoryLayout<UInt32>.stride,
                                                    options: .storageModePrivate) else { return nil }
         peakBuffer = peak
@@ -66,6 +68,11 @@ final class ScopeAnalyzer: @unchecked Sendable {
         for name in ["scopeSampleYUV", "scopeSampleBGRA", "scopeSampleHDR"] {
             guard let state = pipeline(name) else { return nil }
             samplePipelines[name] = state
+        }
+        if colorMode.isAppleLog {
+            guard let state = AppleLogSpecialization.computePipeline("scopeSampleAppleLog", isLog2: colorMode == .appleLog2,
+                library: context.library, device: context.device) else { return nil }
+            samplePipelines["scopeSampleAppleLog"] = state
         }
         let kernels: [ScopeType: String] = [
             .histogram: "scopeHistogram", .waveform: "scopeWaveform",
@@ -186,8 +193,10 @@ final class ScopeAnalyzer: @unchecked Sendable {
         intensity: Double,
         lut: MTLTexture,
         curveLUT: MTLTexture,
-        warpField: MTLTexture
+        warpField: MTLTexture,
+        renderingLUT: MTLTexture? = nil
     ) -> Bool {
+        if colorMode.isAppleLog, renderingLUT == nil { return false }
         lock.lock()
         if inFlight { lock.unlock(); return false }
         let size = Self.analysisSize(width: CVPixelBufferGetWidth(pixelBuffer),
@@ -219,7 +228,7 @@ final class ScopeAnalyzer: @unchecked Sendable {
             let name: String
             switch textures.storage {
             case .biPlanar(_, let luma, _, let chroma):
-                name = "scopeSampleYUV"
+                name = colorMode.isAppleLog ? "scopeSampleAppleLog" : "scopeSampleYUV"
                 encoder.setTexture(luma, index: 0)
                 encoder.setTexture(chroma, index: 1)
                 encoder.setBytes(&yuv, length: MemoryLayout<YUVUniforms>.stride, index: 1)
@@ -237,6 +246,7 @@ final class ScopeAnalyzer: @unchecked Sendable {
             encoder.setComputePipelineState(pipeline)
             encoder.setTexture(analysis, index: 2)
             encoder.setTexture(lut, index: 3)
+            if let renderingLUT { encoder.setTexture(renderingLUT, index: 4) }
             encoder.setTexture(curveLUT, index: 6)
             encoder.setTexture(warpField, index: 12)
             encoder.setBytes(&grade, length: MemoryLayout<GradeUniforms>.stride, index: 0)

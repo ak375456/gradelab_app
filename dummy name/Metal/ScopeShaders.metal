@@ -165,7 +165,7 @@ fragment float4 scopeHistogramFragment(
     for (uint channel = 0; channel < 3; ++channel) {
         float height = scopeDensity(bins[channel * u.bins + bin], peak[0], u.intensity);
         // A soft edge instead of a hard step, so a single-bin spike still reads.
-        float coverage = smoothstep(level + 0.012, level - 0.012, height);
+        float coverage = height > 0.0 ? 1.0 - smoothstep(height - 0.012, height + 0.012, level) : 0.0;
         colour += channelTint[channel] * coverage * 0.72;
     }
     return float4(colour, 1.0);

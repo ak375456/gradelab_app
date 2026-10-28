@@ -27,6 +27,11 @@ struct ContentView: View {
             switch coordinator.screen {
             case .home:
                 HomeView(coordinator: coordinator).transition(.opacity)
+            #if !targetEnvironment(macCatalyst)
+            case .camera:
+                CameraView(onClose: coordinator.showHome, onRecording: coordinator.openCameraRecording)
+                    .transition(.opacity)
+            #endif
             case .analyzing:
                 AnalyzingView(fileName: coordinator.analyzingFileName, media: coordinator.analyzingMedia)
                     .transition(.opacity)

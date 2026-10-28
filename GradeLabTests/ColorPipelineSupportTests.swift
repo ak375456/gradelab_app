@@ -118,12 +118,17 @@ final class ColorPipelineSupportTests: XCTestCase {
 
     /// Depth alone is not enough. A deep source with a colour property we have
     /// no transform for stays blocked.
-    func testTenBitWideGamutIsStillRejected() {
+    func testTaggedSDRP3UsesExplicitRec709Conversion() {
         let support = ColorPipelineSupport(
             metadata: makeVideoMetadata(colorPrimaries: "Display P3", bitDepth: 10)
         )
-        XCTAssertFalse(support.allowsGrading)
-        XCTAssertTrue(support.isBlocking)
+        XCTAssertTrue(support.allowsGrading)
+        XCTAssertFalse(support.isBlocking)
+        XCTAssertEqual(support, .displayP3Supported)
+        XCTAssertEqual(support.colorMode, .sdrWide)
+        XCTAssertTrue(support.notice?.contains("Rec.709") == true)
+        let pq = makeVideoMetadata(colorPrimaries: "Display P3", transferFunction: "PQ", bitDepth: 10)
+        XCTAssertFalse(ColorPipelineSupport(metadata: pq).allowsEditor)
     }
 
     func testUnknownBitDepthIsBlockedInsteadOfSilentlyQuantized() {

@@ -27,6 +27,8 @@ final class CuratedLUTTests: XCTestCase {
             ("fg_CineCold", "Cine Cold"),
             ("FG_CineTeal&Orange1", "Cine Teal & Orange1"),
             ("ON1_Film_Print", "Film Print"),
+            ("IWLTBAP Sedona - Standard", "Sedona - Standard"),
+            ("iwltbap_Aspen", "Aspen"),
             ("Night_Market", "Night Market"),
             ("Apple_LOG2_A", "Apple LOG2 A"),
             ("FGreen", "FGreen")
@@ -79,6 +81,6 @@ final class CuratedLUTTests: XCTestCase {
         attachment.name = "Curated looks — shipping Metal previews"
         attachment.lifetime = .keepAlways
         add(attachment)
-        try sheet.pngData()?.write(to: URL(fileURLWithPath: "/tmp/gradelab-curated-looks.png"))
+        try sheet.pngData()?.write(to: FileManager.default.temporaryDirectory.appendingPathComponent("gradelab-curated-looks.png"))
     }
 }

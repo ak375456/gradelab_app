@@ -94,7 +94,8 @@ final class MetalContext: @unchecked Sendable {
 
     func packedTexture(
         from pixelBuffer: CVPixelBuffer,
-        pixelFormat: MTLPixelFormat
+        pixelFormat: MTLPixelFormat,
+        writable: Bool = false
     ) -> (reference: CVMetalTexture, texture: MTLTexture)? {
         let width = CVPixelBufferGetWidth(pixelBuffer)
         let height = CVPixelBufferGetHeight(pixelBuffer)
@@ -103,7 +104,7 @@ final class MetalContext: @unchecked Sendable {
             kCFAllocatorDefault,
             textureCache,
             pixelBuffer,
-            nil,
+            writable ? [kCVMetalTextureUsage: MTLTextureUsage([.shaderWrite, .shaderRead]).rawValue] as CFDictionary : nil,
             pixelFormat,
             width,
             height,

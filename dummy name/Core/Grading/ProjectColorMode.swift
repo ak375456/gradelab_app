@@ -92,6 +92,7 @@ extension ProjectColorMode {
         default: break
         }
         if canPreserveHDR(for: metadata) { return .hdrHLG }
+        if SourceColorProfile.isSupportedP3(metadata) { return .sdrWide }
         if usesWidePrecisionSDR(for: metadata) { return .sdrWide }
         return .sdr
     }

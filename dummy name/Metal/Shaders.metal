@@ -65,6 +65,33 @@ inline float3 linearToRec709(float3 value) {
                   value >= 0.018);
 }
 
+// Camera monitoring only. HDR remains HLG signal in half float; its existing
+// preview/scope path performs the shared HLG input transform. P3 originals are
+// never touched: this small preview converts D65 P3 into the Rec.709 edit view.
+kernel void cameraMonitorYUV(
+    texture2d<float, access::sample> luma [[texture(0)]],
+    texture2d<float, access::sample> chroma [[texture(1)]],
+    texture2d<float, access::write> output [[texture(2)]],
+    constant YUVUniforms &yuv [[buffer(0)]],
+    constant uint &mode [[buffer(1)]], uint2 position [[thread_position_in_grid]])
+{
+    if (position.x >= output.get_width() || position.y >= output.get_height()) return;
+    constexpr sampler s(coord::normalized, address::clamp_to_edge, filter::linear);
+    float2 uv = (float2(position) + 0.5) / float2(output.get_width(), output.get_height());
+    float3 values = float3(luma.sample(s, uv).r, chroma.sample(s, uv).rg) + yuv.offset.xyz;
+    float3 rgb = yuv.column0.xyz * values.x + yuv.column1.xyz * values.y + yuv.column2.xyz * values.z;
+    if (mode != 0) {
+        float3 linear = mode == 2
+            ? select(max(rgb, 0.0) / 12.92, pow((max(rgb, 0.0) + 0.055) / 1.055, float3(2.4)), rgb > 0.04045)
+            : rec709ToLinear(rgb);
+        float3 rec709 = float3(dot(linear, float3(1.22494018, -0.22494018, 0.0)),
+                              dot(linear, float3(-0.04205695, 1.04205695, 0.0)),
+                              dot(linear, float3(-0.01963755, -0.07863605, 1.09827360)));
+        rgb = linearToRec709(rec709);
+    }
+    output.write(float4(rgb, 1.0), position);
+}
+
 inline float luminance709(float3 color) {
     return dot(color, float3(0.2126, 0.7152, 0.0722));
 }
@@ -136,6 +163,38 @@ inline float3 applyViewerAssist(float3 rgb, float2 pixel, constant GradeUniforms
     // as the picture, so the shot stays watchable while it is switched on.
     if (luma < grade.viewerAssist.y) { return rgb; }
     return fract((pixel.x + pixel.y) / 12.0) < 0.5 ? float3(1.0) : float3(0.0);
+}
+
+// Source-detail peaking: a high-frequency test rejects flat areas and soft
+// gradients. It reads the source before LUTs/exposure aids, so adding contrast
+// to a look cannot make an out-of-focus edge appear sharp. Display fragments
+// alone call this function; recorders, scope samplers and exports never do.
+inline float peakingLuma(texture2d<float, access::sample> source, float2 uv, bool lumaPlane) {
+    constexpr sampler s(coord::normalized, address::clamp_to_edge, filter::linear);
+    float3 rgb = source.sample(s, uv).rgb;
+    return lumaPlane ? rgb.r : luminance709(rgb);
+}
+
+inline float3 applyFocusPeaking(float3 rgb, texture2d<float, access::sample> source,
+                               float2 uv, bool lumaPlane, constant GradeUniforms &grade) {
+    if (grade.viewerAssist.z < 0.5) return rgb;
+    float2 texel = 1.0 / float2(source.get_width(), source.get_height());
+    float2 step = max(texel, abs(dfdx(uv)) + abs(dfdy(uv)));
+    float c = peakingLuma(source, uv, lumaPlane);
+    float l = peakingLuma(source, uv - float2(step.x, 0), lumaPlane);
+    float r = peakingLuma(source, uv + float2(step.x, 0), lumaPlane);
+    float t = peakingLuma(source, uv - float2(0, step.y), lumaPlane);
+    float b = peakingLuma(source, uv + float2(0, step.y), lumaPlane);
+    float threshold = mix(0.12, 0.012, saturate(grade.viewerAssist.w));
+    float detail = abs(4.0 * c - l - r - t - b);
+    float contrast = max(abs(r - l), abs(b - t));
+    float amount = smoothstep(threshold, threshold * 1.8, detail)
+                 * smoothstep(threshold * 0.5, threshold, contrast);
+    uint colorID = uint(grade.viewerAssist.z + 0.5);
+    float3 color = colorID == 2 ? float3(1.0, 0.12, 0.10)
+                 : colorID == 3 ? float3(1.0, 0.90, 0.05)
+                 : colorID == 4 ? float3(1.0) : float3(0.0, 0.88, 1.0);
+    return mix(rgb, color, amount * 0.95);
 }
 
 inline float3 preserveHueLuminance(float3 color, float oldLuma, float newLuma) {
@@ -1437,13 +1496,13 @@ fragment float4 previewFragmentAppleLog(
         // Original comparison bypasses the creative grade but NOT the input
         // transform: raw Log is not a picture, and showing it would make the
         // comparison meaningless.
-        return float4(applyViewerAssist(appleLogWorkingToRec709(working, renderingLUT),
-                                        in.position.xy, grade), 1.0);
+        return float4(applyFocusPeaking(applyViewerAssist(appleLogWorkingToRec709(working, renderingLUT),
+            in.position.xy, grade), lumaTexture, in.textureCoordinate, true, grade), 1.0);
     }
     working = applyLookAndGradeHDR(
         working, in.textureCoordinate, grade, lutTexture, curveLUT, warpField, locals);
-    return float4(applyViewerAssist(appleLogWorkingToRec709(working, renderingLUT),
-                                    in.position.xy, grade), 1.0);
+    return float4(applyFocusPeaking(applyViewerAssist(appleLogWorkingToRec709(working, renderingLUT),
+        in.position.xy, grade), lumaTexture, in.textureCoordinate, true, grade), 1.0);
 }
 
 // The drawable is an HLG-tagged surface with CAEDRMetadata.hlg attached, so the
@@ -1464,12 +1523,14 @@ fragment float4 previewFragmentHDR(
     float4 sample = sourceTexture.sample(videoSampler, in.textureCoordinate);
     if (grade.options.x > 0.5) {
         // Original: untouched signal
-        return float4(applyViewerAssist(saturate(sample.rgb), in.position.xy, grade), 1.0);
+        return float4(applyFocusPeaking(applyViewerAssist(saturate(sample.rgb), in.position.xy, grade),
+            sourceTexture, in.textureCoordinate, false, grade), 1.0);
     }
     float3 working = toWorkingSpace(sample.rgb, hdr);
     working = applyLookAndGradeHDR(
         working, in.textureCoordinate, grade, lutTexture, curveLUT, warpField, locals);
-    return float4(applyViewerAssist(workingToSignal(working, hdr), in.position.xy, grade), 1.0);
+    return float4(applyFocusPeaking(applyViewerAssist(workingToSignal(working, hdr), in.position.xy, grade),
+        sourceTexture, in.textureCoordinate, false, grade), 1.0);
 }
 
 
@@ -1944,7 +2005,8 @@ fragment float4 gradeFragmentYUV(
     float2 uv = chromaTexture.sample(videoSampler, in.textureCoordinate).rg;
     float3 graded = applyLookAndGrade(decodeYUV(y, uv, yuv), in.textureCoordinate,
                                       grade, lutTexture, curveLUT, warpField, locals);
-    return float4(applyViewerAssist(graded, in.position.xy, grade), 1.0);
+    return float4(applyFocusPeaking(applyViewerAssist(graded, in.position.xy, grade),
+        lumaTexture, in.textureCoordinate, true, grade), 1.0);
 }
 
 fragment float4 gradeFragmentBGRA(
@@ -1959,9 +2021,9 @@ fragment float4 gradeFragmentBGRA(
     constexpr sampler videoSampler(coord::normalized, address::clamp_to_edge, filter::linear);
     float4 pixel = sourceTexture.sample(videoSampler, in.textureCoordinate);
     float3 straight = pixel.a > 0.00001 ? pixel.rgb / pixel.a : float3(0);
-    float3 graded = applyViewerAssist(
+    float3 graded = applyFocusPeaking(applyViewerAssist(
         applyLookAndGrade(straight, in.textureCoordinate, grade, lutTexture, curveLUT, warpField, locals),
-        in.position.xy, grade);
+        in.position.xy, grade), sourceTexture, in.textureCoordinate, false, grade);
     float2 cell = floor(in.position.xy / 14.0);
     float checker = fmod(cell.x + cell.y, 2.0) < 1.0 ? 0.16 : 0.24;
     return float4(mix(float3(checker), graded, pixel.a), 1.0);
@@ -2077,7 +2139,8 @@ fragment float4 presentFragmentSDR(
     // fragment; it simply makes a cutout legible when no lower layer exists.
     float2 cell = floor(in.position.xy / 14.0);
     float checker = fmod(cell.x + cell.y, 2.0) < 1.0 ? 0.16 : 0.24;
-    float3 straight = applyViewerAssist(saturate(pixel.rgb), in.position.xy, grade);
+    float3 straight = applyFocusPeaking(applyViewerAssist(saturate(pixel.rgb), in.position.xy, grade),
+        source, in.textureCoordinate, false, grade);
     return float4(mix(float3(checker), straight, pixel.a), 1.0);
 }
 
@@ -2091,7 +2154,8 @@ fragment float4 presentFragmentHDR(
 {
     constexpr sampler videoSampler(coord::normalized, address::clamp_to_edge, filter::linear);
     float3 signal = workingToSignal(source.sample(videoSampler, in.textureCoordinate).rgb, hdr);
-    return float4(applyViewerAssist(signal, in.position.xy, grade), 1.0);
+    return float4(applyFocusPeaking(applyViewerAssist(signal, in.position.xy, grade),
+        source, in.textureCoordinate, false, grade), 1.0);
 }
 
 // ---------------------------------------------------------------------------
@@ -2137,6 +2201,30 @@ kernel void scopeSampleYUV(
     float3 rgb = decodeYUV(lumaTexture.sample(scopeSampler, uv).r,
                            chromaTexture.sample(scopeSampler, uv).rg, yuv);
     analysis.write(float4(applyLookAndGrade(rgb, uv, grade, lutTexture, curveLUT, warpField, locals), 1.0), position);
+}
+
+// Log scopes read the same display transform as previewFragmentAppleLog,
+// without baking monitoring aids into the measurement.
+kernel void scopeSampleAppleLog(
+    texture2d<float, access::sample> lumaTexture [[texture(0)]],
+    texture2d<float, access::sample> chromaTexture [[texture(1)]],
+    texture2d<float, access::write> analysis [[texture(2)]],
+    texture3d<float, access::sample> lutTexture [[texture(3)]],
+    texture3d<float, access::sample> renderingLUT [[texture(4)]],
+    texture2d<float, access::sample> curveLUT [[texture(6)]],
+    texture2d<float, access::sample> warpField [[texture(12)]],
+    constant GradeUniforms &grade [[buffer(0)]],
+    uint2 position [[thread_position_in_grid]],
+    constant LocalGradeStack &locals [[buffer(8)]])
+{
+    if (position.x >= analysis.get_width() || position.y >= analysis.get_height()) { return; }
+    constexpr sampler s(coord::normalized, address::clamp_to_edge, filter::nearest);
+    float2 uv = scopeCoordinate(analysis, position);
+    float3 working = appleLogToWorking(lumaTexture.sample(s, uv).r, chromaTexture.sample(s, uv).rg);
+    if (grade.options.x <= 0.5) {
+        working = applyLookAndGradeHDR(working, uv, grade, lutTexture, curveLUT, warpField, locals);
+    }
+    analysis.write(float4(appleLogWorkingToRec709(working, renderingLUT), 1.0), position);
 }
 
 kernel void scopeSampleBGRA(
@@ -3401,7 +3489,8 @@ fragment float4 presentFragmentAppleLog(
     constant GradeUniforms &grade [[buffer(0)]]) {
     constexpr sampler s(coord::normalized, address::clamp_to_edge, filter::linear);
     float3 rec709 = appleLogWorkingToRec709(source.sample(s, in.textureCoordinate).rgb, renderingLUT);
-    return float4(applyViewerAssist(rec709, in.position.xy, grade), 1);
+    return float4(applyFocusPeaking(applyViewerAssist(rec709, in.position.xy, grade),
+        source, in.textureCoordinate, false, grade), 1);
 }
 
 kernel void encodeAppleLogFromTexture(

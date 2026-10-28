@@ -52,6 +52,7 @@ enum AppleLogSpecialization {
     /// `makeFunction(name:)` directly.
     static let specializedFunctions: Set<String> = [
         "previewFragmentAppleLog",
+        "scopeSampleAppleLog",
         "gradeToTextureAppleLog",
         "compositeVideoAppleLog",
         "gradeExportAppleLogSDR10",

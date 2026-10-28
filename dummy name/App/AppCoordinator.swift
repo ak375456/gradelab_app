@@ -14,6 +14,9 @@ final class AppCoordinator: ObservableObject {
         /// the video editor, because it is a different document with a different
         /// shape — no timeline, no transport, no duration.
         case imageEditor
+        #if !targetEnvironment(macCatalyst)
+        case camera
+        #endif
     }
 
     struct AlertState: Identifiable {
@@ -33,6 +36,8 @@ final class AppCoordinator: ObservableObject {
     /// Set alongside `analyzingFileName` by whichever import began.
     @Published private(set) var analyzingMedia: AnalyzingView.Media = .video
     @Published var alert: AlertState?
+    @Published private(set) var pendingCameraRecordings: [CameraRecording] = []
+    @Published private(set) var deletingCameraRecordings: Set<UUID> = []
     /// Why the video library is empty, when it is empty because reading it
     /// failed rather than because nothing has been imported. Home needs the
     /// difference: "No projects yet" is an invitation, and showing it over a
@@ -44,16 +49,20 @@ final class AppCoordinator: ObservableObject {
     @Published private(set) var imageProjectLoadFailure: String?
 
     private let projectStore: ProjectStore
-    private let imageProjectStore = ImageProjectStore()
+    private let imageProjectStore: ImageProjectStore
     private lazy var importService = VideoImportService(projectStore: projectStore)
     private let metadataReader = VideoMetadataReader()
     private let thumbnailGenerator = ThumbnailGenerator()
     private var importTask: Task<Void, Never>?
     private var autosaveTask: Task<Void, Never>?
     private var imageAutosaveTask: Task<Void, Never>?
+    let cameraRecordingStore: CameraRecordingStore
 
-    init(projectStore: ProjectStore = ProjectStore()) {
+    init(projectStore: ProjectStore = ProjectStore(), cameraRecordingStore: CameraRecordingStore = CameraRecordingStore(),
+         imageProjectStore: ImageProjectStore = ImageProjectStore()) {
         self.projectStore = projectStore
+        self.cameraRecordingStore = cameraRecordingStore
+        self.imageProjectStore = imageProjectStore
         // Started at launch, not when a tool needs it: the compositing shaders
         // take real time to compile the first time they are built on a device,
         // and paying that while someone waits for a frame is what made the first
@@ -214,6 +223,78 @@ final class AppCoordinator: ObservableObject {
 
     func importVideo(from item: MediaImportSource) {
         importVideos(from: [item])
+    }
+
+    #if !targetEnvironment(macCatalyst)
+    func showCamera() {
+        guard !AppPlatform.isMac else { return }
+        withAnimation(.easeInOut(duration: 0.16)) { screen = .camera }
+    }
+    #endif
+
+    /// Capture already owns a durable file: never run it through the importer's
+    /// copy/delete cleanup. The receipt remains retryable until the project is
+    /// saved. Reusing its UUID makes retrying after a crash idempotent.
+    func openCameraRecording(_ recording: CameraRecording) {
+        guard !deletingCameraRecordings.contains(recording.id) else { return }
+        importTask?.cancel()
+        analyzingFileName = recording.displayName
+        analyzingMedia = .video
+        screen = .analyzing
+        importTask = Task { [weak self] in
+            guard let self else { return }
+            do {
+                let url = self.cameraRecordingStore.mediaURL(for: recording)
+                let asset = try await self.metadataReader.read(from: url, originalFileName: url.lastPathComponent)
+                try Task.checkCancellation()
+                let actualProfile = SourceColorProfile.detect(metadata: asset.metadata)
+                if let expected = recording.profile {
+                    let matches = expected.matches(actualProfile)
+                    guard matches else {
+                        throw GradeLabError.unsupportedExport(String(localized: "The recording’s color tags do not match the capture settings. The original has been kept."))
+                    }
+                }
+                _ = try await ExportSourceInspector.inspect(asset, requireExportColorTags: false)
+                let existing = try await self.projectStore.loadProjects().first { $0.id == recording.id }
+                var project = existing ?? GradeProject(id: recording.id, sourceURL: url,
+                    displayName: recording.displayName, metadata: asset.metadata, gradeSettings: recording.grade,
+                    sourceRange: asset.sourceRange, frameDuration: asset.frameDuration)
+                if project.thumbnailFileName == nil,
+                   let thumbnail = try? await self.thumbnailGenerator.makeThumbnail(for: url),
+                   let jpeg = thumbnail.jpegData(compressionQuality: 0.82) {
+                    let thumbnailURL = try await self.projectStore.thumbnailURL(for: project.id)
+                    try jpeg.write(to: thumbnailURL, options: .atomic)
+                    project.thumbnailFileName = thumbnailURL.path
+                }
+                try await self.projectStore.save(project)
+                // A failed receipt cleanup must not hide a successfully saved project.
+                try? self.cameraRecordingStore.complete(recording)
+                await self.loadProjects()
+                self.activeProject = project
+                self.screen = .source
+                self.openEditor()
+            } catch {
+                self.screen = .home
+                await self.loadProjects()
+                self.alert = AlertState(title: String(localized: "Recording Kept"),
+                    message: String(localized: "Your original recording is safe in GradeLab. Retry opening it or share the original from Home.")
+                        + "\n\n" + Self.message(for: error))
+            }
+        }
+    }
+
+    func deleteCameraRecording(_ recording: CameraRecording) async {
+        guard !deletingCameraRecordings.contains(recording.id) else { return }
+        deletingCameraRecordings.insert(recording.id)
+        defer { deletingCameraRecordings.remove(recording.id) }
+        do {
+            let videos = try await projectStore.referencedMediaURLs()
+            let images = try await imageProjectStore.referencedMediaURLs()
+            try cameraRecordingStore.delete(recording, preserving: videos.union(images))
+            await loadProjects()
+        } catch {
+            present(error: error, title: String(localized: "Couldn’t Delete Recording"))
+        }
     }
 
     func importVideos(from items: [MediaImportSource]) {
@@ -390,6 +471,9 @@ final class AppCoordinator: ObservableObject {
     }
 
     private func loadProjects() async {
+        pendingCameraRecordings = ((try? cameraRecordingStore.pending()) ?? []).filter {
+            FileManager.default.fileExists(atPath: cameraRecordingStore.mediaURL(for: $0).path)
+        }
         do {
             projects = try await projectStore.loadProjects()
             projectLoadFailure = nil

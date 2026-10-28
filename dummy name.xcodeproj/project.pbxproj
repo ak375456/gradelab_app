@@ -394,7 +394,7 @@
 				"CODE_SIGN_ENTITLEMENTS[sdk=macosx*]" = "Config/GradeLab-Mac.entitlements";
 				CODE_SIGN_IDENTITY = "Apple Development";
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 23;
+				CURRENT_PROJECT_VERSION = 24;
 				DERIVE_MACCATALYST_PRODUCT_BUNDLE_IDENTIFIER = NO;
 				DEVELOPMENT_TEAM = 93KLT465W3;
 				ENABLE_APP_SANDBOX = YES;
@@ -404,6 +404,8 @@
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_KEY_CFBundleDisplayName = GradeLab;
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.video";
+				INFOPLIST_KEY_NSCameraUsageDescription = "GradeLab uses the camera to record videos with manual controls and live, editable looks.";
+				INFOPLIST_KEY_NSMicrophoneUsageDescription = "GradeLab uses the microphone to record audio with your camera videos.";
 				INFOPLIST_KEY_NSPhotoLibraryAddUsageDescription = "GradeLab needs permission to save your graded video or photo to Photos.";
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
@@ -415,7 +417,7 @@
 					"@executable_path/Frameworks",
 				);
 				MACOSX_DEPLOYMENT_TARGET = 15.0;
-				MARKETING_VERSION = 1.2.3;
+				MARKETING_VERSION = 1.2.4;
 				PRODUCT_BUNDLE_IDENTIFIER = com.aftab.gradelab;
 				PRODUCT_NAME = GradeLab;
 				PROVISIONING_PROFILE_SPECIFIER = "";
@@ -439,7 +441,7 @@
 				"CODE_SIGN_ENTITLEMENTS[sdk=macosx*]" = "Config/GradeLab-Mac.entitlements";
 				CODE_SIGN_IDENTITY = "Apple Development";
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 23;
+				CURRENT_PROJECT_VERSION = 24;
 				DERIVE_MACCATALYST_PRODUCT_BUNDLE_IDENTIFIER = NO;
 				DEVELOPMENT_TEAM = 93KLT465W3;
 				ENABLE_APP_SANDBOX = YES;
@@ -449,6 +451,8 @@
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_KEY_CFBundleDisplayName = GradeLab;
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.video";
+				INFOPLIST_KEY_NSCameraUsageDescription = "GradeLab uses the camera to record videos with manual controls and live, editable looks.";
+				INFOPLIST_KEY_NSMicrophoneUsageDescription = "GradeLab uses the microphone to record audio with your camera videos.";
 				INFOPLIST_KEY_NSPhotoLibraryAddUsageDescription = "GradeLab needs permission to save your graded video or photo to Photos.";
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
@@ -460,7 +464,7 @@
 					"@executable_path/Frameworks",
 				);
 				MACOSX_DEPLOYMENT_TARGET = 15.0;
-				MARKETING_VERSION = 1.2.3;
+				MARKETING_VERSION = 1.2.4;
 				PRODUCT_BUNDLE_IDENTIFIER = com.aftab.gradelab;
 				PRODUCT_NAME = GradeLab;
 				PROVISIONING_PROFILE_SPECIFIER = "";

@@ -1,6 +1,6 @@
 import Foundation
 
-/// Exposure aids drawn over the preview: false colour and zebras.
+/// Monitoring aids drawn only over the preview.
 ///
 /// Deliberately not part of `VideoProject`, and deliberately not part of
 /// `GradeSettings` either. An assist is how the person is *looking* at the
@@ -54,19 +54,28 @@ struct ViewerAssistSettings: Equatable, Sendable {
     /// broadcast convention for "about to clip"; 70 is the other common choice,
     /// used for exposing skin rather than for protecting highlights.
     var zebraThreshold: Double = 90
+    var focusPeaking = false
+    var peakingColor: FocusPeakingColor = .cyan
+    /// More sensitivity marks lower-contrast edges, including more noise.
+    var peakingSensitivity: Double = 50
 
     static let thresholdRange: ClosedRange<Double> = 50...100
 
-    var isEnabled: Bool { mode != .off }
+    var isEnabled: Bool { mode != .off || focusPeaking }
 
     /// `reservedC` as the shader reads it: mode, then the threshold as 0...1.
     var uniform: SIMD4<Float> {
-        SIMD4(mode.shaderMode, Float(zebraThreshold / 100), 0, 0)
+        SIMD4(mode.shaderMode, Float(zebraThreshold / 100),
+              focusPeaking ? peakingColor.shaderValue : 0,
+              Float(min(100, max(0, peakingSensitivity)) / 100))
     }
 
     private enum Key {
         static let mode = "viewerAssist.mode"
         static let threshold = "viewerAssist.zebraThreshold"
+        static let peaking = "viewerAssist.focusPeaking"
+        static let color = "viewerAssist.peakingColor"
+        static let sensitivity = "viewerAssist.peakingSensitivity"
     }
 
     static func load(from defaults: UserDefaults = .standard) -> ViewerAssistSettings {
@@ -79,11 +88,35 @@ struct ViewerAssistSettings: Equatable, Sendable {
             settings.zebraThreshold = min(max(stored, thresholdRange.lowerBound),
                                           thresholdRange.upperBound)
         }
+        settings.focusPeaking = defaults.bool(forKey: Key.peaking)
+        if let raw = defaults.string(forKey: Key.color), let color = FocusPeakingColor(rawValue: raw) { settings.peakingColor = color }
+        if defaults.object(forKey: Key.sensitivity) != nil {
+            settings.peakingSensitivity = min(100, max(0, defaults.double(forKey: Key.sensitivity)))
+        }
         return settings
     }
 
     func save(to defaults: UserDefaults = .standard) {
         defaults.set(mode.rawValue, forKey: Key.mode)
         defaults.set(zebraThreshold, forKey: Key.threshold)
+        defaults.set(focusPeaking, forKey: Key.peaking)
+        defaults.set(peakingColor.rawValue, forKey: Key.color)
+        defaults.set(peakingSensitivity, forKey: Key.sensitivity)
+    }
+}
+
+enum FocusPeakingColor: String, CaseIterable, Identifiable, Sendable {
+    case cyan, red, yellow, white
+    var id: Self { self }
+    var title: String {
+        switch self {
+        case .cyan: String(localized: "Cyan")
+        case .red: String(localized: "Red")
+        case .yellow: String(localized: "Yellow")
+        case .white: String(localized: "White")
+        }
+    }
+    var shaderValue: Float {
+        switch self { case .cyan: 1; case .red: 2; case .yellow: 3; case .white: 4 }
     }
 }

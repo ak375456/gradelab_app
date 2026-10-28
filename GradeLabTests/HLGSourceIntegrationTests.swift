@@ -12,9 +12,7 @@ import XCTest
 /// a stage that reads the file itself and refuses it.
 final class HLGSourceIntegrationTests: XCTestCase {
     private var hlgURL: URL {
-        URL(fileURLWithPath: #filePath)
-            .deletingLastPathComponent()
-            .appendingPathComponent("hlg_test.mov")
+        colorFixture("hlg_test")
     }
 
     private func readMetadata() async throws -> VideoAsset {
@@ -165,8 +163,7 @@ final class HDRExportSettingsTests: XCTestCase {
     /// Built from the real HLG fixture through the real inspector, so these
     /// exercise the path the app takes rather than a hand-made stand-in.
     private func hlgSource() async throws -> ExportSourceInfo {
-        let url = URL(fileURLWithPath: #filePath)
-            .deletingLastPathComponent().appendingPathComponent("hlg_test.mov")
+        let url = colorFixture("hlg_test")
         let asset = try await VideoMetadataReader().read(from: url)
         return try await ExportSourceInspector.inspect(asset)
     }
@@ -266,8 +263,7 @@ final class HDRExportSettingsTests: XCTestCase {
 /// same Rec.709 path 8-bit SDR has always used. Only the containers widen.
 final class WidePrecisionSDRTests: XCTestCase {
     private var proResURL: URL {
-        URL(fileURLWithPath: #filePath)
-            .deletingLastPathComponent().appendingPathComponent("prores_test.mov")
+        colorFixture("prores_test")
     }
 
     /// Matches the real source that prompted this: ProRes 422, fully tagged
@@ -321,10 +317,11 @@ final class WidePrecisionSDRTests: XCTestCase {
 
     /// A wide-gamut or HDR transfer at high bit depth is a different problem and
     /// must stay blocked rather than being waved through as "just precision".
-    func testWideGamutAboveEightBitIsStillBlocked() {
+    func testTaggedP3ConvertsToRec709WithoutBeingTreatedAsHDR() {
         let p3 = proResMetadata(primaries: "Display P3")
-        XCTAssertFalse(ColorPipelineSupport(metadata: p3).allowsEditor)
-        XCTAssertTrue(ColorPipelineSupport(metadata: p3).isBlocking)
+        XCTAssertTrue(ColorPipelineSupport(metadata: p3).allowsEditor)
+        XCTAssertEqual(ColorPipelineSupport(metadata: p3).colorMode, .sdrWide)
+        XCTAssertFalse(ProjectColorMode.default(for: p3).isHDR)
     }
 
     /// Export writes 10-bit rather than reducing to 8, and stays Rec.709.
@@ -332,8 +329,7 @@ final class WidePrecisionSDRTests: XCTestCase {
         // Built from the real HLG fixture only to obtain a valid
         // ExportSourceInfo; the colour mode under test is set explicitly.
         let hlg = try await VideoMetadataReader().read(
-            from: URL(fileURLWithPath: #filePath)
-                .deletingLastPathComponent().appendingPathComponent("hlg_test.mov"))
+            from: colorFixture("hlg_test"))
         var source = try await ExportSourceInspector.inspect(hlg)
         source.colorMode = .sdrWide
         let settings = ExportMediaSettings.videoWriterSettings(source: source, configuration: .maximumQuality)
@@ -410,4 +406,11 @@ final class WidePrecisionSDRTests: XCTestCase {
             kCVPixelFormatType_420YpCbCr8BiPlanarVideoRange
         )
     }
+}
+
+// Xcode copies these fixtures into the test bundle on physical devices. The
+// source-tree fallback keeps direct host harnesses usable as well.
+private func colorFixture(_ name: String) -> URL {
+    Bundle(for: HLGSourceIntegrationTests.self).url(forResource: name, withExtension: "mov")
+        ?? URL(fileURLWithPath: #filePath).deletingLastPathComponent().appendingPathComponent(name + ".mov")
 }

@@ -1,0 +1,50 @@
+[
+  {
+    "name": "Desert Sunset",
+    "source": "/Users/aftab/Downloads/IWLTBAP - Sedona (Free LUT)/LUTs by IWLTBAP (CUBE)/IWLTBAP Sedona - Standard.cube",
+    "filename": "Desert_Sunset.cube",
+    "source_sha256": "0437a8a221ed42aac66af545434af57ab687ff00528dc0e951c714b44499e00b",
+    "bundled_source_sha256": "6204d863e9dbd147adf6d3d996514b758b17b6be81084fba41f54e868d8a7bde",
+    "redistribution_basis": "User explicitly confirmed separate redistribution permission on 2026-10-28."
+  },
+  {
+    "name": "Evergreen Chrome",
+    "source": "/Users/aftab/Downloads/IWLTBAP - Sedona (Free LUT)/LUTs by IWLTBAP (CUBE)/BONUS/Aspen/IWLTBAP Aspen - Standard.cube",
+    "filename": "Evergreen_Chrome.cube",
+    "source_sha256": "1c207dac6a0762dfce3d219cdacd41ec2b2b4270c02d0e7fd32c7b50677e64b9",
+    "bundled_source_sha256": "5cfe4ae68a1b603aa02c652dbbeffc5d45df4b31542e3c86adf57a4c3e36e818",
+    "redistribution_basis": "User explicitly confirmed separate redistribution permission on 2026-10-28."
+  },
+  {
+    "name": "Amber Grove",
+    "source": "/Users/aftab/Downloads/IWLTBAP - Sedona (Free LUT)/LUTs by IWLTBAP (CUBE)/BONUS/Arapaho/IWLTBAP Arapaho - Standard.cube",
+    "filename": "Amber_Grove.cube",
+    "source_sha256": "f2ae66d7253c2e27663d8b34e9a36a0884ca2957e0b1808e83975bf9b04d645c",
+    "bundled_source_sha256": "4ce2f4e1facbd24781813233b9475566b29645d1c5d96ddc7e42007aa044a109",
+    "redistribution_basis": "User explicitly confirmed separate redistribution permission on 2026-10-28."
+  },
+  {
+    "name": "Soft Bloom",
+    "source": "/Users/aftab/Downloads/IWLTBAP - Sedona (Free LUT)/LUTs by IWLTBAP (CUBE)/BONUS/Humble/IWLTBAP Humble - Standard.cube",
+    "filename": "Soft_Bloom.cube",
+    "source_sha256": "f11cb3b0b720d745f4f3f62105bb6c25bfc5da7a6ecb5f07462399aac0c926d3",
+    "bundled_source_sha256": "43ffa4348546d59dc7c6a79c5316f8228c8629487c038864ee273df7e22b5519",
+    "redistribution_basis": "User explicitly confirmed separate redistribution permission on 2026-10-28."
+  },
+  {
+    "name": "Azure Film",
+    "source": "/Users/aftab/Downloads/IWLTBAP - Sedona (Free LUT)/LUTs by IWLTBAP (CUBE)/BONUS/8700/F-8700-STD.cube",
+    "filename": "Azure_Film.cube",
+    "source_sha256": "d080843df3aecd9c6092c5e2a31665a22cc9911c6c4944a7589b6fb693341afe",
+    "bundled_source_sha256": "39c0a59a9dd1e67e5d691988090f99dbb11246fce7d4f17254f890e14fda498b",
+    "redistribution_basis": "User explicitly confirmed separate redistribution permission on 2026-10-28."
+  },
+  {
+    "name": "Azure Film Deep",
+    "source": "/Users/aftab/Downloads/IWLTBAP - Sedona (Free LUT)/LUTs by IWLTBAP (CUBE)/BONUS/8700/F-8700-V2-STD.cube",
+    "filename": "Azure_Film_Deep.cube",
+    "source_sha256": "702459004a1819e4fafb01bc9a19079c77b9677a9f81e4d55bf3cdb5a9fe557c",
+    "bundled_source_sha256": "2a908cf08239b575a72fc506583c0ad28d02d50708020221f9dc44401e8d3049",
+    "redistribution_basis": "User explicitly confirmed separate redistribution permission on 2026-10-28."
+  }
+]

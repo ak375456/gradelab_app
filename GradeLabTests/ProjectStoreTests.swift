@@ -93,8 +93,13 @@ final class ProjectStoreTests: XCTestCase {
         XCTAssertTrue(FileManager.default.fileExists(atPath: repaired.sourceURL.path))
 
         // The repair is written back, not held only in memory for this launch.
-        let stored = try String(contentsOf: currentRoot.appendingPathComponent("projects.json"), encoding: .utf8)
-        XCTAssertTrue(stored.contains(currentMedia.path))
-        XCTAssertFalse(stored.contains(previousRoot.path))
+        // Assert the persisted values, independent of JSON's optional slash escaping.
+        struct SavedLibrary: Decodable { let projects: [GradeProject] }
+        let decoder = JSONDecoder()
+        decoder.dateDecodingStrategy = .iso8601
+        let bytes = try Data(contentsOf: currentRoot.appendingPathComponent("projects.json"))
+        let stored = try XCTUnwrap(decoder.decode(SavedLibrary.self, from: bytes).projects.first)
+        XCTAssertEqual(stored.sourceURL.standardizedFileURL, currentMedia.standardizedFileURL)
+        XCTAssertEqual(stored.thumbnailFileName, currentThumbnail.path)
     }
 }
