@@ -13,6 +13,23 @@ import CoreText
         let registry = FontRegistry.shared
         let entries = registry.entries()
         precondition(!entries.isEmpty && Set(entries.map(\.family)).count == entries.count, "Duplicate family rows")
+        let suppliedFaces: [String: [String]] = [
+            "Magari": ["Magari-thin", "Magari-light", "Magari-Regular", "Magari-bold", "Magari-extrabold"],
+            "Pirata One": ["PirataOne-Regular"],
+            "Hopeless Romantic": ["HopelessRomantic-Regular"],
+            "Syne": ["Syne-Regular", "Syne-Medium", "Syne-SemiBold", "Syne-Bold", "Syne-ExtraBold"]
+        ]
+        for (family, names) in suppliedFaces {
+            precondition(entries.contains { $0.family == family }, "Missing bundled family: \(family)")
+            precondition(registry.faces(names[0]).map(\.id) == names, "Missing or unordered styles: \(family)")
+            for name in names {
+                var style = TextStyle()
+                registry.selectFace(name, for: &style)
+                registry.normalize(&style)
+                precondition(registry.selectedFace(style) == name, "Style was replaced: \(name)")
+            }
+        }
+        precondition(registry.faces("Raleway-Regular").count == 18, "Missing Raleway styles")
         var supported = 0, unavailable = 0
         for entry in entries {
             for bold in [false, true] { for italic in [false, true] {
@@ -30,6 +47,6 @@ import CoreText
             } }
         }
         precondition(supported > 0 && unavailable > 0)
-        print("PASS: \(entries.count) unique font families; \(supported) exact supported combinations, \(unavailable) unsupported combinations disabled; selection normalization matches rendered traits.")
+        print("PASS: all 12 downloaded faces and 18 Raleway styles selectable; \(entries.count) unique font families; \(supported) exact supported combinations, \(unavailable) unsupported combinations disabled; selection normalization matches rendered traits.")
     }
 }
