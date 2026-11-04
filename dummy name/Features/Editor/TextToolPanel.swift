@@ -73,6 +73,21 @@ struct TextToolPanel: View {
                         .font(.caption.weight(.bold))
                         .background(.white.opacity(0.07), in: RoundedRectangle(cornerRadius: 9))
                     }
+                    let faces = FontRegistry.shared.faces(clip.style.fontName)
+                    if faces.count > 1 {
+                        Picker("Font style", selection: Binding(
+                            get: { FontRegistry.shared.selectedFace(model.selectedText?.style ?? clip.style) ?? "" },
+                            set: { name in
+                                model.editText("Font style", immediate: true) {
+                                    FontRegistry.shared.selectFace(name, for: &$0.style)
+                                }
+                            }
+                        )) {
+                            ForEach(faces) { face in Text(face.name).tag(face.id) }
+                        }
+                        .pickerStyle(.menu)
+                        .frame(minHeight: 44)
+                    }
                     Button { importer = true } label: {
                         HStack(spacing: 6) {
                             Label("Import TTF font", systemImage: "square.and.arrow.down")

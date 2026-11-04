@@ -7,6 +7,7 @@ import CoreText
 final class FontRegistry: @unchecked Sendable {
     static let shared = FontRegistry()
     struct Entry: Identifiable, Sendable { let id: String; let family: String; let name: String }
+    struct Face: Identifiable, Sendable { let id: String; let name: String }
     private let lock = NSLock()
     private var loaded = false
     private var registered = Set<URL>()
@@ -14,6 +15,8 @@ final class FontRegistry: @unchecked Sendable {
     /// one bundled with the app. Needed because the two are indistinguishable
     /// once CoreText has registered them, and only the imported ones are Pro.
     private var importedNames = Set<String>()
+    private var bundledNames = Set<String>()
+    private var cachedFaces: [String: [Face]] = [:]
     /// The one-face-per-family list, which is stable until a font is
     /// registered. Building it walks every face CoreText knows about - several
     /// hundred on an iPad - so recomputing it per keystroke of the font search,
@@ -49,14 +52,15 @@ final class FontRegistry: @unchecked Sendable {
         CTFontManagerRegisterFontsForURL(url as CFURL, .process, nil)
         // A new face means a new family list. Always called under the lock.
         cachedEntries = nil; registrations += 1
+        cachedFaces.removeAll()
         // A name resolved before this face was registered resolved to a
         // fallback family, so those answers are dropped too.
         familyNames.removeAll()
-        guard imported else { return }
         let descriptors = CTFontManagerCreateFontDescriptorsFromURL(url as CFURL) as? [CTFontDescriptor] ?? []
         for descriptor in descriptors {
             if let name = CTFontDescriptorCopyAttribute(descriptor, kCTFontNameAttribute) as? String {
-                importedNames.insert(name)
+                if imported { importedNames.insert(name) }
+                else { bundledNames.insert(name) }
             }
         }
     }
@@ -68,7 +72,8 @@ final class FontRegistry: @unchecked Sendable {
         guard let name else { return false }
         prepare()
         lock.lock(); defer { lock.unlock() }
-        return importedNames.contains(name)
+        // A previously imported face becomes free when it ships with the app.
+        return importedNames.contains(name) && !bundledNames.contains(name)
     }
     /// Safe to call off the main thread, and worth doing: the first build is the
     /// slow one and everything after it is served from the cache.
@@ -131,6 +136,75 @@ final class FontRegistry: @unchecked Sendable {
         let family = CTFontCopyFamilyName(CTFontCreateWithName(name as CFString, 32, nil)) as String
         lock.lock(); familyNames[name] = family; lock.unlock()
         return family
+    }
+    /// Exact faces keep every supplied weight selectable without adding duplicate
+    /// family rows or changing the PostScript identifiers saved in projects.
+    func faces(_ name: String?) -> [Face] {
+        guard let name else { return [] }
+        prepare()
+        let family = familyName(name)
+        lock.lock()
+        if let cached = cachedFaces[family] { lock.unlock(); return cached }
+        let generation = registrations
+        lock.unlock()
+        let query = CTFontDescriptorCreateWithAttributes([kCTFontFamilyNameAttribute: family] as CFDictionary)
+        let requiredAttributes = Set([kCTFontFamilyNameAttribute as String]) as CFSet
+        let descriptors = CTFontDescriptorCreateMatchingFontDescriptors(query, requiredAttributes) as? [CTFontDescriptor] ?? []
+        var ranked: [String: (face: Face, weight: Double, italic: Bool, variable: Bool)] = [:]
+        for descriptor in descriptors {
+            guard CTFontDescriptorCopyAttribute(descriptor, kCTFontFamilyNameAttribute) as? String == family,
+                  let id = CTFontDescriptorCopyAttribute(descriptor, kCTFontNameAttribute) as? String,
+                  !id.hasPrefix(".") else { continue }
+            let style = CTFontDescriptorCopyAttribute(descriptor, kCTFontStyleNameAttribute) as? String ?? id
+            let styleKey = style.lowercased().filter(\.isLetter)
+            let variable = CTFontDescriptorCopyAttribute(descriptor, kCTFontVariationAttribute) != nil
+            // Existing families may include both static and variable files.
+            // Present each named style once, preferring its static face.
+            if let held = ranked[styleKey] {
+                if !held.variable && variable { continue }
+                if held.variable == variable && held.face.id <= id { continue }
+            }
+            let traits = CTFontDescriptorCopyAttribute(descriptor, kCTFontTraitsAttribute) as? NSDictionary
+            let symbolic = CTFontSymbolicTraits(rawValue: traits?[kCTFontSymbolicTrait] as? UInt32 ?? 0)
+            var weight = traits?[kCTFontWeightTrait] as? Double ?? 0
+            // Some supplied fonts (including Magari) mark every face as regular.
+            // Use their style names to keep the menu in typographic weight order.
+            if weight == 0 {
+                let weights: [(String, Double)] = [("thin", -0.6), ("extralight", -0.4),
+                    ("ultralight", -0.4), ("light", -0.2), ("medium", 0.2),
+                    ("semibold", 0.3), ("demibold", 0.3), ("extrabold", 0.6),
+                    ("ultrabold", 0.6), ("bold", 0.4), ("black", 0.8), ("heavy", 0.8)]
+                weight = weights.first { styleKey.contains($0.0) }?.1 ?? 0
+            }
+            ranked[styleKey] = (Face(id: id, name: style.localizedCapitalized), weight, symbolic.contains(.italicTrait), variable)
+        }
+        let faces = ranked.values.sorted {
+            if $0.weight != $1.weight { return $0.weight < $1.weight }
+            if $0.italic != $1.italic { return !$0.italic }
+            return $0.face.id.localizedStandardCompare($1.face.id) == .orderedAscending
+        }.map(\.face)
+        lock.lock(); defer { lock.unlock() }
+        if registrations == generation { cachedFaces[family] = faces }
+        return faces
+    }
+    func selectedFace(_ style: TextStyle) -> String? {
+        guard style.fontName != nil else { return nil }
+        let font = variant(style.fontName, bold: style.isBold, italic: style.isItalic)
+            ?? baseFont(style.fontName, size: 32)
+        let id = CTFontCopyPostScriptName(font) as String
+        let options = faces(style.fontName)
+        if options.contains(where: { $0.id == id }) { return id }
+        // Old projects can keep a variable face's persisted identifier while
+        // the picker checks its equivalent static style.
+        let name = (CTFontCopyName(font, kCTFontStyleNameKey) as String?)?.localizedCapitalized
+        return options.first { $0.name == name }?.id ?? id
+    }
+    func selectFace(_ name: String, for style: inout TextStyle) {
+        let font = baseFont(name, size: style.fontSize)
+        let traits = CTFontGetSymbolicTraits(font)
+        style.fontName = name
+        style.isBold = traits.contains(.boldTrait)
+        style.isItalic = traits.contains(.italicTrait)
     }
     func baseFont(_ name: String?, size: Double) -> CTFont {
         prepare()
