@@ -4,6 +4,7 @@ import UniformTypeIdentifiers
 
 struct ClipReplacementSheet: View {
     @ObservedObject var model: EditorViewModel
+    @AppStorage(DurationDisplayFormat.preferenceKey) private var durationFormat = DurationDisplayFormat.defaultValue
     let clipID: UUID
     let assetFrames: [UUID: [UIImage]]
     @Environment(\.dismiss) private var dismiss
@@ -402,7 +403,7 @@ struct ClipReplacementSheet: View {
     }
 
     private func seconds(_ value: Double) -> String {
-        String(localized: "\(value.formatted(.number.precision(.fractionLength(0...2))))s")
+        DurationText.string(from: value, format: durationFormat, frameRate: model.durationDisplayFrameRate)
     }
 
     private func rippleDescription(_ delta: Double) -> String {

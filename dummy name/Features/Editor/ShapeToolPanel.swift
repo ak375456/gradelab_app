@@ -32,9 +32,12 @@ struct ShapeToolPanel: View {
                             }.accessibilityLabel(kind.title)
                         }
                     }
-                    number(String(localized: "Duration (s)"),
-                           Binding(get: { model.selectedShape?.placement.duration.seconds ?? 3 },
-                                   set: model.setShapeDuration), 0.1...600, reset: 3)
+                    DurationSliderRow(value: model.selectedShape?.placement.duration.seconds ?? 3,
+                                      range: 0.1...600, reset: 3,
+                                      frameRate: model.durationDisplayFrameRate,
+                                      change: model.setShapeDuration,
+                                      commit: { model.setShapeDuration($0); model.flushGradeHistory() },
+                                      onEditingChanged: { if !$0 { model.flushGradeHistory() } })
                     keyframeHeader
                     // Bounded by the canvas rather than by a fixed 4096, for the
                     // same reason the corner radius is bounded by the shape: a

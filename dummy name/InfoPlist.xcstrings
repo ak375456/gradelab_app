@@ -52,6 +52,18 @@
             "state" : "translated",
             "value" : "GradeLab"
           }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "GradeLab"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "GradeLab"
+          }
         }
       }
     },
@@ -66,6 +78,18 @@
           }
         },
         "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "GradeLab"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "GradeLab"
+          }
+        },
+        "zh-Hant" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "GradeLab"
@@ -123,6 +147,18 @@
             "state" : "translated",
             "value" : "GradeLab använder kameran för att spela in video med manuella kontroller och redigerbara lookar i realtid."
           }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "GradeLab 需要使用相机来录制视频，支持手动控制和实时、可编辑的风格预览。"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "GradeLab 需要取用相機以錄製影片，支援手動控制和可繼續編輯的即時風格預覽。"
+          }
         }
       }
     },
@@ -175,6 +211,18 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "GradeLab använder mikrofonen för att spela in ljud till dina kameravideor."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "GradeLab 需要使用麦克风，为相机录制的视频录入声音。"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "GradeLab 需要取用麥克風，為相機錄製的影片收音。"
           }
         }
       }
@@ -229,6 +277,18 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "GradeLab behöver tillstånd för att spara din gradade video eller bild till Bilder."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "请允许 GradeLab 将调色后的视频或照片保存到“照片”。"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "請允許 GradeLab 將調色後的影片或照片儲存至「照片」。"
           }
         }
       }

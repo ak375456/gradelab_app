@@ -1557,6 +1557,8 @@ struct HDRLayerUniforms {
     float4 row1;
     float4 params;   // x = opacity, y = blend amount, z = source is SDR, w = premultiplied
     float4 matte;    // x = track matte is inverted (coverage is 1 - alpha); y..w spare
+    float4 stabilizationRow0;
+    float4 stabilizationRow1;
 };
 
 struct LayerMaskUniforms {
@@ -1638,9 +1640,17 @@ inline float3 sdrToWorking(float3 encoded) {
     return kRec709ToBT2020 * rec709ToLinear(encoded);
 }
 
+inline float2 layerCoordinateAtPoint(constant HDRLayerUniforms &layer, float3 p) {
+    float2 uv = float2(dot(layer.row0.xyz, p), dot(layer.row1.xyz, p));
+    // Crop in the fitted picture BEFORE looking up the corrected source. This
+    // keeps letterboxing/overlays rectangular even while the camera rolls.
+    if (any(uv < 0.0) || any(uv > 1.0)) return float2(-2.0);
+    float3 source = float3(uv, 1.0);
+    return float2(dot(layer.stabilizationRow0.xyz, source), dot(layer.stabilizationRow1.xyz, source));
+}
+
 inline float2 layerCoordinate(constant HDRLayerUniforms &layer, uint2 position) {
-    float3 p = float3(float(position.x) + 0.5, float(position.y) + 0.5, 1.0);
-    return float2(dot(layer.row0.xyz, p), dot(layer.row1.xyz, p));
+    return layerCoordinateAtPoint(layer, float3(float(position.x) + 0.5, float(position.y) + 0.5, 1.0));
 }
 
 // Preview-only bottom canvas for communicating transparency. Export-created
@@ -2793,7 +2803,7 @@ inline float4 gradedHDRTransitionSample(
     if (screenUV.x < 0.0 || screenUV.x > 1.0 || screenUV.y < 0.0 || screenUV.y > 1.0) return float4(0.0);
     float2 pixel = screenUV * float2(outputSize) - 0.5;
     float3 point = float3(pixel, 1.0);
-    float2 uv = float2(dot(layer.row0.xyz, point), dot(layer.row1.xyz, point));
+    float2 uv = layerCoordinateAtPoint(layer, point);
     if (uv.x < 0.0 || uv.x > 1.0 || uv.y < 0.0 || uv.y > 1.0) return float4(0.0);
     constexpr sampler s(coord::normalized, address::clamp_to_edge, filter::linear);
     float3 signal = source.sample(s, uv).rgb;

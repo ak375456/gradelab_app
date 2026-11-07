@@ -43,25 +43,24 @@ struct TransitionPanel: View {
             }
 
             if let transition = model.selectedTransition {
-                VStack(spacing: 6) {
-                    HStack {
-                        Text("Duration").font(.caption.weight(.semibold))
-                        Spacer()
-                        Text(String(format: "%.2fs", locale: .current, transition.duration.seconds))
-                            .font(.caption.monospacedDigit().weight(.semibold))
-                    }
-                    Slider(value: Binding(
-                        get: { model.selectedTransition?.duration.seconds ?? TimelineTransitionEditing.defaultSeconds },
-                        set: model.setTransitionDuration),
-                        in: model.selectedTransitionMinimumDuration...max(model.selectedTransitionMinimumDuration,
-                            model.selectedTransitionMaximumDuration),
-                        onEditingChanged: { editing in
-                            if editing { model.beginTransitionDurationEditing() }
-                            else { model.endTransitionDurationEditing() }
-                        })
-                        .tint(AppColors.accent)
-                        .accessibilityLabel("Transition duration")
-                }
+                DurationSliderRow(value: transition.duration.seconds,
+                                  range: model.selectedTransitionMinimumDuration...max(model.selectedTransitionMinimumDuration,
+                                      model.selectedTransitionMaximumDuration),
+                                  reset: min(model.selectedTransitionMaximumDuration,
+                                             max(model.selectedTransitionMinimumDuration, TimelineTransitionEditing.defaultSeconds)),
+                                  frameRate: model.durationDisplayFrameRate,
+                                  snapPoints: DurationSliderRow.wholeSecondSnapPoints,
+                                  change: model.setTransitionDuration,
+                                  commit: { seconds in
+                                      model.beginTransitionDurationEditing()
+                                      model.setTransitionDuration(seconds)
+                                      model.endTransitionDurationEditing()
+                                  },
+                                  onEditingChanged: { editing in
+                                      if editing { model.beginTransitionDurationEditing() }
+                                      else { model.endTransitionDurationEditing() }
+                                  })
+                .tint(AppColors.accent)
                 .padding(10)
                 .background(.white.opacity(0.055), in: RoundedRectangle(cornerRadius: 10))
             }

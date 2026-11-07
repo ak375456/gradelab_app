@@ -200,6 +200,8 @@ struct VideoClip: TimelineClip {
     /// Optional so every project written before Shot Match decodes as the
     /// unchanged clip it was.
     var shotMatch: ShotMatchSettings? = nil
+    /// Optional for compatibility with projects saved before stabilization.
+    var stabilization: VideoStabilization? = nil
     // Follows this video's source range and placement until explicitly separated.
     var embeddedAudio: EmbeddedAudio?
     /// Optional so projects saved before keyframes existed still decode unchanged.
@@ -443,7 +445,7 @@ enum AudioFade {
 
 struct TextClip: TimelineClip {
     var placement: ItemPlacement
-    var text = "Text"
+    var text = String(localized: "Text")
     var style = TextStyle()
     var transform = VisualTransform()
     var opacity: Double = 1

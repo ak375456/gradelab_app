@@ -242,6 +242,9 @@ struct HDRLayerUniforms: Sendable {
     /// rather than `sourceAlpha`; the remaining three are spare, and are where
     /// the luma readings will go rather than a fourth vector.
     var matte: SIMD4<Float>
+    /// Fitted-picture UV → original source UV, after the rectangular crop.
+    var stabilizationRow0: SIMD4<Float>
+    var stabilizationRow1: SIMD4<Float>
 
     /// - Parameters:
     ///   - transform: source → canvas, in Core Image's bottom-left coordinates.
@@ -257,7 +260,8 @@ struct HDRLayerUniforms: Sendable {
         blendAmount: Double = 0,
         sourceIsSDR: Bool = false,
         premultiplied: Bool = false,
-        matteInverted: Bool = false
+        matteInverted: Bool = false,
+        sourceCorrection: CGAffineTransform = .identity
     ) {
         // Canvas pixel (top-left origin) → Core Image canvas point → source
         // point → normalised source coordinate with the row order flipped back.
@@ -278,6 +282,9 @@ struct HDRLayerUniforms: Sendable {
             premultiplied ? 1 : 0
         )
         matte = SIMD4(matteInverted ? 1 : 0, 0, 0, 0)
+        let correction = toNormalized.inverted().concatenating(sourceCorrection.inverted()).concatenating(toNormalized)
+        stabilizationRow0 = SIMD4(Float(correction.a), Float(correction.c), Float(correction.tx), 0)
+        stabilizationRow1 = SIMD4(Float(correction.b), Float(correction.d), Float(correction.ty), 0)
     }
 }
 

@@ -59,6 +59,7 @@ struct EditorView: View {
     @State private var importImage = false
     @State private var layers = false
     @State private var transforms = false
+    @State private var stabilizationTool = false
     @ObservedObject private var warmup = CompositorWarmup.shared
     @State private var maskMode = false
     @State private var matteMode = false
@@ -231,7 +232,7 @@ struct EditorView: View {
                             // NLE. Phone landscape keeps the compact behaviour
                             // so its preview is not squeezed by two panels.
                             let showsTimeline = AppPlatform.usesDesktopWorkspace || hasExpandedPhoneSpace
-                                || (!colorMode && !transforms && !canvasTool && !speedTool && !backgroundMode)
+                                || (!colorMode && !transforms && !stabilizationTool && !canvasTool && !speedTool && !backgroundMode)
                             if showsTimeline {
                                 WorkspaceDivider(
                                     orientation: .horizontal,
@@ -499,7 +500,7 @@ struct EditorView: View {
     /// picture. The tools that take the whole panel hide it, and the picture is
     /// welcome to that room when they do.
     private var showsTimelineInTallLayout: Bool {
-        !colorMode && !transforms && !canvasTool && !speedTool && !backgroundMode
+        !colorMode && !transforms && !stabilizationTool && !canvasTool && !speedTool && !backgroundMode
     }
 
     private func setPreviewHeight(_ value: CGFloat, in size: CGSize) {
@@ -697,7 +698,7 @@ struct EditorView: View {
                 ClipReplacementSheet(model: model, clipID: id, assetFrames: assetFrames)
             }
         }
-        .sheet(isPresented: $settingsSheet) { EditorSettings() }
+        .sheet(isPresented: $settingsSheet) { EditorSettings(frameRate: model.durationDisplayFrameRate) }
         .sheet(isPresented: $markers) { MarkerControls(model: model).presentationDetents([.medium, .large]) }
         .sheet(isPresented: $soundEffects) {
             SoundEffectBrowser { url in audioURL = url }
@@ -1542,7 +1543,7 @@ struct EditorView: View {
     /// single place to switch, instead of nine buttons each clearing seven
     /// flags by hand — which is how a tool used to end up half switched.
     private enum EditorMode: String, CaseIterable, Identifiable {
-        case timeline, text, shape, audio, color, transform, mask, matte, background, speed, transition, canvas
+        case timeline, text, shape, audio, color, transform, stabilization, mask, matte, background, speed, transition, canvas
 
         var id: String { rawValue }
 
@@ -1554,6 +1555,7 @@ struct EditorView: View {
             case .audio: return String(localized: "Audio")
             case .color: return String(localized: "Color")
             case .transform: return String(localized: "Transform")
+            case .stabilization: return String(localized: "Stabilize")
             case .mask: return String(localized: "Mask")
             case .matte: return String(localized: "Matte")
             case .background: return String(localized: "Remove BG")
@@ -1571,6 +1573,7 @@ struct EditorView: View {
             case .audio: return "waveform"
             case .color: return "camera.filters"
             case .transform: return "crop.rotate"
+            case .stabilization: return "camera.metering.center.weighted"
             case .mask: return "circle.dashed"
             case .matte: return "square.on.square.dashed"
             case .background: return "person.crop.rectangle"
@@ -1583,7 +1586,7 @@ struct EditorView: View {
         /// Tools that cannot run until the compositing shaders have been built.
         var needsCompositor: Bool {
             switch self {
-            case .text, .shape, .audio, .transform, .mask, .matte, .background, .transition: return true
+            case .text, .shape, .audio, .transform, .stabilization, .mask, .matte, .background, .transition: return true
             case .timeline, .color, .speed, .canvas: return false
             }
         }
@@ -1595,6 +1598,7 @@ struct EditorView: View {
         if audioMode { return .audio }
         if colorMode { return .color }
         if transforms { return .transform }
+        if stabilizationTool { return .stabilization }
         if maskMode { return .mask }
         if matteMode { return .matte }
         if backgroundMode { return .background }
@@ -1611,6 +1615,7 @@ struct EditorView: View {
         audioMode = mode == .audio
         colorMode = mode == .color
         transforms = mode == .transform
+        stabilizationTool = mode == .stabilization
         maskMode = mode == .mask
         matteMode = mode == .matte
         backgroundMode = mode == .background
@@ -1644,6 +1649,8 @@ struct EditorView: View {
         case .color, .transform:
             if model.selectedClip == nil { return String(localized: "Select a clip in the timeline first.") }
             return model.canGrade ? nil : String(localized: "This clip can’t be graded.")
+        case .stabilization:
+            return model.canStabilize ? nil : String(localized: "Select one unlocked video clip to stabilize it.")
         case .mask:
             if model.selectedClip == nil { return String(localized: "Select a clip in the timeline first.") }
             return model.canEditSelection ? nil : String(localized: "This clip is locked.")
@@ -1679,7 +1686,7 @@ struct EditorView: View {
             activate(mode); model.flushGradeHistory()
         case .audio:
             activate(mode); model.beginAudioEditing()
-        case .transform:
+        case .transform, .stabilization:
             activate(mode); model.beginTransformEditing()
         case .mask:
             activate(mode); model.beginLayerMaskEditing()
@@ -1835,6 +1842,7 @@ struct EditorView: View {
         else if matteMode { TrackMattePanel(model: model) }
         else if backgroundMode { BackgroundRemovalPanel(model: model) }
         else if transforms { LiveTransformPanel(model: model) }
+        else if stabilizationTool { StabilizationPanel(model: model) }
         else if canvasTool { CanvasTools(model: model) }
         else if colorMode && model.canGrade { controls }
         else {

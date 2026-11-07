@@ -14,11 +14,14 @@ struct ResettableSlider: View {
     /// Lets a caller route the reset through its own rules — the keyframe rows use this so a
     /// reset on an animated property writes a keyframe instead of the base value.
     var onReset: (() -> Void)?
+    var snapPoints: [Double] = []
 
     @State private var resetFeedback = 0
 
     var body: some View {
-        Slider(value: $value, in: range, onEditingChanged: onEditingChanged)
+        Slider(value: Binding(get: { value }, set: {
+            value = SliderSnap.value($0, in: range, points: snapPoints)
+        }), in: range, onEditingChanged: onEditingChanged)
             .accessibilityLabel(label)
             .accessibilityHint("Double tap to reset")
             .accessibilityAction(named: Text("Reset \(label)"), reset)
@@ -26,6 +29,7 @@ struct ResettableSlider: View {
             // swallow anything; dragging the thumb is unaffected.
             .highPriorityGesture(TapGesture(count: 2).onEnded(reset))
             .sensoryFeedback(.impact(weight: .light, intensity: 0.65), trigger: resetFeedback)
+            .sensoryFeedback(.selection, trigger: snapPoints.first { abs(value - $0) < 0.0005 })
     }
 
     private func reset() {

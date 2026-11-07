@@ -322,13 +322,13 @@ private struct MaskInspector: View {
                 }
                 .buttonStyle(.plain)
 
-                qualifierSlider("Hue", \.hueCenter, 0...360, "°")
-                qualifierSlider("Hue range", \.hueRange, 1...180, "°")
-                qualifierSlider("Saturation from", \.saturationMin, 0...1, "%", scale: 100)
-                qualifierSlider("Saturation to", \.saturationMax, 0...1, "%", scale: 100)
-                qualifierSlider("Luma from", \.lumaMin, 0...1, "%", scale: 100)
-                qualifierSlider("Luma to", \.lumaMax, 0...1, "%", scale: 100)
-                qualifierSlider("Softness", \.softness, 0...1, "%", scale: 100)
+                qualifierSlider(String(localized: "Hue"), \.hueCenter, 0...360, "°")
+                qualifierSlider(String(localized: "Hue range"), \.hueRange, 1...180, "°")
+                qualifierSlider(String(localized: "Saturation from"), \.saturationMin, 0...1, "%", scale: 100)
+                qualifierSlider(String(localized: "Saturation to"), \.saturationMax, 0...1, "%", scale: 100)
+                qualifierSlider(String(localized: "Luma from"), \.lumaMin, 0...1, "%", scale: 100)
+                qualifierSlider(String(localized: "Luma to"), \.lumaMax, 0...1, "%", scale: 100)
+                qualifierSlider(String(localized: "Softness"), \.softness, 0...1, "%", scale: 100)
 
                 Toggle("Invert selection", isOn: model.maskQualifierFlagBinding(mask.id, \.isInverted))
                     .font(AppTypography.caption)
@@ -599,7 +599,7 @@ private struct MaskTrackingControls: View {
 
     private func trackButton(_ direction: MaskTrackingDirection, symbol: String, title: String) -> some View {
         Button { model.requestMaskTracking(direction) } label: {
-            Label(title, systemImage: symbol)
+            Label(LocalizedStringKey(title), systemImage: symbol)
                 .font(AppTypography.caption.weight(.semibold))
                 .frame(maxWidth: .infinity, minHeight: 44)
                 .background(AppColors.surfaceRaised, in: RoundedRectangle(cornerRadius: AppCornerRadius.control))

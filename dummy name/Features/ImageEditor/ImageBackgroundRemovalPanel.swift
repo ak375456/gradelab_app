@@ -52,19 +52,19 @@ struct ImageBackgroundRemovalPanel: View {
                                                     blue: settings.colorKey.color.blue)).frame(width: 24, height: 24) }
                                 .frame(minHeight: 44)
                         }
-                        slider("Similarity", model.backgroundRemovalBinding(\.colorKey.similarity), 0...100, reset: 38)
-                        slider("Smoothness", model.backgroundRemovalBinding(\.colorKey.smoothness), 0...100, reset: 18)
-                        slider("Spill", model.backgroundRemovalBinding(\.colorKey.spill), 0...100, reset: 35)
+                        slider(String(localized: "Similarity"), model.backgroundRemovalBinding(\.colorKey.similarity), 0...100, reset: 38)
+                        slider(String(localized: "Smoothness"), model.backgroundRemovalBinding(\.colorKey.smoothness), 0...100, reset: 18)
+                        slider(String(localized: "Spill"), model.backgroundRemovalBinding(\.colorKey.spill), 0...100, reset: 35)
                     }
                     section("REFINE")
                     HStack(spacing: 8) { brush("Add", .add, "plus.circle"); brush("Remove", .remove, "minus.circle") }
                     if model.backgroundBrush != nil {
-                        slider("Brush Size", $model.backgroundBrushSize, 0.005...0.20, reset: 0.04, percent: true)
-                        slider("Softness", $model.backgroundBrushSoftness, 0...1, reset: 0.65, percent: true)
+                        slider(String(localized: "Brush Size"), $model.backgroundBrushSize, 0.005...0.20, reset: 0.04, percent: true)
+                        slider(String(localized: "Softness"), $model.backgroundBrushSoftness, 0...1, reset: 0.65, percent: true)
                     }
                     section("EDGE")
-                    slider("Feather", model.backgroundRemovalBinding(\.feather), 0...100, reset: 0)
-                    slider("Shift Edge", model.backgroundRemovalBinding(\.edgeShift), -100...100, reset: 0)
+                    slider(String(localized: "Feather"), model.backgroundRemovalBinding(\.feather), 0...100, reset: 0)
+                    slider(String(localized: "Shift Edge"), model.backgroundRemovalBinding(\.edgeShift), -100...100, reset: 0)
                     Toggle("Show Matte", isOn: $model.showsBackgroundMatte).frame(minHeight: 44)
                     Toggle("Invert", isOn: model.backgroundRemovalBinding(\.isInverted)).frame(minHeight: 44)
                     Button("Reset Refinement", action: model.resetBackgroundRefinement)

@@ -54,9 +54,10 @@ struct MaskTrackingCoordinates: Sendable {
 
     /// The existing compositor's top-left placement transform, before its CI
     /// origin flips. Used only to put editor handles over a transformed layer.
-    func sourceToCanvasTransform(_ placement: VisualTransform, canvas: CGSize) -> CGAffineTransform {
+    func sourceToCanvasTransform(_ placement: VisualTransform, canvas: CGSize,
+                                 sourceCorrection: CGAffineTransform = .identity) -> CGAffineTransform {
         let fit = min(canvas.width / displayBounds.width, canvas.height / displayBounds.height)
-        return CGAffineTransform(scaleX: encodedSize.width, y: encodedSize.height)
+        return sourceCorrection.concatenating(CGAffineTransform(scaleX: encodedSize.width, y: encodedSize.height))
             .concatenating(preferredTransform)
             .concatenating(.init(translationX: -displayBounds.minX - displayBounds.width * placement.anchorX,
                                  y: -displayBounds.minY - displayBounds.height * placement.anchorY))

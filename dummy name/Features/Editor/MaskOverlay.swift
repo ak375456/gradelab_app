@@ -111,7 +111,8 @@ struct MaskOverlay: View {
     private var canvasTransform: CGAffineTransform? {
         guard model.maskOverlayUsesCanvas, let coordinates, let clip = model.evaluatedSelectedClip else { return nil }
         return coordinates.sourceToCanvasTransform(clip.transform,
-            canvas: CGSize(width: model.project.canvas.width, height: model.project.canvas.height))
+            canvas: CGSize(width: model.project.canvas.width, height: model.project.canvas.height),
+            sourceCorrection: model.stabilizationSourceUVTransform)
     }
 
     private func sourceToView(_ point: CGPoint, _ picture: CGRect) -> CGPoint {

@@ -128,7 +128,7 @@ struct VideoProject: Codable, Identifiable, Equatable, Sendable {
             // optical flow both need two source frames at once.
             return !clip.placement.isEnabled || clip.transform != VisualTransform() || clip.opacity != 1 ||
                 clip.blendMode != .normal || clip.resolvedLayerMask.isEnabled ||
-                clip.resolvedBackgroundRemoval != nil || editedAudio || clip.smoothsMotion ||
+                clip.resolvedBackgroundRemoval != nil || clip.resolvedStabilization != nil || editedAudio || clip.smoothsMotion ||
                 clip.isRamped || clip.isReversed
         }
     }
@@ -160,7 +160,7 @@ struct VideoProject: Codable, Identifiable, Equatable, Sendable {
             placement: .init(id: clipID, trackID: trackID, timelineStart: .zero, duration: range.duration),
             assetID: primaryAssetID, sourceRange: range, gradeSettings: gradeSettings,
             embeddedAudio: metadata.hasAudio ? EmbeddedAudio() : nil)
-        timeline = .init(tracks: [.init(id: trackID, name: "Main Video", kind: .mainVideo, items: [.video(clip)])])
+        timeline = .init(tracks: [.init(id: trackID, name: String(localized: "Main Video"), kind: .mainVideo, items: [.video(clip)])])
         self.createdAt = createdAt
         self.updatedAt = updatedAt
         // A new import defaults by source, but the caller decides: the import

@@ -202,7 +202,7 @@ struct TextAnimationSettings: Codable, Equatable, Sendable {
 
     static let defaultDuration = (try? TimelineTime.seconds(0.5)) ?? .zero
     static let minimumDuration = 0.1
-    static let maximumDuration = 2.0
+    static let maximumDuration = 5.0
 
     /// Nothing selected in any slot: the title renders exactly as an old
     /// project's would, and the evaluator returns early.

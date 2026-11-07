@@ -977,8 +977,8 @@ final class MetalVideoRenderer: NSObject, MTKViewDelegate, @unchecked Sendable {
         }
         stateLock.lock(); let isStill = stillEffectSize != nil; stateLock.unlock()
         view.accessibilityLabel = isStill
-            ? "Image preview"
-            : (colorMode.isHDR ? "HDR video preview" : "Video preview")
+            ? String(localized: "Image preview")
+            : (colorMode.isHDR ? String(localized: "HDR video preview") : String(localized: "Video preview"))
     }
 
     func mtkView(_ view: MTKView, drawableSizeWillChange size: CGSize) {

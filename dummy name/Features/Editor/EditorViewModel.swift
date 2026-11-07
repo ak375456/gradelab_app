@@ -84,6 +84,80 @@ final class EditorViewModel: ObservableObject, GradingModel {
     private var relightSourceAssets: [ProjectMediaAsset]?
     private var audioRouting = TimelineAudioMix()
     private var forceLayerPreview = false
+    @Published var unstabilizedPreviewClipID: UUID? {
+        didSet { if oldValue != unstabilizedPreviewClipID { synchronizeRenderer() } }
+    }
+    private var stabilizationGestureIsActive = false
+    private let stabilizationAccess: @MainActor () -> Bool
+    @Published var stabilizationPaywallFeature: ProFeature?
+
+    var hasStabilizationAccess: Bool { stabilizationAccess() }
+
+    @discardableResult
+    func requireStabilizationAccess() -> Bool {
+        guard let feature = ProAccessPolicy.stabilizationRequirement(hasPro: hasStabilizationAccess) else { return true }
+        stabilizationPaywallFeature = feature
+        return false
+    }
+
+    func setStabilizationEnabled(_ enabled: Bool) {
+        guard canStabilize, !enabled || requireStabilizationAccess() else { return }
+        unstabilizedPreviewClipID = nil
+        changeVisual(String(localized: "Stabilization"), immediate: true) { $0.stabilization?.isEnabled = enabled }
+    }
+
+    @discardableResult
+    func applyStabilization(_ result: VideoStabilization, analyzedClip: VideoClip) -> Bool {
+        guard canStabilize, let current = selectedClip, current.id == analyzedClip.id,
+              current.assetID == analyzedClip.assetID, current.sourceRange == analyzedClip.sourceRange,
+              requireStabilizationAccess() else { return false }
+        changeVisual(String(localized: "Stabilization"), immediate: true) { $0.stabilization = result }
+        return true
+    }
+
+    var canStabilize: Bool {
+        canEditSelection && selectedClipIDs.count == 1 && selectedClip.flatMap { clip in
+            project.assets.first(where: { $0.id == clip.assetID })
+        }.map { $0.stillImage == nil && $0.videoMetadata != nil } == true
+    }
+
+    func stabilizationGestureChanged(_ editing: Bool) {
+        flushGradeHistory()
+        stabilizationGestureIsActive = editing
+    }
+
+    func setStabilizationStrength(_ strength: Double) {
+        guard canStabilize, selectedClip?.stabilization != nil, requireStabilizationAccess() else { return }
+        changeVisual(String(localized: "Stabilization Smoothness")) { clip in
+            clip.stabilization = clip.stabilization?.adjustingStrength(strength)
+        }
+        if stabilizationGestureIsActive { gradeTask?.cancel(); gradeTask = nil }
+        else { flushGradeHistory() }
+    }
+
+    private var renderPreviewProject: VideoProject {
+        var copy = maskPreviewProject
+        guard let id = unstabilizedPreviewClipID else { return copy }
+        for track in copy.timeline.tracks.indices {
+            for item in copy.timeline.tracks[track].items.indices {
+                guard case .video(var clip) = copy.timeline.tracks[track].items[item], clip.id == id else { continue }
+                clip.stabilization?.isEnabled = false
+                copy.timeline.tracks[track].items[item] = .video(clip)
+            }
+        }
+        return copy
+    }
+
+    /// Source-UV handles and eyedroppers follow the same corrected picture.
+    var stabilizationSourceUVTransform: CGAffineTransform {
+        guard let clip = selectedClip, unstabilizedPreviewClipID != clip.id,
+              let metadata = project.assets.first(where: { $0.id == clip.assetID })?.videoMetadata else { return .identity }
+        let size = metadata.encodedSize
+        guard size.width > 0, size.height > 0 else { return .identity }
+        let toPixels = CGAffineTransform(a: size.width, b: 0, c: 0, d: -size.height, tx: 0, ty: size.height)
+        return toPixels.concatenating(clip.stabilizationCorrection(at: playheadTime.cmTime, size: size))
+            .concatenating(toPixels.inverted())
+    }
     private var historyLabel = "Color"
     @Published private(set) var isImporting = false
     @Published var selectedTrackID: UUID?
@@ -319,7 +393,8 @@ final class EditorViewModel: ObservableObject, GradingModel {
         renderer.setViewerAssist(viewerAssist)
     }
 
-    init(project: GradeProject) throws {
+    init(project: GradeProject, stabilizationAccess: @escaping @MainActor () -> Bool = { ProStore.shared.hasPro }) throws {
+        self.stabilizationAccess = stabilizationAccess
         var project = project
         // Normalize transitions written by the first transition build. That
         // version allowed odd frame counts, placing centered handles on half
@@ -497,7 +572,7 @@ final class EditorViewModel: ObservableObject, GradingModel {
                 project.addAsset(media)
                 let trackIndex: Int
                 if overlay {
-                    project.timeline.tracks.insert(.init(id: UUID(), name: "Overlay \(project.timeline.tracks.count)", kind: .videoOverlay), at: 0)
+                    project.timeline.tracks.insert(.init(id: UUID(), name: String(localized: "Overlay \(project.timeline.tracks.count)"), kind: .videoOverlay), at: 0)
                     trackIndex = 0
                 } else { trackIndex = main! }
                 let track = project.timeline.tracks[trackIndex]
@@ -552,7 +627,7 @@ final class EditorViewModel: ObservableObject, GradingModel {
                 let duration = try TimelineEditing.snapped(.seconds(3), frame: project.canvas.frameDuration)
                 let clip = VideoClip(placement: .init(id: UUID(), trackID: trackID, timelineStart: start, duration: duration),
                     assetID: asset.id, sourceRange: .init(start: .zero, duration: duration))
-                project.timeline.tracks.insert(.init(id: trackID, name: "Image overlay", kind: .videoOverlay, items: [.video(clip)]), at: 0)
+                project.timeline.tracks.insert(.init(id: trackID, name: String(localized: "Image overlay"), kind: .videoOverlay, items: [.video(clip)]), at: 0)
                 self.selectedTrackID = trackID
                 return clip.id
             }
@@ -953,7 +1028,8 @@ final class EditorViewModel: ObservableObject, GradingModel {
         }
         if maskOverlayUsesCanvas {
             return coordinates.sourceToCanvasTransform(clip.transform,
-                canvas: CGSize(width: project.canvas.width, height: project.canvas.height))
+                canvas: CGSize(width: project.canvas.width, height: project.canvas.height),
+                sourceCorrection: stabilizationSourceUVTransform)
         }
         let bounds = coordinates.displayBounds
         return CGAffineTransform(scaleX: size.width, y: size.height)
@@ -1252,7 +1328,9 @@ final class EditorViewModel: ObservableObject, GradingModel {
         max(0, min(AudioFade.maximum, audioClipDuration / 2))
     }
     var audioProcessing: AudioProcessingSettings { audioSettings?.processing ?? .init() }
-    var audioDuckingSources: [(id: UUID, name: String)] {
+    var durationDisplayFrameRate: Double? { project.canvas.frameRate ?? project.metadata.bestFrameRate }
+
+    func audioDuckingSources(format: DurationDisplayFormat) -> [(id: UUID, name: String)] {
         project.timeline.tracks.flatMap { track in
             track.items.compactMap { item -> (id: UUID, name: String)? in
                 guard item.id != selectedClipID else { return nil }
@@ -1266,7 +1344,9 @@ final class EditorViewModel: ObservableObject, GradingModel {
                 }
                 let media = project.assets.first { $0.id == assetID }
                 let name = media?.audioName ?? media?.url.deletingPathExtension().lastPathComponent ?? track.name
-                return (item.id, "\(name) · \(String(format: "%.1fs", item.placement.timelineStart.seconds))")
+                let time = DurationText.string(from: item.placement.timelineStart.seconds,
+                                               format: format, frameRate: durationDisplayFrameRate)
+                return (item.id, "\(name) · \(time)")
             }
         }
     }
@@ -1594,7 +1674,7 @@ final class EditorViewModel: ObservableObject, GradingModel {
                                      assetID: media.id, sourceRange: sourceRange,
                                      embeddedAudio: hasAudio ? EmbeddedAudio() : nil)
                 project.timeline.tracks.insert(
-                    .init(id: trackID, name: "Overlay \(project.timeline.tracks.count)",
+                    .init(id: trackID, name: String(localized: "Overlay \(project.timeline.tracks.count)"),
                           kind: .videoOverlay, items: [.video(clip)]), at: 0)
                 self.selectedTrackID = trackID
                 return clip.id
@@ -1627,9 +1707,9 @@ final class EditorViewModel: ObservableObject, GradingModel {
             let start = max(.zero, min(try TimelineEditing.snapped(.seconds(self.timelineTime), frame: frame), try max(.zero, end.subtracting(frame))))
             let remaining = try end.subtracting(start)
             let duration = remaining > .zero ? min(try .seconds(3), remaining) : try .seconds(3)
-            var clip = TextClip(placement: .init(id: UUID(), trackID: trackID, timelineStart: start, duration: duration), text: "Text")
+            var clip = TextClip(placement: .init(id: UUID(), trackID: trackID, timelineStart: start, duration: duration), text: String(localized: "Text"))
             clip.style.fontSize = max(32, Double(project.canvas.width)*0.08)
-            project.timeline.tracks.insert(.init(id: trackID, name: "Text", kind: .text, items: [.text(clip)]), at: 0)
+            project.timeline.tracks.insert(.init(id: trackID, name: String(localized: "Text"), kind: .text, items: [.text(clip)]), at: 0)
             return clip.id
         }
     }
@@ -1811,6 +1891,7 @@ final class EditorViewModel: ObservableObject, GradingModel {
             synchronizeRenderer()
             gradeTask?.cancel()
             if immediate { flushGradeHistory(); return }
+            if isEditingTextAnimation { return }
             gradeTask = Task { [weak self] in
                 do { try await Task.sleep(for: .milliseconds(650)) } catch { return }
                 self?.flushGradeHistory()
@@ -2178,6 +2259,13 @@ final class EditorViewModel: ObservableObject, GradingModel {
     /// True when the selected title carries any preset, for the tab's dot.
     var hasTextAnimation: Bool { selectedText?.textAnimation?.isEmpty == false }
 
+    private var isEditingTextAnimation = false
+
+    func setTextAnimationEditing(_ editing: Bool) {
+        flushGradeHistory()
+        isEditingTextAnimation = editing
+    }
+
     /// One write path, so every animation control is an ordinary undo step and a
     /// slider drag coalesces into one entry exactly as the grading sliders do.
     func editTextAnimation(_ label: String, immediate: Bool = true,
@@ -2195,7 +2283,9 @@ final class EditorViewModel: ObservableObject, GradingModel {
     }
 
     func setTextAnimationDuration(_ seconds: Double, for slot: TextAnimationSlot, immediate: Bool = false) {
-        guard let time = try? TimelineTime.seconds(seconds) else { return }
+        guard seconds.isFinite, slot != .loop,
+              let time = try? TimelineTime.seconds(min(textAnimationDurationLimit,
+                  max(TextAnimationSettings.minimumDuration, seconds))) else { return }
         editTextAnimation(String(localized: "Animation Duration"), immediate: immediate) {
             $0.setDuration(time, for: slot)
         }
@@ -2737,7 +2827,7 @@ final class EditorViewModel: ObservableObject, GradingModel {
                 self.layerState = sequence.layerState
                 self.sequenceSource = sequence.source
                 self.audioRouting = sequence.audioRouting
-                self.layerState?.update(self.project, bypass: self.showsOriginal,
+                self.layerState?.update(self.renderPreviewProject, bypass: self.showsOriginal,
                                         inspectingMatteOn: self.inspectedMatteTargetID,
                                         inspectingBackgroundOn: self.showsBackgroundMatte ? self.selectedClipID : nil,
                                         showsTransparencyGrid: !self.showsOriginal && !self.showsBackgroundMatte
@@ -3706,7 +3796,7 @@ final class EditorViewModel: ObservableObject, GradingModel {
     /// Not private: the masked-grade editing extension pushes mask changes
     /// through the same one path everything else uses.
     func synchronizeRenderer() {
-        let previewProject = maskPreviewProject
+        let previewProject = renderPreviewProject
         layerState?.update(previewProject, bypass: showsOriginal, inspectingMatteOn: inspectedMatteTargetID,
                            inspectingBackgroundOn: showsBackgroundMatte ? selectedClipID : nil,
                            showsTransparencyGrid: !showsOriginal && !showsBackgroundMatte

@@ -26,9 +26,9 @@ struct HSLPanel<Model: GradingModel>: View {
             // The slider offers the working range; the property itself stores a
             // wider one, so a hue arriving from elsewhere is never snapped by
             // being keyframed.
-            slider(.hue, "Hue", -30...30) { "\(Int($0))°" }
-            slider(.saturation, "Saturation", -100...100, AdjustmentValueFormatters.signed())
-            slider(.luminance, "Lightness", -100...100, AdjustmentValueFormatters.signed())
+            slider(.hue, String(localized: "Hue"), -30...30) { "\(Int($0))°" }
+            slider(.saturation, String(localized: "Saturation"), -100...100, AdjustmentValueFormatters.signed())
+            slider(.luminance, String(localized: "Lightness"), -100...100, AdjustmentValueFormatters.signed())
         }
     }
 
@@ -104,9 +104,9 @@ struct WheelsPanel<Model: GradingModel>: View {
                 })
                 .accessibilityHidden(true)
                 .disabled(!model.canGrade || !canEdit)
-            slider(.hue, "Hue", 0...360) { "\(Int($0))°" }
-            slider(.strength, "Color strength", 0...100) { "\(Int($0))%" }
-            slider(.brightness, "Brightness", -100...100, AdjustmentValueFormatters.signed())
+            slider(.hue, String(localized: "Hue"), 0...360) { "\(Int($0))°" }
+            slider(.strength, String(localized: "Color strength"), 0...100) { "\(Int($0))%" }
+            slider(.brightness, String(localized: "Brightness"), -100...100, AdjustmentValueFormatters.signed())
         }
         // Selecting a mask while Offset is showing would leave the picker on a
         // segment that no longer exists, which reads as no selection at all.
@@ -198,7 +198,7 @@ struct LUTPanel<Model: GradingModel>: View {
                     lookTile(
                         // Wrapped, because `lookTile` takes a `String` and a
                         // `String` is invisible to the string extractor. The
-                        // look names it carries stay English; this word does not.
+                        // LUTAsset localizes bundled titles; imported names stay intact.
                         title: String(localized: "None"),
                         preview: model.lookPreviews[LookPreviewKey.original],
                         isSelected: selected == nil
@@ -244,7 +244,7 @@ struct LUTPanel<Model: GradingModel>: View {
                 GradeSlider(
                     model: model,
                     property: .gradeLookIntensity,
-                    title: "Strength",
+                    title: String(localized: "Strength"),
                     range: 0...100,
                     neutral: 100,
                     valueFormatter: { "\(Int($0))%" }

@@ -134,7 +134,7 @@ enum AudioEditing {
             if project.timeline.tracks[i].items.contains(where: { $0.placement.timelineStart < end && ((try? $0.placement.range.end) ?? .zero) > start }) { index = nil }
         }
         if index == nil {
-            project.timeline.tracks.append(.init(id: UUID(), name: "Audio", kind: .audio))
+            project.timeline.tracks.append(.init(id: UUID(), name: String(localized: "Audio"), kind: .audio))
             index = project.timeline.tracks.count - 1
         }
         let i = index!

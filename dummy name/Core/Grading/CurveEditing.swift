@@ -127,19 +127,19 @@ extension CurveType {
     /// What the horizontal axis measures, for the selected-point readout.
     var inputLabel: String {
         switch self {
-        case .master, .red, .green, .blue: "In"
-        case .hueVsHue, .hueVsSaturation, .hueVsLuma: "Hue"
-        case .lumaVsSaturation: "Luma"
-        case .saturationVsSaturation, .saturationVsLuma: "Sat"
+        case .master, .red, .green, .blue: String(localized: "In")
+        case .hueVsHue, .hueVsSaturation, .hueVsLuma: String(localized: "Hue")
+        case .lumaVsSaturation: String(localized: "Luma")
+        case .saturationVsSaturation, .saturationVsLuma: String(localized: "Sat")
         }
     }
 
     var outputLabel: String {
         switch self {
-        case .master, .red, .green, .blue, .saturationVsSaturation: "Out"
+        case .master, .red, .green, .blue, .saturationVsSaturation: String(localized: "Out")
         case .hueVsHue: String(localized: "Shift")
-        case .hueVsSaturation, .lumaVsSaturation: "Sat"
-        case .hueVsLuma, .saturationVsLuma: "Luma"
+        case .hueVsSaturation, .lumaVsSaturation: String(localized: "Sat")
+        case .hueVsLuma, .saturationVsLuma: String(localized: "Luma")
         }
     }
 

@@ -247,7 +247,7 @@ extension NoiseReduction {
 
         var title: String {
             switch self {
-            case .light: String(localized: "Light")
+            case .light: String(localized: "noisePreset.light", defaultValue: "Light")
             case .medium: String(localized: "Medium")
             case .strong: String(localized: "Strong")
             case .lowLight: String(localized: "Low Light")

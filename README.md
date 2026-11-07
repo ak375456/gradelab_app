@@ -4,6 +4,11 @@ Native SwiftUI video and photo color grading for iPhone, iPad and Mac Catalyst.
 UI/UX is the priority: keep the picture usable, reuse the shared controls and
 design tokens, and check both compact and wide layouts when changing the editor.
 
+In **Settings → Time display → Duration display**, choose seconds and
+milliseconds, decimal seconds, or seconds and project frames. The preference is
+shared by all projects; exact duration entry remains in seconds. Frame labels
+fall back to milliseconds when the project frame rate is unknown.
+
 ## Open and verify
 
 Open `dummy name.xcodeproj` and select the shared **GradeLab** scheme. The app
@@ -87,6 +92,7 @@ placed inside those trees may become app/test inputs automatically.
 - [Freehand masks, preview zoom, tracking and device acceptance](Docs/MASK_EDITING.md)
 - [Audio processing, preview/export behavior and tests](Docs/AUDIO_TOOLS.md)
 - [Camera capture, capability limits, recovery and device acceptance](Docs/CAMERA.md)
+- [Editor stabilization, motion analysis, crop limits and validation](Docs/STABILIZATION.md)
 - [Relight architecture, models, limitations and validation](Docs/RELIGHT.md)
 - [Mac workspace, platform distinctions, shortcuts and release procedure](Docs/MAC_RELEASE.md)
 - [LUT import format and naming](LUTSources/Imported/HOW_TO_ADD_LUTS.md)

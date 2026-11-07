@@ -285,7 +285,8 @@ struct RelightOverlay: View {
     private var canvasTransform: CGAffineTransform? {
         guard model.maskOverlayUsesCanvas, let coordinates, let clip = model.evaluatedSelectedClip else { return nil }
         return coordinates.sourceToCanvasTransform(
-            clip.transform, canvas: CGSize(width: model.project.canvas.width, height: model.project.canvas.height))
+            clip.transform, canvas: CGSize(width: model.project.canvas.width, height: model.project.canvas.height),
+            sourceCorrection: model.stabilizationSourceUVTransform)
     }
 
     /// An upright-picture point to the view.

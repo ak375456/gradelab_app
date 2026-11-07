@@ -208,9 +208,9 @@ struct BackgroundRemovalPanel: View {
                         .frame(width: 24, height: 24).overlay(Circle().stroke(.white.opacity(0.4)))
                 }.frame(minHeight: 44)
             }
-            valueSlider("Similarity", model.backgroundRemovalBinding(\.colorKey.similarity), 0...100, reset: 38)
-            valueSlider("Smoothness", model.backgroundRemovalBinding(\.colorKey.smoothness), 0...100, reset: 18)
-            valueSlider("Spill", model.backgroundRemovalBinding(\.colorKey.spill), 0...100, reset: 35)
+            valueSlider(String(localized: "Similarity"), model.backgroundRemovalBinding(\.colorKey.similarity), 0...100, reset: 38)
+            valueSlider(String(localized: "Smoothness"), model.backgroundRemovalBinding(\.colorKey.smoothness), 0...100, reset: 18)
+            valueSlider(String(localized: "Spill"), model.backgroundRemovalBinding(\.colorKey.spill), 0...100, reset: 35)
         }
     }
 
@@ -224,9 +224,9 @@ struct BackgroundRemovalPanel: View {
                 brushButton("Remove", .remove, symbol: "minus.circle")
             }
             if model.backgroundBrush != nil {
-                valueSlider("Brush Size", $model.backgroundBrushSize, 0.005...0.20,
+                valueSlider(String(localized: "Brush Size"), $model.backgroundBrushSize, 0.005...0.20,
                             reset: 0.04, format: { "\(Int($0 * 1000) / 10)%" })
-                valueSlider("Softness", $model.backgroundBrushSoftness, 0...1,
+                valueSlider(String(localized: "Softness"), $model.backgroundBrushSoftness, 0...1,
                             reset: 0.65, format: { "\(Int($0 * 100))%" })
                 frameStepControls
                 Text("Paint this frame, then use Next Frame to continue. Add is blue; Remove is red. A magnifier appears below your finger.")
@@ -253,8 +253,8 @@ struct BackgroundRemovalPanel: View {
     private var edgeControls: some View {
         VStack(alignment: .leading, spacing: 14) {
             sectionTitle("EDGE")
-            valueSlider("Feather", model.backgroundRemovalBinding(\.feather), 0...100, reset: 0)
-            valueSlider("Shift Edge", model.backgroundRemovalBinding(\.edgeShift), -100...100, reset: 0)
+            valueSlider(String(localized: "Feather"), model.backgroundRemovalBinding(\.feather), 0...100, reset: 0)
+            valueSlider(String(localized: "Shift Edge"), model.backgroundRemovalBinding(\.edgeShift), -100...100, reset: 0)
         }
     }
 

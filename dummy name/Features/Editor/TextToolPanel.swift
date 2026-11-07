@@ -118,7 +118,12 @@ struct TextToolPanel: View {
                     TextAnimationPanel(model: model, slot: $animationSlot)
                 case "Transform":
                     keyframeHeader
-                    number(String(localized: "Duration (s)"), Binding(get: { model.selectedText?.placement.duration.seconds ?? 3 }, set: model.setTextDuration), 0.1...600, reset: 3)
+                    DurationSliderRow(value: model.selectedText?.placement.duration.seconds ?? 3,
+                                      range: 0.1...600, reset: 3,
+                                      frameRate: model.durationDisplayFrameRate,
+                                      change: model.setTextDuration,
+                                      commit: { model.setTextDuration($0); model.flushGradeHistory() },
+                                      onEditingChanged: { if !$0 { model.flushGradeHistory() } })
                     CanvasAlignmentRow(model: model)
                     animated(.positionX, -1...2)
                     animated(.positionY, -1...2)

@@ -2,6 +2,7 @@ import SwiftUI
 
 struct AudioToolPanel: View {
     @ObservedObject var model: EditorViewModel
+    @AppStorage(DurationDisplayFormat.preferenceKey) private var durationFormat = DurationDisplayFormat.defaultValue
     let addSoundEffect: () -> Void
     let addAudio: () -> Void
     let showTracks: () -> Void
@@ -79,10 +80,10 @@ struct AudioToolPanel: View {
                 format: Self.panLabel) { value in model.changeAudioProcessing { $0.pan = value / 100 } }
             if model.audioFadeLimit > 0 {
                 HStack(spacing: 16) {
-                    row("Fade in", value: settings.fadeIn ?? 0, range: 0...model.audioFadeLimit,
-                        format: Self.seconds) { model.changeAudio(fadeIn: $0) }
-                    row("Fade out", value: settings.fadeOut ?? 0, range: 0...model.audioFadeLimit,
-                        format: Self.seconds) { model.changeAudio(fadeOut: $0) }
+                    durationRow(String(localized: "Fade in"), value: settings.fadeIn ?? 0,
+                                range: 0...model.audioFadeLimit) { model.changeAudio(fadeIn: $0) }
+                    durationRow(String(localized: "Fade out"), value: settings.fadeOut ?? 0,
+                                range: 0...model.audioFadeLimit) { model.changeAudio(fadeOut: $0) }
                 }
             }
         }
@@ -186,7 +187,7 @@ struct AudioToolPanel: View {
 
     private var ducking: some View {
         let d = model.audioProcessing.ducking ?? .init()
-        let sources = model.audioDuckingSources
+        let sources = model.audioDuckingSources(format: durationFormat)
         let hasSource = sources.contains { $0.id == d.sourceClipID }
         return effectCard("Auto Ducking", icon: "speaker.wave.1", summary: model.audioProcessing.ducking?.isEnabled == true && hasSource ? "On" : "Off",
                           expanded: $duckingExpanded) {
@@ -217,10 +218,10 @@ struct AudioToolPanel: View {
                         editEffect(\.ducking, fallback: .init()) { $0.reduction = value }
                     }
                     HStack(spacing: 16) {
-                        row(String(localized: "Lower before"), value: d.attack, range: 0.02...1, reset: 0.15, format: Self.seconds) { value in
+                        durationRow(String(localized: "Lower before"), value: d.attack, range: 0.02...1, reset: 0.15) { value in
                             editEffect(\.ducking, fallback: .init()) { $0.attack = value }
                         }
-                        row(String(localized: "Recover"), value: d.release, range: 0.1...3, reset: 0.6, format: Self.seconds) { value in
+                        durationRow(String(localized: "Recover"), value: d.release, range: 0.1...3, reset: 0.6) { value in
                             editEffect(\.ducking, fallback: .init()) { $0.release = value }
                         }
                     }
@@ -257,7 +258,7 @@ struct AudioToolPanel: View {
                     editEffect(\.echo, fallback: .init()) { $0.mix = value / 100 }
                 }
                 HStack(spacing: 16) {
-                    row("Time", value: e.time, range: 0.04...1.5, reset: 0.3, format: Self.seconds) { value in
+                    durationRow(String(localized: "Time"), value: e.time, range: 0.04...1.5, reset: 0.3) { value in
                         editEffect(\.echo, fallback: .init()) { $0.time = value }
                     }
                     row(String(localized: "Feedback"), value: e.feedback * 100, range: 0...80, reset: 35, format: Self.percent) { value in
@@ -368,13 +369,20 @@ struct AudioToolPanel: View {
         }
     }
 
+    private func durationRow(_ title: String, value: Double, range: ClosedRange<Double>, reset: Double = 0,
+                             set: @escaping (Double) -> Void) -> some View {
+        row(title, value: value, range: range, reset: reset,
+            entryTitle: String(localized: "\(title) (seconds)"), format: seconds, set: set)
+    }
+
     private func row(_ title: String, value: Double, range: ClosedRange<Double>, reset: Double = 0,
+                     entryTitle: String? = nil,
                      format: @escaping (Double) -> String, set: @escaping (Double) -> Void) -> some View {
         VStack(spacing: 0) {
             HStack {
                 Text(title).font(.caption.weight(.medium))
                 Spacer(minLength: 4)
-                NumericEntryLabel(title: title, text: format(value), value: value, range: range,
+                NumericEntryLabel(title: entryTitle ?? title, text: format(value), value: value, range: range,
                                   tint: value == reset ? AppColors.textSecondary : AppColors.accent) {
                     set($0); model.flushGradeHistory()
                 }.font(.caption.monospacedDigit())
@@ -405,8 +413,10 @@ struct AudioToolPanel: View {
         Button(action: showTracks) { Label("Tracks", systemImage: "slider.horizontal.3") }.frame(minHeight: 44)
     }
 
-    private static func seconds(_ value: Double) -> String {
-        value > 0.0005 ? String(format: value < 1 ? "%.2fs" : "%.1fs", locale: .current, value) : String(localized: "Off")
+    private func seconds(_ value: Double) -> String {
+        value > 0.0005
+            ? DurationText.string(from: value, format: durationFormat, frameRate: model.durationDisplayFrameRate)
+            : String(localized: "Off")
     }
     private static func panLabel(_ value: Double) -> String {
         abs(value) < 0.5 ? String(localized: "Center") : "\(value < 0 ? "L" : "R") \(Int(abs(value).rounded()))"

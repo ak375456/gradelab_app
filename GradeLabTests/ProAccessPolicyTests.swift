@@ -8,6 +8,53 @@ import XCTest
 /// here either gives away the product or blocks a paying customer, and neither
 /// shows up in a build log — so every rule in the feature table gets a case.
 final class ProAccessPolicyTests: XCTestCase {
+    func testStabilizationRequiresProForAnalysisAndActiveSavedExports() throws {
+        XCTAssertEqual(ProAccessPolicy.stabilizationRequirement(hasPro: false), .stabilization)
+        XCTAssertNil(ProAccessPolicy.stabilizationRequirement(hasPro: true))
+        XCTAssertFalse(ProFeature.stabilization.title.isEmpty)
+        XCTAssertFalse(ProFeature.stabilization.detail.isEmpty)
+        var project = project()
+        var clip = project.timeline.firstVideoClip!
+        clip.stabilization = VideoStabilization(encodedWidth: 1920, encodedHeight: 1080,
+            analyzedRange: clip.sourceRange, samples: [
+                .init(seconds: 0, x: 0.01, y: 0, rotation: 0, segment: 0),
+                .init(seconds: 1, x: -0.01, y: 0, rotation: 0, segment: 0)
+            ]).adjustingStrength(0.8)
+        try TimelineEditing.replace(clip.id, with: [clip], in: &project)
+        XCTAssertEqual(ProAccessPolicy.exportRequirement(project, configuration: free), .stabilization)
+        let reopened = try JSONDecoder().decode(VideoProject.self, from: JSONEncoder().encode(project))
+        XCTAssertEqual(ProAccessPolicy.exportRequirements(reopened, configuration: free, settings: .neutral), [.stabilization])
+    }
+
+    func testUnusedStabilizationDoesNotLockExport() throws {
+        var project = project()
+        var clip = project.timeline.firstVideoClip!
+        let settings = VideoStabilization(encodedWidth: 1920, encodedHeight: 1080,
+            analyzedRange: clip.sourceRange, samples: [
+                .init(seconds: 0, x: 0.01, y: 0, rotation: 0, segment: 0),
+                .init(seconds: 1, x: -0.01, y: 0, rotation: 0, segment: 0)
+            ]).adjustingStrength(0.8)
+        clip.stabilization = settings
+        clip.stabilization?.isEnabled = false
+        XCTAssertNil(ProAccessPolicy.clipRequirement(clip))
+        clip.stabilization = settings.adjustingStrength(0)
+        XCTAssertNil(ProAccessPolicy.clipRequirement(clip))
+        clip.stabilization = settings
+        clip.stabilization?.samples = []
+        XCTAssertNil(ProAccessPolicy.clipRequirement(clip))
+        clip.stabilization = settings
+        clip.stabilization?.analyzedRange.duration = try .seconds(1)
+        XCTAssertNil(ProAccessPolicy.clipRequirement(clip))
+        clip.stabilization = settings
+        clip.placement.isEnabled = false
+        try TimelineEditing.replace(clip.id, with: [clip], in: &project)
+        XCTAssertNil(ProAccessPolicy.exportRequirement(project, configuration: free))
+        clip.placement.isEnabled = true
+        try TimelineEditing.replace(clip.id, with: [clip], in: &project)
+        project.timeline.tracks[0].isEnabled = false
+        XCTAssertNil(ProAccessPolicy.exportRequirement(project, configuration: free))
+    }
+
     func testCameraRecordingRequiresAnActiveProEntitlement() {
         XCTAssertEqual(ProAccessPolicy.cameraRecordingRequirement(hasPro: false), .cameraRecording)
         XCTAssertNil(ProAccessPolicy.cameraRecordingRequirement(hasPro: true))

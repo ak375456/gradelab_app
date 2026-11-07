@@ -10,6 +10,7 @@ struct TextAnimationPanel: View {
     /// Owned by EditorView, so a redraw of the panel cannot bounce the user
     /// back to In while they are choosing an exit.
     @Binding var slot: TextAnimationSlot
+    @AppStorage(DurationDisplayFormat.preferenceKey) private var durationFormat = DurationDisplayFormat.defaultValue
 
     private var settings: TextAnimationSettings { model.textAnimationSettings }
     private var selected: TextAnimationPreset? { settings.preset(slot) }
@@ -32,6 +33,7 @@ struct TextAnimationPanel: View {
                 .accessibilityHint("Clears In, Out and Loop. Manual keyframes are not affected.")
             }
         }
+        .onDisappear { model.setTextAnimationEditing(false) }
     }
 
     // MARK: - Slots
@@ -109,13 +111,19 @@ struct TextAnimationPanel: View {
                 model.setTextAnimationLoopSpeed($0, immediate: true)
             }
         } else {
-            slider(String(localized: "Duration (s)"),
+            DurationSliderRow(
                    value: min(settings.duration(slot).seconds, model.textAnimationDurationLimit),
                    range: TextAnimationSettings.minimumDuration...model.textAnimationDurationLimit,
-                   reset: min(TextAnimationSettings.defaultDuration.seconds, model.textAnimationDurationLimit)) {
-                model.setTextAnimationDuration($0, for: slot)
-            } commit: {
-                model.setTextAnimationDuration($0, for: slot, immediate: true)
+                   reset: min(TextAnimationSettings.defaultDuration.seconds, model.textAnimationDurationLimit),
+                   frameRate: model.durationDisplayFrameRate,
+                   snapPoints: DurationSliderRow.wholeSecondSnapPoints,
+                   change: { model.setTextAnimationDuration($0, for: slot) },
+                   commit: { model.setTextAnimationDuration($0, for: slot, immediate: true) },
+                   onEditingChanged: model.setTextAnimationEditing)
+            if model.textAnimationDurationLimit < TextAnimationSettings.maximumDuration {
+                Text("Extend the text clip to use an animation longer than \(durationText(model.textAnimationDurationLimit)).")
+                    .font(.caption2).foregroundStyle(AppColors.textSecondary)
+                    .fixedSize(horizontal: false, vertical: true)
             }
         }
         slider(String(localized: "Strength"), value: settings.strength, range: 0...1, reset: 1) {
@@ -141,10 +149,14 @@ struct TextAnimationPanel: View {
             let fitted = TextAnimator.windows(settings, duration: clip.placement.duration.seconds)
             if fitted.incoming + 0.005 < settings.incomingDuration.seconds
                 || fitted.outgoing + 0.005 < settings.outgoingDuration.seconds {
-                Text("This clip is too short for both, so they have been scaled to \(fitted.incoming, specifier: "%.2f")s in and \(fitted.outgoing, specifier: "%.2f")s out.")
+                Text("This clip is too short for both, so they have been scaled to \(durationText(fitted.incoming)) in and \(durationText(fitted.outgoing)) out.")
                     .font(.caption2).foregroundStyle(AppColors.warning)
             }
         }
+    }
+
+    private func durationText(_ seconds: Double) -> String {
+        DurationText.string(from: seconds, format: durationFormat, frameRate: model.durationDisplayFrameRate)
     }
 
     /// Matches the slider rows in the rest of the Text inspector: a tappable
@@ -162,7 +174,7 @@ struct TextAnimationPanel: View {
             }
             ResettableSlider(value: Binding(get: { value }, set: change),
                              range: range, resetValue: reset, label: title,
-                             onEditingChanged: { editing in if !editing { model.flushGradeHistory() } },
+                             onEditingChanged: model.setTextAnimationEditing,
                              onReset: { commit(reset) })
         }
     }

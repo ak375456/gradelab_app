@@ -16,6 +16,7 @@ import SwiftUI
 ///   column is not a curve anyone can edit.
 struct SpeedPanel: View {
     @ObservedObject var model: EditorViewModel
+    @AppStorage(DurationDisplayFormat.preferenceKey) private var durationFormat = DurationDisplayFormat.defaultValue
     /// Set by the ⇧-free R shortcut: open straight into Ramp. A one-shot, so
     /// the panel does not keep forcing the mode every time it redraws.
     var opensRamp: Binding<Bool> = .constant(false)
@@ -325,11 +326,10 @@ struct SpeedPanel: View {
             HStack {
                 Image(systemName: "snowflake").font(AppTypography.caption)
                     .foregroundStyle(AppColors.accent)
-                Text(TimecodeText.short(offset.seconds))
+                Text(durationText(offset.seconds))
                     .font(AppTypography.caption).monospacedDigit()
                 Spacer()
-                Text(String(format: String(localized: "%.2fs"), locale: .current,
-                            freeze.duration.seconds))
+                Text(durationText(freeze.duration.seconds))
                     .font(AppTypography.numeric)
                 Button(role: .destructive) {
                     model.removeFreeze(freeze.id)
@@ -427,9 +427,11 @@ struct SpeedPanel: View {
 
     private var summaryText: String {
         guard let clip = model.selectedClip else { return String(localized: "No clip selected") }
-        return String(format: String(localized: "%.2fs source · %.2fs on the timeline"),
-                      locale: .current,
-                      clip.sourceRange.duration.seconds, clip.placement.duration.seconds)
+        return String(localized: "\(durationText(clip.sourceRange.duration.seconds)) source · \(durationText(clip.placement.duration.seconds)) on the timeline")
+    }
+
+    private func durationText(_ seconds: Double) -> String {
+        DurationText.string(from: seconds, format: durationFormat, frameRate: model.durationDisplayFrameRate)
     }
 }
 

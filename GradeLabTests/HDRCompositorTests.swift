@@ -16,6 +16,27 @@ import XCTest
 /// here in Swift rather than read back out of the shader, so the shader is
 /// checked against the specification and not against itself.
 final class HDRCompositorTests: XCTestCase {
+    func testStabilizationSamplesOriginalSourceAndKeepsTheFittedRectangle() throws {
+        let source = try halfTexture(filledWith: (0.4,0.4,0.4))
+        var pixels = [Float16](repeating: 1,count: size*size*4)
+        for y in 0..<size { for x in 0..<size {
+            for channel in 0..<3 { pixels[(y*size+x)*4+channel] = Float16(0.2+Double(x)*0.05) }
+        } }
+        pixels.withUnsafeBytes { source.replace(region: MTLRegionMake2D(0,0,size,size),mipmapLevel: 0,
+            withBytes: $0.baseAddress!,bytesPerRow: size*8) }
+        let canvas = CGSize(width: size,height: size)
+        let corrected = try compositeVideo(source: source,layer: HDRLayerUniforms(
+            transform: identityPlacement,sourceSize: canvas,canvasSize: canvas,opacity: 1,
+            sourceCorrection: .init(translationX: 2,y: 0)))
+        XCTAssertEqual(read(corrected,x: 4,y: 4).0,0.3,accuracy: 0.002)
+        XCTAssertEqual(read(corrected,x: 0,y: 4).0,0,accuracy: 0.002)
+        var placement = VisualTransform(); placement.scale = 0.5
+        let fitted = LayerCompositor.transform(placement,encoded: canvas,preferred: .identity,canvas: canvas)
+        let small = try compositeVideo(source: source,layer: HDRLayerUniforms(transform: fitted,
+            sourceSize: canvas,canvasSize: canvas,opacity: 1,sourceCorrection: .init(translationX: 2,y: 0)))
+        XCTAssertEqual(read(small,x: 6,y: 4).0,0,accuracy: 0.002)
+    }
+
     private var context: MetalContext!
     private var videoPipeline: MTLComputePipelineState!
     private var imagePipeline: MTLComputePipelineState!

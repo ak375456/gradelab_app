@@ -193,7 +193,7 @@ struct TimelineTransition: Codable, Equatable, Identifiable, Sendable {
 enum TimelineTransitionEditing {
     static let defaultSeconds = 0.5
     static let minimumSeconds = 0.1
-    static let maximumSeconds = 2.0
+    static let maximumSeconds = 5.0
 
     struct EditPoint {
         let outgoing: VideoClip

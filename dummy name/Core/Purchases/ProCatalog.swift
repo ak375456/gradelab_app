@@ -177,6 +177,7 @@ enum ProFeature: String, Identifiable, Sendable {
     case gradePresets
     case scopes
     case cameraRecording
+    case stabilization
 
     var id: String { rawValue }
 
@@ -197,6 +198,7 @@ enum ProFeature: String, Identifiable, Sendable {
         case .gradePresets: String(localized: "Keep the look you built.")
         case .scopes: String(localized: "Read the picture, don't guess.")
         case .cameraRecording: String(localized: "Unlock camera recording.")
+        case .stabilization: String(localized: "Stabilization")
         }
     }
 
@@ -232,6 +234,8 @@ enum ProFeature: String, Identifiable, Sendable {
             String(localized: "Waveform, RGB parade and vectorscope in the editor. Camera monitoring and the histogram stay free.")
         case .cameraRecording:
             String(localized: "Preview LUTs and adjust focus, white balance, ISO and exposure for free. Upgrade to GradeLab Pro to record video on iPhone and iPad.")
+        case .stabilization:
+            String(localized: "Unlock on-device video stabilization, smoothness controls and stabilized exports with GradeLab Pro.")
         }
     }
 }
@@ -248,11 +252,16 @@ enum ProFeature: String, Identifiable, Sendable {
 /// Camera setup stays free; starting a take is its paid file-writing boundary.
 /// Editor scopes are gated while viewing because they never reach an export.
 /// Camera scopes stay free as part of the pre-recording preview.
+/// Editor stabilization requires Pro for analysis, authoring and export.
 enum ProAccessPolicy {
     /// Camera setup and monitoring are free. Writing a take requires Pro,
     /// independently of its format, resolution or chosen preview look.
     static func cameraRecordingRequirement(hasPro: Bool) -> ProFeature? {
         hasPro ? nil : .cameraRecording
+    }
+
+    static func stabilizationRequirement(hasPro: Bool) -> ProFeature? {
+        hasPro ? nil : .stabilization
     }
 
     // MARK: - Looks
@@ -437,8 +446,15 @@ enum ProAccessPolicy {
 
     static func clipRequirements(_ clip: VideoClip) -> [ProFeature] {
         // Overlays, animation and every blend mode are part of the free editor.
-        // Only an actually premium grade applied to this clip can gate export.
-        gradeRequirements(clip.gradeSettings)
+        var found = gradeRequirements(clip.gradeSettings)
+        if let stabilization = clip.resolvedStabilization,
+           stabilization.strength.isFinite, stabilization.strength > 0,
+           stabilization.cropZoom.isFinite, stabilization.cropZoom >= 1,
+           stabilization.encodedWidth > 0, stabilization.encodedHeight > 0,
+           stabilization.samples.count > 1 {
+            found.append(.stabilization)
+        }
+        return found
     }
 
     static func textRequirements(_ clip: TextClip) -> [ProFeature] {

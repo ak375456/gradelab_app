@@ -390,6 +390,7 @@ struct ShotMatchPanel: View {
 /// average the whole shot rather than to make a frame the user must get right.
 struct ShotMatchClipPicker: View {
     @ObservedObject var model: EditorViewModel
+    @AppStorage(DurationDisplayFormat.preferenceKey) private var durationFormat = DurationDisplayFormat.defaultValue
     @Binding var isPresented: Bool
     @State private var selected: VideoClip?
     @State private var seconds: Double = 0
@@ -459,7 +460,8 @@ struct ShotMatchClipPicker: View {
     private func timecode(_ clip: VideoClip) -> String {
         let start = clip.placement.timelineStart.seconds
         let duration = clip.placement.duration.seconds
-        return String(format: "%@ · %.1fs", Self.timeLabel(start), duration)
+        let length = DurationText.string(from: duration, format: durationFormat, frameRate: model.durationDisplayFrameRate)
+        return "\(Self.timeLabel(start)) · \(length)"
     }
 
     static func timeLabel(_ seconds: Double) -> String {

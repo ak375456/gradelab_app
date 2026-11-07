@@ -74,9 +74,9 @@ struct GradingControls<Model: GradingModel>: View {
                         }
                     case .lut: LUTPanel(model: model, onSaveGrade: onSaveGrade)
                     case .vignette:
-                        vignette("Amount", .gradeVignette, -100...100, 0)
-                        vignette("Midpoint", .gradeVignetteMidpoint, 0...100, 50)
-                        vignette("Feather", .gradeVignetteFeather, 0...100, 70)
+                        vignette(String(localized: "Amount"), .gradeVignette, -100...100, 0)
+                        vignette(String(localized: "Midpoint"), .gradeVignetteMidpoint, 0...100, 50)
+                        vignette(String(localized: "Feather"), .gradeVignetteFeather, 0...100, 70)
                     case .effects: FilmEffectsPanel(model: model)
                     }
                 }.padding(.horizontal, 20).padding(.top, usesCompactLayout ? 12 : 0).padding(.bottom, 24)
@@ -436,15 +436,15 @@ private struct GradeMaskPanel<Model: GradingModel>: View {
                     }
                 }
             } else {
-                maskAdjustment("Position X", \.centerX, 0...100, 50)
-                maskAdjustment("Position Y", \.centerY, 0...100, 50)
+                maskAdjustment(String(localized: "Position X"), \.centerX, 0...100, 50)
+                maskAdjustment(String(localized: "Position Y"), \.centerY, 0...100, 50)
                 if model.gradeMask.shape != .linear {
-                    maskAdjustment("Width", \.width, 1...200, 60)
-                    maskAdjustment("Height", \.height, 1...200, 40)
+                    maskAdjustment(String(localized: "Width"), \.width, 1...200, 60)
+                    maskAdjustment(String(localized: "Height"), \.height, 1...200, 40)
                 }
-                maskAdjustment("Rotation", \.rotation, -180...180, 0, suffix: "°")
-                maskAdjustment("Feather", \.feather, 0...100, 25)
-                maskAdjustment("Opacity", \.opacity, 0...100, 100)
+                maskAdjustment(String(localized: "Rotation"), \.rotation, -180...180, 0, suffix: "°")
+                maskAdjustment(String(localized: "Feather"), \.feather, 0...100, 25)
+                maskAdjustment(String(localized: "Opacity"), \.opacity, 0...100, 100)
             }
 
             Text("Tip: on a layered timeline, select the top visible clip. A clip above the selected one can hide its colour change.")

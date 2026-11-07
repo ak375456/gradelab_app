@@ -101,7 +101,7 @@ struct NoiseReductionPanel<Model: GradingModel>: View {
     @ViewBuilder
     private var temporal: some View {
         VStack(alignment: .leading, spacing: 12) {
-            sectionHeader("TEMPORAL", isOn: model.noiseBinding(\.isTemporalEnabled),
+            sectionHeader(String(localized: "TEMPORAL"), isOn: model.noiseBinding(\.isTemporalEnabled),
                           enabled: capability?.supportsTemporal ?? true)
             if capability?.supportsTemporal == false {
                 Text("This device does not have the memory to hold several frames of this project at once. Spatial reduction is still available.")
@@ -167,7 +167,7 @@ struct NoiseReductionPanel<Model: GradingModel>: View {
     @ViewBuilder
     private var spatial: some View {
         VStack(alignment: .leading, spacing: 12) {
-            sectionHeader("SPATIAL", isOn: model.noiseBinding(\.isSpatialEnabled), enabled: true)
+            sectionHeader(String(localized: "SPATIAL"), isOn: model.noiseBinding(\.isSpatialEnabled), enabled: true)
             ForEach(NoiseReductionParameter.section(.spatial)) { parameter in
                 slider(parameter)
             }

@@ -197,7 +197,7 @@ extension LUTAsset {
     /// looks and are not listed here.
     static let bundledCreativeLooks: [LUTAsset] = [
         LUTAsset(
-            name: "Warm Cinema",
+            name: String(localized: "Warm Cinema"),
             filename: "Warm_Cinema.cube",
             category: "Cinematic",
             summary: String(localized: "Warm, contrasty cinematic look with soft highlights and flattering skin tones."),
@@ -205,7 +205,7 @@ extension LUTAsset {
             kind: .creative
         ),
         LUTAsset(
-            name: "Teal Orange",
+            name: String(localized: "Teal Orange"),
             filename: "Teal_Orange.cube",
             category: "Cinematic",
             summary: String(localized: "Restrained modern teal-shadow / warm-highlight look with controlled greens."),
@@ -213,7 +213,7 @@ extension LUTAsset {
             kind: .creative
         ),
         LUTAsset(
-            name: "Soft Film",
+            name: String(localized: "Soft Film"),
             filename: "Soft_Film.cube",
             category: "Film-inspired",
             summary: String(localized: "Soft, slightly faded look with lifted blacks, muted colour and smooth highlights."),
@@ -226,7 +226,7 @@ extension LUTAsset {
     /// intentional descriptions. Loaded on demand rather than at app launch.
     static let bundledCuratedLooks: [LUTAsset] = [
         LUTAsset(
-            name: "Daylight",
+            name: String(localized: "Daylight"),
             filename: "Daylight.cube",
             category: "Cinematic",
             summary: String(localized: "Bright, warm color for a sunlit feel. Lower the strength for a softer finish."),
@@ -235,7 +235,7 @@ extension LUTAsset {
             origin: .bundled
         ),
         LUTAsset(
-            name: "Vivid Cinema",
+            name: String(localized: "Vivid Cinema"),
             filename: "Vivid_Cinema.cube",
             category: "Cinematic",
             summary: String(localized: "Rich color, deeper midtones and bold blue skies."),
@@ -244,7 +244,7 @@ extension LUTAsset {
             origin: .bundled
         ),
         LUTAsset(
-            name: "Silver Mono",
+            name: String(localized: "Silver Mono"),
             filename: "Silver_Mono.cube",
             category: "Black & White",
             summary: String(localized: "Clean black-and-white with crisp contrast and bright midtones."),
@@ -253,7 +253,7 @@ extension LUTAsset {
             origin: .bundled
         ),
         LUTAsset(
-            name: "Dramatic Cinema",
+            name: String(localized: "Dramatic Cinema"),
             filename: "Dramatic_Cinema.cube",
             category: "Cinematic",
             summary: String(localized: "Warm highlights and cool blues for a stylized cinematic finish."),
@@ -262,7 +262,7 @@ extension LUTAsset {
             origin: .bundled
         ),
         LUTAsset(
-            name: "Cool Cinema",
+            name: String(localized: "Cool Cinema"),
             filename: "Cool_Cinema.cube",
             category: "Cinematic",
             summary: String(localized: "Restrained color with a cooler balance and gentle blue highlights."),
@@ -271,7 +271,7 @@ extension LUTAsset {
             origin: .bundled
         ),
         LUTAsset(
-            name: "Vintage Chrome",
+            name: String(localized: "Vintage Chrome"),
             filename: "Vintage_Chrome.cube",
             category: "Film-inspired",
             summary: String(localized: "Golden midtones, muted greens and a nostalgic chrome palette."),
@@ -280,7 +280,7 @@ extension LUTAsset {
             origin: .bundled
         ),
         LUTAsset(
-            name: "Film Print",
+            name: String(localized: "Film Print"),
             filename: "Film_Print.cube",
             category: "Film-inspired",
             summary: String(localized: "A film-print palette with warm skin tones and rich, clear blues."),
@@ -289,7 +289,7 @@ extension LUTAsset {
             origin: .bundled
         ),
         LUTAsset(
-            name: "Studio Portrait",
+            name: String(localized: "Studio Portrait"),
             filename: "Studio_Portrait.cube",
             category: "Portrait",
             summary: String(localized: "Subtle skin-tone shaping with restrained color for portraits."),
@@ -304,32 +304,32 @@ extension LUTAsset {
     /// uses concise names. Compiled 32³/33³ textures load only when selected.
     static let bundledSunsetLooks: [LUTAsset] = [
         LUTAsset(
-            name: "Desert Sunset", filename: "Desert_Sunset.cube", category: "Cinematic",
+            name: String(localized: "Desert Sunset"), filename: "Desert_Sunset.cube", category: "Cinematic",
             summary: String(localized: "Sunset warmth with amber highlights and turquoise blues."),
             inputColorSpace: "Rec.709 / working SDR", kind: .creative, origin: .bundled
         ),
         LUTAsset(
-            name: "Evergreen Chrome", filename: "Evergreen_Chrome.cube", category: "Film-inspired",
+            name: String(localized: "Evergreen Chrome"), filename: "Evergreen_Chrome.cube", category: "Film-inspired",
             summary: String(localized: "Deep cyan greens, rich blues and warm film-like skin tones."),
             inputColorSpace: "Rec.709 / working SDR", kind: .creative, origin: .bundled
         ),
         LUTAsset(
-            name: "Amber Grove", filename: "Amber_Grove.cube", category: "Cinematic",
+            name: String(localized: "Amber Grove"), filename: "Amber_Grove.cube", category: "Cinematic",
             summary: String(localized: "Golden foliage and warm earth tones with crisp, saturated blues."),
             inputColorSpace: "Rec.709 / working SDR", kind: .creative, origin: .bundled
         ),
         LUTAsset(
-            name: "Soft Bloom", filename: "Soft_Bloom.cube", category: "Film-inspired",
+            name: String(localized: "Soft Bloom"), filename: "Soft_Bloom.cube", category: "Film-inspired",
             summary: String(localized: "Gentle contrast, soft warmth and mellow teal shadows."),
             inputColorSpace: "Rec.709 / working SDR", kind: .creative, origin: .bundled
         ),
         LUTAsset(
-            name: "Azure Film", filename: "Azure_Film.cube", category: "Film-inspired",
+            name: String(localized: "Azure Film"), filename: "Azure_Film.cube", category: "Film-inspired",
             summary: String(localized: "Faded cool shadows, warm skin and a soft blue film palette."),
             inputColorSpace: "Rec.709 / working SDR", kind: .creative, origin: .bundled
         ),
         LUTAsset(
-            name: "Azure Film Deep", filename: "Azure_Film_Deep.cube", category: "Cinematic",
+            name: String(localized: "Azure Film Deep"), filename: "Azure_Film_Deep.cube", category: "Cinematic",
             summary: String(localized: "Deep blacks, vivid blue skies and warm, punchy midtones."),
             inputColorSpace: "Rec.709 / working SDR", kind: .creative, origin: .bundled
         )

@@ -820,7 +820,7 @@ class LayerCompositor: NSObject, AVVideoCompositing, @unchecked Sendable {
                     coverage = CIImage(color: .white).cropped(to: rect)
                 }
             }
-            coverage = coverage.transformed(by: transform)
+            coverage = Self.stabilized(coverage, clip: clip, at: compositionTime).transformed(by: transform)
             placed = coverage.applyingFilter("CIColorMatrix", parameters: [
                 "inputAVector": CIVector(x: 0, y: 0, z: 0, w: clip.opacity)
             ])
@@ -1153,7 +1153,8 @@ class LayerCompositor: NSObject, AVVideoCompositing, @unchecked Sendable {
                 let frame = try masked(cutoutFrame, with: clip.resolvedLayerMask)
                 retained.append(cutoutFrame)
                 retained.append(frame)
-                var image = CIImage(cvPixelBuffer: frame, options: [.colorSpace: colorSpace]).transformed(by: transform)
+                var image = Self.stabilized(CIImage(cvPixelBuffer: frame, options: [.colorSpace: colorSpace]),
+                    clip: clip, at: request.compositionTime).transformed(by: transform)
                 image = image.applyingFilter("CIColorMatrix", parameters: ["inputAVector": CIVector(x: 0, y: 0, z: 0, w: clip.opacity)])
                 // Last thing before the blend: the clip is fully graded, its
                 // power windows are applied, it is placed, its own layer mask
@@ -1235,8 +1236,8 @@ class LayerCompositor: NSObject, AVVideoCompositing, @unchecked Sendable {
             asset: asset, projectID: project.id, compositionTime: request.compositionTime)
         let bounds = CGRect(origin: .zero, size: request.renderContext.size)
         let black = CIImage(color: .black).cropped(to: bounds)
-        let white = CIImage(cvPixelBuffer: matteFrame, options: [.colorSpace: colorSpace])
-            .transformed(by: transform)
+        let white = Self.stabilized(CIImage(cvPixelBuffer: matteFrame, options: [.colorSpace: colorSpace]),
+                                    clip: clip, at: request.compositionTime).transformed(by: transform)
         ci.render(white.composited(over: black).cropped(to: bounds), to: output,
                   bounds: bounds, colorSpace: colorSpace)
         withExtendedLifetime(settings) {}
@@ -1313,7 +1314,8 @@ class LayerCompositor: NSObject, AVVideoCompositing, @unchecked Sendable {
         let cutoutFrame = try backgroundRemoved(gradedFrame, original: source, clip: clip,
             asset: asset, projectID: project.id, compositionTime: request.compositionTime)
         let frame = try masked(cutoutFrame, with: clip.resolvedLayerMask)
-        var image = CIImage(cvPixelBuffer: frame, options: [.colorSpace: colorSpace]).transformed(by: transform)
+        var image = Self.stabilized(CIImage(cvPixelBuffer: frame, options: [.colorSpace: colorSpace]),
+                    clip: clip, at: request.compositionTime).transformed(by: transform)
         image = image.applyingFilter("CIColorMatrix",
             parameters: ["inputAVector": CIVector(x: 0, y: 0, z: 0, w: clip.opacity)])
         // The transition receives the MATTED layer, alpha and all. Cutting the
@@ -1572,12 +1574,14 @@ class LayerCompositor: NSObject, AVVideoCompositing, @unchecked Sendable {
                     transform: Self.transform(outgoingClip.transform, metadata: outgoingMetadata, canvas: canvasSize),
                     sourceSize: outgoingMetadata.encodedSize, canvasSize: canvasSize,
                     opacity: outgoingClip.opacity, sourceIsSDR: outgoingMetadata.transferFunction != "HLG",
-                    matteInverted: outgoingMatte?.inverted ?? false)
+                    matteInverted: outgoingMatte?.inverted ?? false,
+                    sourceCorrection: outgoingClip.stabilizationCorrection(at: request.compositionTime, size: outgoingMetadata.encodedSize))
                 var incomingLayer = HDRLayerUniforms(
                     transform: Self.transform(incomingClip.transform, metadata: incomingMetadata, canvas: canvasSize),
                     sourceSize: incomingMetadata.encodedSize, canvasSize: canvasSize,
                     opacity: incomingClip.opacity, sourceIsSDR: incomingMetadata.transferFunction != "HLG",
-                    matteInverted: incomingMatte?.inverted ?? false)
+                    matteInverted: incomingMatte?.inverted ?? false,
+                    sourceCorrection: incomingClip.stabilizationCorrection(at: request.compositionTime, size: incomingMetadata.encodedSize))
                 var outgoingMask = LayerMaskUniforms(outgoingClip.layerMask)
                 var incomingMask = LayerMaskUniforms(incomingClip.layerMask)
                 var outgoingBackgroundRemoval = BackgroundRemovalUniforms(outgoingClip.resolvedBackgroundRemoval ?? .automatic)
@@ -1745,7 +1749,8 @@ class LayerCompositor: NSObject, AVVideoCompositing, @unchecked Sendable {
                     transform: Self.transform(clip.transform, metadata: metadata, canvas: canvasSize),
                     sourceSize: metadata.encodedSize, canvasSize: canvasSize,
                     opacity: clip.opacity, blendAmount: blendAmount, sourceIsSDR: sourceIsSDR,
-                    matteInverted: layerMatte.inverted)
+                    matteInverted: layerMatte.inverted,
+                    sourceCorrection: clip.stabilizationCorrection(at: request.compositionTime, size: metadata.encodedSize))
                 // 2 marks a source that is already in working space.
                 if relitWorking { layer.params.z = 2 }
                 var mask = LayerMaskUniforms(clip.layerMask)
@@ -1880,6 +1885,13 @@ class LayerCompositor: NSObject, AVVideoCompositing, @unchecked Sendable {
         let buffer = try pooledBGRA(width: Int(size.width), height: Int(size.height))
         ci.render(image, to: buffer, bounds: CGRect(origin: .zero, size: size), colorSpace: colorSpace)
         return buffer
+    }
+
+    /// Source-local grades/mattes move with the picture; placement stays authored.
+    static func stabilized(_ image: CIImage, clip: VideoClip, at time: CMTime) -> CIImage {
+        let correction = clip.stabilizationCorrection(at: time, size: image.extent.size)
+        guard correction != .identity else { return image }
+        return image.transformed(by: correction).cropped(to: image.extent)
     }
 
     static func transform(_ t: VisualTransform, metadata: VideoMetadata, canvas: CGSize) -> CGAffineTransform {
@@ -2254,7 +2266,8 @@ extension LayerCompositor {
             var layer = HDRLayerUniforms(transform: Self.transform(clip.transform, metadata: metadata, canvas: size),
                 sourceSize: sourceSize, canvasSize: size, opacity: clip.opacity,
                 blendAmount: amount, sourceIsSDR: profile != expectedProfile,
-                matteInverted: layerMatte.inverted)
+                matteInverted: layerMatte.inverted,
+                sourceCorrection: clip.stabilizationCorrection(at: request.compositionTime, size: metadata.encodedSize))
             // 2 marks a source that is already in working space.
             if relitWorking { layer.params.z = 2 }
             var mask = LayerMaskUniforms(clip.layerMask)

@@ -18,6 +18,7 @@ import SwiftUI
 ///   point diagonally on a small screen means neither axis lands where intended.
 struct SpeedCurveView: View {
     @ObservedObject var model: EditorViewModel
+    @AppStorage(DurationDisplayFormat.preferenceKey) private var durationFormat = DurationDisplayFormat.defaultValue
     @ObservedObject var editor: SpeedEditorModel
     /// Height is set by whoever hosts this: a phone sheet gives it most of the
     /// screen, a Mac panel gives it whatever the divider says.
@@ -220,7 +221,7 @@ struct SpeedCurveView: View {
             Text(ClipSpeed.percentLabel(bubble.speed))
                 .font(AppTypography.numeric)
                 .foregroundStyle(AppColors.textPrimary)
-            Text(TimecodeText.short(bubble.offset.seconds))
+            Text(durationText(bubble.offset.seconds))
                 .font(AppTypography.caption)
                 .foregroundStyle(AppColors.textSecondary)
         }
@@ -238,7 +239,7 @@ struct SpeedCurveView: View {
     private func hoverReadout(_ readout: SpeedEditorModel.Readout) -> some View {
         HStack(spacing: AppSpacing.xSmall) {
             Text(ClipSpeed.percentLabel(readout.speed)).font(AppTypography.numeric)
-            Text(TimecodeText.short(readout.offset.seconds))
+            Text(durationText(readout.offset.seconds))
                 .font(AppTypography.caption).foregroundStyle(AppColors.textSecondary)
         }
         .padding(.horizontal, AppSpacing.small)
@@ -246,6 +247,10 @@ struct SpeedCurveView: View {
         .background(AppColors.surfaceRaised.opacity(0.92), in: Capsule())
         .padding(AppSpacing.small)
         .allowsHitTesting(false)
+    }
+
+    private func durationText(_ seconds: Double) -> String {
+        DurationText.string(from: seconds, format: durationFormat, frameRate: model.durationDisplayFrameRate)
     }
 }
 
@@ -324,15 +329,5 @@ struct SpeedPointMenu: View {
                 Label("Reset Curve", systemImage: "arrow.uturn.backward")
             }
         }
-    }
-}
-
-/// Short seconds-and-frames style text for the readouts.
-enum TimecodeText {
-    static func short(_ seconds: Double) -> String {
-        guard seconds.isFinite, seconds >= 0 else { return "0:00.00" }
-        let whole = Int(seconds)
-        let hundredths = Int(((seconds - Double(whole)) * 100).rounded())
-        return String(format: "%d:%02d.%02d", whole / 60, whole % 60, min(99, hundredths))
     }
 }

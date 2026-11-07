@@ -140,7 +140,7 @@ enum TimelineEditing {
             insertion = min(max(insertion, 0), candidate.timeline.tracks.count)
             let number = candidate.timeline.tracks.filter { $0.kind == .videoOverlay }.count + 1
             candidate.timeline.tracks.insert(
-                .init(id: UUID(), name: "Overlay \(number)", kind: .videoOverlay),
+                .init(id: UUID(), name: String(localized: "Overlay \(number)"), kind: .videoOverlay),
                 at: insertion
             )
             destinationIndex = insertion

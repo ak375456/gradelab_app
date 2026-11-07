@@ -36,6 +36,16 @@
           "description": "Kertaostos. Kaikki Pro-ominaisuudet.",
           "displayName": "Elinikäinen Pro",
           "locale": "fi_FI"
+        },
+        {
+          "description": "一次购买，永久解锁全部 Pro 功能。",
+          "displayName": "Pro 终身版",
+          "locale": "zh_CN"
+        },
+        {
+          "description": "一次購買，永久解鎖所有 Pro 功能。",
+          "displayName": "Pro 終身版",
+          "locale": "zh_TW"
         }
       ],
       "productID": "com.aftab.gradelab.pro.lifetime",
@@ -96,6 +106,16 @@
               "description": "Pro-ominaisuudet, laskutus viikoittain.",
               "displayName": "Viikoittain",
               "locale": "fi_FI"
+            },
+            {
+              "description": "解锁全部 Pro 功能，按周自动续订。",
+              "displayName": "周订阅",
+              "locale": "zh_CN"
+            },
+            {
+              "description": "解鎖所有 Pro 功能，每週自動續訂。",
+              "displayName": "周訂閱",
+              "locale": "zh_TW"
             }
           ],
           "productID": "com.aftab.gradelab.pro.weekly",
@@ -142,6 +162,16 @@
               "description": "Pro-ominaisuudet, laskutus kuukausittain.",
               "displayName": "Kuukausittain",
               "locale": "fi_FI"
+            },
+            {
+              "description": "解锁全部 Pro 功能，按月自动续订。",
+              "displayName": "月订阅",
+              "locale": "zh_CN"
+            },
+            {
+              "description": "解鎖所有 Pro 功能，每月自動續訂。",
+              "displayName": "月訂閱",
+              "locale": "zh_TW"
             }
           ],
           "productID": "com.aftab.gradelab.pro.monthly",
@@ -188,6 +218,16 @@
               "description": "Pro-ominaisuudet, laskutus vuosittain.",
               "displayName": "Vuosittain",
               "locale": "fi_FI"
+            },
+            {
+              "description": "解锁全部 Pro 功能，按年自动续订。",
+              "displayName": "年订阅",
+              "locale": "zh_CN"
+            },
+            {
+              "description": "解鎖所有 Pro 功能，每年自動續訂。",
+              "displayName": "年訂閱",
+              "locale": "zh_TW"
             }
           ],
           "productID": "com.aftab.gradelab.pro.yearly",

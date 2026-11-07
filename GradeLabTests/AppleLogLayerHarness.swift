@@ -61,7 +61,8 @@ final class AppleLogLayerHarness {
     func render(_ source: CVPixelBuffer, settings: GradeSettings = .neutral, tile: Int? = nil,
                 opacity: Double = 1, transform: CGAffineTransform = .identity,
                 mask authoredMask: LayerMask? = nil, sourceIsSDR: Bool = false,
-                partner: CVPixelBuffer? = nil, blendAmount: Double = 0, canvasSize: CGSize? = nil) throws -> (working: [Float], display: [Float]) {
+                partner: CVPixelBuffer? = nil, blendAmount: Double = 0, canvasSize: CGSize? = nil,
+                sourceCorrection: CGAffineTransform = .identity) throws -> (working: [Float], display: [Float]) {
         let sourceSize = CGSize(width: CVPixelBufferGetWidth(source), height: CVPixelBufferGetHeight(source))
         let size = canvasSize ?? sourceSize
         let width = Int(size.width), height = Int(size.height)
@@ -84,7 +85,7 @@ final class AppleLogLayerHarness {
         var grade = program.uniforms
         var yuv = YUVUniforms.make(for: source, fallbackMatrix: "BT.709")
         var layer = HDRLayerUniforms(transform: transform, sourceSize: sourceSize, canvasSize: size, opacity: opacity,
-            blendAmount: blendAmount, sourceIsSDR: sourceIsSDR)
+            blendAmount: blendAmount, sourceIsSDR: sourceIsSDR, sourceCorrection: sourceCorrection)
         var mask = LayerMaskUniforms(authoredMask)
         try renderer.encode(AppleLogSpecialization.key("compositeVideoAppleLog", isLog2: isLog2),
                             into: command, width: width, height: height, tileSize: tile) { enc in

@@ -34,6 +34,7 @@ enum ClipReplacement {
 
         var clip = original
         clip.assetID = asset.id
+        clip.stabilization = nil // Motion belongs to the replaced source.
         // A cutout's generated masks and hand-traced outline describe the old
         // footage. Colour keys remain portable; analysed cutouts must be redone.
         if clip.backgroundRemoval?.mode != .colorKey { clip.backgroundRemoval = nil }

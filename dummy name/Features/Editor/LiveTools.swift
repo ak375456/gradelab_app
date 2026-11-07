@@ -327,6 +327,7 @@ struct LayerMaskOverlay: View {
         return Geometry(
             sourceSize: sourceSize,
             sourceToPreview: sourceTopToBottom
+                .concatenating(clip.stabilizationCorrection(at: model.playheadTime.cmTime, size: sourceSize))
                 .concatenating(placement)
                 .concatenating(canvasBottomToTop)
                 .concatenating(canvasToPreview)
@@ -598,6 +599,7 @@ struct CanvasTools: View {
 }
 
 struct EditorSettings: View {
+    var frameRate: Double? = nil
     @AppStorage("editor.frameStep") private var frameStep = 2
     @AppStorage("keyframes.hintDismissed") private var hintDismissed = false
     @AppStorage("timeline.showsClipNames") private var showsClipNames = true
@@ -610,6 +612,7 @@ struct EditorSettings: View {
                 if !AppPlatform.isMac && UIDevice.current.userInterfaceIdiom == .phone {
                     PhoneColorLayoutSettings()
                 }
+                DurationDisplaySettingsLink(frameRate: frameRate)
                 Section {
                     Picker("Frames per press", selection: $frameStep) {
                         ForEach([1, 2, 5, 10, 20, 30], id: \.self) { Text("\($0) frames").tag($0) }

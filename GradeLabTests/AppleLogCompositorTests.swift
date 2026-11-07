@@ -4,6 +4,19 @@ import XCTest
 @testable import GradeLab
 
 final class AppleLogCompositorTests: XCTestCase {
+    func testStabilizationUsesOriginalLogSamplesInWholeAndTiledRendering() throws {
+        let source = try AppleLogLayerHarness.rawFrame()
+        let original = try harness.render(source)
+        let corrected = try harness.render(source,sourceCorrection: .init(translationX: 4,y: 0))
+        let tiled = try harness.render(source,tile: 13,sourceCorrection: .init(translationX: 4,y: 0))
+        XCTAssertEqual(corrected.working,tiled.working)
+        for channel in 0..<3 {
+            XCTAssertEqual(corrected.working[(16*64+32)*4+channel],
+                           original.working[(16*64+28)*4+channel],accuracy: 0.0001)
+            XCTAssertEqual(corrected.working[(16*64)*4+channel],0)
+        }
+    }
+
     private var harness: AppleLogLayerHarness!
     override func setUpWithError() throws {
         harness = try AppleLogLayerHarness(context: MetalContext())
@@ -200,8 +213,11 @@ final class AppleLogCompositorTests: XCTestCase {
         do {
             _ = try await SequenceComposition.buildLayers(project: project, forExport: true)
             XCTFail("Unidentified footage must not take the Log transform")
+        } catch GradeLabError.unsupportedExport(let reason) {
+            // Assert the rejection, independent of localized explanatory copy.
+            XCTAssertFalse(reason.isEmpty)
         } catch {
-            XCTAssertTrue(error.localizedDescription.contains("no supported Apple Log profile"))
+            XCTFail("Expected explicit unsupported-export rejection, got \(error)")
         }
     }
 }

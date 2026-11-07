@@ -310,6 +310,7 @@ struct BackgroundRemovalOverlay: View {
     private func canvasTransform(_ coordinates: MaskTrackingCoordinates) -> CGAffineTransform? {
         guard model.maskOverlayUsesCanvas, let clip = model.evaluatedSelectedClip else { return nil }
         let canvas = CGSize(width: model.project.canvas.width, height: model.project.canvas.height)
-        return coordinates.sourceToCanvasTransform(clip.transform, canvas: canvas)
+        return coordinates.sourceToCanvasTransform(clip.transform, canvas: canvas,
+                                                   sourceCorrection: model.stabilizationSourceUVTransform)
     }
 }
