@@ -97,6 +97,7 @@ final class CameraCaptureController: NSObject, @unchecked Sendable {
     private var rotation = 90
     private var stabilization = true
     private var audioEnabled = false
+    private var previousAudioFeedbackSetting: Bool?
     private var zoomFactor: Double = 1
     private var recordingInputIDs: [String]?
     private var prepared = false
@@ -131,6 +132,7 @@ final class CameraCaptureController: NSObject, @unchecked Sendable {
                 frames.clear()
                 if !session.isRunning { session.startRunning() }
                 guard session.isRunning else { throw CameraError.unavailable }
+                enablePreviewFeedback()
                 publishConfiguration()
                 startTelemetry()
             } catch {
@@ -154,6 +156,7 @@ final class CameraCaptureController: NSObject, @unchecked Sendable {
             timer?.cancel(); timer = nil
             frames.clear()
             frameSize = .zero
+            restoreAudioFeedbackSetting()
             try? AVAudioSession.sharedInstance().setActive(false, options: .notifyOthersOnDeactivation)
         }
     }
@@ -167,6 +170,7 @@ final class CameraCaptureController: NSObject, @unchecked Sendable {
             observations.forEach(NotificationCenter.default.removeObserver)
             observations.removeAll()
             frames.clear()
+            restoreAudioFeedbackSetting()
             try? AVAudioSession.sharedInstance().setActive(false, options: .notifyOthersOnDeactivation)
             // A finishing delegate still needs to deliver the durable receipt.
             if recording == nil { sink = nil }
@@ -352,6 +356,7 @@ final class CameraCaptureController: NSObject, @unchecked Sendable {
             var receipt: CameraRecording?
             do {
                 guard availableBytes() > 250_000_000 else { throw CameraError.storageFull }
+                if audioEnabled { try? AVAudioSession.sharedInstance().setAllowHapticsAndSystemSoundsDuringRecording(false) }
                 let prepared = try recordingStore.prepare(grade: grade, profile: selected.profile)
                 receipt = prepared
                 if usesSampleRecording {
@@ -384,6 +389,7 @@ final class CameraCaptureController: NSObject, @unchecked Sendable {
                 }
             } catch {
                 if let receipt { try? recordingStore.discardEmpty(receipt) }
+                enablePreviewFeedback()
                 emit(.message(error.localizedDescription))
             }
         }
@@ -402,6 +408,7 @@ final class CameraCaptureController: NSObject, @unchecked Sendable {
                     self.sampleRecorder = nil; self.recording = nil
                     if let error {
                         try? self.recordingStore.discardEmpty(receipt)
+                        self.enablePreviewFeedback()
                         self.emit(.message(error))
                     } else { self.emit(.finished(receipt, warning: warning)) }
                 }
@@ -461,6 +468,23 @@ final class CameraCaptureController: NSObject, @unchecked Sendable {
         let audio = AVAudioSession.sharedInstance()
         try audio.setCategory(.playAndRecord, mode: .videoRecording, options: [.defaultToSpeaker, .allowBluetoothHFP])
         try audio.setActive(true)
+    }
+
+    /// The live meter uses audio input even before a take, which normally
+    /// suppresses UI sounds and haptics. Allow ruler feedback only in preview.
+    private func enablePreviewFeedback() {
+        guard audioEnabled, !suspended, recording == nil, !movie.isRecording else { return }
+        let audio = AVAudioSession.sharedInstance()
+        if previousAudioFeedbackSetting == nil {
+            previousAudioFeedbackSetting = audio.allowHapticsAndSystemSoundsDuringRecording
+        }
+        try? audio.setAllowHapticsAndSystemSoundsDuringRecording(true)
+    }
+
+    private func restoreAudioFeedbackSetting() {
+        guard let previousAudioFeedbackSetting else { return }
+        try? AVAudioSession.sharedInstance().setAllowHapticsAndSystemSoundsDuringRecording(previousAudioFeedbackSetting)
+        self.previousAudioFeedbackSetting = nil
     }
 
     private static func options(for device: AVCaptureDevice) -> [(CameraFormatOption, AVCaptureDevice.Format)] {
@@ -785,6 +809,7 @@ extension CameraCaptureController: AVCaptureFileOutputRecordingDelegate {
             if success { emit(.finished(receipt, warning: message)) }
             else {
                 try? recordingStore.discardEmpty(receipt)
+                enablePreviewFeedback()
                 emit(.message(message ?? String(localized: "Recording stopped. Any captured footage is kept for recovery.")))
             }
         }

@@ -6,6 +6,48 @@ import XCTest
 
 @MainActor
 final class CameraWorkspaceTests: XCTestCase {
+    func testCameraRulersKeepHardwareLimitsAndFrameRateStops() {
+        let iso = CameraRulerScale.iso(37...1472)
+        XCTAssertEqual(iso.values.first, 37)
+        XCTAssertEqual(iso.values.last, 1472)
+        XCTAssertTrue(iso.values.contains(400))
+
+        let limits = CameraControlLimits(shutter: (1.0 / 8000)...(1.0 / 24))
+        let range = limits.shutterRange(fps: 60)
+        let shutter = CameraRulerScale.shutter(range, fps: 60)
+        XCTAssertEqual(shutter.values.first, range.lowerBound)
+        XCTAssertEqual(shutter.values.last, 1.0 / 60)
+        XCTAssertTrue(shutter.values.contains(1.0 / 120))
+        XCTAssertFalse(shutter.values.contains(1.0 / 30))
+    }
+
+    func testExposureRulerPreservesTheLiveValueUntilATickChanges() throws {
+        var value = 0.04
+        var applied: [Double] = []
+        let scale = CameraRulerScale(range: -2...2, step: 0.1, labelEvery: 5)
+        let picker = CameraRulerPicker(title: "Exposure", value: Binding(get: { value }, set: {
+            value = $0
+            applied.append($0)
+        }), scale: scale, feedbackEnabled: false, soundsEnabled: false) { String(format: "%+.1f EV", $0) }
+        try snapshot(picker.padding(16).background(AppColors.surface),
+                     size: .init(width: 320, height: 160), name: "camera-exposure-ruler") { view in
+            let ruler = try XCTUnwrap(self.scrollViews(in: view).first { $0.contentSize.width > $0.bounds.width })
+            let pitch = (ruler.contentSize.width - ruler.bounds.width) / CGFloat(scale.values.count - 1)
+            XCTAssertEqual(ruler.contentOffset.x, 20.4 * pitch, accuracy: 0.5)
+            XCTAssertTrue(applied.isEmpty)
+
+            ruler.delegate?.scrollViewWillBeginDragging?(ruler)
+            ruler.setContentOffset(CGPoint(x: 20.45 * pitch, y: 0), animated: false)
+            XCTAssertTrue(applied.isEmpty)
+            ruler.setContentOffset(CGPoint(x: 20.7 * pitch, y: 0), animated: false)
+            XCTAssertEqual(applied, [0.1])
+
+            var proposed = CGPoint(x: 22.7 * pitch, y: 0)
+            ruler.delegate?.scrollViewWillEndDragging?(ruler, withVelocity: .zero, targetContentOffset: &proposed)
+            XCTAssertEqual(proposed.x, 23 * pitch, accuracy: 0.5)
+        }
+    }
+
     func testShutterAnglePanelFitsPhone() throws {
         try render(size: .init(width: 390, height: 844), tool: .exposure, name: "camera-shutter-angle", manual: true)
     }
@@ -311,7 +353,8 @@ final class CameraWorkspaceTests: XCTestCase {
         try snapshot(content, size: size, name: largeText ? "camera-choice-large-type" : "camera-choice")
     }
 
-    private func snapshot<Content: View>(_ content: Content, size: CGSize, name: String, scrollToBottom: Bool = false) throws {
+    private func snapshot<Content: View>(_ content: Content, size: CGSize, name: String, scrollToBottom: Bool = false,
+                                         inspect: ((UIView) throws -> Void)? = nil) throws {
         let controller = UIHostingController(rootView: content)
         let scene = UIApplication.shared.connectedScenes.first as? UIWindowScene
         let window = scene.map { UIWindow(windowScene: $0) } ?? UIWindow(frame: .zero)
@@ -338,6 +381,7 @@ final class CameraWorkspaceTests: XCTestCase {
         let url = FileManager.default.temporaryDirectory.appendingPathComponent("\(name).png")
         try image.pngData()?.write(to: url)
         print("CAMERA_LAYOUT_SHOT \(url.path)")
+        try inspect?(controller.view)
     }
 
     private func scrollViews(in view: UIView) -> [UIScrollView] {

@@ -71,6 +71,7 @@ struct CameraWorkspace: View {
     @ObservedObject private var store = ProStore.shared
     let onClose: () -> Void
     @AppStorage("camera.proControls") private var proControls = false
+    @AppStorage("camera.rulerSounds") private var rulerSounds = false
     @State private var tool: CameraTool = .looks
     @State private var lookSearch = ""
     @State private var showsPanel = false
@@ -368,7 +369,8 @@ struct CameraWorkspace: View {
     }
 
     private func toolSelector(isExpanded: Bool, collapsible: Bool) -> some View {
-        HStack(spacing: 8) {
+        let showsSoundControl = isExpanded && tool.isManual
+        return HStack(spacing: 8) {
             ForEach([CameraTool.looks, .assist]) { item in
                 Button {
                     withAnimation(.easeInOut(duration: 0.18)) {
@@ -378,12 +380,23 @@ struct CameraWorkspace: View {
                 } label: {
                     Label(item.title, systemImage: item.symbol)
                         .font(.system(size: 12, weight: .medium))
+                        .lineLimit(1).minimumScaleFactor(0.75)
                         .foregroundStyle(tool == item && isExpanded ? AppColors.accent : AppColors.textSecondary)
-                        .padding(.horizontal, 12).frame(minHeight: 44)
+                        .padding(.horizontal, showsSoundControl ? 8 : 12).frame(minWidth: 44, minHeight: 44)
                         .background(tool == item && isExpanded ? AppColors.accentMuted : .clear, in: Capsule())
                 }.accessibilityAddTraits(tool == item && isExpanded ? .isSelected : [])
             }
             Spacer(minLength: 0)
+            if showsSoundControl {
+                Button { rulerSounds.toggle() } label: {
+                    Image(systemName: rulerSounds ? "speaker.wave.1" : "speaker.slash")
+                        .foregroundStyle(rulerSounds ? AppColors.accent : AppColors.textSecondary)
+                        .frame(width: 44, height: 44)
+                        .contentShape(Rectangle())
+                }
+                .accessibilityLabel("Sound effects")
+                .accessibilityValue(rulerSounds ? String(localized: "On") : String(localized: "Off"))
+            }
             if isExpanded && collapsible {
                 Button { withAnimation(.easeInOut(duration: 0.18)) { showsPanel = false } } label: {
                     Image(systemName: "chevron.down").frame(width: 44, height: 44)
@@ -458,7 +471,8 @@ struct CameraWorkspace: View {
             controlMode("Exposure", manual: Binding(get: { model.controls.manualExposure }, set: model.setManualExposure))
                 .disabled(model.configuration?.limits.supportsExposure != true)
             if model.controls.manualExposure, let limits = model.configuration?.limits, let fps = model.configuration?.selected.fps {
-                cameraSlider("ISO", value: control(\.iso), range: limits.iso, label: "\(Int(model.controls.iso))")
+                let shutterRange = limits.shutterRange(fps: fps)
+                cameraRuler("ISO", value: control(\.iso), scale: .iso(limits.iso)) { "\(Int($0.rounded()))" }
                 HStack {
                     Text("Shutter").font(AppTypography.headline)
                     Spacer(minLength: 8)
@@ -467,16 +481,18 @@ struct CameraWorkspace: View {
                     }.pickerStyle(.segmented).frame(width: 150)
                 }.frame(minHeight: 44)
                 if model.shutterUnit == .angle {
-                    cameraSlider("Shutter angle", value: Binding(get: {
+                    let degreesPerSecond = Double(fps) * 360
+                    let angleRange = (shutterRange.lowerBound * degreesPerSecond)...(shutterRange.upperBound * degreesPerSecond)
+                    cameraRuler("Shutter angle", value: Binding(get: {
                         CameraGeometry.shutterAngle(model.controls.shutterSeconds, fps: fps)
                     }, set: model.setShutterAngle),
-                        range: (limits.shutterRange(fps: fps).lowerBound * Double(fps) * 360)...(limits.shutterRange(fps: fps).upperBound * Double(fps) * 360),
-                        label: "\(CameraGeometry.angleLabel(model.controls.shutterSeconds, fps: fps)) · \(CameraGeometry.shutterLabel(model.controls.shutterSeconds))")
+                        scale: .init(range: angleRange, step: 5, labelEvery: 6)) { angle in
+                        let seconds = angle / degreesPerSecond
+                        return "\(CameraGeometry.angleLabel(seconds, fps: fps)) · \(CameraGeometry.shutterLabel(seconds))"
+                    }
                 } else {
-                    cameraSlider("Shutter speed", value: Binding(get: { log2(max(model.controls.shutterSeconds, 0.000001)) },
-                        set: { model.setShutterSpeed(pow(2, $0)) }),
-                        range: log2(limits.shutterRange(fps: fps).lowerBound)...log2(limits.shutterRange(fps: fps).upperBound),
-                        label: CameraGeometry.shutterLabel(model.controls.shutterSeconds))
+                    cameraRuler("Shutter speed", value: Binding(get: { model.controls.shutterSeconds }, set: model.setShutterSpeed),
+                                scale: .shutter(shutterRange, fps: fps), format: CameraGeometry.shutterLabel)
                 }
                 HStack(spacing: 8) {
                     ForEach([90, 180, 360], id: \.self) { angle in
@@ -487,8 +503,10 @@ struct CameraWorkspace: View {
                     }
                 }.font(AppTypography.caption)
             } else {
-                cameraSlider("Exposure", value: control(\.exposureBias), range: model.configuration?.limits.bias ?? -2...2,
-                             label: String(format: "%+.1f EV", model.controls.exposureBias))
+                cameraRuler("Exposure", value: control(\.exposureBias),
+                            scale: .init(range: model.configuration?.limits.bias ?? -2...2, step: 0.1, labelEvery: 5)) {
+                    String(format: "%+.1f EV", $0)
+                }
                 Text("ISO \(Int(model.telemetry.iso)) · \(CameraGeometry.shutterLabel(model.telemetry.shutter))")
                     .font(AppTypography.caption).foregroundStyle(AppColors.textSecondary)
             }
@@ -516,9 +534,15 @@ struct CameraWorkspace: View {
         VStack(spacing: 12) {
             controlMode("White balance", manual: Binding(get: { model.controls.manualWhiteBalance }, set: model.setManualWhiteBalance))
                 .disabled(model.configuration?.limits.supportsWhiteBalance != true)
-            cameraSlider("Temperature", value: control(\.temperature), range: 2500...10000,
-                         label: "\(Int(model.controls.manualWhiteBalance ? model.controls.temperature : model.telemetry.temperature)) K")
-            cameraSlider("Tint", value: control(\.tint), range: -100...100, label: String(format: "%+.0f", model.controls.manualWhiteBalance ? model.controls.tint : model.telemetry.tint))
+            Group {
+                cameraRuler("Temperature", value: control(\.temperature) {
+                    model.controls.manualWhiteBalance ? nil : model.telemetry.temperature
+                }, scale: .init(range: 2500...10000, step: 100, labelEvery: 5)) { "\(Int($0.rounded())) K" }
+                cameraRuler("Tint", value: control(\.tint) {
+                    model.controls.manualWhiteBalance ? nil : model.telemetry.tint
+                }, scale: .init(range: -100...100, step: 1, labelEvery: 5)) { String(format: "%+.0f", $0) }
+            }
+            .disabled(model.configuration?.limits.supportsWhiteBalance != true)
             Text("Lock to keep color consistent throughout a take.").font(.caption2).foregroundStyle(AppColors.textTertiary)
         }.font(AppTypography.callout).tint(AppColors.accent)
             .disabled(model.phase != .ready && model.phase != .recording)
@@ -528,8 +552,9 @@ struct CameraWorkspace: View {
         VStack(spacing: 12) {
             controlMode("Focus", manual: Binding(get: { model.controls.manualFocus }, set: model.setManualFocus))
                 .disabled(model.configuration?.limits.supportsFocus != true)
-            cameraSlider("Near → Far", value: control(\.focus), range: 0...1,
-                         label: String(format: "%.0f%%", (model.controls.manualFocus ? model.controls.focus : model.telemetry.focus) * 100))
+            cameraRuler("Near → Far", value: control(\.focus) {
+                model.controls.manualFocus ? nil : model.telemetry.focus
+            }, scale: .init(range: 0...1, step: 0.01, labelEvery: 5)) { String(format: "%.0f%%", $0 * 100) }
                 .disabled(!model.controls.manualFocus)
             CameraPeakingControls(assist: $model.assist)
             Text(model.configuration?.limits.supportsFocus == false
@@ -595,12 +620,25 @@ struct CameraWorkspace: View {
         }.frame(minHeight: 44)
     }
 
-    private func control(_ keyPath: WritableKeyPath<CameraControls, Double>) -> Binding<Double> {
-        Binding(get: { model.controls[keyPath: keyPath] }, set: {
-            model.controls[keyPath: keyPath] = $0
-            if keyPath == \.temperature || keyPath == \.tint { model.controls.manualWhiteBalance = true }
+    private func control(_ keyPath: WritableKeyPath<CameraControls, Double>, autoValue: @escaping () -> Double? = { nil }) -> Binding<Double> {
+        Binding(get: { autoValue() ?? model.controls[keyPath: keyPath] }, set: {
+            var controls = model.controls
+            if !controls.manualWhiteBalance && (keyPath == \.temperature || keyPath == \.tint) {
+                controls.temperature = model.telemetry.temperature
+                controls.tint = model.telemetry.tint
+                controls.manualWhiteBalance = true
+            }
+            controls[keyPath: keyPath] = $0
+            model.controls = controls
             model.applyControls()
         })
+    }
+
+    private func cameraRuler(_ title: LocalizedStringKey, value: Binding<Double>, scale: CameraRulerScale,
+                             format: @escaping (Double) -> String) -> some View {
+        CameraRulerPicker(title: title, value: value, scale: scale,
+                          feedbackEnabled: model.phase == .ready && !model.checkingRecordingAccess,
+                          soundsEnabled: rulerSounds, format: format)
     }
 
     private func cameraSlider(_ title: String, value: Binding<Double>, range: ClosedRange<Double>, label: String) -> some View {
