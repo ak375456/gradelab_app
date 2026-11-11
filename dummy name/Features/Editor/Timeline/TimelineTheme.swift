@@ -70,9 +70,7 @@ enum TimelineTheme {
 
 /// The timeline's vertical rhythm and touch geometry.
 ///
-/// Touch targets are separate from the drawn sizes on purpose: a trim handle
-/// is a 13pt bar that answers to a 44pt grab region, which is what makes it
-/// usable on a phone without turning the clip into a pair of fat bookends.
+/// Touch targets extend beyond the drawn sizes so handles stay usable at phone widths.
 enum TimelineMetrics {
     /// The ruler band across the top. Rows begin below it. Tall enough for a
     /// line of labels above the ticks, with the playhead's timecode bubble
@@ -92,10 +90,13 @@ enum TimelineMetrics {
     static let selectedBorderWidth: CGFloat = 2.5
     static let borderWidth: CGFloat = 1
 
-    /// Drawn width of a trim handle, and the half-width of the region that
-    /// actually answers a touch. 22 either side of the edge is a 44pt target.
+    /// Maximum drawn width and hit-test reach from a trim edge.
     static let trimHandleWidth: CGFloat = 13
     static let trimHitSlop: CGFloat = 22
+
+    static func trimHandleWidth(for clipWidth: CGFloat) -> CGFloat {
+        min(trimHandleWidth, max(4, clipWidth / 3))
+    }
 
     /// The dark strip along a clip's bottom that carries its name.
     static let labelBarHeight: CGFloat = 20

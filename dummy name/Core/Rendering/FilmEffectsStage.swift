@@ -12,13 +12,16 @@ struct EffectUniforms: Sendable {
     var bloomThreshold: Float = 0.62
     var extendedRange: Float = 0
     var step: SIMD2<Float> = .zero
+    var clarity: Float = 0
+
+    var needsGlow: Bool { bloom > 0 || glow > 0 || halation > 0 }
 }
 
-/// Sharpen, bloom, glow and halation, applied to a graded frame.
+/// Spatial finishing effects applied to a graded frame.
 ///
 /// One instance serves every path that needs it — preview, export and both
 /// compositors — so the effects cannot look different in the exported file than
-/// they did on screen. It owns only its two blur textures, which are rebuilt
+/// they did on screen. It caches blur textures, which are rebuilt
 /// when the frame size changes and released when nothing is using them.
 ///
 /// It never runs unless something asks for it: `GradeSettings` with no effects
@@ -30,6 +33,9 @@ final class FilmEffectsStage: @unchecked Sendable {
     /// Two Gaussian pairs. One is too tight to read as a halo at this
     /// resolution; more than two costs passes for a difference nobody sees.
     static let blurIterations = 2
+    /// A fixed long edge gives Clarity the same radius relative to the image
+    /// in a smaller preview and a full-resolution export.
+    static let clarityBlurLongEdge = StillEffectGeometry.blurLongEdge
 
     private let context: MetalContext
     private let prepare: MTLComputePipelineState
@@ -37,6 +43,7 @@ final class FilmEffectsStage: @unchecked Sendable {
     private let composite: MTLComputePipelineState
     private let lock = NSLock()
     private var blurTextures: (MTLTexture, MTLTexture)?
+    private var clarityTextures: (MTLTexture, MTLTexture)?
 
     init?(context: MetalContext) {
         self.context = context
@@ -65,16 +72,20 @@ final class FilmEffectsStage: @unchecked Sendable {
             halation: grade.effectsB.z,
             bloomThreshold: 0.62,
             extendedRange: workingSpace ? 1 : 0,
-            step: SIMD2(1 / Float(max(size.width, 1)), 1 / Float(max(size.height, 1))))
+            step: SIMD2(1 / Float(max(size.width, 1)), 1 / Float(max(size.height, 1))),
+            clarity: grade.effectsB.w)
     }
 
     /// True when the stage would change anything.
     static func isActive(_ grade: GradeUniforms) -> Bool {
-        grade.effectsA.z > 0 || grade.effectsB.x > 0 || grade.effectsB.y > 0 || grade.effectsB.z > 0
+        grade.effectsA.z > 0 || grade.effectsB != .zero
     }
 
     func releaseResources() {
-        lock.lock(); blurTextures = nil; lock.unlock()
+        lock.lock()
+        blurTextures = nil
+        clarityTextures = nil
+        lock.unlock()
     }
 
     /// The size the blur pyramid is built at.
@@ -111,20 +122,27 @@ final class FilmEffectsStage: @unchecked Sendable {
         into command: MTLCommandBuffer
     ) -> MTLTexture? {
         let size = Self.blurSize(width: source.width, height: source.height, longEdge: blurLongEdge)
-        var uniforms = Self.uniforms(grade, size: (source.width, source.height), workingSpace: workingSpace)
-        uniforms.step = SIMD2(1 / Float(size.width), 1 / Float(size.height))
-        let descriptor = MTLTextureDescriptor.texture2DDescriptor(
-            pixelFormat: .rgba16Float, width: size.width, height: size.height, mipmapped: false)
-        descriptor.usage = [.shaderRead, .shaderWrite]
-        descriptor.storageMode = .private
-        guard let first = context.device.makeTexture(descriptor: descriptor),
-              let second = context.device.makeTexture(descriptor: descriptor),
-              let seedEncoder = command.makeComputeCommandEncoder() else { return nil }
+        let uniforms = Self.uniforms(grade, size: (source.width, source.height), workingSpace: workingSpace)
+        guard let pair = makeTextures(width: size.width, height: size.height) else { return nil }
+        return encodeBlur(source: source, pair: pair, uniforms: uniforms, into: command)
+    }
+
+    private func encodeBlur(
+        source: MTLTexture,
+        pair: (MTLTexture, MTLTexture),
+        uniforms: EffectUniforms,
+        into command: MTLCommandBuffer
+    ) -> MTLTexture? {
+        let (first, second) = pair
+        let width = first.width, height = first.height
+        var blurUniforms = uniforms
+        blurUniforms.step = SIMD2(1 / Float(width), 1 / Float(height))
+        guard let seedEncoder = command.makeComputeCommandEncoder() else { return nil }
         seedEncoder.setComputePipelineState(prepare)
         seedEncoder.setTexture(source, index: 0)
         seedEncoder.setTexture(first, index: 1)
-        seedEncoder.setBytes(&uniforms, length: MemoryLayout<EffectUniforms>.stride, index: 0)
-        Self.dispatch(seedEncoder, pipeline: prepare, width: size.width, height: size.height)
+        seedEncoder.setBytes(&blurUniforms, length: MemoryLayout<EffectUniforms>.stride, index: 0)
+        Self.dispatch(seedEncoder, pipeline: prepare, width: width, height: height)
         seedEncoder.endEncoding()
 
         var read = first, write = second
@@ -135,9 +153,9 @@ final class FilmEffectsStage: @unchecked Sendable {
                 encoder.setComputePipelineState(blur)
                 encoder.setTexture(read, index: 0)
                 encoder.setTexture(write, index: 1)
-                encoder.setBytes(&uniforms, length: MemoryLayout<EffectUniforms>.stride, index: 0)
+                encoder.setBytes(&blurUniforms, length: MemoryLayout<EffectUniforms>.stride, index: 0)
                 encoder.setBytes(&direction, length: MemoryLayout<SIMD2<Float>>.stride, index: 1)
-                Self.dispatch(encoder, pipeline: blur, width: size.width, height: size.height)
+                Self.dispatch(encoder, pipeline: blur, width: width, height: height)
                 encoder.endEncoding()
                 swap(&read, &write)
             }
@@ -145,18 +163,24 @@ final class FilmEffectsStage: @unchecked Sendable {
         return read
     }
 
-    private func textures(width: Int, height: Int) -> (MTLTexture, MTLTexture)? {
+    private func textures(width: Int, height: Int, forClarity: Bool = false) -> (MTLTexture, MTLTexture)? {
         lock.lock(); defer { lock.unlock() }
-        if let existing = blurTextures, existing.0.width == width, existing.0.height == height {
+        if let existing = forClarity ? clarityTextures : blurTextures,
+           existing.0.width == width, existing.0.height == height {
             return existing
         }
+        guard let pair = makeTextures(width: width, height: height) else { return nil }
+        if forClarity { clarityTextures = pair } else { blurTextures = pair }
+        return pair
+    }
+
+    private func makeTextures(width: Int, height: Int) -> (MTLTexture, MTLTexture)? {
         let descriptor = MTLTextureDescriptor.texture2DDescriptor(
             pixelFormat: .rgba16Float, width: width, height: height, mipmapped: false)
         descriptor.usage = [.shaderRead, .shaderWrite]
         descriptor.storageMode = .private
         guard let first = context.device.makeTexture(descriptor: descriptor),
               let second = context.device.makeTexture(descriptor: descriptor) else { return nil }
-        blurTextures = (first, second)
         return (first, second)
     }
 
@@ -174,58 +198,35 @@ final class FilmEffectsStage: @unchecked Sendable {
     ) -> Bool {
         var uniforms = Self.uniforms(
             grade, size: (source.width, source.height), workingSpace: workingSpace)
-        let needsBlur = uniforms.bloom > 0 || uniforms.glow > 0 || uniforms.halation > 0
-        let (blurWidth, blurHeight) = Self.blurSize(
-            width: source.width, height: source.height, longEdge: blurLongEdge)
-        guard let pair = textures(width: blurWidth, height: blurHeight) else { return false }
-
-        if needsBlur {
-            var seedUniforms = uniforms
-            seedUniforms.step = SIMD2(1 / Float(blurWidth), 1 / Float(blurHeight))
-            guard let encoder = command.makeComputeCommandEncoder() else { return false }
-            encoder.setComputePipelineState(prepare)
-            encoder.setTexture(source, index: 0)
-            encoder.setTexture(pair.0, index: 1)
-            encoder.setBytes(&seedUniforms, length: MemoryLayout<EffectUniforms>.stride, index: 0)
-            Self.dispatch(encoder, pipeline: prepare, width: blurWidth, height: blurHeight)
-            encoder.endEncoding()
-
-            var blurUniforms = seedUniforms
-            var read = pair.0, write = pair.1
-            for _ in 0..<Self.blurIterations {
-                for direction in [SIMD2<Float>(1, 0), SIMD2<Float>(0, 1)] {
-                    var direction = direction
-                    guard let encoder = command.makeComputeCommandEncoder() else { return false }
-                    encoder.setComputePipelineState(blur)
-                    encoder.setTexture(read, index: 0)
-                    encoder.setTexture(write, index: 1)
-                    encoder.setBytes(&blurUniforms, length: MemoryLayout<EffectUniforms>.stride, index: 0)
-                    encoder.setBytes(&direction, length: MemoryLayout<SIMD2<Float>>.stride, index: 1)
-                    Self.dispatch(encoder, pipeline: blur, width: blurWidth, height: blurHeight)
-                    encoder.endEncoding()
-                    swap(&read, &write)
-                }
-            }
-            // `read` now holds the finished blur; the composite reads that one.
-            guard let encoder = command.makeComputeCommandEncoder() else { return false }
-            encoder.setComputePipelineState(composite)
-            encoder.setTexture(source, index: 0)
-            encoder.setTexture(read, index: 1)
-            encoder.setTexture(destination, index: 2)
-            encoder.setBytes(&uniforms, length: MemoryLayout<EffectUniforms>.stride, index: 0)
-            Self.dispatch(encoder, pipeline: composite, width: destination.width, height: destination.height)
-            encoder.endEncoding()
-            return true
+        var halo: MTLTexture?
+        if uniforms.needsGlow {
+            let size = Self.blurSize(width: source.width, height: source.height, longEdge: blurLongEdge)
+            guard let pair = textures(width: size.width, height: size.height),
+                  let blurred = encodeBlur(source: source, pair: pair, uniforms: uniforms,
+                                           into: command) else { return false }
+            halo = blurred
         }
 
-        // Sharpening only: the blur texture is still bound, because a kernel
-        // must have something at every texture it declares, but every glow
-        // amount is zero so nothing is read from it.
+        var clarityBase: MTLTexture?
+        if uniforms.clarity > 0 {
+            let size = Self.blurSize(width: source.width, height: source.height,
+                                     longEdge: Self.clarityBlurLongEdge)
+            if let halo, halo.width == size.width, halo.height == size.height {
+                clarityBase = halo
+            } else {
+                guard let pair = textures(width: size.width, height: size.height, forClarity: true),
+                      let blurred = encodeBlur(source: source, pair: pair, uniforms: uniforms,
+                                               into: command) else { return false }
+                clarityBase = blurred
+            }
+        }
+
         guard let encoder = command.makeComputeCommandEncoder() else { return false }
         encoder.setComputePipelineState(composite)
         encoder.setTexture(source, index: 0)
-        encoder.setTexture(pair.0, index: 1)
+        encoder.setTexture(halo ?? source, index: 1)
         encoder.setTexture(destination, index: 2)
+        encoder.setTexture(clarityBase ?? source, index: 3)
         encoder.setBytes(&uniforms, length: MemoryLayout<EffectUniforms>.stride, index: 0)
         Self.dispatch(encoder, pipeline: composite, width: destination.width, height: destination.height)
         encoder.endEncoding()

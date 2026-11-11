@@ -9,11 +9,11 @@ import Foundation
 /// - **Per-pixel** (`fade`, `grain`) need only the pixel they are on, so they
 ///   live inside the shared grading functions and reach every render path for
 ///   free: preview, export, both compositors, and the scopes.
-/// - **Spatial** (`sharpness`, `bloom`, `glow`, `halation`) need the pixels
-///   around them, and the three glows need a wide blur. Those run in
+/// - **Spatial** (`sharpness`, `clarity`, `bloom`, `glow`, `halation`) need the
+///   pixels around them. Those run in
 ///   `FilmEffectsStage`, a post-grade pass over the graded frame.
 ///
-/// All six are stored as 0…100, all default to zero, and the whole struct is
+/// All amounts are stored as 0…100 and default to zero. The whole struct is
 /// optional on `AdvancedGrade` so projects saved before it existed decode
 /// unchanged.
 struct FilmEffects: Codable, Equatable, Sendable {
@@ -31,6 +31,8 @@ struct FilmEffects: Codable, Equatable, Sendable {
     var halation: Float = 0
     /// Monochrome grain, weighted toward the midtones the way film is.
     var grain: Float = 0
+    /// Local luminance contrast across a broader area than sharpening.
+    var clarity: Float = 0
 
     static let neutral = FilmEffects()
     static let range: ClosedRange<Float> = 0...100
@@ -39,9 +41,8 @@ struct FilmEffects: Codable, Equatable, Sendable {
     /// existing single-pass behaviour untouched.
     var isNeutral: Bool { self == .neutral }
 
-    /// True when a blur pass is needed. Sharpening is spatial but only reaches
-    /// one pixel, so it does not on its own justify building the blur pyramid.
-    var needsBlur: Bool { bloom > 0 || glow > 0 || halation > 0 }
+    /// True when an effect samples a blurred version of the frame.
+    var needsBlur: Bool { bloom > 0 || glow > 0 || halation > 0 || clarity > 0 }
 
     /// True when the post-grade stage has anything to do at all.
     var needsStage: Bool { needsBlur || sharpness > 0 }
@@ -50,6 +51,20 @@ struct FilmEffects: Codable, Equatable, Sendable {
         func c(_ v: Float) -> Float { v.isFinite ? min(max(v, 0), 100) : 0 }
         fade = c(fade); sharpness = c(sharpness); bloom = c(bloom)
         glow = c(glow); halation = c(halation); grain = c(grain)
+        clarity = c(clarity)
+    }
+}
+
+extension FilmEffects {
+    init(from decoder: Decoder) throws {
+        let values = try decoder.container(keyedBy: CodingKeys.self)
+        fade = try values.decode(Float.self, forKey: .fade)
+        sharpness = try values.decode(Float.self, forKey: .sharpness)
+        bloom = try values.decode(Float.self, forKey: .bloom)
+        glow = try values.decode(Float.self, forKey: .glow)
+        halation = try values.decode(Float.self, forKey: .halation)
+        grain = try values.decode(Float.self, forKey: .grain)
+        clarity = try values.decodeIfPresent(Float.self, forKey: .clarity) ?? 0
     }
 }
 
@@ -74,6 +89,9 @@ struct FilmEffectParameter: Identifiable {
         .init(id: "sharpness", name: String(localized: "Sharpen"),
               detail: String(localized: "Local contrast at the edges. Past the middle it starts to show halos."),
               keyPath: \.sharpness),
+        .init(id: "clarity", name: String(localized: "Clarity"),
+              detail: String(localized: "Adds definition by increasing local contrast in the midtones."),
+              keyPath: \.clarity),
         .init(id: "bloom", name: String(localized: "Bloom"),
               detail: String(localized: "Bright areas bleed into what surrounds them."),
               keyPath: \.bloom),

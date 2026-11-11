@@ -265,6 +265,25 @@ final class TimelineEditingTests: XCTestCase {
         )
     }
 
+    func testSelectedTitlesOnTheSameRowStopTogetherAtAStationaryClip() throws {
+        var project = project()
+        let trackID = UUID()
+        let titles = try [0.0, 1, 4].map { start in
+            TextClip(placement: .init(id: UUID(), trackID: trackID,
+                                     timelineStart: try .seconds(start), duration: try .seconds(1)),
+                     text: "Title")
+        }
+        project.timeline.tracks.insert(.init(id: trackID, name: "Text", kind: .text,
+                                             items: titles.map(\.timelineItem)), at: 0)
+
+        try OverlayEditing.moveTogether([titles[0].id, titles[1].id], by: .seconds(5), in: &project)
+
+        XCTAssertEqual(project.timeline.item(id: titles[0].id)?.placement.timelineStart, try .seconds(2))
+        XCTAssertEqual(project.timeline.item(id: titles[1].id)?.placement.timelineStart, try .seconds(3))
+        XCTAssertEqual(project.timeline.item(id: titles[2].id), titles[2].timelineItem)
+        try project.validate()
+    }
+
     private func threeClips() throws -> (VideoProject, [UUID]) {
         var project = project(duration: 9)
         let first = try XCTUnwrap(project.timeline.firstVideoClip).id

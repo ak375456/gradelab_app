@@ -103,6 +103,10 @@ enum GradeParameter: String, CaseIterable, Codable, Identifiable, Sendable {
 
     var neutralValue: Float { 0 }
 
+    /// The renderer's stored positive Tint adds green. The control uses
+    /// positive for magenta while preserving the appearance of saved grades.
+    var displaySign: Float { self == .tint ? -1 : 1 }
+
     var keyPath: WritableKeyPath<GradeSettings, Float> {
         switch self {
         case .exposure: \GradeSettings.exposure

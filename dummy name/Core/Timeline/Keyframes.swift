@@ -85,7 +85,7 @@ enum AnimatableProperty: String, Codable, CaseIterable, Sendable {
     // whole-warp snapshot track, which the curve tracks are the template for.
     case gradeColorWarpStrength
     // Colour → Effects.
-    case effectFade, effectSharpen, effectBloom, effectGlow, effectHalation, effectGrain
+    case effectFade, effectSharpen, effectClarity, effectBloom, effectGlow, effectHalation, effectGrain
     // Colour → Curves. One track per curve, each keyframe a WHOLE curve
     // snapshot rather than a per-control-point animation.
     case curveMaster, curveRed, curveGreen, curveBlue

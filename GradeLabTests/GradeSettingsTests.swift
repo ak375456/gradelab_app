@@ -2,6 +2,15 @@ import XCTest
 @testable import GradeLab
 
 final class GradeSettingsTests: XCTestCase {
+    func testDisplayedTintSignMatchesTheRenderedColor() {
+        let gray = SIMD3<Float>(repeating: 0.18)
+        let sign = GradeParameter.tint.displaySign
+        let magenta = ShotMatchColor.applyWhiteBalance(gray, temperature: 0, tint: sign)
+        let green = ShotMatchColor.applyWhiteBalance(gray, temperature: 0, tint: -sign)
+        XCTAssertLessThan(magenta.y, min(magenta.x, magenta.z))
+        XCTAssertGreaterThan(green.y, max(green.x, green.z))
+    }
+
     func testLegacySettingsDecodeWithoutAdvancedFields() throws {
         let data = try JSONEncoder().encode(GradeSettings.neutral)
         var object = try XCTUnwrap(JSONSerialization.jsonObject(with: data) as? [String: Any])

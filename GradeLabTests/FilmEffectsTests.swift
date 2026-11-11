@@ -21,12 +21,34 @@ final class FilmEffectsModelTests: XCTestCase {
     func testEffectsSurviveSaveAndReload() throws {
         var grade = AdvancedGrade.neutral
         var effects = FilmEffects.neutral
-        effects.bloom = 40; effects.halation = 25; effects.grain = 60
+        effects.bloom = 40; effects.halation = 25; effects.grain = 60; effects.clarity = 35
         grade.effects = effects
         let reloaded = try JSONDecoder().decode(AdvancedGrade.self, from: try JSONEncoder().encode(grade))
         XCTAssertEqual(reloaded.effects?.bloom, 40)
         XCTAssertEqual(reloaded.effects?.halation, 25)
         XCTAssertEqual(reloaded.effects?.grain, 60)
+        XCTAssertEqual(reloaded.effects?.clarity, 35)
+    }
+
+    func testEffectsSavedBeforeClarityKeepTheirValues() throws {
+        let json = #"{"fade":5,"sharpness":20,"bloom":30,"glow":4,"halation":2,"grain":7}"#
+        let decoded = try JSONDecoder().decode(FilmEffects.self, from: Data(json.utf8))
+        XCTAssertEqual(decoded, FilmEffects(fade: 5, sharpness: 20, bloom: 30,
+                                            glow: 4, halation: 2, grain: 7))
+    }
+
+    func testClarityKeyframesDriveTheSpatialStage() throws {
+        let property = try XCTUnwrap(AnimatableProperty.effect(.clarity))
+        var track = AnimationTrack(property: property)
+        track.set(.number(0), at: .zero)
+        try track.set(.number(80), at: .seconds(2))
+        let decoded = try JSONDecoder().decode(AnimationTrack.self, from: JSONEncoder().encode(track))
+        let midpoint = try XCTUnwrap(decoded.value(at: .seconds(1))?.number)
+        var settings = GradeSettings.neutral
+        settings.setGradeNumber(midpoint, for: decoded.property)
+        XCTAssertEqual(settings.gradeNumber(property), 40)
+        XCTAssertTrue(settings.advanced?.resolvedEffects.needsStage == true)
+        XCTAssertTrue(FilmEffectsStage.isActive(GradeUniforms(settings: settings, bypass: false)))
     }
 
     func testOutOfRangeValuesAreClamped() {
@@ -64,7 +86,7 @@ final class FilmEffectsModelTests: XCTestCase {
         var settings = GradeSettings.neutral
         var advanced = AdvancedGrade.neutral
         advanced.effects = FilmEffects(fade: 100, sharpness: 50, bloom: 25,
-                                       glow: 10, halation: 75, grain: 40)
+                                       glow: 10, halation: 75, grain: 40, clarity: 60)
         settings.advanced = advanced
         let uniforms = GradeUniforms(settings: settings, bypass: false)
         XCTAssertEqual(uniforms.effectsA.x, 1, accuracy: 0.0001, "fade")
@@ -73,6 +95,7 @@ final class FilmEffectsModelTests: XCTestCase {
         XCTAssertEqual(uniforms.effectsB.x, 0.25, accuracy: 0.0001, "bloom")
         XCTAssertEqual(uniforms.effectsB.y, 0.1, accuracy: 0.0001, "glow")
         XCTAssertEqual(uniforms.effectsB.z, 0.75, accuracy: 0.0001, "halation")
+        XCTAssertEqual(uniforms.effectsB.w, 0.60, accuracy: 0.0001, "clarity")
         XCTAssertTrue(FilmEffectsStage.isActive(uniforms))
 
         // Hold-to-compare has to show the untouched frame, effects included.
@@ -100,7 +123,7 @@ final class FilmEffectsModelTests: XCTestCase {
 final class FilmEffectsStageTests: XCTestCase {
     private var context: MetalContext!
     private var stage: FilmEffectsStage!
-    private let side = 64
+    private var side = 64
 
     override func setUpWithError() throws {
         try super.setUpWithError()
@@ -219,11 +242,29 @@ final class FilmEffectsStageTests: XCTestCase {
         XCTAssertEqual(flat, 0.7, accuracy: 0.01, "a flat area has no edge to sharpen")
     }
 
+    func testClarityIncreasesContrastBeyondTheSharpeningRadius() throws {
+        side = 512
+        let edge = try texture { x, _ in
+            x < 0.5 ? .init(0.3, 0.25, 0.2) : .init(0.6, 0.5, 0.4)
+        }
+        let sharpened = try run(edge, effects: FilmEffects(sharpness: 100))
+        let moderate = try run(edge, effects: FilmEffects(clarity: 40))
+        let strong = try run(edge, effects: FilmEffects(clarity: 100))
+        let light = read(strong, x: 259, y: 256)
+        XCTAssertEqual(read(sharpened, x: 259, y: 256).y, 0.5, accuracy: 0.002)
+        XCTAssertGreaterThan(read(moderate, x: 259, y: 256).y, 0.51)
+        XCTAssertGreaterThan(light.y, read(moderate, x: 259, y: 256).y)
+        XCTAssertLessThan(read(strong, x: 252, y: 256).y, 0.22)
+        XCTAssertEqual(light.x / light.y, 1.2, accuracy: 0.003)
+        XCTAssertEqual(read(strong, x: 400, y: 256).y, 0.5, accuracy: 0.002)
+    }
+
     /// HDR values run above diffuse white, and clamping them here would throw
     /// away the range the whole HDR pipeline exists to keep.
     func testWorkingSpaceHighlightsAreNotClamped() throws {
         var effects = FilmEffects.neutral
         effects.sharpness = 10
+        effects.clarity = 100
         let bright = try texture { _, _ in .init(3.5, 3.5, 3.5) }
         let out = try run(bright, effects: effects, workingSpace: true)
         XCTAssertGreaterThan(read(out, x: 32, y: 32).x, 3.0,

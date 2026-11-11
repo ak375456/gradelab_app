@@ -1482,6 +1482,7 @@ struct EditorView: View {
                     onSetWaveformSize: model.setWaveformSize,
                     onEdit: model.editTiming,
                     onTrimMany: model.trimClips,
+                    onMoveMany: model.moveOverlays,
                     onBeginEdit: model.playback.pause,
                     onBeginSeek: model.playback.beginSeeking,
                     onSeek: { model.seekTimeline(to: $0, finishing: false) },

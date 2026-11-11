@@ -140,6 +140,28 @@ final class PhoneColorWorkspaceTests: XCTestCase {
         XCTAssertEqual(model.project, before)
     }
 
+    func testActiveClarityFitsNarrowAndWideEffectsInspectors() throws {
+        let model = try makeModel()
+        model.selectedPanel = .effects
+        model.gradeBinding(.effectClarity).wrappedValue = 60
+        model.flushGradeHistory()
+
+        for width in [320.0, 540.0] {
+            let compact = width == 320
+            let controls = ScrollView {
+                FilmEffectsPanel(model: model).padding(.horizontal, 20)
+            }
+            try host(controls.environment(\.dynamicTypeSize, compact ? .accessibility3 : .large),
+                     size: CGSize(width: width, height: 420),
+                     name: compact ? "clarity-compact" : "clarity-wide") { view in
+                try self.assertNoHorizontalOverflow(view)
+            }
+        }
+        XCTAssertEqual(model.gradeBinding(.effectClarity).wrappedValue, 60)
+        model.undo()
+        XCTAssertEqual(model.gradeBinding(.effectClarity).wrappedValue, 0)
+    }
+
     func testChangingTheLayoutPreservesTheGradeAndItsSingleUndoEntry() throws {
         let model = try makeModel()
         model.gradeBinding(.gradeExposure).wrappedValue = 0.7

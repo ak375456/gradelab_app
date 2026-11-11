@@ -128,6 +128,65 @@ enum OverlayEditing {
         }
     }
 
+    /// The whole group stops at zero or the first stationary neighbour on any row.
+    static func moveBounds(for ids: Set<UUID>, in tracks: [TimelineTrack]) throws -> (lower: TimelineTime, upper: TimelineTime?) {
+        var lower: TimelineTime?
+        var upper: TimelineTime?
+        for track in tracks {
+            let moving = track.items.filter { ids.contains($0.id) }
+            guard !moving.isEmpty else { continue }
+            let stationary = track.items.filter { !ids.contains($0.id) }
+            for item in moving {
+                let start = item.placement.timelineStart
+                let end = try item.placement.range.end
+                var previousEnd = TimelineTime.zero
+                var nextStart: TimelineTime?
+                for other in stationary {
+                    let otherStart = other.placement.timelineStart
+                    if otherStart < start {
+                        previousEnd = max(previousEnd, try other.placement.range.end)
+                    } else {
+                        nextStart = min(nextStart ?? otherStart, otherStart)
+                    }
+                }
+                let earliest = try previousEnd.subtracting(start)
+                lower = max(lower ?? earliest, earliest)
+                if let nextStart {
+                    let latest = try nextStart.subtracting(end)
+                    upper = min(upper ?? latest, latest)
+                }
+            }
+        }
+        return (lower ?? .zero, upper)
+    }
+
+    static func moveTogether(_ ids: Set<UUID>, by delta: TimelineTime, in project: inout VideoProject) throws {
+        let items = project.timeline.items.filter { ids.contains($0.id) }
+        guard items.count == ids.count, items.allSatisfy(\.isDrawnOverlay) else {
+            throw TimelineError.invalid(String(localized: "Overlay clip not found."))
+        }
+        let bounds = try moveBounds(for: ids, in: project.timeline.tracks)
+        // Snap the travel once so even off-grid clips keep their exact spacing.
+        var shift = max(bounds.lower, try TimelineEditing.snapped(delta, frame: project.canvas.frameDuration))
+        if let upper = bounds.upper { shift = min(shift, upper) }
+        guard shift != .zero else { return }
+
+        var timeline = project.timeline
+        for index in timeline.tracks.indices {
+            let track = timeline.tracks[index]
+            timeline.tracks[index].items = try track.items.map { item in
+                guard ids.contains(item.id) else { return item }
+                guard !track.isLocked, !item.placement.isLocked else {
+                    throw TimelineError.invalid(String(localized: "Unlock the clip and its track before editing."))
+                }
+                var placement = item.placement
+                placement.timelineStart = try placement.timelineStart.adding(shift)
+                return item.withPlacement(placement)
+            }
+        }
+        project.timeline = timeline
+    }
+
     static func edit<Clip: DrawnOverlayClip>(_ original: Clip, operation: TimelineGestureEdit, to time: TimelineTime, in project: inout VideoProject) throws {
         var clip = original
         let target = max(.zero, try TimelineEditing.snapped(time, frame: project.canvas.frameDuration))

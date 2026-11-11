@@ -317,7 +317,7 @@ struct ShotMatchPanel: View {
                          String(format: "%+.2f", locale: .current, adjustment.exposure)))
         }
         add(GradeParameter.temperature.title, adjustment.temperature)
-        add(GradeParameter.tint.title, adjustment.tint)
+        add(GradeParameter.tint.title, adjustment.tint * GradeParameter.tint.displaySign)
         add(GradeParameter.contrast.title, adjustment.contrast)
         add(GradeParameter.highlights.title, adjustment.highlights)
         add(GradeParameter.shadows.title, adjustment.shadows)

@@ -91,9 +91,7 @@ struct TimelineClipPresentation {
     /// Length shown on the clip's duration chip.
     var duration: Double
     var isSelected = false
-    /// Whether this clip draws trim handles. Every selected clip does: a trim
-    /// carries the whole selection, so any of their edges is a valid grab and
-    /// all of them have to look like one.
+    /// Whether the canvas offers this clip's edges as trim handles.
     var showsTrimHandles = false
     var isLocked = false
     /// A row that is hidden or muted draws faded rather than disappearing.
@@ -519,12 +517,11 @@ struct TimelineClipRenderer {
         context.strokePath()
     }
 
-    /// Obvious grab targets on both edges. The bar is 13pt wide; the region
-    /// that answers a touch is 44pt, which the canvas enforces in
-    /// `operation(at:clip:)`.
+    /// Visible grab targets on both edges. The canvas gives them extra reach
+    /// in `operation(at:clip:)`.
     private func drawTrimHandles(_ presentation: TimelineClipPresentation, layout: TimelineClipLayout) {
         let body = layout.body
-        let width = min(TimelineMetrics.trimHandleWidth, max(4, body.width / 3))
+        let width = TimelineMetrics.trimHandleWidth(for: body.width)
         let radius = min(layout.cornerRadius, width / 2)
         for isLeading in [true, false] {
             let rect = CGRect(x: isLeading ? body.minX : body.maxX - width,

@@ -46,12 +46,13 @@ enum GradeSlot: Hashable, Sendable {
 /// key path. Raw values match `FilmEffectParameter.id` so the panel can pair
 /// them up without a second table.
 enum FilmEffectSlot: String, Hashable, Sendable, CaseIterable {
-    case fade, sharpness, bloom, glow, halation, grain
+    case fade, sharpness, clarity, bloom, glow, halation, grain
 
     var keyPath: WritableKeyPath<FilmEffects, Float> {
         switch self {
         case .fade: \.fade
         case .sharpness: \.sharpness
+        case .clarity: \.clarity
         case .bloom: \.bloom
         case .glow: \.glow
         case .halation: \.halation
@@ -63,6 +64,7 @@ enum FilmEffectSlot: String, Hashable, Sendable, CaseIterable {
         switch self {
         case .fade: String(localized: "Fade")
         case .sharpness: String(localized: "Sharpen")
+        case .clarity: String(localized: "Clarity")
         case .bloom: String(localized: "Bloom")
         case .glow: String(localized: "Glow")
         case .halation: String(localized: "Halation")
@@ -253,6 +255,7 @@ extension AnimatableProperty {
 
         case .effectFade: .effect(.fade)
         case .effectSharpen: .effect(.sharpness)
+        case .effectClarity: .effect(.clarity)
         case .effectBloom: .effect(.bloom)
         case .effectGlow: .effect(.glow)
         case .effectHalation: .effect(.halation)

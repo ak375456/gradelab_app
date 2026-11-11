@@ -24,7 +24,7 @@ struct GradeUniforms {
     float4 shadowWheel, midtoneWheel, highlightWheel;
     float4 vignette;
     float4 effectsA;   // fade, grain, sharpen, grain seed
-    float4 effectsB;   // bloom, glow, halation, spare
+    float4 effectsB;   // bloom, glow, halation, clarity
     float4 colorWarp;  // Color Warper: strength, active-plane mask, preserve luminance
 };
 

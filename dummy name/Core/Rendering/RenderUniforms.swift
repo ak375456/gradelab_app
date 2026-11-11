@@ -72,7 +72,7 @@ struct GradeUniforms: Sendable {
     var vignette: SIMD4<Float>
     /// fade, grain, sharpen, grain seed
     var effectsA: SIMD4<Float>
-    /// bloom, glow, halation, spare
+    /// bloom, glow, halation, clarity
     var effectsB: SIMD4<Float>
     /// The Color Warper: strength 0...1, the active-plane mask, and whether
     /// luminance is held. Appended rather than folded into a spare slot on
@@ -122,7 +122,7 @@ struct GradeUniforms: Sendable {
         )
         let effects = bypass ? FilmEffects.neutral : advanced.resolvedEffects
         effectsA = SIMD4(effects.fade / 100, effects.grain / 100, effects.sharpness / 100, 0)
-        effectsB = SIMD4(effects.bloom / 100, effects.glow / 100, effects.halation / 100, 0)
+        effectsB = SIMD4(effects.bloom / 100, effects.glow / 100, effects.halation / 100, effects.clarity / 100)
         func band(_ i: Int) -> SIMD4<Float> {
             let b = advanced.band(i)
             return SIMD4(b.hue / 360, b.saturation / 100, b.luminance / 100, HueBand.centers[i] / 360)

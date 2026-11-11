@@ -279,6 +279,29 @@ final class ImageExportIntegrationTests: XCTestCase {
 
     // MARK: - The grade actually reaches the file
 
+    func testClarityAloneChangesLocalContrastInTheExport() throws {
+        let url = try writeSource(width: 1800, height: 1200, orientation: 1, type: .png)
+        let exporter = try ImageExporter()
+        var configuration = ImageExportConfiguration()
+        configuration.format = .png
+        func render(_ grade: GradeSettings) throws -> CGImage {
+            let output = try exporter.export(
+                project: try makeProject(url: url, grade: grade), configuration: configuration,
+                destinationDirectory: directory)
+            let source = try XCTUnwrap(CGImageSourceCreateWithURL(output.url as CFURL, nil))
+            return try XCTUnwrap(CGImageSourceCreateImageAtIndex(source, 0, nil))
+        }
+
+        let neutral = try render(.neutral)
+        var grade = GradeSettings.neutral
+        grade.setGradeNumber(100, for: .effectClarity)
+        let graded = try render(grade)
+        XCTAssertGreaterThan(sample(graded, atX: 0.502, y: 0.25).g,
+                             sample(neutral, atX: 0.502, y: 0.25).g)
+        XCTAssertEqual(sample(graded, atX: 0.8, y: 0.25).g,
+                       sample(neutral, atX: 0.8, y: 0.25).g)
+    }
+
     /// A grade with something set in every part of the model changes the
     /// exported pixels, and a neutral one does not — which is what proves the
     /// export is running the grading pipeline rather than copying the source.

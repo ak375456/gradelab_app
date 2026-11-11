@@ -23,6 +23,16 @@ final class TimelineTrimGestureTests: XCTestCase {
         override func translation(in view: UIView?) -> CGPoint { travel }
     }
 
+    private final class Hold: UILongPressGestureRecognizer {
+        var phase: UIGestureRecognizer.State = .possible
+        var point = CGPoint.zero
+        override var state: UIGestureRecognizer.State {
+            get { phase }
+            set { phase = newValue }
+        }
+        override func location(in view: UIView?) -> CGPoint { point }
+    }
+
     private func fixture(time: Double = 0, onVideoLayer: Bool = false) throws -> (TimelineCanvas, EditorViewModel, UUID) {
         var project = VideoProject(sourceURL: URL(fileURLWithPath: "/tmp/handle-recovery.mov"),
             displayName: "Handle recovery", metadata: makeVideoMetadata(durationSeconds: 12))
@@ -63,6 +73,105 @@ final class TimelineTrimGestureTests: XCTestCase {
         pan.travel = CGPoint(x: translation, y: 0)
         pan.point = CGPoint(x: origin.x + translation, y: origin.y)
         canvas.perform(NSSelectorFromString("edited:"), with: pan)
+    }
+
+    private func titleGroup(width: CGFloat) throws -> (TimelineCanvas, EditorViewModel, [UUID], UUID) {
+        let project = VideoProject(sourceURL: URL(fileURLWithPath: "/tmp/title-group.mov"),
+            displayName: "Title group", metadata: makeVideoMetadata(durationSeconds: 14))
+        let video = try XCTUnwrap(project.timeline.firstVideoClip).id
+        let model = try EditorViewModel(project: project)
+        model.suspendPreviewForExport()
+        let titles = try [0.5, 1.5, 2.5].map { start in
+            model.addText()
+            let id = try XCTUnwrap(model.selectedClipID)
+            model.editTiming(id: id, operation: .move, seconds: start)
+            model.editTiming(id: id, operation: .trimEnd, seconds: 3)
+            return id
+        }
+        model.selectClip(id: video, seek: false)
+        model.selectClips(Set(titles + [video]))
+        let canvas = TimelineCanvas(frame: CGRect(x: 0, y: 0, width: width, height: 250))
+        canvas.clips = model.project.timeline.items.compactMap(TimelineDisplayClip.init)
+        canvas.tracks = model.project.timeline.tracks
+        canvas.assets = model.project.assets
+        canvas.selectedID = model.selectedClipID
+        canvas.selectedIDs = model.selectedClipIDs
+        canvas.minimumDuration = 1 / 30
+        canvas.onDragSelect = { model.selectClip(id: $0, seek: false) }
+        canvas.onEdit = model.editTiming
+        canvas.onTrimMany = model.trimClips
+        canvas.onMoveMany = model.moveOverlays
+        canvas.layoutIfNeeded()
+        canvas.applyExternalZoom(60)
+        canvas.update(time: 1.5)
+        return (canvas, model, titles, video)
+    }
+
+    func testShortTitleRightHandleExtendsAllSelectedTitlesWithVideoAlsoSelected() throws {
+        for width: CGFloat in [390, 720] {
+            let (canvas, model, titles, video) = try titleGroup(width: width)
+            let before = model.project.timeline
+            let pan = Pan()
+            // The right handle of a half-second clip, within 22pt of its left edge too.
+            let origin = CGPoint(x: width / 2 + (3 - 1.5) * 60 - 9, y: TimelineMetrics.rowsTop + 15)
+            send(.began, translation: 11, from: origin, pan: pan, canvas: canvas)
+            send(.ended, translation: 12, from: origin, pan: pan, canvas: canvas)
+
+            XCTAssertNil(model.editError)
+            for id in titles {
+                let placement = try XCTUnwrap(model.project.timeline.item(id: id)).placement
+                XCTAssertEqual(try placement.range.end, try .seconds(3.2))
+                XCTAssertEqual(placement.timelineStart, before.item(id: id)?.placement.timelineStart)
+            }
+            XCTAssertEqual(model.project.timeline.item(id: video), before.item(id: video))
+            XCTAssertEqual(model.selectedClipIDs, Set(titles + [video]))
+            model.undo()
+            XCTAssertEqual(model.project.timeline, before)
+            XCTAssertEqual(model.selectedClipIDs, Set(titles + [video]))
+        }
+    }
+
+    func testHoldingShortTitleMovesSelectedTitlesTogetherWithoutChangingSelection() throws {
+        let width: CGFloat = 720
+        let (canvas, model, titles, video) = try titleGroup(width: width)
+        canvas.isSnappingEnabled = false
+        let before = model.project.timeline
+        let origin = CGPoint(x: width / 2 + (2.75 - 1.5) * 60, y: TimelineMetrics.rowsTop + 15)
+        let scroll = try XCTUnwrap(canvas.subviews.compactMap { $0 as? UIScrollView }.first)
+        let installedHold = try XCTUnwrap(scroll.gestureRecognizers?.compactMap { $0 as? UILongPressGestureRecognizer }
+            .first { $0.delegate === canvas })
+        let touch = Touch()
+        touch.point = origin
+        XCTAssertTrue(canvas.gestureRecognizer(installedHold, shouldReceive: touch), "The short clip body remains draggable")
+        XCTAssertTrue(canvas.gestureRecognizerShouldBegin(installedHold))
+
+        let hold = Hold()
+        hold.phase = .began
+        // A little drift reaches the trim area while the long press recognizes.
+        hold.point = CGPoint(x: origin.x + 7, y: origin.y)
+        canvas.perform(NSSelectorFromString("held:"), with: hold)
+        XCTAssertEqual(model.selectedClipIDs, Set(titles + [video]))
+        hold.phase = .changed
+        // The earliest title can move only half a second before it reaches zero.
+        hold.point.x -= 60
+        canvas.perform(NSSelectorFromString("held:"), with: hold)
+        XCTAssertEqual(model.project.timeline, before, "The drag commits on release")
+        hold.phase = .ended
+        canvas.perform(NSSelectorFromString("held:"), with: hold)
+
+        XCTAssertNil(model.editError)
+        for id in titles {
+            let old = try XCTUnwrap(before.item(id: id)).placement
+            let moved = try XCTUnwrap(model.project.timeline.item(id: id)).placement
+            XCTAssertEqual(moved.timelineStart, try old.timelineStart.subtracting(.seconds(0.5)))
+            XCTAssertEqual(moved.duration, old.duration)
+            XCTAssertEqual(moved.trackID, old.trackID)
+        }
+        XCTAssertEqual(model.project.timeline.item(id: video), before.item(id: video))
+        XCTAssertEqual(model.selectedClipIDs, Set(titles + [video]))
+        model.undo()
+        XCTAssertEqual(model.project.timeline, before)
+        XCTAssertEqual(model.selectedClipIDs, Set(titles + [video]))
     }
 
     func testLeftwardGrabUsesTouchDownBeforePanRecognitionMovement() throws {

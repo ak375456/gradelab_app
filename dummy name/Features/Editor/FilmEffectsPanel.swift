@@ -1,18 +1,16 @@
 import SwiftUI
 
-/// The finishing effects: fade, sharpen, bloom, glow, halation and grain.
-///
-/// One slider each, with the explanation shown only for the ones that are
-/// actually doing something — six paragraphs of help at once would be worse
-/// than none.
+/// Finishing effects with help shown under each active slider.
 struct FilmEffectsPanel<Model: GradingModel>: View {
     @ObservedObject var model: Model
 
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
-            ProPanelNotice(feature: .filmEffects)
             ForEach(FilmEffectParameter.all) { parameter in
                 if let property = parameter.property {
+                    if parameter.slot == .bloom {
+                        ProPanelNotice(feature: .filmEffects)
+                    }
                     let isPro = ProAccessPolicy.proEffectIDs.contains(parameter.id)
                     VStack(alignment: .leading, spacing: 2) {
                         GradeSlider(

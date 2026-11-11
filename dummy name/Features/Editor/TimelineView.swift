@@ -86,6 +86,7 @@ struct TimelineView: UIViewRepresentable {
     let onSetWaveformSize: (UUID, TimelineWaveformSize) -> Void
     let onEdit: (UUID, TimelineGestureEdit, Double) -> Void
     let onTrimMany: (Set<UUID>, TimelineGestureEdit, Double) -> Void
+    let onMoveMany: (Set<UUID>, Double) -> Void
     let onBeginEdit: () -> Void
     let onBeginSeek: () -> Void
     let onSeek: (Double) -> Void
@@ -114,7 +115,8 @@ struct TimelineView: UIViewRepresentable {
         view.onToggleTrackMute = onToggleTrackMute
         view.onSetTrackHeight = onSetTrackHeight
         view.onSetWaveformSize = onSetWaveformSize
-        view.onEdit = onEdit; view.onTrimMany = onTrimMany; view.onBeginEdit = onBeginEdit
+        view.onEdit = onEdit; view.onTrimMany = onTrimMany; view.onMoveMany = onMoveMany
+        view.onBeginEdit = onBeginEdit
         view.onSelect = onSelect; view.onBeginSeek = onBeginSeek
         view.onSelectMany = onSelectMany
         view.onSelectTransition = onSelectTransition
@@ -225,15 +227,18 @@ final class TimelineCanvas: UIView, UIScrollViewDelegate, UIGestureRecognizerDel
         return result
     }
     var onEdit: ((UUID, TimelineGestureEdit, Double) -> Void)?
-    /// A trim carrying every selected clip. The third value is how far the
-    /// edge travelled, not where it landed: each clip applies it to its own.
+    /// A shared trim delta relative to each participating clip's edge.
     var onTrimMany: ((Set<UUID>, TimelineGestureEdit, Double) -> Void)?
+    var onMoveMany: ((Set<UUID>, Double) -> Void)?
     var onBeginEdit: (() -> Void)?
     private var editPan: UIPanGestureRecognizer!
     private var pendingTrimTarget: (clip: TimelineDisplayClip, operation: TimelineGestureEdit)?
     private var ghost: (clip: TimelineDisplayClip, operation: TimelineGestureEdit, time: Double)?
+    /// Captured at the start of a group gesture. Includes the grabbed clip.
+    private var gestureClipIDs: Set<UUID> = []
     private var snappedBoundary: Double?
     private var hold: UILongPressGestureRecognizer!
+    private var holdTouchDown: CGPoint?
     private var dragTimer: Timer?
     private var dragPoint = CGPoint.zero
     private var dragAnchor = 0.0
@@ -249,6 +254,12 @@ final class TimelineCanvas: UIView, UIScrollViewDelegate, UIGestureRecognizerDel
     private var insertionPreview: [UUID: Double] {
         if layerDropTarget != nil { return [:] }
         guard let ghost, ghost.operation == .move else { return [:] }
+        if !gestureClipIDs.isEmpty {
+            let delta = ghost.time - ghost.clip.placement.timelineStart.seconds
+            return Dictionary(uniqueKeysWithValues: clips.filter { gestureClipIDs.contains($0.id) }.map {
+                ($0.id, $0.placement.timelineStart.seconds + delta)
+            })
+        }
         let others = clips.filter { $0.id != ghost.clip.id && $0.placement.trackID == ghost.clip.placement.trackID }
         if tracks.first(where: { $0.id == ghost.clip.placement.trackID })?.kind != .mainVideo { return [ghost.clip.id: ghost.time] }
         let index = others.firstIndex { ghost.time < $0.placement.timelineStart.seconds + $0.placement.duration.seconds/2 } ?? others.count
@@ -266,7 +277,7 @@ final class TimelineCanvas: UIView, UIScrollViewDelegate, UIGestureRecognizerDel
               tracks.first(where: { $0.id == ghost.clip.placement.trackID })?.kind == .mainVideo else { return [:] }
         return Self.rippleTrimPreview(
             clips: clips, trackID: ghost.clip.placement.trackID,
-            trimmedIDs: Set(([ghost.clip] + trimmingPartners).map(\.id)),
+            trimmedIDs: gestureClipIDs.union([ghost.clip.id]),
             anchorID: ghost.clip.id,
             operation: ghost.operation,
             delta: ghost.time - trimEdge(of: ghost.clip, operation: ghost.operation))
@@ -485,7 +496,9 @@ final class TimelineCanvas: UIView, UIScrollViewDelegate, UIGestureRecognizerDel
         // Leaving the editor must never resume playback through a delayed seek.
         interacting = false
         dragTimer?.invalidate(); dragTimer = nil; ghost = nil; layerDropTarget = nil
+        gestureClipIDs = []
         pendingTrimTarget = nil
+        holdTouchDown = nil
         marqueeOrigin = nil; marqueePoint = nil; marqueeSelection = []
         scroll.panGestureRecognizer.isEnabled = true
         scroll.delegate = nil
@@ -685,7 +698,7 @@ final class TimelineCanvas: UIView, UIScrollViewDelegate, UIGestureRecognizerDel
             end = preview.end
             trimOffset = preview.offset
         } else if let ghost, ghost.operation != .move,
-           ghost.clip.id == clip.id || trimmingPartners.contains(where: { $0.id == clip.id }) {
+           ghost.clip.id == clip.id || gestureClipIDs.contains(clip.id) {
             // Partners move by the anchor's travel, so the preview shows the
             // same relationship the commit will produce.
             let delta = ghost.time - trimEdge(of: ghost.clip, operation: ghost.operation)
@@ -900,34 +913,35 @@ final class TimelineCanvas: UIView, UIScrollViewDelegate, UIGestureRecognizerDel
         }
     }
 
-    /// The other clips a trim is carrying, in stable timeline order. Empty for
-    /// an ordinary single-clip trim, which keeps its exact previous behaviour.
-    private var trimmingPartners: [TimelineDisplayClip] {
-        guard let ghost, ghost.operation != .move, selectedIDs.count > 1 else { return [] }
-        return clips.filter { selectedIDs.contains($0.id) && $0.id != ghost.clip.id && !isLocked($0) }
+    /// A gesture on a selected title or shape carries its peers even when the
+    /// marquee also caught another kind of clip, such as the video underneath.
+    private func selectedOverlayGroup(anchoredAt clip: TimelineDisplayClip) -> Set<UUID> {
+        guard clip.isDrawnOverlay, selectedIDs.contains(clip.id) else { return [] }
+        let peers = clips.filter { selectedIDs.contains($0.id) && $0.isDrawnOverlay && $0.isText == clip.isText }
+        guard peers.count > 1 else { return [] }
+        return Set(peers.filter { !isLocked($0) }.map(\.id))
     }
 
-    /// Which edge a touch is reaching for. The handles are 13pt wide but
-    /// answer within 22pt either side of the edge, so the grab region is the
-    /// 44pt a finger needs.
     private func operation(at point: CGPoint, clip: TimelineDisplayClip) -> TimelineGestureEdit? {
-        let top = TimelineMetrics.rowsTop + rowOffset(clip)
-        let height = clipHeight(trackID: clip.placement.trackID)
+        let rect = visibleRect(for: clip)
         guard point.x >= contentLeft,
               point.y >= TimelineMetrics.rulerHeight,
-              ((top - 6)...(top + height + 6)).contains(point.y),
+              ((rect.minY - 6)...(rect.maxY + 6)).contains(point.y),
               !isLocked(clip) else { return nil }
-        let left = viewport.x(for: clip.placement.timelineStart.seconds)
-        let right = viewport.x(for: (try? clip.placement.range.end.seconds) ?? 0)
-        if abs(point.x-left) < TimelineMetrics.trimHitSlop { return .trimStart }
-        if abs(point.x-right) < TimelineMetrics.trimHitSlop { return .trimEnd }
-        return nil
+        // Keep the full reach outside the clip, and leave a draggable body
+        // between the handles when a short clip is zoomed out.
+        let slop = TimelineMetrics.trimHitSlop
+        let inner = min(slop, max(TimelineMetrics.trimHandleWidth(for: rect.width), rect.width / 4))
+        if point.x <= rect.midX {
+            return (rect.minX - slop...rect.minX + inner).contains(point.x) ? .trimStart : nil
+        }
+        return (rect.maxX - inner...rect.maxX + slop).contains(point.x) ? .trimEnd : nil
     }
     override func gestureRecognizerShouldBegin(_ gestureRecognizer: UIGestureRecognizer) -> Bool {
         if gestureRecognizer === hold {
             // Holding a clip moves it; holding open timeline space starts a
             // desktop-style marquee across as many rows as the drag crosses.
-            let location = gestureRecognizer.location(in: self)
+            let location = holdTouchDown ?? gestureRecognizer.location(in: self)
             return location.y >= TimelineMetrics.rulerHeight && location.x >= contentLeft
                 && trimTarget(at: location) == nil
         }
@@ -945,16 +959,22 @@ final class TimelineCanvas: UIView, UIScrollViewDelegate, UIGestureRecognizerDel
         }
         // Holding a handle still means trim. Reserve it at touch-down so a
         // deliberate, slow grab cannot turn into moving the whole clip.
-        return gestureRecognizer !== hold || trimTarget(at: touch.location(in: self)) == nil
+        guard gestureRecognizer === hold else { return true }
+        let origin = touch.location(in: self)
+        holdTouchDown = trimTarget(at: origin) == nil ? origin : nil
+        return holdTouchDown != nil
     }
 
     /// The handle a touch has landed on, across the whole selection.
     ///
     /// The clip whose edge was grabbed becomes the anchor the drag follows, so
     /// it does not matter which of several selected clips the finger found.
-    /// The focused clip is offered first, so a single selection behaves exactly
-    /// as it did.
     private func trimTarget(at point: CGPoint) -> (clip: TimelineDisplayClip, operation: TimelineGestureEdit)? {
+        // A touch on a clip belongs to its own row before neighbouring slop.
+        if let clip = hitClip(at: point) {
+            guard selectedIDs.contains(clip.id), let operation = operation(at: point, clip: clip) else { return nil }
+            return (clip, operation)
+        }
         let ordered = clips.filter { selectedIDs.contains($0.id) }
             .sorted { ($0.id == selectedID ? 0 : 1) < ($1.id == selectedID ? 0 : 1) }
         for clip in ordered {
@@ -967,24 +987,29 @@ final class TimelineCanvas: UIView, UIScrollViewDelegate, UIGestureRecognizerDel
         case .began:
             guard let target = pendingTrimTarget else { return }
             onBeginEdit?()
+            gestureClipIDs = selectedOverlayGroup(anchoredAt: target.clip)
+            if gestureClipIDs.isEmpty, selectedIDs.count > 1 {
+                gestureClipIDs = Set(clips.filter { selectedIDs.contains($0.id) && !isLocked($0) }.map(\.id))
+            }
             ghost = (target.clip, target.operation,
                      trimEdge(of: target.clip, operation: target.operation))
             snappedBoundary = nil
             updateTrim(recognizer)
         case .changed:
             updateTrim(recognizer)
-        case .ended:
-            updateTrim(recognizer)
-            if let ghost {
-                if trimmingPartners.isEmpty {
+        case .ended, .cancelled, .failed:
+            if recognizer.state == .ended {
+                updateTrim(recognizer)
+            }
+            if recognizer.state == .ended, let ghost, ghost.operation != .move {
+                if gestureClipIDs.isEmpty {
                     onEdit?(ghost.clip.id, ghost.operation, ghost.time)
                 } else {
                     let delta = ghost.time - trimEdge(of: ghost.clip, operation: ghost.operation)
-                    onTrimMany?(Set(([ghost.clip] + trimmingPartners).map(\.id)), ghost.operation, delta)
+                    onTrimMany?(gestureClipIDs, ghost.operation, delta)
                 }
             }
-            ghost = nil; pendingTrimTarget = nil; snappedBoundary = nil; setNeedsDisplay()
-        case .cancelled, .failed:
+            gestureClipIDs = []
             ghost = nil; pendingTrimTarget = nil; snappedBoundary = nil; setNeedsDisplay()
         default: break
         }
@@ -1000,8 +1025,9 @@ final class TimelineCanvas: UIView, UIScrollViewDelegate, UIGestureRecognizerDel
         // A title belongs to the edit, not just its otherwise-empty text
         // row. Its handles therefore see every picture cut and marker.
         let trackFilter = ghost.clip.isDrawnOverlay ? nil : ghost.clip.placement.trackID
+        let snapClips = gestureClipIDs.isEmpty ? clips : clips.filter { !gestureClipIDs.contains($0.id) }
         let proposed = rawTarget < 0 ? rawTarget : TimelineEditing.snapClipEdge(
-            rawTarget, clips: clips, markers: markers, excluding: ghost.clip.id,
+            rawTarget, clips: snapClips, markers: markers, excluding: ghost.clip.id,
             trackID: trackFilter, playhead: currentTime, tolerance: snapTolerance(14))
         let targetIsSticky = rawTarget >= 0 && snappedBoundary.map { abs($0-rawTarget) <= 22/zoom } == true
         var target = targetIsSticky ? snappedBoundary! : proposed
@@ -1017,10 +1043,10 @@ final class TimelineCanvas: UIView, UIScrollViewDelegate, UIGestureRecognizerDel
         // of them can give — letting each stop at its own limit would let
         // the group drift apart mid-drag, which is not what grabbing one
         // handle for all of them means.
-        if trimmingPartners.isEmpty {
+        if gestureClipIDs.isEmpty {
             ghost.time = target
         } else {
-            let carried = (trimmingPartners + [ghost.clip]).map { clip in
+            let carried = clips.filter { gestureClipIDs.contains($0.id) }.map { clip in
                 (edge: trimEdge(of: clip, operation: ghost.operation),
                  limits: trimBounds(for: clip, operation: ghost.operation))
             }
@@ -1033,7 +1059,8 @@ final class TimelineCanvas: UIView, UIScrollViewDelegate, UIGestureRecognizerDel
     @objc private func held(_ recognizer: UILongPressGestureRecognizer) {
         switch recognizer.state {
         case .began:
-            let location = recognizer.location(in: self)
+            let location = holdTouchDown ?? recognizer.location(in: self)
+            holdTouchDown = nil
             guard let clip = hitClip(at: location), !isLocked(clip) else {
                 marqueeOrigin = location
                 marqueePoint = location
@@ -1046,13 +1073,16 @@ final class TimelineCanvas: UIView, UIScrollViewDelegate, UIGestureRecognizerDel
                 return
             }
             onBeginEdit?()
-            selectedID = clip.id
+            gestureClipIDs = selectedOverlayGroup(anchoredAt: clip)
             ghost = (clip, .move, clip.placement.timelineStart.seconds)
             dragPoint = recognizer.location(in: self)
             holdOrigin = dragPoint; holdStarted = .now; hasMoved = false; snappedBoundary = nil; layerDropTarget = nil
             dragAnchor = (dragPoint.x + scroll.contentOffset.x - bounds.midX) / zoom - clip.placement.timelineStart.seconds
             scroll.panGestureRecognizer.isEnabled = false
-            onDragSelect?(clip.id)
+            if gestureClipIDs.isEmpty {
+                selectedID = clip.id
+                onDragSelect?(clip.id)
+            }
             UIImpactFeedbackGenerator(style: .light).impactOccurred()
             startDragTimer()
             setNeedsDisplay()
@@ -1063,10 +1093,11 @@ final class TimelineCanvas: UIView, UIScrollViewDelegate, UIGestureRecognizerDel
                 return
             }
             dragPoint = recognizer.location(in: self)
-            if hypot(dragPoint.x-holdOrigin.x, dragPoint.y-holdOrigin.y) > 8 { hasMoved = true }
-            if layerDropTarget != nil ||
-                (ghost != nil && abs(dragPoint.y-holdOrigin.y) > 24 &&
-                 abs(dragPoint.y-holdOrigin.y) > abs(dragPoint.x-holdOrigin.x)*1.2) {
+            let dx = abs(dragPoint.x - holdOrigin.x)
+            let dy = abs(dragPoint.y - holdOrigin.y)
+            let isGroup = !gestureClipIDs.isEmpty
+            if (isGroup ? dx : hypot(dx, dy)) > 8 { hasMoved = true }
+            if !isGroup, ghost != nil, layerDropTarget != nil || (dy > 24 && dy > dx * 1.2) {
                 updateLayerDrag(); return
             }
             if hasMoved { updateDrag() }
@@ -1074,9 +1105,12 @@ final class TimelineCanvas: UIView, UIScrollViewDelegate, UIGestureRecognizerDel
             if marqueeOrigin != nil { finishMarquee(commit: true); return }
             let finished = hasMoved ? ghost : nil
             let destination = layerDropTarget
+            let movedIDs = gestureClipIDs
             finishDrag()
             if let finished, let destination {
                 onMoveClipToLayer?(finished.clip.id, destination, finished.time)
+            } else if let finished, !movedIDs.isEmpty {
+                onMoveMany?(movedIDs, finished.time - finished.clip.placement.timelineStart.seconds)
             } else if let finished {
                 onEdit?(finished.clip.id, .move, finished.time)
             }
@@ -1089,6 +1123,7 @@ final class TimelineCanvas: UIView, UIScrollViewDelegate, UIGestureRecognizerDel
 
     private func finishDrag() {
         dragTimer?.invalidate(); dragTimer = nil
+        gestureClipIDs = []
         ghost = nil; snappedBoundary = nil; layerDropTarget = nil
         scroll.panGestureRecognizer.isEnabled = true
         updating = true
@@ -1179,7 +1214,7 @@ final class TimelineCanvas: UIView, UIScrollViewDelegate, UIGestureRecognizerDel
             updating = false; updateLayerDrag(); return
         }
         if !hasMoved {
-            if Date.now.timeIntervalSince(holdStarted) >= 0.65, let id = ghost?.clip.id {
+            if gestureClipIDs.isEmpty, Date.now.timeIntervalSince(holdStarted) >= 0.65, let id = ghost?.clip.id {
                 finishDrag()
                 UIImpactFeedbackGenerator(style: .medium).impactOccurred()
                 onOptions?(id)
@@ -1201,13 +1236,22 @@ final class TimelineCanvas: UIView, UIScrollViewDelegate, UIGestureRecognizerDel
         let target = max(0, (dragPoint.x + scroll.contentOffset.x - bounds.midX) / zoom - dragAnchor)
         if tracks.first(where: { $0.id == ghost.clip.placement.trackID })?.kind != .mainVideo {
             let sticky = snappedBoundary.flatMap { abs($0-target) <= 22/zoom ? $0 : nil }
+            let snapClips = gestureClipIDs.isEmpty ? clips : clips.filter { !gestureClipIDs.contains($0.id) }
             let destination = sticky ?? TimelineEditing.snapMovingClipStart(
                 target, duration: ghost.clip.placement.duration.seconds,
-                clips: clips, markers: markers, excluding: ghost.clip.id,
+                clips: snapClips, markers: markers, excluding: ghost.clip.id,
                 playhead: currentTime, tolerance: snapTolerance(14))
-            if destination != target && destination != snappedBoundary { UISelectionFeedbackGenerator().selectionChanged() }
-            ghost.time = destination; self.ghost = ghost
-            snappedBoundary = destination == target ? nil : destination
+            var position = destination
+            if !gestureClipIDs.isEmpty {
+                let start = ghost.clip.placement.timelineStart.seconds
+                guard let limits = try? OverlayEditing.moveBounds(for: gestureClipIDs, in: tracks) else { return }
+                let delta = max(limits.lower.seconds, min(destination - start, limits.upper?.seconds ?? .infinity))
+                position = start + delta
+            }
+            let snap = position == destination && destination != target ? destination : nil
+            if let snap, snap != snappedBoundary { UISelectionFeedbackGenerator().selectionChanged() }
+            ghost.time = position; self.ghost = ghost
+            snappedBoundary = snap
             setNeedsDisplay(); return
         }
         // Horizontal moves within the main row explicitly reorder whole clips.

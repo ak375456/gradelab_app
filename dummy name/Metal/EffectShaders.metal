@@ -2,7 +2,7 @@
 using namespace metal;
 
 // ---------------------------------------------------------------------------
-// Spatial finishing effects: sharpen, bloom, glow, halation.
+// Spatial finishing effects: sharpen, clarity, bloom, glow, halation.
 //
 // These need the pixels around them, and the three glows need a wide blur, so
 // they cannot live in the grading functions the way fade and grain do. They run
@@ -29,15 +29,15 @@ struct EffectUniforms {
     float extendedRange;
     /// Texel step for the blur, in normalised coordinates.
     float2 step;
+    float clarity;
 };
 
 constant float3 kLumaRec709 = float3(0.2126, 0.7152, 0.0722);
 
 // Quarter-resolution seed for the glows.
 //
-// Two things are carried: the whole image, which `glow` diffuses, and the part
-// above the threshold, which `bloom` and `halation` bleed. Keeping both in one
-// texture means one blur pyramid serves all three rather than three.
+// The alpha carries whole-image luma for Glow and Clarity. RGB carries the
+// highlight seed for Bloom and Halation.
 kernel void effectPrepare(
     texture2d<float, access::sample> source [[texture(0)]],
     texture2d<float, access::write> seed [[texture(1)]],
@@ -90,13 +90,12 @@ kernel void effectBlur(
     destination.write(sum, position);
 }
 
-// Full resolution: sharpening against the graded frame itself, and the three
-// glows against the blur.
+// Full resolution: sharpening reads the graded frame itself. Clarity and the
+// glows read blurred versions of it.
 //
 // The body lives in `effectComposeAt` so that the tiled still-image path can run
 // the identical arithmetic while reading its halo at a different coordinate —
-// see `effectCompositeTile`. There is one implementation of these four effects,
-// not two.
+// see `effectCompositeTile`.
 //
 // `uv` locates the pixel in `source`; `blurUV` locates it in `blurred`. For a
 // whole frame they are the same coordinate. For one tile of a large photograph
@@ -106,6 +105,7 @@ kernel void effectBlur(
 inline float4 effectComposeAt(
     texture2d<float, access::sample> source,
     texture2d<float, access::sample> blurred,
+    texture2d<float, access::sample> clarityBase,
     float2 uv,
     float2 blurUV,
     constant EffectUniforms &u)
@@ -125,25 +125,39 @@ inline float4 effectComposeAt(
         colour += (colour - neighbours * 0.25) * u.sharpness * 1.6;
     }
 
-    float4 halo = blurred.sample(linearSampler, blurUV);
-
-    // Bloom and glow are additive light: bright areas bleed outward, they do not
-    // replace what is under them.
-    colour += halo.rgb * u.bloom * 0.9;
-
-    if (u.glow > 0.0) {
-        // Glow diffuses the whole image, not only the highlights, so it uses the
-        // blurred luma the seed carried alongside the thresholded colour.
-        float3 diffuse = float3(halo.a);
-        colour = mix(colour, max(colour, diffuse), u.glow * 0.55);
+    if (u.clarity > 0.0) {
+        float luma = max(0.0, dot(centre.rgb, kLumaRec709));
+        float localLuma = clarityBase.sample(linearSampler, blurUV).a;
+        float tone = u.extendedRange > 0.5 ? sqrt(saturate(luma)) : saturate(luma);
+        float midtones = smoothstep(0.04, 0.28, tone) * (1.0 - smoothstep(0.70, 0.99, tone));
+        // Suppress small residuals from noise and limit the response at strong
+        // edges. A shared RGB gain keeps the hue of the original detail.
+        float detail = (luma - localLuma) / max(0.08, luma + localLuma);
+        float magnitude = abs(detail);
+        float structure = smoothstep(0.008, 0.05, magnitude);
+        float gain = exp2(2.8 * u.clarity * midtones * structure * detail / (1.0 + 3.0 * magnitude));
+        if (u.extendedRange < 0.5) {
+            float peak = max(colour.r, max(colour.g, colour.b));
+            gain = min(gain, 1.0 / max(peak, 0.0001));
+        }
+        colour *= gain;
     }
 
-    // Halation is red-weighted because that is what it is: long-wavelength light
-    // passes through the emulsion, scatters off the back of the base and
-    // re-exposes it, so the halo film gets around a bright edge is orange-red.
-    if (u.halation > 0.0) {
-        float3 tint = float3(1.0, 0.34, 0.12);
-        colour += halo.rgb * tint * u.halation * 1.5;
+    if (u.bloom > 0.0 || u.glow > 0.0 || u.halation > 0.0) {
+        float4 halo = blurred.sample(linearSampler, blurUV);
+        colour += halo.rgb * u.bloom * 0.9;
+
+        if (u.glow > 0.0) {
+            float3 diffuse = float3(halo.a);
+            colour = mix(colour, max(colour, diffuse), u.glow * 0.55);
+        }
+
+        // Long-wavelength light scatters off the film base and re-exposes the
+        // emulsion, which makes the halo around a bright edge orange-red.
+        if (u.halation > 0.0) {
+            float3 tint = float3(1.0, 0.34, 0.12);
+            colour += halo.rgb * tint * u.halation * 1.5;
+        }
     }
 
     // SDR is a display signal and has a ceiling; HDR working space does not, and
@@ -156,12 +170,13 @@ kernel void effectComposite(
     texture2d<float, access::sample> source [[texture(0)]],
     texture2d<float, access::sample> blurred [[texture(1)]],
     texture2d<float, access::write> destination [[texture(2)]],
+    texture2d<float, access::sample> clarityBase [[texture(3)]],
     constant EffectUniforms &u [[buffer(0)]],
     uint2 position [[thread_position_in_grid]])
 {
     if (position.x >= destination.get_width() || position.y >= destination.get_height()) { return; }
     float2 uv = (float2(position) + 0.5) / float2(destination.get_width(), destination.get_height());
-    destination.write(effectComposeAt(source, blurred, uv, uv, u), position);
+    destination.write(effectComposeAt(source, blurred, clarityBase, uv, uv, u), position);
 }
 
 // One tile of a full-resolution still, composited against a halo that was blurred
@@ -185,7 +200,7 @@ kernel void effectCompositeTile(
     if (position.x >= destination.get_width() || position.y >= destination.get_height()) { return; }
     float2 uv = (float2(position) + 0.5) / float2(destination.get_width(), destination.get_height());
     float2 blurUV = (float2(position) + tile.xy + 0.5) / tile.zw;
-    destination.write(effectComposeAt(source, blurred, uv, blurUV, u), position);
+    destination.write(effectComposeAt(source, blurred, blurred, uv, blurUV, u), position);
 }
 
 // Copies a finished frame into an 8-bit display surface.

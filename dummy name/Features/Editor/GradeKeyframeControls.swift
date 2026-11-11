@@ -69,6 +69,15 @@ struct GradeSlider<Model: GradingModel>: View {
     var neutral: Float = 0
     let valueFormatter: (Float) -> String
 
+    private var displayedValue: Binding<Float> {
+        let stored = model.gradeBinding(property)
+        guard case .light(let parameter) = property.gradeSlot, parameter.displaySign != 1 else {
+            return stored
+        }
+        let sign = parameter.displaySign
+        return Binding(get: { stored.wrappedValue * sign }, set: { stored.wrappedValue = $0 * sign })
+    }
+
     private var spectrum: SliderSpectrum? {
         var hue: Double = 0
         if case .wheelStrength(let index) = property.gradeSlot,
@@ -81,7 +90,7 @@ struct GradeSlider<Model: GradingModel>: View {
     var body: some View {
         VStack(spacing: AppSpacing.small) {
             AdjustmentSlider(
-                value: model.gradeBinding(property),
+                value: displayedValue,
                 title: title,
                 range: range,
                 step: step,

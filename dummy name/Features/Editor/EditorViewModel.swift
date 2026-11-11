@@ -2705,7 +2705,7 @@ final class EditorViewModel: ObservableObject, GradingModel {
     /// not the gesture's.
     func trimClips(_ ids: Set<UUID>, operation: TimelineGestureEdit, delta: Double) {
         guard operation != .move, delta != 0, !ids.isEmpty else { return }
-        commit(operation.rawValue) { project in
+        commit(operation.rawValue, preservingSelection: true) { project in
             // The id list is fixed up front so nothing is missed or visited
             // twice, but each edge is read back from the project as it is
             // reached. That matters on the main row: trimming one clip there
@@ -2729,6 +2729,14 @@ final class EditorViewModel: ObservableObject, GradingModel {
                         id, edge: operation == .trimStart ? .left : .right, to: target, in: &project)
                 }
             }
+            return self.selectedClipID
+        }
+    }
+
+    func moveOverlays(_ ids: Set<UUID>, delta: Double) {
+        guard delta != 0, !ids.isEmpty else { return }
+        commit(TimelineGestureEdit.move.rawValue, preservingSelection: true) { project in
+            try OverlayEditing.moveTogether(ids, by: .seconds(delta), in: &project)
             return self.selectedClipID
         }
     }

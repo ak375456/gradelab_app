@@ -391,7 +391,7 @@ final class ImageExporter: @unchecked Sendable {
         // Sharpening alone needs no blur, but the composite kernel still has to
         // have a texture bound at every slot it declares. Every glow amount is
         // zero here, so nothing is read from it.
-        guard uniforms.effectsB.x > 0 || uniforms.effectsB.y > 0 || uniforms.effectsB.z > 0 else {
+        guard uniforms.effectsB != .zero else {
             return emptyHalo()
         }
         let reference = StillEffectGeometry.referenceSize(for: imageSize)
