@@ -9,6 +9,7 @@ enum TimelineGlyph {
     static let mutedNote = symbol("speaker.slash.fill", size: 8, color: TimelineTheme.textTertiary)
     static let image = symbol("photo.fill", size: 8.5, color: TimelineTheme.textPrimary)
     static let text = symbol("textformat", size: 8.5, color: TimelineTheme.textPrimary)
+    static let camera = symbol("camera.fill", size: 8.5, color: TimelineTheme.textPrimary)
     static let shape = symbol("square.on.circle.fill", size: 8.5, color: TimelineTheme.textPrimary)
     static let lock = symbol("lock.fill", size: 8, color: TimelineTheme.lockedTint)
 
@@ -22,6 +23,7 @@ enum TimelineGlyph {
         if clip.isAudio { return note }
         if clip.isText { return text }
         if clip.isShape { return shape }
+        if clip.isCamera { return camera }
         return isStill ? image : film
     }
 }
@@ -97,6 +99,8 @@ struct TimelineClipPresentation {
     /// A row that is hidden or muted draws faded rather than disappearing.
     var isDimmed = false
     var isStillImage = false
+    var labelColor: TimelineTrackColor? = nil
+    var labelTint: UIColor { labelColor?.tint ?? TimelineTheme.tint(for: clip.kind) }
     /// The two chips a clip carries. Both are preferences rather than state:
     /// an editor who knows their own footage often wants the picture and the
     /// waveform uncovered, and these are what cover them.
@@ -128,7 +132,7 @@ struct TimelineClipLayout {
 
     init(presentation: TimelineClipPresentation) {
         body = presentation.rect
-        cornerRadius = presentation.clip.isDrawnOverlay
+        cornerRadius = presentation.clip.usesOverlayTiming
             ? TimelineMetrics.overlayCornerRadius
             : TimelineMetrics.clipCornerRadius
         let height = body.height
@@ -139,7 +143,7 @@ struct TimelineClipLayout {
             // An audio clip is all waveform: there is no picture to share with.
             picture = nil
             waveform = body.insetBy(dx: 0, dy: isCompact ? 1 : 3)
-        } else if presentation.clip.isDrawnOverlay || isCompact {
+        } else if presentation.clip.usesOverlayTiming || isCompact {
             picture = nil
             waveform = nil
         } else if hasAudio,
@@ -200,6 +204,11 @@ struct TimelineClipRenderer {
         if let lane = layout.waveform { drawWaveform(presentation, in: lane, isSoleContent: layout.picture == nil) }
         drawFades(presentation, layout: layout)
         drawLabels(presentation, layout: layout)
+        if let color = presentation.labelColor {
+            let stripe = CGRect(x: body.minX, y: body.minY + 2, width: body.width, height: 3)
+            context.setFillColor(color.tint.cgColor)
+            context.fill(stripe.intersection(canvas))
+        }
 
         context.restoreGState()
 
@@ -215,10 +224,10 @@ struct TimelineClipRenderer {
     private func fillBody(_ presentation: TimelineClipPresentation, layout: TimelineClipLayout) {
         let clip = presentation.clip
         let fill: UIColor
-        if clip.isDrawnOverlay {
-            fill = TimelineTheme.tint(for: clip).withAlphaComponent(0.34)
+        if clip.usesOverlayTiming {
+            fill = presentation.labelTint.withAlphaComponent(0.34)
         } else if clip.isAudio {
-            fill = TimelineTheme.tint(for: clip).withAlphaComponent(0.20)
+            fill = presentation.labelTint.withAlphaComponent(0.20)
         } else {
             fill = TimelineTheme.clipBody
         }
@@ -278,9 +287,9 @@ struct TimelineClipRenderer {
         }
 
         let muted = presentation.clip.isMuted
-        let tint = presentation.clip.isAudio ? TimelineTheme.tint(for: presentation.clip) : TimelineTheme.accent
-        let bright = presentation.clip.isAudio
-            ? tint.withAlphaComponent(muted ? 0.35 : 1) : TimelineTheme.accentBright.withAlphaComponent(muted ? 0.35 : 1)
+        let usesLabelTint = presentation.clip.isAudio || presentation.labelColor != nil
+        let tint = usesLabelTint ? presentation.labelTint : TimelineTheme.accent
+        let bright = (usesLabelTint ? tint : TimelineTheme.accentBright).withAlphaComponent(muted ? 0.35 : 1)
 
         // The note glyph marks the lane, and a narrow gutter keeps the
         // envelope from starting underneath it.
@@ -412,20 +421,22 @@ struct TimelineClipRenderer {
         guard let picture = chipArea, picture.height >= 26 else {
             // Short rows get one centred name and no chips: there is no room
             // for anything else, and a title row needs a label, not furniture.
-            guard presentation.showsName else { return }
+            guard presentation.showsName || presentation.isLocked else { return }
             let area = layout.body.intersection(canvas)
             guard area.width > 24, layout.body.height >= 13 else { return }
             context.saveGState()
             context.clip(to: area.insetBy(dx: 5, dy: 0))
             var x = max(layout.body.minX, canvas.minX) + 6
-            if let icon, area.width > 40 {
+            if let icon, presentation.isLocked || area.width > 40 {
                 icon.draw(at: CGPoint(x: x, y: layout.body.midY - icon.size.height / 2))
                 x += icon.size.width + 4
             }
-            let font = UIFont.systemFont(ofSize: 10.5, weight: .medium)
-            (presentation.title as NSString).draw(
-                at: CGPoint(x: x, y: layout.body.midY - font.lineHeight / 2),
-                withAttributes: [.font: font, .foregroundColor: TimelineTheme.textPrimary])
+            if presentation.showsName {
+                let font = UIFont.systemFont(ofSize: 10.5, weight: .medium)
+                (presentation.title as NSString).draw(
+                    at: CGPoint(x: x, y: layout.body.midY - font.lineHeight / 2),
+                    withAttributes: [.font: font, .foregroundColor: TimelineTheme.textPrimary])
+            }
             context.restoreGState()
             return
         }
@@ -433,8 +444,8 @@ struct TimelineClipRenderer {
         // Name chip, pinned to the visible left edge so a clip scrolled
         // half-way off screen still says what it is.
         let chipLeft = max(picture.minX + 5, canvas.minX + 5)
-        if presentation.showsName, chipLeft < picture.maxX - 12 {
-            drawChip(text: presentation.title, icon: icon,
+        if (presentation.showsName || presentation.isLocked), chipLeft < picture.maxX - 12 {
+            drawChip(text: presentation.showsName ? presentation.title : "", icon: icon,
                      attributes: Self.titleAttributes,
                      origin: CGPoint(x: chipLeft, y: picture.minY + 5),
                      maximumRight: picture.maxX - 5)
@@ -487,7 +498,7 @@ struct TimelineClipRenderer {
         let textSize = string.size(withAttributes: attributes)
         let iconWidth = icon.map { $0.size.width + 4 } ?? 0
         let width = min(textSize.width + iconWidth + 12, max(24, maximumRight - origin.x))
-        let height = textSize.height + 6
+        let height = max(textSize.height, icon?.size.height ?? 0) + 6
         let chip = CGRect(x: origin.x, y: origin.y, width: width, height: height)
         context.saveGState()
         context.addPath(UIBezierPath(roundedRect: chip, cornerRadius: height / 2).cgPath)

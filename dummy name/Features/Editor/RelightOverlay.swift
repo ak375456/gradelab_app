@@ -283,9 +283,9 @@ struct RelightOverlay: View {
     /// Source (encoded) to canvas, when the preview is the composited canvas
     /// rather than the clip on its own.
     private var canvasTransform: CGAffineTransform? {
-        guard model.maskOverlayUsesCanvas, let coordinates, let clip = model.evaluatedSelectedClip else { return nil }
+        guard model.maskOverlayUsesCanvas, let coordinates, let clip = model.cameraProjectedSelectedClip else { return nil }
         return coordinates.sourceToCanvasTransform(
-            clip.transform, canvas: CGSize(width: model.project.canvas.width, height: model.project.canvas.height),
+            clip, canvas: CGSize(width: model.project.canvas.width, height: model.project.canvas.height),
             sourceCorrection: model.stabilizationSourceUVTransform)
     }
 

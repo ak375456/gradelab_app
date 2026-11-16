@@ -10,12 +10,21 @@ struct TransitionUniforms: Sendable {
     var progress: Float
     var aspectRatio: Float
     var padding: Float = 0
+    var sceneFrame: SIMD4<Float>
 
-    init(_ transition: TimelineTransition, progress: Float, size: CGSize) {
+    init(_ transition: TimelineTransition, progress: Float, size: CGSize, sceneFrame: CGRect? = nil) {
         type = UInt32(transition.type.rawValue)
         self.progress = min(1, max(0, progress))
         aspectRatio = Float(size.width / max(1, size.height))
+        self.sceneFrame = frameEdges(sceneFrame, scale: size)
     }
+}
+
+/// A centered camera aperture in top-left or bottom-left coordinates.
+private func frameEdges(_ frame: CGRect?, scale: CGSize = CGSize(width: 1, height: 1)) -> SIMD4<Float> {
+    guard let frame else { return .zero }
+    return SIMD4(Float(frame.minX / scale.width), Float(frame.minY / scale.height),
+                 Float(frame.maxX / scale.width), Float(frame.maxY / scale.height))
 }
 
 /// Parameters for the HDR display path. Separate from `GradeUniforms` on
@@ -245,6 +254,11 @@ struct HDRLayerUniforms: Sendable {
     /// Fitted-picture UV → original source UV, after the rectangular crop.
     var stabilizationRow0: SIMD4<Float>
     var stabilizationRow1: SIMD4<Float>
+    var cameraRow0: SIMD4<Float>
+    var cameraRow1: SIMD4<Float>
+    var cameraFocus: SIMD4<Float> = .zero
+    var cameraFocusOffsets: SIMD4<Float> = .zero
+    var sceneFrame: SIMD4<Float>
 
     /// - Parameters:
     ///   - transform: source → canvas, in Core Image's bottom-left coordinates.
@@ -261,7 +275,9 @@ struct HDRLayerUniforms: Sendable {
         sourceIsSDR: Bool = false,
         premultiplied: Bool = false,
         matteInverted: Bool = false,
-        sourceCorrection: CGAffineTransform = .identity
+        sourceCorrection: CGAffineTransform = .identity,
+        camera: ClipPicturePlacement? = nil,
+        sceneFrame: CGRect? = nil
     ) {
         // Canvas pixel (top-left origin) → Core Image canvas point → source
         // point → normalised source coordinate with the row order flipped back.
@@ -282,9 +298,28 @@ struct HDRLayerUniforms: Sendable {
             premultiplied ? 1 : 0
         )
         matte = SIMD4(matteInverted ? 1 : 0, 0, 0, 0)
+        self.sceneFrame = frameEdges(sceneFrame)
         let correction = toNormalized.inverted().concatenating(sourceCorrection.inverted()).concatenating(toNormalized)
         stabilizationRow0 = SIMD4(Float(correction.a), Float(correction.c), Float(correction.tx), 0)
         stabilizationRow1 = SIMD4(Float(correction.b), Float(correction.d), Float(correction.ty), 0)
+        if let camera, let bounds = camera.frameBounds {
+            let frame = toCanvasPoints.concatenating(camera.frameToCanvas.inverted())
+                .concatenating(.init(scaleX: 1 / bounds.width, y: 1 / bounds.height))
+            cameraRow0 = SIMD4(Float(frame.a), Float(frame.c), Float(frame.tx), 1)
+            cameraRow1 = SIMD4(Float(frame.b), Float(frame.d), Float(frame.ty), Float(bounds.width / bounds.height))
+            if let focus = camera.focus {
+                let step = min(bounds.width, bounds.height) * 0.024
+                let fromFrame = camera.sourceToFrame.inverted()
+                    .concatenating(sourceCorrection.inverted()).concatenating(toNormalized)
+                cameraFocus = SIMD4(Float(focus.focusX), Float(1 - focus.focusY),
+                                    Float(focus.focusRadius), Float(focus.focusAmount))
+                cameraFocusOffsets = SIMD4(Float(fromFrame.a * step), Float(fromFrame.b * step),
+                                           Float(fromFrame.c * step), Float(fromFrame.d * step))
+            }
+        } else {
+            cameraRow0 = .zero
+            cameraRow1 = .zero
+        }
     }
 }
 

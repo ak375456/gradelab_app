@@ -87,7 +87,7 @@ extension TimelineItem {
         case .video(let clip): clip.trackMatte
         case .text(let clip): clip.trackMatte
         case .shape(let clip): clip.trackMatte
-        case .audio: nil
+        case .audio, .camera: nil
         }
     }
 
@@ -96,7 +96,7 @@ extension TimelineItem {
     var isCompositable: Bool {
         switch self {
         case .video, .text, .shape: true
-        case .audio: false
+        case .audio, .camera: false
         }
     }
 
@@ -106,7 +106,7 @@ extension TimelineItem {
         case .video(var clip): clip.trackMatte = configuration; return .video(clip)
         case .text(var clip): clip.trackMatte = configuration; return .text(clip)
         case .shape(var clip): clip.trackMatte = configuration; return .shape(clip)
-        case .audio: return self
+        case .audio, .camera: return self
         }
     }
 }
@@ -272,8 +272,8 @@ enum TrackMatteEditing {
         case .shape(var clip):
             clip.trackMatte = configuration
             try OverlayEditing.replace(id, with: clip, in: &project)
-        case .audio:
-            throw TimelineError.invalid(String(localized: "An audio clip has no picture to cut."))
+        case .audio, .camera:
+            throw TimelineError.invalid(String(localized: "Choose a video, image, text, or shape layer."))
         }
     }
 
@@ -344,7 +344,7 @@ enum TrackMatteEditing {
             let noun = isStill ? String(localized: "Image") : String(localized: "Clip")
             return ordinals.count > 1 ? "\(track.layerDisplayName) · \(noun) \(index)"
                                       : "\(track.layerDisplayName) · \(noun)"
-        case .audio:
+        case .audio, .camera:
             return track.layerDisplayName
         }
     }

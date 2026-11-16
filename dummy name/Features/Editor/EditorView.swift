@@ -34,6 +34,7 @@ struct EditorView: View {
     @FocusState private var textFocused: Bool
     @State private var keyboardOverlap: CGFloat = 0
     @State private var clipOptions = false
+    @State private var editingLayerColor: TimelineTrack?
     @State private var replacementClipID: UUID?
     @StateObject private var filmstrip = FilmstripStore()
     @State private var assetFrames: [UUID: [UIImage]] = [:]
@@ -59,8 +60,11 @@ struct EditorView: View {
     @State private var importImage = false
     @State private var layers = false
     @State private var transforms = false
+    @State private var cameraMode = false
+    @State private var showsCameraFrame = false
+    @State private var pickingCameraFocus = false
+    @StateObject private var cameraTracking = ClipCameraTracking()
     @State private var stabilizationTool = false
-    @ObservedObject private var warmup = CompositorWarmup.shared
     @State private var maskMode = false
     @State private var matteMode = false
     @State private var backgroundMode = false
@@ -101,6 +105,7 @@ struct EditorView: View {
     }
     /// One finger belongs to the active tool; two fingers always navigate.
     private var previewInteraction: PreviewInteraction {
+        if cameraGesturesActive || sceneCameraGesturesActive { return .camera }
         let drawsOnPicture = backgroundToolArmed || model.selectedText != nil || model.selectedShape != nil
             || model.evaluatedMediaOverlay != nil
             || model.isPickingCurveHue || model.isPickingWarpColor || model.isPickingMaskQualifier
@@ -112,6 +117,7 @@ struct EditorView: View {
     /// come up showing the curve rather than the constant-speed slider.
     @State private var opensSpeedRamp = false
     @State private var transitionMode = false
+    @State private var transitionCuts: [TimelineTransitionEditing.Cut] = []
     @State private var settingsSheet = false
     @AppStorage("editor.frameStep") private var frameStep = 2
     // Workspace sizes, in points. Zero means "automatic": the layout picks the
@@ -190,7 +196,7 @@ struct EditorView: View {
                                 assets: model.project.assets,
                                 usageCounts: model.assetUsageCounts,
                                 assetFrames: assetFrames,
-                                isEnabled: !model.isPreparingTimeline && !model.isImporting && warmup.isReady,
+                                isEnabled: !model.isPreparingTimeline && !model.isImporting,
                                 onImport: { requestFiles(.bin) },
                                 onPlace: { model.placeAsset($0, as: $1) },
                                 onImportFiles: { urls in Task { await model.importIntoBin(urls) } })
@@ -338,7 +344,7 @@ struct EditorView: View {
             showsScopes: scopesVisible, isExpanded: colorControlsExpanded,
             scopeHeight: ScopeLayout.compactHeight,
             transportHeight: EditorWorkspaceBudget.transport,
-            footerHeight: EditorWorkspaceBudget.modeButtons + (warmup.isReady ? 0 : EditorWorkspaceBudget.warmupNotice),
+            footerHeight: EditorWorkspaceBudget.modeButtons,
             onResizeBegin: beginWorkspaceResize, onResizeEnd: endWorkspaceResize,
             preview: { preview },
             scope: { ScopePanel(model: model, isRegularWidth: false,
@@ -463,8 +469,7 @@ struct EditorView: View {
     private func clampedCompactTimelineHeight(_ value: CGFloat, in size: CGSize) -> CGFloat {
         let lower = EditorWorkspaceBudget.minimumTimeline
         let ceiling = EditorWorkspaceBudget.timelineCeiling(
-            height: size.height, previewHeight: previewHeight(size),
-            showsWarmupNotice: !warmup.isReady)
+            height: size.height, previewHeight: previewHeight(size))
         return min(max(value, lower), max(lower, ceiling))
     }
 
@@ -491,8 +496,7 @@ struct EditorView: View {
         // is what repairs a workspace someone had already dragged too far.
         let lower: CGFloat = 140
         let ceiling = EditorWorkspaceBudget.previewCeiling(
-            height: size.height, floor: lower, showsTimeline: showsTimelineInTallLayout,
-            showsWarmupNotice: !warmup.isReady)
+            height: size.height, floor: lower, showsTimeline: showsTimelineInTallLayout)
         return min(max(value, lower), max(lower, ceiling))
     }
 
@@ -634,6 +638,21 @@ struct EditorView: View {
             clipOptionActions
             Button("Cancel", role: .cancel) {}
         }
+        .alert("Remove footage and transition?", isPresented: Binding(
+            get: { model.pendingClipDeletion != nil },
+            set: { if !$0 { model.cancelClipDeletion() } }
+        ), presenting: model.pendingClipDeletion) { deletion in
+            Button(deletion.cutting ? "Cut" : "Delete", role: .destructive) {
+                model.confirmClipDeletion(deletion)
+            }
+            Button("Cancel", role: .cancel) { model.cancelClipDeletion() }
+        } message: { deletion in
+            if deletion.transitionCount == 1 {
+                Text("Removing this footage will also remove its attached transition.")
+            } else {
+                Text("Removing this footage will also remove its attached transitions.")
+            }
+        }
         .alert("Edit unavailable", isPresented: Binding(get: { model.editError != nil }, set: { if !$0 { model.editError = nil } })) {
             Button("OK", role: .cancel) { model.editError = nil }
         } message: { Text(model.editError ?? "") }
@@ -692,6 +711,12 @@ struct EditorView: View {
             self.mediaItem = nil
         }
         .sheet(isPresented: $layers) { LayerControls(model: model).presentationDetents([.medium, .large]) }
+        .sheet(item: $editingLayerColor) { track in
+            LayerColorPicker(track: track) { color in
+                model.setTrackColor(track.id, color)
+            }
+            .presentationDetents([.medium, .large])
+        }
         .sheet(isPresented: Binding(get: { replacementClipID != nil },
                                     set: { if !$0 { replacementClipID = nil } })) {
             if let id = replacementClipID {
@@ -722,9 +747,29 @@ struct EditorView: View {
         }
         .onChange(of: holdingOriginal) { _, value in model.setOriginalVisible(value || comparePinned) }
         .onChange(of: comparePinned) { _, value in model.setOriginalVisible(value || holdingOriginal) }
+        .onChange(of: model.playback.isPlaying) { _, playing in
+            if playing {
+                model.setCameraPreview(nil)
+                model.setSceneCameraPreview(nil)
+                showsCameraFrame = false
+                pickingCameraFocus = false
+                if cameraTracking.targetID != nil { cameraTracking.cancel() }
+            }
+        }
         .animation(.easeInOut(duration: 0.18), value: model.statusMessage)
-        .onChange(of: model.project) { _, project in onSettingsChanged(project, false) }
+        .onChange(of: model.project, initial: true) { previous, project in
+            transitionCuts = TimelineTransitionEditing.editableCuts(in: project)
+            if previous != project { onSettingsChanged(project, false) }
+        }
+        .onChange(of: model.playheadTime) { _, _ in model.setSceneCameraPreview(nil) }
+        .onChange(of: model.animationTime) { _, _ in model.setCameraPreview(nil) }
+        .onChange(of: showsCameraFrame) { _, _ in model.setCameraPreview(nil) }
         .onChange(of: model.selectedClipID, initial: true) { _, _ in
+            model.setCameraPreview(nil)
+            model.setSceneCameraPreview(nil)
+            showsCameraFrame = false
+            cameraTracking.cancel()
+            pickingCameraFocus = false
             // A title that was just created to be typed into opens the dock;
             // every other selection change closes it.
             let startsTyping = startsTypingOnSelection && model.selectedText != nil
@@ -734,6 +779,8 @@ struct EditorView: View {
                 openTextTool()
             } else if case .shape = model.selectedItem {
                 openShapeTool()
+            } else if model.selectedSceneCamera != nil {
+                activate(.camera)
             } else if model.selectedAudio != nil {
                 activate(.audio)
                 model.beginAudioEditing()
@@ -746,9 +793,19 @@ struct EditorView: View {
         }
         .onChange(of: scenePhase) { _, phase in
             model.handleScenePhase(active: phase == .active)
-            if phase != .active { comparePinned = false; model.setOriginalVisible(false); onSettingsChanged(model.project, true) }
+            if phase != .active {
+                model.setCameraPreview(nil)
+                model.setSceneCameraPreview(nil)
+                cameraTracking.cancel()
+                comparePinned = false; model.setOriginalVisible(false); onSettingsChanged(model.project, true)
+            }
         }
-        .onDisappear { model.stopMaskTracking(); model.playback.pause(); model.setOriginalVisible(false) }
+        .onDisappear {
+            model.setCameraPreview(nil)
+            model.setSceneCameraPreview(nil)
+            cameraTracking.cancel()
+            model.stopMaskTracking(); model.playback.pause(); model.setOriginalVisible(false)
+        }
         .sheet(isPresented: $model.showsExport, onDismiss: model.resumePreviewAfterExport) {
             ExportView(project: model.project, settings: model.settings)
                 .onAppear { model.suspendPreviewForExport() }
@@ -783,17 +840,17 @@ struct EditorView: View {
     private var shortcutsEnabled: Bool {
         !typingText && !model.showsExport && clipExport == nil && !savingPreset && !help
             && !settingsSheet && !layers && !markers && editingMarker == nil && !soundEffects && !showsFileImporter && !mediaPicker
-            && !clipOptions && replacementClipID == nil && !confirmsResetAll && !colorInfo && model.editError == nil
+            && !clipOptions && editingLayerColor == nil && replacementClipID == nil
+            && !confirmsResetAll && !colorInfo && model.editError == nil
     }
 
     private var workspaceShortcuts: [WorkspaceShortcut] {
         let ready = !model.isPreparingTimeline && !model.isImporting
-        let canImport = ready && warmup.isReady
         let singleSelection = model.selectedClipIDs.count == 1 && model.selectedItem != nil
         return [
-            .init(.addVideo, isEnabled: canImport) { requestMedia(images: false, overlay: false) },
-            .init(.addImageOverlay, isEnabled: canImport) { requestMedia(images: true, overlay: true) },
-            .init(.addAudio, isEnabled: canImport) { requestFiles(.audio) },
+            .init(.addVideo, isEnabled: ready) { requestMedia(images: false, overlay: false) },
+            .init(.addImageOverlay, isEnabled: ready) { requestMedia(images: true, overlay: true) },
+            .init(.addAudio, isEnabled: ready) { requestFiles(.audio) },
             .init(.saveProject) {
                 model.flushGradeHistory(); onSettingsChanged(model.project, true)
             },
@@ -1024,6 +1081,41 @@ struct EditorView: View {
     /// A media-bin drag is over the picture.
     @State private var isCanvasDropTarget = false
 
+    private var isShowingCameraSource: Bool {
+        cameraMode && showsCameraFrame && model.selectedClip?.camera != nil && model.isPlayheadInsideSelection
+    }
+
+    private var cameraGesturesActive: Bool {
+        cameraMode && !isShowingCameraSource && model.canEditCamera &&
+            model.selectedClip?.camera != nil && model.isPlayheadInsideSelection && !model.playback.isPlaying
+    }
+
+    private var sceneCameraGesturesActive: Bool {
+        cameraMode && !model.playback.isPlaying && !model.showsOriginal &&
+            model.canAdjustSceneCamera && model.selectedCameraDrivesPreview
+    }
+
+    @ViewBuilder private var cameraResultGestures: some View {
+        if sceneCameraGesturesActive, let clip = model.selectedSceneCamera {
+            let time = model.playheadTime
+            SceneCameraResultGestures(canvas: model.cameraCanvasSize, position: clip.evaluated(at: time).position,
+                                      onPreview: { model.previewSceneCameraGesture($0, id: clip.id, time: time) },
+                                      onCommit: { model.applySceneCameraGesture($1, id: clip.id, time: time, from: $0) })
+                .id(clip.id)
+                .id(time.seconds)
+        } else if cameraGesturesActive, let clip = model.cameraProjectedSelectedClip, let camera = clip.camera,
+           let size = model.displaySize(of: clip) {
+            let time = model.playheadTime
+            ClipCameraResultGestures(clip: clip, camera: camera, source: size, canvas: model.cameraCanvasSize,
+                                     onPreview: { draft in
+                model.previewCameraGesture(draft, clipID: clip.id, time: time, showsResult: true)
+            }) { before, after in
+                model.applyCameraGesture(from: before, to: after, clipID: clip.id, time: time)
+            }
+            .id(clip.id)
+        }
+    }
+
     private var preview: some View {
         ZStack(alignment: .topLeading) {
             PreviewViewport(interaction: previewInteraction,
@@ -1032,14 +1124,16 @@ struct EditorView: View {
                 MetalPreviewView(renderer: model.renderer, settings: model.settings,
                              showsOriginal: model.showsOriginal, isPlaying: model.playback.isPlaying,
                              redrawTime: model.playback.currentTime, frameUpdateID: model.playback.frameUpdateID,
-                             isActive: scenePhase == .active && !model.showsExport)
+                             isActive: scenePhase == .active && !model.showsExport && !isShowingCameraSource)
                     // Inside the viewport, so the edge zooms with the picture it
                     // belongs to. Hidden while the original is held, which is a
                     // look at the untouched frame and wants nothing over it.
                     if showsCanvasEdge && model.hasMedia && !model.showsOriginal {
                         CanvasEdgeOverlay(canvas: model.project.canvas)
                     }
-                    if !typingText { OverlayCanvasControls(model: model, editContent: { typingText = true }) }
+                    if !typingText && !cameraMode {
+                        OverlayCanvasControls(model: model, editContent: { typingText = true })
+                    }
                     if localMaskMode && !model.showsOriginal {
                         GradeMaskOverlay(model: model, displayedRect: model.renderer.displayedVideoRect,
                             sourceToPicture: { model.gradeMaskSourceToPictureTransform }, isZooming: previewPinching)
@@ -1065,9 +1159,64 @@ struct EditorView: View {
                     }
                     if model.isPickingCurveHue || model.isPickingWarpColor { colorPickingLayer }
                     if model.isPickingMaskQualifier { qualifierPickingLayer }
+                    cameraResultGestures
                 }
             } controls: {
-                previewControls
+                if cameraMode, let camera = model.selectedClip?.camera {
+                    Button {
+                        model.playback.pause()
+                        if !model.isPlayheadInsideSelection { model.goToSelectedClip() }
+                        showsCameraFrame = true
+                    } label: {
+                        PreviewToolbarLabel(title: camera.mode == .crop ? "Crop Handles" : "Source Frame",
+                                            symbol: camera.mode == .crop ? "crop" : "viewfinder")
+                    }
+                    .buttonStyle(.plain)
+                } else {
+                    previewControls
+                }
+            }
+            .allowsHitTesting(!isShowingCameraSource)
+            .accessibilityHidden(isShowingCameraSource)
+            if isShowingCameraSource, let source = model.cameraSourceFrame,
+               let clip = model.evaluatedSelectedClip, let camera = clip.camera {
+                let time = model.playheadTime
+                VStack(spacing: 0) {
+                    ClipCameraViewfinder(source: source, canvasSize: model.cameraCanvasSize, camera: camera,
+                                         canEdit: model.canEditCamera,
+                                         isPickingPoint: pickingCameraFocus || cameraTracking.targetID != nil,
+                                         onPoint: { point in
+                        if pickingCameraFocus {
+                            model.placeCameraFocus(point)
+                            pickingCameraFocus = false
+                        } else {
+                            cameraTracking.track(at: point, in: model)
+                        }
+                    }, preview: model.cameraPreview, onPreview: { draft in
+                        model.previewCameraGesture(draft, clipID: clip.id, time: time, showsResult: false)
+                    }) { before, after in
+                        model.applyCameraGesture(from: before, to: after, clipID: clip.id, time: time)
+                    }
+                    .id(clip.id)
+                    HStack {
+                        Text(pickingCameraFocus ? "Tap to set focus" :
+                                (cameraTracking.targetID == nil ? "Source Only" : "Tap a detail to track"))
+                            .font(AppTypography.caption).foregroundStyle(AppColors.textSecondary)
+                        Spacer(minLength: 4)
+                        Button {
+                            if cameraTracking.targetID != nil { cameraTracking.cancel() }
+                            pickingCameraFocus = false
+                            showsCameraFrame = false
+                        } label: {
+                            PreviewToolbarLabel(title: "Show Result", symbol: "play.rectangle")
+                        }.buttonStyle(.plain)
+                    }
+                    .padding(.horizontal, AppSpacing.small)
+                    .frame(height: PreviewToolbarMetrics.height)
+                    .background(AppColors.editorBackground)
+                    .overlay(alignment: .top) { AppDivider() }
+                }
+                .background(AppColors.editorBackground)
             }
             if model.isPreparingTimeline || !model.hasMedia {
                 Color.black
@@ -1080,7 +1229,7 @@ struct EditorView: View {
                     .padding(6)
                     .allowsHitTesting(false)
             }
-            if !model.showsOriginal && model.previewStatus.projectMode.isAppleLog {
+            if !isShowingCameraSource && !model.showsOriginal && model.previewStatus.projectMode.isAppleLog {
                 // Log footage that has been correctly managed looks like an
                 // ordinary picture, which is the point — but it also means
                 // nothing on screen says the source is Log. The badge says it,
@@ -1092,7 +1241,7 @@ struct EditorView: View {
                         .foregroundStyle(AppColors.accent)
                 }.buttonStyle(.plain).padding(14)
                     .accessibilityLabel("Source is Apple Log. Tap for details.")
-            } else if !model.showsOriginal && model.previewStatus.projectMode.isHDR {
+            } else if !isShowingCameraSource && !model.showsOriginal && model.previewStatus.projectMode.isHDR {
                 let _ = model.displayStateID
                 Button { colorInfo = true } label: {
                     Text(model.previewStatus.badge).font(.caption2.weight(.semibold)).tracking(1.2)
@@ -1102,8 +1251,14 @@ struct EditorView: View {
                 }.buttonStyle(.plain).padding(14)
                     .accessibilityLabel("Colour mode: \(model.previewStatus.badge). Tap for details.")
             }
-            if !model.playback.isReady && model.playback.errorMessage == nil {
-                ProgressView().frame(maxWidth: .infinity, maxHeight: .infinity)
+            if model.hasMedia && (model.isPreparingTimeline ||
+                                  (!model.playback.isReady && model.playback.errorMessage == nil)) {
+                ProgressView()
+                    .padding(12)
+                    .background(.black.opacity(0.7), in: Capsule())
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    .accessibilityLabel("Preparing preview…")
+                    .allowsHitTesting(false)
             }
             if let status = model.statusMessage {
                 VStack {
@@ -1142,7 +1297,7 @@ struct EditorView: View {
             .onDrop(of: AppPlatform.isMac ? [.fileURL, .text] : [],
                     isTargeted: $isCanvasDropTarget) { providers in
                 guard AppPlatform.isMac, !model.isPreparingTimeline,
-                      !model.isImporting, warmup.isReady else { return false }
+                      !model.isImporting else { return false }
                 return acceptCanvasDrop(providers)
             }
     }
@@ -1259,7 +1414,7 @@ struct EditorView: View {
                 Image(systemName: "rectangle.2.swap").frame(width: 40, height: 36)
             }
             .accessibilityLabel("Add transition at playhead")
-            .disabled(!model.canUseTransitions || !warmup.isReady)
+            .disabled(!model.canUseTransitions)
             // Delete belongs beside the other editing commands rather than in
             // the inspector below, which is where it used to be: the inspector
             // changes with the tool, and deleting a clip does not.
@@ -1291,7 +1446,7 @@ struct EditorView: View {
                    height: AppPlatform.isMac ? 36 : 44)
         }
         .accessibilityLabel("Add media")
-        .disabled(model.isImporting || !warmup.isReady)
+        .disabled(model.isImporting)
     }
 
     @ViewBuilder private var addMediaActions: some View {
@@ -1326,11 +1481,11 @@ struct EditorView: View {
     private var timelineActionsMenu: some View {
         Menu {
             Menu("Add", systemImage: "plus") { addMediaActions }
-                .disabled(model.isImporting || !warmup.isReady)
+                .disabled(model.isImporting)
             Button("Split at playhead", systemImage: "scissors", action: model.split)
                 .disabled(!model.canSplit)
             Button("Add transition", systemImage: "rectangle.2.swap", action: openTransitionTool)
-                .disabled(!model.canUseTransitions || !warmup.isReady)
+                .disabled(!model.canUseTransitions)
             Divider()
             Button("Paste", systemImage: "doc.on.clipboard", action: model.pasteClip)
                 .disabled(model.clipboard == nil)
@@ -1437,6 +1592,8 @@ struct EditorView: View {
         Section("Overlays") {
             Button("Text", systemImage: "textformat", action: addTextAndType)
             Button("Shape", systemImage: "square.on.circle") { openShapeTool(); model.addShape() }
+            Button("Camera", systemImage: "camera", action: addCameraLayer)
+                .disabled(!model.canAddSceneCamera)
         }
     }
 
@@ -1444,6 +1601,9 @@ struct EditorView: View {
         VStack(spacing: 0) {
                 TimelineView(clips: model.project.timeline.items.compactMap(TimelineDisplayClip.init), tracks: model.project.timeline.tracks, markers: model.project.timeline.markers,
                     transitions: model.project.timeline.transitions,
+                    transitionCuts: transitionCuts,
+                    transitionDurationLimits: model.selectedTransitionDurationLimits,
+                    frameDuration: model.project.canvas.frameDuration?.seconds,
                     keyframeTimes: model.selectedClipKeyframeTimes,
                     assets: model.project.assets, assetFrames: assetFrames, waveforms: waveforms, sourceRange: model.project.primaryAsset.sourceRange,
                     minimumDuration: model.project.canvas.frameDuration?.seconds ?? 0.01, name: model.project.displayName,
@@ -1464,9 +1624,12 @@ struct EditorView: View {
                         model.selectClips(ids)
                         if model.selectionContainsOnlyText { openTextTool() }
                         else if model.selectionContainsOnlyShapes { openShapeTool() }
+                        else if model.selectedSceneCamera != nil { activate(.camera) }
                         else { activate(.timeline) }
                     },
                     onSelectTransition: { id in openTransitionTool(id: id) },
+                    onAddTransition: { cut in openTransitionTool(at: cut) },
+                    onResizeTransition: model.resizeTransition,
                     onSelectMarker: { marker, anchor in
                         markerAnchor = anchor
                         editingMarker = marker
@@ -1480,6 +1643,7 @@ struct EditorView: View {
                     onToggleTrackMute: model.toggleTrackMute,
                     onSetTrackHeight: model.setTrackHeight,
                     onSetWaveformSize: model.setWaveformSize,
+                    onChooseTrackColor: openLayerColorPicker,
                     onEdit: model.editTiming,
                     onTrimMany: model.trimClips,
                     onMoveMany: model.moveOverlays,
@@ -1509,42 +1673,10 @@ struct EditorView: View {
         model.addMarker()
     }
 
-    private var modeBar: some View {
-        VStack(spacing: 0) {
-            modeButtons
-            // Shown rather than letting someone tap Transform and meet a frozen
-            // picture with nothing on screen to explain it. The compositing
-            // shaders take real time to compile the first time they are built on
-            // a device — measured at about a minute on an A16 — and the system
-            // caches the result, so this appears once after installing and never
-            // again.
-            if !warmup.isReady {
-                HStack(spacing: 6) {
-                    ProgressView().controlSize(.mini)
-                    Text("Preparing layers, transforms and effects… first run only")
-                        .font(.caption2)
-                        .foregroundStyle(AppColors.textTertiary)
-                        .lineLimit(2)
-                        .fixedSize(horizontal: false, vertical: true)
-                }
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .padding(.horizontal, 12)
-                .padding(.bottom, 4)
-                .accessibilityElement(children: .combine)
-            }
-        }
-    }
+    private var modeBar: some View { modeButtons }
 
-    // MARK: - Mode bar
-
-    /// The bar's ten tools, in the order they are drawn.
-    ///
-    /// The modes themselves are still the eight `@State` booleans the rest of
-    /// this view reads. This only gives the bar a single list to draw and a
-    /// single place to switch, instead of nine buttons each clearing seven
-    /// flags by hand — which is how a tool used to end up half switched.
     private enum EditorMode: String, CaseIterable, Identifiable {
-        case timeline, text, shape, audio, color, transform, stabilization, mask, matte, background, speed, transition, canvas
+        case timeline, text, shape, audio, color, transform, camera, stabilization, mask, matte, background, speed, transition, canvas
 
         var id: String { rawValue }
 
@@ -1556,6 +1688,7 @@ struct EditorView: View {
             case .audio: return String(localized: "Audio")
             case .color: return String(localized: "Color")
             case .transform: return String(localized: "Transform")
+            case .camera: return String(localized: "Camera")
             case .stabilization: return String(localized: "Stabilize")
             case .mask: return String(localized: "Mask")
             case .matte: return String(localized: "Matte")
@@ -1574,6 +1707,7 @@ struct EditorView: View {
             case .audio: return "waveform"
             case .color: return "camera.filters"
             case .transform: return "crop.rotate"
+            case .camera: return "viewfinder"
             case .stabilization: return "camera.metering.center.weighted"
             case .mask: return "circle.dashed"
             case .matte: return "square.on.square.dashed"
@@ -1581,14 +1715,6 @@ struct EditorView: View {
             case .speed: return "speedometer"
             case .transition: return "rectangle.2.swap"
             case .canvas: return "aspectratio"
-            }
-        }
-
-        /// Tools that cannot run until the compositing shaders have been built.
-        var needsCompositor: Bool {
-            switch self {
-            case .text, .shape, .audio, .transform, .stabilization, .mask, .matte, .background, .transition: return true
-            case .timeline, .color, .speed, .canvas: return false
             }
         }
     }
@@ -1599,6 +1725,7 @@ struct EditorView: View {
         if audioMode { return .audio }
         if colorMode { return .color }
         if transforms { return .transform }
+        if cameraMode { return .camera }
         if stabilizationTool { return .stabilization }
         if maskMode { return .mask }
         if matteMode { return .matte }
@@ -1616,6 +1743,14 @@ struct EditorView: View {
         audioMode = mode == .audio
         colorMode = mode == .color
         transforms = mode == .transform
+        cameraMode = mode == .camera
+        if mode != .camera {
+            model.setCameraPreview(nil)
+            model.setSceneCameraPreview(nil)
+            showsCameraFrame = false
+            pickingCameraFocus = false
+            cameraTracking.cancel()
+        }
         stabilizationTool = mode == .stabilization
         maskMode = mode == .mask
         matteMode = mode == .matte
@@ -1632,6 +1767,7 @@ struct EditorView: View {
         canvasTool = mode == .canvas
         speedTool = mode == .speed
         transitionMode = mode == .transition
+        if mode != .transition { model.clearPendingTransitionCut() }
     }
 
     /// Why a tool cannot be used at this moment, or nil when it can.
@@ -1640,16 +1776,14 @@ struct EditorView: View {
     /// silence. A dimmed control with no stated reason is what makes people
     /// think an app is broken, and five of these nine can be unavailable.
     private func unavailableReason(for mode: EditorMode) -> String? {
-        // Checked first: it is temporary, and it covers most of the list at once.
-        if mode.needsCompositor && !warmup.isReady {
-            return String(localized: "Still preparing effects — first run only.")
-        }
         switch mode {
         case .timeline, .canvas, .text, .shape, .audio:
             return nil
         case .color, .transform:
             if model.selectedClip == nil { return String(localized: "Select a clip in the timeline first.") }
             return model.canGrade ? nil : String(localized: "This clip can’t be graded.")
+        case .camera:
+            return nil
         case .stabilization:
             return model.canStabilize ? nil : String(localized: "Select one unlocked video clip to stabilize it.")
         case .mask:
@@ -1661,7 +1795,7 @@ struct EditorView: View {
             // translation.
             if model.selectedItem == nil { return String(localized: "Select a layer in the timeline first.") }
             if model.selectedItem?.isCompositable != true {
-                return String(localized: "An audio clip has no picture to cut.")
+                return String(localized: "Choose a video, image, text, or shape layer.")
             }
             return model.canEditSelection ? nil : String(localized: "This layer is locked.")
         case .background:
@@ -1689,6 +1823,11 @@ struct EditorView: View {
             activate(mode); model.beginAudioEditing()
         case .transform, .stabilization:
             activate(mode); model.beginTransformEditing()
+        case .camera:
+            activate(mode)
+            model.flushGradeHistory()
+            model.playback.pause()
+            showsCameraFrame = false
         case .mask:
             activate(mode); model.beginLayerMaskEditing()
         case .matte:
@@ -1843,6 +1982,17 @@ struct EditorView: View {
         else if matteMode { TrackMattePanel(model: model) }
         else if backgroundMode { BackgroundRemovalPanel(model: model) }
         else if transforms { LiveTransformPanel(model: model) }
+        else if cameraMode {
+            VStack(spacing: 0) {
+                SceneCameraHeader(model: model, addCamera: addCameraLayer)
+                if model.selectedSceneCamera != nil {
+                    SceneCameraPanel(model: model).id(model.selectedClipID)
+                } else if model.selectedClip != nil {
+                    ClipCameraPanel(model: model, tracking: cameraTracking, showsFrame: $showsCameraFrame,
+                                    pickingFocus: $pickingCameraFocus).id(model.selectedClipID)
+                }
+            }
+        }
         else if stabilizationTool { StabilizationPanel(model: model) }
         else if canvasTool { CanvasTools(model: model) }
         else if colorMode && model.canGrade { controls }
@@ -1860,7 +2010,9 @@ struct EditorView: View {
                         // toolbar folds into a menu instead.
                         if !AppPlatform.usesDesktopWorkspace {
                             Button(role: .destructive) { model.deleteClip() } label: { Image(systemName: "trash").frame(width: 44, height: 44) }
-                                .accessibilityLabel(model.selectedAudio == nil ? "Delete clip and close gaps" : "Delete audio clip").disabled(!model.canEditSelection)
+                                .accessibilityLabel(model.selectedTrack?.ripplesTrimsAndDeletes == true
+                                                    ? "Delete clip and close gaps" : "Delete clip")
+                                .disabled(!model.canEditSelection)
                         }
                         let playheadMarker = model.markerAtPlayhead
                         Button(action: addMarkerAtPlayhead) {
@@ -1921,6 +2073,12 @@ struct EditorView: View {
     /// second button before a single character can be typed is a step nobody
     /// wants; with a title already selected this edits that one instead of
     /// stacking another on top of it.
+    private func addCameraLayer() {
+        guard model.canAddSceneCamera else { return }
+        activate(.camera)
+        model.addSceneCamera()
+    }
+
     private func addTextAndType() {
         openTextTool()
         if model.selectedText != nil {
@@ -1940,6 +2098,13 @@ struct EditorView: View {
         model.flushGradeHistory()
         activate(.transition)
         model.prepareTransitionPanel()
+    }
+
+    private func openTransitionTool(at cut: TimelineTransitionEditing.Cut) {
+        guard model.canUseTransitions else { return }
+        model.flushGradeHistory()
+        activate(.transition)
+        model.prepareTransitionPanel(at: cut)
     }
 
     private func openTransitionTool(id: UUID) {
@@ -1987,6 +2152,19 @@ struct EditorView: View {
     }
 
     @ViewBuilder private var clipOptionActions: some View {
+        if let item = model.selectedItem, model.selectedClipIDs.count == 1 {
+            let locked = item.placement.isLocked
+            let trackLocked = model.project.timeline.tracks.first { $0.id == item.placement.trackID }?.isLocked
+            Button {
+                model.setClipLocked(!locked, id: item.id)
+            } label: {
+                Label(locked ? "Unlock clip" : "Lock clip", systemImage: locked ? "lock.open" : "lock")
+            }
+            .disabled(model.isPreparingTimeline || trackLocked != false)
+            Button("Layer color", systemImage: "paintpalette") {
+                openLayerColorPicker(for: item.placement.trackID)
+            }
+        }
         if let id = model.selectedClipID, model.project.timeline.videoClip(id: id) != nil {
             Button("Replace clip", systemImage: "arrow.triangle.2.circlepath", action: openReplacement)
                 .disabled(!model.canReplaceClip)
@@ -2000,13 +2178,20 @@ struct EditorView: View {
             }
         }
         Button("Copy", action: model.copyClip)
-        Button("Cut") { model.deleteClip(cutting: true) }
-        Button("Duplicate", action: model.duplicateClip)
-        Button("Trim start to playhead") { if let id = model.selectedClipID { model.editTiming(id: id, operation: .trimStart, seconds: model.timelineTime) } }
-        Button("Trim end to playhead") { if let id = model.selectedClipID { model.editTiming(id: id, operation: .trimEnd, seconds: model.timelineTime) } }
+        Group {
+            Button("Cut") { model.deleteClip(cutting: true) }
+            Button("Duplicate", action: model.duplicateClip)
+            Button("Trim start to playhead") { if let id = model.selectedClipID { model.editTiming(id: id, operation: .trimStart, seconds: model.timelineTime) } }
+            Button("Trim end to playhead") { if let id = model.selectedClipID { model.editTiming(id: id, operation: .trimEnd, seconds: model.timelineTime) } }
+        }
+        .disabled(!model.canEditSelection)
         if model.selectedClip?.embeddedAudio != nil {
             Button("Separate audio", systemImage: "waveform", action: model.separateAudio).disabled(!model.canEditSelection)
         }
+    }
+
+    private func openLayerColorPicker(for trackID: UUID) {
+        editingLayerColor = model.project.timeline.tracks.first { $0.id == trackID }
     }
 
     private func openReplacement() {

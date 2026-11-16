@@ -70,6 +70,71 @@ struct LayerControls: View {
     }
 }
 
+struct LayerColorPicker: View {
+    let track: TimelineTrack
+    let onChoose: (TimelineTrackColor?) -> Void
+    @Environment(\.dismiss) private var dismiss
+
+    var body: some View {
+        NavigationStack {
+            ScrollView {
+                VStack(alignment: .leading, spacing: AppSpacing.standard) {
+                    Text(track.layerDisplayName)
+                        .font(.headline)
+                        .foregroundStyle(AppColors.textSecondary)
+                    LazyVGrid(columns: [GridItem(.adaptive(minimum: 64), spacing: AppSpacing.small)],
+                              spacing: AppSpacing.small) {
+                        swatch(nil)
+                        ForEach(TimelineTrackColor.allCases, id: \.self) { color in
+                            swatch(color)
+                        }
+                    }
+                }
+                .frame(maxWidth: 480)
+                .padding(AppSpacing.standard)
+                .frame(maxWidth: .infinity)
+            }
+            .navigationTitle("Layer color")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar { Button("Done") { dismiss() } }
+        }
+        .preferredColorScheme(.dark)
+    }
+
+    private func swatch(_ color: TimelineTrackColor?) -> some View {
+        let tint = Color(uiColor: color?.tint ?? TimelineTheme.tint(for: track.kind))
+        let title = color?.title ?? String(localized: "Default")
+        let isSelected = color == track.labelColor
+        return Button {
+            onChoose(color)
+            dismiss()
+        } label: {
+            VStack(spacing: AppSpacing.small) {
+                Circle()
+                    .fill(tint)
+                    .frame(width: 32, height: 32)
+                    .overlay {
+                        if isSelected {
+                            Image(systemName: "checkmark")
+                                .font(.system(size: 13, weight: .bold))
+                                .foregroundStyle(.black)
+                        }
+                    }
+                    .accessibilityHidden(true)
+                Text(title)
+                    .font(.caption)
+                    .foregroundStyle(AppColors.textPrimary)
+            }
+            .padding(.vertical, AppSpacing.small)
+            .frame(maxWidth: .infinity, minHeight: 68)
+            .background(isSelected ? AppColors.surfacePressed : AppColors.surfaceRaised,
+                        in: RoundedRectangle(cornerRadius: AppCornerRadius.control))
+        }
+        .buttonStyle(.plain)
+        .accessibilityAddTraits(isSelected ? .isSelected : [])
+    }
+}
+
 struct VideoTransformPanel: View {
     @State var clip: VideoClip
     let apply: (VideoClip) -> Void

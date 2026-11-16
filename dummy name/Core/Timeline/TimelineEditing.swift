@@ -6,23 +6,32 @@ enum TimelineGestureEdit: String { case move = "Move", trimStart = "Trim Start",
 /// Phase 3 deliberately supports non-overlapping main-track clips from the imported
 /// asset. Other layers must wait for the compositing milestone, not be ignored.
 enum TimelineEditing {
+    static func setClipLocked(_ locked: Bool, id: UUID, in project: inout VideoProject) throws {
+        guard let trackIndex = project.timeline.tracks.firstIndex(where: { track in
+            track.items.contains { $0.id == id }
+        }), let itemIndex = project.timeline.tracks[trackIndex].items.firstIndex(where: { $0.id == id }) else { return }
+        guard !project.timeline.tracks[trackIndex].isLocked else {
+            throw TimelineError.invalid(String(localized: "Unlock the clip and its track before editing."))
+        }
+        let item = project.timeline.tracks[trackIndex].items[itemIndex]
+        guard item.placement.isLocked != locked else { return }
+        var placement = item.placement
+        placement.isLocked = locked
+        project.timeline.tracks[trackIndex].items[itemIndex] = item.withPlacement(placement)
+    }
+
     /// Ripple deletion also closes pre-existing empty sections on the main track.
     static func deleteClosingGaps(_ id: UUID, in project: inout VideoProject) throws {
         let original = try editable(id, in: project)
-        let ordered = try clips(in: project).filter { $0.placement.trackID == original.placement.trackID }
         var candidate = project
         try replace(id, with: [], in: &candidate)
-        if project.timeline.tracks.first(where: { $0.id == original.placement.trackID })?.kind != .mainVideo {
-            project = candidate; return
+        if let index = candidate.timeline.tracks.firstIndex(where: { $0.id == original.placement.trackID }),
+           candidate.timeline.tracks[index].ripplesTrimsAndDeletes {
+            try pack(trackAt: index, in: &candidate)
         }
-        var cursor = TimelineTime.zero
-        for var clip in ordered where clip.id != id {
-            if clip.placement.timelineStart != cursor {
-                clip.placement.timelineStart = cursor
-                try replace(clip.id, with: [clip], in: &candidate)
-            }
-            cursor = try cursor.adding(clip.placement.duration)
-        }
+        // Validate only after the cut list reflects the finished ripple. This
+        // removes transitions touching a deleted clip and moves surviving cuts.
+        try TimelineTransitionEditing.reconcile(in: &candidate)
         _ = try clips(in: candidate)
         project = candidate
     }
@@ -213,7 +222,7 @@ enum TimelineEditing {
     /// kind when no destination is given.
     ///
     /// Video keeps its own path above, including its overlay stacking rules.
-    /// Audio, text and shapes share a plain non-overlapping sequence per row.
+    /// Audio, text, shapes and cameras share a plain non-overlapping sequence per row.
     static func moveToLayer(_ id: UUID, destinationTrackID: UUID?, newTrackIndex: Int? = nil,
                             at time: TimelineTime, in project: inout VideoProject) throws {
         guard let item = project.timeline.item(id: id) else {
@@ -323,7 +332,7 @@ enum TimelineEditing {
         var result: [VideoClip] = []
         for track in project.timeline.tracks {
             if track.kind == .audio { try AudioEditing.validate(track); continue }
-            if track.kind == .text || track.kind == .shape { continue }
+            if track.kind.usesOverlayTiming { continue }
             guard track.kind == .mainVideo || track.kind == .videoOverlay else {
                 throw TimelineError.invalid(String(localized: "Only video, audio and drawn overlay tracks are supported."))
             }
@@ -442,7 +451,8 @@ enum TimelineEditing {
         let seam = try original.placement.timelineStart.adding(left.placement.duration)
         right.placement = .init(
             id: UUID(), trackID: original.placement.trackID, timelineStart: seam,
-            duration: try right.timelineDuration(forSourceDuration: right.sourceRange.duration)
+            duration: try right.timelineDuration(forSourceDuration: right.sourceRange.duration),
+            cameraDepth: original.placement.cameraDepth
         )
         // Same rule as text: keep the whole curve on both halves and move the window.
         right.shiftAnimationWindow(by: left.placement.duration)
@@ -468,7 +478,7 @@ enum TimelineEditing {
         try trim(id, edge: edge, to: time, clamping: true, in: &candidate)
         let trackID = try editable(id, in: candidate).placement.trackID
         guard let index = candidate.timeline.tracks.firstIndex(where: { $0.id == trackID }),
-              candidate.timeline.tracks[index].kind == .mainVideo else {
+              candidate.timeline.tracks[index].ripplesTrimsAndDeletes else {
             project = candidate; return
         }
         // Packed before anything validates the result. Growing a clip on a
@@ -513,7 +523,7 @@ enum TimelineEditing {
         // clip has been moved to zero. Persisted positions never are negative.
         // The main row also packs later clips after its length changes.
         let ripples = clamping && project.timeline.tracks
-            .first { $0.id == clip.placement.trackID }?.kind == .mainVideo
+            .first { $0.id == clip.placement.trackID }?.ripplesTrimsAndDeletes == true
         if clamping {
             let others = try clips(in: project).filter { $0.id != id && $0.placement.trackID == clip.placement.trackID }
             guard let asset = project.assets.first(where: { $0.id == clip.assetID }) else { throw TimelineError.invalid(String(localized: "Missing source.")) }
@@ -912,7 +922,8 @@ enum TimelineEditing {
               !project.timeline.tracks[index].isLocked else { throw TimelineError.invalid(String(localized: "Unlock the main track before pasting.")) }
         var clip = copied
         clip.placement = .init(id: UUID(), trackID: project.timeline.tracks[index].id,
-            timelineStart: try snapped(max(.zero, time), frame: project.canvas.frameDuration), duration: copied.placement.duration)
+            timelineStart: try snapped(max(.zero, time), frame: project.canvas.frameDuration),
+            duration: copied.placement.duration, cameraDepth: copied.placement.cameraDepth)
         project.timeline.tracks[index].items.append(.video(clip))
         return clip.id
     }

@@ -6,8 +6,7 @@ import SwiftUI
 /// not shrink rigid children — it lays them out at the size they asked for and
 /// lets the ones at the end fall off the bottom. So the two of them together
 /// have to be checked against the window, or the mode bar goes off screen,
-/// taking the first-run "preparing layers" notice with it. That is exactly what
-/// happened when the timeline gained its toolbar.
+/// which contains the editor’s main tools.
 ///
 /// Everything here is arithmetic over constants that the views themselves fix,
 /// which is what makes it testable: `EditorWorkspaceBudgetTests` asserts the
@@ -25,12 +24,6 @@ enum EditorWorkspaceBudget {
     static let transport: CGFloat = 44
     /// `modeButtons` fixes its own height.
     static let modeButtons: CGFloat = 52
-    /// The first-run compositor warm-up notice under the mode bar: two lines of
-    /// `caption2` plus its bottom padding. Budgeted because a new user has to
-    /// be able to read it — it is the only thing on screen explaining a minute
-    /// of shader compilation — but not over-budgeted, because every point
-    /// reserved here is a point the timeline does not get.
-    static let warmupNotice: CGFloat = 36
     /// Enough tool panel to keep its action row and hint line on screen. The
     /// panel ends in a `Spacer`, so anything above this it gives up for free.
     static let minimumInspector: CGFloat = 72
@@ -41,14 +34,13 @@ enum EditorWorkspaceBudget {
     /// Everything in the tall layout that is neither the picture nor the
     /// timeline: header, both handles, transport, a usable tool panel and the
     /// whole mode bar.
-    static func chrome(showsTimeline: Bool, showsWarmupNotice: Bool) -> CGFloat {
+    static func chrome(showsTimeline: Bool) -> CGFloat {
         header
             + divider                              // under the picture
             + transport
             + (showsTimeline ? divider : 0)        // under the timeline
             + minimumInspector
             + modeButtons
-            + (showsWarmupNotice ? warmupNotice : 0)
     }
 
     // MARK: - Ceilings
@@ -60,17 +52,16 @@ enum EditorWorkspaceBudget {
     /// two-thirds of an iPad's height was enough on its own to push the mode
     /// bar off the bottom.
     static func previewCeiling(height: CGFloat, floor: CGFloat,
-                               showsTimeline: Bool, showsWarmupNotice: Bool) -> CGFloat {
+                               showsTimeline: Bool) -> CGFloat {
         guard showsTimeline else { return max(floor, height * 0.72) }
-        let available = height - chrome(showsTimeline: true, showsWarmupNotice: showsWarmupNotice) - minimumTimeline
+        let available = height - chrome(showsTimeline: true) - minimumTimeline
         return max(floor, min(height * 0.72, available))
     }
 
     /// The most the timeline may take before it starts pushing the mode bar off
     /// the bottom of the screen.
-    static func timelineCeiling(height: CGFloat, previewHeight: CGFloat,
-                                showsWarmupNotice: Bool) -> CGFloat {
+    static func timelineCeiling(height: CGFloat, previewHeight: CGFloat) -> CGFloat {
         max(minimumTimeline,
-            height - previewHeight - chrome(showsTimeline: true, showsWarmupNotice: showsWarmupNotice))
+            height - previewHeight - chrome(showsTimeline: true))
     }
 }

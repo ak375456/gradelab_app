@@ -5,6 +5,7 @@ import QuartzCore
 
 @MainActor
 final class VideoPlaybackController: ObservableObject {
+    /// A play request stays active while AVPlayer waits for frames.
     @Published private(set) var isPlaying = false
     @Published private(set) var currentTime: Double = 0
     @Published private(set) var duration: Double
@@ -18,12 +19,11 @@ final class VideoPlaybackController: ObservableObject {
 
     private let output: AVPlayerItemVideoOutput
     private var periodicTimeObserver: Any?
-    private var endObserver: NSObjectProtocol?
+    private var itemObservers: [NSObjectProtocol] = []
     private var interruptionObserver: NSObjectProtocol?
     private var routeChangeObserver: NSObjectProtocol?
     private var statusObservation: AnyCancellable?
     private var wasPlayingBeforeInterruption = false
-    private var wantsPlayback = false
     private var pendingSeekTask: Task<Void, Never>?
     private var pendingInteractiveTime: CMTime?
     private var preciseSeekTask: Task<Void, Never>?
@@ -71,7 +71,7 @@ final class VideoPlaybackController: ObservableObject {
     /// to the existing item is all it takes — the asset, the item and the player
     /// are untouched, so there is no reload and no gap in the audio.
     private func updatePreviewComposition() {
-        guard let item = player.currentItem, let fullVideoComposition else { return }
+        guard errorMessage == nil, let item = player.currentItem, let fullVideoComposition else { return }
         let reduced = isPlaying ? reducedComposition : nil
         let target = reduced ?? fullVideoComposition
         // Compared by identity, not by "is it reduced": changing the quality
@@ -84,7 +84,7 @@ final class VideoPlaybackController: ObservableObject {
         item.videoComposition = target
         // Coming back to full resolution has to repaint the still: nothing else
         // will, and the frame on screen was rendered at the smaller size.
-        if reduced == nil, !isSeeking, pendingSeekTask == nil,
+        if !isPlaying, !isSeeking, pendingSeekTask == nil,
            item.status == .readyToPlay {
             seekPrecisely(to: currentTime)
         }
@@ -164,7 +164,8 @@ final class VideoPlaybackController: ObservableObject {
     func replaceSequence(_ sequence: SequenceComposition, at time: Double) {
         pause()
         if let observer = periodicTimeObserver { player.removeTimeObserver(observer); periodicTimeObserver = nil }
-        if let observer = endObserver { NotificationCenter.default.removeObserver(observer); endObserver = nil }
+        itemObservers.forEach(NotificationCenter.default.removeObserver)
+        itemObservers.removeAll()
         statusObservation = nil
         player.currentItem?.remove(output)
         let item = AVPlayerItem(asset: sequence.source.asset)
@@ -263,14 +264,14 @@ final class VideoPlaybackController: ObservableObject {
     /// Pausing retains the decoder and custom compositor. Release them while
     /// exporting, but keep the playhead and duration for the editor underneath.
     func releaseSequenceResources() {
+        // The item is about to go away, so there is no paused frame to render.
+        fullVideoComposition = nil
         pause()
-        pendingSeekTask?.cancel(); pendingSeekTask = nil
-        preciseSeekTask?.cancel(); preciseSeekTask = nil
         if let observer = periodicTimeObserver { player.removeTimeObserver(observer); periodicTimeObserver = nil }
-        if let observer = endObserver { NotificationCenter.default.removeObserver(observer); endObserver = nil }
+        itemObservers.forEach(NotificationCenter.default.removeObserver)
+        itemObservers.removeAll()
         statusObservation = nil
         isReady = false
-        fullVideoComposition = nil
         playbackVideoCompositions = [:]
         appliedVideoComposition = nil
         isPreviewReduced = false
@@ -313,9 +314,7 @@ final class VideoPlaybackController: ObservableObject {
         if let periodicTimeObserver {
             player.removeTimeObserver(periodicTimeObserver)
         }
-        if let endObserver {
-            NotificationCenter.default.removeObserver(endObserver)
-        }
+        itemObservers.forEach(NotificationCenter.default.removeObserver)
         if let interruptionObserver {
             NotificationCenter.default.removeObserver(interruptionObserver)
         }
@@ -337,28 +336,23 @@ final class VideoPlaybackController: ObservableObject {
     }
 
     func play() {
-        guard errorMessage == nil else { return }
-        wantsPlayback = true
+        guard !isPlaying, errorMessage == nil, player.currentItem != nil else { return }
+        isPlaying = true
+        updatePreviewComposition()
         activateAudioSession()
-        // A seek now stops one frame short of the end, so the threshold has to
-        // clear a frame as well or play would resume on the last frame instead
-        // of starting over.
         if currentTime >= seekBounds.endThreshold {
-            seekPrecisely(to: minimumTime) { [weak self] in
-                guard let self, self.wantsPlayback else { return }
-                self.player.play()
-                self.isPlaying = true
-                self.updatePreviewComposition()
-            }
-        } else {
+            isSeeking = true
+            seekPrecisely(to: minimumTime) { [weak self] in self?.isSeeking = false }
+        } else if preciseSeekTask == nil {
             player.play()
-            isPlaying = true
-            updatePreviewComposition()
         }
     }
 
     func pause() {
-        wantsPlayback = false
+        stopPlayback(deactivatesAudioSession: true)
+    }
+
+    private func stopPlayback(deactivatesAudioSession: Bool) {
         pendingSeekTask?.cancel()
         preciseSeekTask?.cancel()
         pendingSeekTask = nil
@@ -368,7 +362,7 @@ final class VideoPlaybackController: ObservableObject {
         player.pause()
         isPlaying = false
         updatePreviewComposition()
-        deactivateAudioSession()
+        if deactivatesAudioSession { deactivateAudioSession() }
     }
 
     /// Touching the playhead stops playback, and it stays stopped.
@@ -434,6 +428,7 @@ final class VideoPlaybackController: ObservableObject {
             self.frameProvider.clear()
             self.preciseSeekTask = nil
             completion?()
+            if self.isPlaying, self.preciseSeekTask == nil { self.player.play() }
         }
     }
 
@@ -458,12 +453,7 @@ final class VideoPlaybackController: ObservableObject {
                         self.frameProvider.clear()
                         self.frameUpdateID &+= 1
                     case .failed:
-                        self.isReady = false
-                        #if DEBUG
-                        if let error = item.error { print("Playback preparation failed: \(error as NSError)") }
-                        #endif
-                        self.errorMessage = "This video could not be prepared for playback."
-                        self.pause()
+                        self.reportPlaybackFailure(item.error)
                     case .unknown:
                         self.isReady = false
                     @unknown default:
@@ -479,31 +469,42 @@ final class VideoPlaybackController: ObservableObject {
                 if !self.isSeeking {
                     self.currentTime = max(0, time.seconds.isFinite ? time.seconds : 0)
                 }
-                let wasPlaying = self.isPlaying
-                self.isPlaying = self.player.timeControlStatus == .playing
-                if self.currentTime >= self.duration, self.isPlaying { self.pause() }
-                // Playback can also stop without anyone calling pause -- a stall,
-                // or the end of the item. The picture has to come back to full
-                // resolution either way.
-                else if wasPlaying != self.isPlaying { self.updatePreviewComposition() }
-                self.isReady = item.status == .readyToPlay
-                if item.status == .failed {
-                    self.errorMessage = "This video could not be prepared for playback."
-                }
+                // A buffer wait leaves the play request and its preview
+                // composition in place. Replacing it here restarts decoding.
             }
         }
-        endObserver = NotificationCenter.default.addObserver(
+        itemObservers.append(NotificationCenter.default.addObserver(
             forName: .AVPlayerItemDidPlayToEndTime,
             object: item,
             queue: .main
         ) { [weak self, weak item] _ in
             MainActor.assumeIsolated {
-                guard let self, let item, self.player.currentItem === item else { return }
-                self.isPlaying = false
+                guard let self, let item, self.player.currentItem === item, !self.isSeeking else { return }
                 self.currentTime = self.duration
-                self.updatePreviewComposition()
+                self.pause()
             }
-        }
+        })
+        itemObservers.append(NotificationCenter.default.addObserver(
+            forName: .AVPlayerItemFailedToPlayToEndTime,
+            object: item,
+            queue: .main
+        ) { [weak self, weak item] notification in
+            let error = notification.userInfo?[AVPlayerItemFailedToPlayToEndTimeErrorKey] as? NSError
+            MainActor.assumeIsolated {
+                guard let self, let item, self.player.currentItem === item else { return }
+                self.reportPlaybackFailure(error ?? item.error)
+            }
+        })
+    }
+
+    private func reportPlaybackFailure(_ error: Error?) {
+        guard errorMessage == nil else { return }
+        #if DEBUG
+        if let error { print("Playback failed: \(error as NSError)") }
+        #endif
+        isReady = false
+        errorMessage = String(localized: "This video could not be prepared for playback.")
+        pause()
     }
 
     private func installAudioObservers() {
@@ -558,9 +559,7 @@ final class VideoPlaybackController: ObservableObject {
         switch type {
         case .began:
             wasPlayingBeforeInterruption = isPlaying
-            wantsPlayback = false
-            player.pause()
-            isPlaying = false
+            stopPlayback(deactivatesAudioSession: false)
         case .ended:
             let rawOptions = notification.userInfo?[AVAudioSessionInterruptionOptionKey] as? UInt ?? 0
             let shouldResume = AVAudioSession.InterruptionOptions(rawValue: rawOptions)

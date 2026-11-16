@@ -50,12 +50,27 @@ extension SequenceComposition {
         }
         let clips = try TimelineEditing.clips(in: project)
         guard project.timeline.duration > .zero, let cadence = project.canvas.frameDuration else { throw TimelineError.invalid(String(localized: "Add media before playback.")) }
-        // The layer compositor has its own Metal context during preview, while
-        // export supplies the exporter's context. Load every referenced look
-        // into the context that will actually execute the grade before the
-        // first composition frame is requested.
+        let resources = try CompositorResources.shared(supplied: context)
+        let stillAssets = Set(project.assets.filter { $0.stillImage != nil }.map(\.id))
+        let enabledTracks = Set(project.timeline.tracks.lazy.filter(\.isEnabled).map(\.id))
+        let visibleClips = clips.filter { $0.placement.isEnabled && enabledTracks.contains($0.placement.trackID) }
+        let visibleClipIDs = Set(visibleClips.map(\.id))
+        let hasDrawnLayers = project.timeline.tracks.contains { track in
+            track.isEnabled && (track.kind == .text || track.kind == .shape)
+                && track.items.contains(where: \.placement.isEnabled)
+        }
+        let plan = CompositorResources.PipelinePlan(
+            mode: project.colorMode,
+            hasVideo: visibleClips.contains { !stillAssets.contains($0.assetID) },
+            hasStills: visibleClips.contains { stillAssets.contains($0.assetID) },
+            hasTransitions: project.timeline.transitions.contains {
+                $0.enabled && visibleClipIDs.contains($0.outgoingClipID) && visibleClipIDs.contains($0.incomingClipID)
+            },
+            hasDrawnLayers: hasDrawnLayers)
+        async let preparePipelines: Void = resources.prepare(plan)
+        // Load referenced looks into the same context that will render them.
         let lookIdentifiers = Set(clips.compactMap { $0.gradeSettings.advanced?.lut })
-        _ = await CompositorResources.prepareLooks(lookIdentifiers, context: context)
+        _ = await CompositorResources.prepareLooks(lookIdentifiers, resources: resources)
         try Task.checkCancellation()
         let composition = AVMutableComposition()
         var sources: [UUID: ExportSourceInfo] = [:]
@@ -127,14 +142,49 @@ extension SequenceComposition {
             let lead = try incomingTransition.map {
                 try TimelineTime(CMTimeMultiplyByRatio($0.duration.cmTime, multiplier: 1, divisor: 2))
             } ?? .zero
-            let sourceLead = try ClipSpeed.sourceDuration(timelineDuration: lead, speed: clip.speed)
-            let sourceTail = try ClipSpeed.sourceDuration(timelineDuration: tail, speed: clip.speed)
-            let extendedSourceStart = try clip.sourceRange.start.subtracting(sourceLead)
-            let extendedSourceDuration = try clip.sourceRange.duration.adding(sourceLead).adding(sourceTail)
-            let extendedTimelineStart = try clip.placement.timelineStart.subtracting(lead)
-            let extendedTimelineDuration = try clip.placement.duration.adding(lead).adding(tail)
-            let video = try decoderTrack(assetID: clip.assetID, start: extendedTimelineStart.cmTime,
-                end: CMTimeAdd(extendedTimelineStart.cmTime, extendedTimelineDuration.cmTime), slots: &videoSlots)
+            let scheduledStart = try clip.placement.timelineStart.subtracting(lead)
+            let scheduledEnd = try clip.placement.range.end.adding(tail)
+            let video = try decoderTrack(assetID: clip.assetID, start: scheduledStart.cmTime,
+                                         end: scheduledEnd.cmTime, slots: &videoSlots)
+
+            let mediaBounds = media.map {
+                CMTimeRangeGetIntersection($0.sourceRange.cmTimeRange, otherRange: source.videoTimeRange)
+            } ?? source.videoTimeRange
+            func motionHandle(_ requested: TimelineTime, available: CMTime) throws
+                -> (source: TimelineTime, timeline: TimelineTime) {
+                guard requested > .zero else { return (.zero, .zero) }
+                let wanted = try ClipSpeed.sourceDuration(timelineDuration: requested, speed: clip.speed)
+                let media = try TimelineTime(CMTimeMaximum(.zero, available))
+                let length = min(wanted, media)
+                guard length > .zero else { return (.zero, .zero) }
+                if length == wanted { return (length, requested) }
+                let time = min(requested, try ClipSpeed.timelineDuration(sourceDuration: length, speed: clip.speed))
+                return time > .zero ? (length, time) : (.zero, .zero)
+            }
+            let movingLead = try motionHandle(lead, available: CMTimeSubtract(clip.sourceRange.start.cmTime, mediaBounds.start))
+            let movingTail = try motionHandle(tail, available: CMTimeSubtract(mediaBounds.end, try clip.sourceRange.end.cmTime))
+            let heldLead = try lead.subtracting(movingLead.timeline)
+            let heldTail = try tail.subtracting(movingTail.timeline)
+            let extendedSourceStart = try clip.sourceRange.start.subtracting(movingLead.source)
+            let extendedSourceDuration = try clip.sourceRange.duration.adding(movingLead.source).adding(movingTail.source)
+            let extendedTimelineStart = try clip.placement.timelineStart.subtracting(movingLead.timeline)
+            let extendedTimelineDuration = try clip.placement.duration.adding(movingLead.timeline).adding(movingTail.timeline)
+            let needsCadence = media?.frameDuration == nil && (heldLead > .zero || heldTail > .zero || clip.smoothsMotion)
+            let loadedMinFrameDuration = needsCadence ? (try? await source.videoTrack.load(.minFrameDuration)) : nil
+            let sourceFrameDuration = media?.frameDuration?.cmTime
+                ?? loadedMinFrameDuration.flatMap { $0.isNumeric && $0 > .zero ? $0 : nil }
+
+            // Full-length clips can still participate in a centered transition.
+            // Stretch only the decoder's edge sample into the unavailable part.
+            // The actual clip placement, its source edit and its audio are unchanged.
+            let frameDuration = CMTimeMinimum(sourceFrameDuration ?? cadence.cmTime, extendedSourceDuration.cmTime)
+            func insertHeldFrame(from start: CMTime, at time: CMTime, duration: TimelineTime) throws {
+                guard duration > .zero else { return }
+                try video.insertTimeRange(CMTimeRange(start: start, duration: frameDuration),
+                                          of: source.videoTrack, at: time)
+                video.scaleTimeRange(CMTimeRange(start: time, duration: frameDuration), toDuration: duration.cmTime)
+            }
+            try insertHeldFrame(from: extendedSourceStart.cmTime, at: scheduledStart.cmTime, duration: heldLead)
             try video.insertTimeRange(
                 CMTimeRange(start: extendedSourceStart.cmTime, duration: extendedSourceDuration.cmTime),
                 of: source.videoTrack, at: extendedTimelineStart.cmTime)
@@ -157,14 +207,14 @@ extension SequenceComposition {
                 // they adjoin, which is the rate the picture is actually moving
                 // at where the dissolve begins.
                 var pieces: [RetimeSegment] = []
-                if sourceLead > .zero, let first = rampSegments.first {
-                    pieces.append(RetimeSegment(sourceOffset: .zero, sourceDuration: sourceLead,
-                                                timelineDuration: lead > .zero ? lead : first.timelineDuration))
+                if movingLead.source > .zero {
+                    pieces.append(RetimeSegment(sourceOffset: .zero, sourceDuration: movingLead.source,
+                                                timelineDuration: movingLead.timeline))
                 }
                 pieces.append(contentsOf: rampSegments)
-                if sourceTail > .zero, let last = rampSegments.last {
-                    pieces.append(RetimeSegment(sourceOffset: .zero, sourceDuration: sourceTail,
-                                                timelineDuration: tail > .zero ? tail : last.timelineDuration))
+                if movingTail.source > .zero {
+                    pieces.append(RetimeSegment(sourceOffset: .zero, sourceDuration: movingTail.source,
+                                                timelineDuration: movingTail.timeline))
                 }
                 TimeMap.applySegments(pieces, to: video, startingAt: extendedTimelineStart.cmTime)
             } else if clip.isRetimed {
@@ -174,6 +224,10 @@ extension SequenceComposition {
                     toDuration: extendedTimelineDuration.cmTime
                 )
             }
+            let endSampleStart = CMTimeSubtract(CMTimeAdd(extendedSourceStart.cmTime, extendedSourceDuration.cmTime),
+                                                frameDuration)
+            let motionEnd = try clip.placement.range.end.adding(movingTail.timeline)
+            try insertHeldFrame(from: endSampleStart, at: motionEnd.cmTime, duration: heldTail)
             ids[clip.id] = video.trackID
 
             // Smoothing needs the NEXT source frame as well as the current one,
@@ -187,12 +241,7 @@ extension SequenceComposition {
             // from the track and the other from the asset lets them disagree on
             // a variable-frame-rate source, and the dissolve then runs on the
             // wrong ramp.
-            let loadedMinFrameDuration = try? await source.videoTrack.load(.minFrameDuration)
-            let blendFrameDuration = media?.frameDuration?.cmTime
-                ?? (loadedMinFrameDuration?.isNumeric == true && loadedMinFrameDuration! > .zero
-                    ? loadedMinFrameDuration : nil)
-            if clip.smoothsMotion,
-               let frameDuration = blendFrameDuration, frameDuration > .zero {
+            if clip.smoothsMotion, let frameDuration = sourceFrameDuration, frameDuration > .zero {
                 let shifted = CMTimeAdd(clip.sourceRange.start.cmTime, frameDuration)
                 let available = CMTimeSubtract(source.videoTimeRange.end, shifted)
                 let duration = CMTimeMinimum(clip.sourceRange.duration.cmTime, available)
@@ -312,7 +361,9 @@ extension SequenceComposition {
             }
             try Task.checkCancellation()
         }
-        let state = LayerRenderState(project, context: context, forExport: forExport)
+        try await preparePipelines
+        try Task.checkCancellation()
+        let state = LayerRenderState(project, resources: resources, forExport: forExport)
         if videos.isEmpty {
             guard let clock = composition.addMutableTrack(withMediaType: .video, preferredTrackID: kCMPersistentTrackID_Invalid) else { throw TimelineError.invalid(String(localized: "Could not create image timeline.")) }
             clock.insertEmptyTimeRange(CMTimeRange(start: .zero, duration: project.timeline.duration.cmTime))
@@ -415,9 +466,13 @@ extension SequenceComposition {
         // does — every layer is a full-canvas read and write — so the reduced
         // copies matter most here. The custom compositor normalises to whatever
         // canvas it is handed, so only the render size changes.
+        // A transition can decode and grade two pictures per frame. Give
+        // Medium playback more headroom without changing cadence or switching
+        // render contexts mid-cut.
         let playbackCompositions = forExport
             ? [:]
-            : Self.playbackCompositions(base: vc, scalingTrack: nil)
+            : Self.playbackCompositions(base: vc, scalingTrack: nil,
+                mediumLongEdgeLimit: project.timeline.transitions.contains(where: \.enabled) ? 1280 : nil)
         try await routing.prepareDucking(project, composition: composition)
         return Self(source: .init(asset: composition, videoTrack: videos[0], encodedWidth: Int(renderSize.width),
             encodedHeight: Int(renderSize.height), duration: range.duration, videoTimeRange: range, sessionStartTime: .zero,

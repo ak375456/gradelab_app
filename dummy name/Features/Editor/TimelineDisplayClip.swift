@@ -5,13 +5,12 @@ struct TimelineDisplayClip: Identifiable {
     let placement: ItemPlacement
     let assetID: UUID
     let sourceRange: TimelineRange
-    let isAudio: Bool
-    let isText: Bool
-    let isShape: Bool
-    /// Text and shapes: rows the app draws rather than reads from media. They
-    /// share every timeline behaviour — no filmstrip, a short row, and free
-    /// movement across the whole timeline rather than within one track.
-    var isDrawnOverlay: Bool { isText || isShape }
+    let kind: TimelineTrack.Kind
+    var isAudio: Bool { kind == .audio }
+    var isText: Bool { kind == .text }
+    var isShape: Bool { kind == .shape }
+    var isCamera: Bool { kind == .camera }
+    var usesOverlayTiming: Bool { kind.usesOverlayTiming }
     var title: String? = nil
     let isMuted: Bool
     let embeddedAudio: EmbeddedAudio?
@@ -31,10 +30,11 @@ struct TimelineDisplayClip: Identifiable {
     var id: UUID { placement.id }
     init?(_ item: TimelineItem) {
         placement = item.placement
+        kind = item.trackKind
         switch item {
         case .video(let c):
             keyframeTimes = c.allVisibleKeyframeSeconds
-            assetID = c.assetID; sourceRange = c.sourceRange; isAudio = false; isText = false; isShape = false
+            assetID = c.assetID; sourceRange = c.sourceRange
             isMuted = c.embeddedAudio?.isMuted ?? false; embeddedAudio = c.embeddedAudio
             speed = c.speed
             timeMap = c.isRamped || c.isReversed ? c.timeMap : nil
@@ -45,7 +45,7 @@ struct TimelineDisplayClip: Identifiable {
             } ?? (0, 0)
         case .audio(let c):
             keyframeTimes = []
-            assetID = c.assetID; sourceRange = c.sourceRange; isAudio = true; isText = false; isShape = false
+            assetID = c.assetID; sourceRange = c.sourceRange
             isMuted = c.isMuted; embeddedAudio = nil
             speed = 1; timeMap = nil; isRamped = false; isReversed = false
             fade = AudioFade.resolved(duration: c.placement.duration.seconds,
@@ -53,15 +53,19 @@ struct TimelineDisplayClip: Identifiable {
         case .text(let c):
             keyframeTimes = c.visibleKeyframeSeconds
             assetID = c.id; sourceRange = .init(start: .zero, duration: c.placement.duration)
-            isAudio = false; isText = true; isShape = false
             title = c.text.isEmpty ? "Text" : c.text.replacingOccurrences(of: "\n", with: " ")
             isMuted = false; embeddedAudio = nil; speed = 1; fade = (0, 0)
             timeMap = nil; isRamped = false; isReversed = false
         case .shape(let c):
             keyframeTimes = c.visibleKeyframeSeconds
             assetID = c.id; sourceRange = .init(start: .zero, duration: c.placement.duration)
-            isAudio = false; isText = false; isShape = true
             title = c.kind.title
+            isMuted = false; embeddedAudio = nil; speed = 1; fade = (0, 0)
+            timeMap = nil; isRamped = false; isReversed = false
+        case .camera(let c):
+            keyframeTimes = c.visibleKeyframeSeconds
+            assetID = c.id; sourceRange = .init(start: .zero, duration: c.placement.duration)
+            title = String(localized: "Camera")
             isMuted = false; embeddedAudio = nil; speed = 1; fade = (0, 0)
             timeMap = nil; isRamped = false; isReversed = false
         }

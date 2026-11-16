@@ -4,6 +4,37 @@ import XCTest
 @testable import GradeLab
 
 final class AppleLogCompositorTests: XCTestCase {
+    func testCameraCropIsIdenticalInWholeAndTiledAppleLog() throws {
+        let source = try AppleLogLayerHarness.rawFrame()
+        let size = CGSize(width: 64, height: 32)
+        let duration = try TimelineTime.seconds(1)
+        var clip = VideoClip(placement: .init(id: UUID(), trackID: UUID(), timelineStart: .zero, duration: duration),
+                             assetID: UUID(), sourceRange: .init(start: .zero, duration: duration))
+        clip.camera = ClipCamera(mode: .crop, y: 0, cropHeight: 0.5)
+        let placement = ClipPicturePlacement(clip: clip, encoded: size, preferred: .identity, canvas: size)
+        let original = try harness.render(source)
+        let cropped = try harness.render(source, camera: placement)
+        let tiled = try harness.render(source, tile: 13, camera: placement)
+        XCTAssertEqual(cropped.working, tiled.working)
+        XCTAssertEqual(cropped.working[(16 * 64 + 32) * 4], original.working[(8 * 64 + 32) * 4])
+        XCTAssertEqual(cropped.working[(26 * 64 + 32) * 4], 0)
+    }
+
+    func testSceneCameraApertureMatchesInWholeAndTiledAppleLog() throws {
+        let source = try AppleLogLayerHarness.rawFrame()
+        var camera = SceneCameraPosition()
+        camera.frameWidth = 0.75
+        camera.frameHeight = 0.5
+        let aperture = camera.frame(in: CGSize(width: 64, height: 32))
+        let original = try harness.render(source)
+        let framed = try harness.render(source, sceneFrame: aperture)
+        let tiled = try harness.render(source, tile: 13, sceneFrame: aperture)
+        XCTAssertEqual(framed.working, tiled.working)
+        XCTAssertEqual(framed.working[(16 * 64 + 32) * 4], original.working[(16 * 64 + 32) * 4])
+        XCTAssertEqual(framed.working[(16 * 64 + 4) * 4], 0)
+        XCTAssertEqual(framed.working[(25 * 64 + 32) * 4], 0)
+    }
+
     func testStabilizationUsesOriginalLogSamplesInWholeAndTiledRendering() throws {
         let source = try AppleLogLayerHarness.rawFrame()
         let original = try harness.render(source)

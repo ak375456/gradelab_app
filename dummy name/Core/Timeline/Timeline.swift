@@ -39,14 +39,29 @@ enum TimelineWaveformSize: String, Codable, CaseIterable, Sendable {
     }
 }
 
+enum TimelineTrackColor: String, Codable, CaseIterable, Sendable {
+    case red, orange, yellow, green, teal, blue, purple, pink
+
+    var title: String {
+        switch self {
+        case .red: String(localized: "Red")
+        case .orange: String(localized: "Orange")
+        case .yellow: String(localized: "Yellow")
+        case .green: String(localized: "Green")
+        case .teal: String(localized: "Teal")
+        case .blue: String(localized: "Blue")
+        case .purple: String(localized: "Purple")
+        case .pink: String(localized: "Pink")
+        }
+    }
+}
+
 struct TimelineTrack: Codable, Equatable, Identifiable, Sendable {
     enum Kind: String, Codable, Sendable {
-        case mainVideo, videoOverlay, text, shape, audio
+        case mainVideo, videoOverlay, text, shape, audio, camera
 
-        /// Rows whose picture the app draws rather than reads from media. They
-        /// have no filmstrip and no waveform, so the timeline gives them a
-        /// short row and sizes itself accordingly.
-        var isDrawnOverlay: Bool { self == .text || self == .shape }
+        /// Rows with no source range, filmstrip or waveform.
+        var usesOverlayTiming: Bool { self == .text || self == .shape || self == .camera }
     }
     let id: UUID
     var name: String
@@ -60,6 +75,8 @@ struct TimelineTrack: Codable, Equatable, Identifiable, Sendable {
     /// keeps every project written before row heights readable.
     var heightChoice: TimelineTrackHeightChoice? = nil
     var waveformSize: TimelineWaveformSize? = nil
+    /// A timeline label. Older projects use the default tint for this kind of layer.
+    var labelColor: TimelineTrackColor? = nil
 
     var resolvedHeight: TimelineTrackHeightChoice { heightChoice ?? .regular }
     var resolvedWaveformSize: TimelineWaveformSize { waveformSize ?? .medium }
@@ -88,6 +105,7 @@ struct TimelineTrack: Codable, Equatable, Identifiable, Sendable {
         case .videoOverlay: "Overlay"
         case .text: "Text"
         case .shape: "Shape"
+        case .camera: "Camera"
         case .audio: "Audio"
         }
     }
@@ -100,6 +118,7 @@ struct TimelineTrack: Codable, Equatable, Identifiable, Sendable {
         case "Overlay": String(localized: "Overlay")
         case "Text": String(localized: "Text")
         case "Shape": String(localized: "Shape")
+        case "Camera": String(localized: "Camera")
         case "Audio": String(localized: "Audio")
         default: name
         }
@@ -132,7 +151,7 @@ struct TimelineTrack: Codable, Equatable, Identifiable, Sendable {
             switch item {
             case .audio: true
             case .video(let clip): clip.embeddedAudio != nil
-            case .text, .shape: false
+            case .text, .shape, .camera: false
             }
         }
     }
@@ -142,16 +161,22 @@ struct TimelineTrack: Codable, Equatable, Identifiable, Sendable {
             switch item {
             case .audio(let clip): clip.isMuted
             case .video(let clip): clip.embeddedAudio?.isMuted
-            case .text, .shape: nil
+            case .text, .shape, .camera: nil
             }
         }
         return !states.isEmpty && states.allSatisfy { $0 }
     }
 
+    /// A locked clip keeps its time on the main row, so trims and deletes on
+    /// that row use the available space instead of repacking the clips.
+    var ripplesTrimsAndDeletes: Bool {
+        kind == .mainVideo && !items.contains { $0.placement.isLocked }
+    }
+
     func accepts(_ item: TimelineItem) -> Bool {
         switch (kind, item) {
         case (.mainVideo, .video), (.videoOverlay, .video), (.text, .text),
-             (.shape, .shape), (.audio, .audio): true
+             (.shape, .shape), (.audio, .audio), (.camera, .camera): true
         default: false
         }
     }
@@ -211,9 +236,10 @@ struct Timeline: Codable, Equatable, Sendable {
         transitions = try container.decodeIfPresent([TimelineTransition].self, forKey: .transitions) ?? []
     }
 
-    /// Disabled/locked clips retain their extent. Markers never extend the movie.
+    /// Disabled/locked media retains its extent. Cameras and markers never extend the movie.
     var duration: TimelineTime {
-        tracks.flatMap(\.items).compactMap { try? $0.placement.range.end }.max() ?? .zero
+        tracks.lazy.filter { $0.kind != .camera }.flatMap(\.items)
+            .compactMap { try? $0.placement.range.end }.max() ?? .zero
     }
 
     func videoClip(id: UUID) -> VideoClip? {

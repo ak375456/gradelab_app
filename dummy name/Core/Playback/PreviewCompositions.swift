@@ -31,13 +31,15 @@ extension SequenceComposition {
     ///   handed and therefore needs only the new render size.
     static func playbackCompositions(
         base: AVVideoComposition,
-        scalingTrack: AVAssetTrack?
+        scalingTrack: AVAssetTrack?,
+        mediumLongEdgeLimit: Int? = nil
     ) -> [PreviewQuality: AVVideoComposition] {
         let width = Int(base.renderSize.width.rounded())
         let height = Int(base.renderSize.height.rounded())
         var result: [PreviewQuality: AVVideoComposition] = [:]
         for quality in PreviewQuality.allCases {
-            guard let limit = quality.longEdgeLimit,
+            let limit = quality == .medium ? mediumLongEdgeLimit ?? quality.longEdgeLimit : quality.longEdgeLimit
+            guard let limit,
                   let size = reducedRenderSize(width: width, height: height, longEdgeLimit: limit),
                   let copy = base.mutableCopy() as? AVMutableVideoComposition else { continue }
             copy.renderSize = size

@@ -1,13 +1,7 @@
 import Foundation
 
-/// A layer whose picture the app draws rather than reading it from an asset.
-///
-/// Text and shapes are the two, and their timeline lifecycle is identical: no
-/// source range, a track of their own, free placement with nothing underneath
-/// them to respect, and an animation window that has to survive a trim or a
-/// split. So it is implemented once, here, instead of in two files that would
-/// drift apart the first time one of them was fixed.
-protocol DrawnOverlayClip: AnimatableClip {
+/// A layer with independent timeline placement and no asset source range.
+protocol TimelineOverlayClip: AnimatableClip {
     static var trackKind: TimelineTrack.Kind { get }
     /// The noun used in the messages a person actually reads.
     static var noun: String { get }
@@ -15,26 +9,32 @@ protocol DrawnOverlayClip: AnimatableClip {
     var timelineItem: TimelineItem { get }
 }
 
-extension TextClip: DrawnOverlayClip {
+extension TextClip: TimelineOverlayClip {
     static let trackKind = TimelineTrack.Kind.text
     static let noun = "text"
     var timelineItem: TimelineItem { .text(self) }
 }
 
-extension ShapeClip: DrawnOverlayClip {
+extension ShapeClip: TimelineOverlayClip {
     static let trackKind = TimelineTrack.Kind.shape
     static let noun = "shape"
     var timelineItem: TimelineItem { .shape(self) }
 }
 
-/// Placement, trimming, splitting and deletion for drawn overlay layers.
+extension SceneCameraClip: TimelineOverlayClip {
+    static let trackKind = TimelineTrack.Kind.camera
+    static let noun = "camera"
+    var timelineItem: TimelineItem { .camera(self) }
+}
+
+/// Placement, trimming, splitting and deletion for asset-free layers.
 ///
 /// The id-taking entry points switch over the item ONCE and then run the same
 /// generic body, so there is exactly one implementation of each rule — notably
 /// the animation-window handling on a head trim and on a split, which is the
 /// part that is easy to get subtly wrong twice.
 enum OverlayEditing {
-    static func replace<Clip: DrawnOverlayClip>(_ id: UUID, with clip: Clip, in project: inout VideoProject) throws {
+    static func replace<Clip: TimelineOverlayClip>(_ id: UUID, with clip: Clip, in project: inout VideoProject) throws {
         guard let t = project.timeline.tracks.firstIndex(where: { $0.id == clip.placement.trackID }),
               let i = project.timeline.tracks[t].items.firstIndex(where: { $0.id == id }),
               !project.timeline.tracks[t].isLocked,
@@ -48,11 +48,12 @@ enum OverlayEditing {
         switch project.timeline.item(id: id) {
         case .text(let clip): try delete(clip, in: &project)
         case .shape(let clip): try delete(clip, in: &project)
+        case .camera(let clip): try delete(clip, in: &project)
         default: return
         }
     }
 
-    static func delete<Clip: DrawnOverlayClip>(_ clip: Clip, in project: inout VideoProject) throws {
+    static func delete<Clip: TimelineOverlayClip>(_ clip: Clip, in project: inout VideoProject) throws {
         // Routed through `replace` first so a locked track refuses the delete
         // for the same reason, with the same message, that it refuses an edit.
         try replace(clip.id, with: clip, in: &project)
@@ -63,16 +64,16 @@ enum OverlayEditing {
         project.timeline.reconcileTrackMattes()
     }
 
-    /// Pasting a drawn layer gives it a track of its own rather than hunting for
+    /// Pasting an asset-free layer gives it a track of its own rather than hunting for
     /// room on an existing one: it has no media edit to line up with, and a new
     /// row is both predictable and immediately visible.
-    static func paste<Clip: DrawnOverlayClip>(_ original: Clip, at time: TimelineTime, in project: inout VideoProject) throws -> UUID {
+    static func paste<Clip: TimelineOverlayClip>(_ original: Clip, at time: TimelineTime, in project: inout VideoProject) throws -> UUID {
         var clip = original
         let trackID = UUID()
         clip.placement = .init(
             id: UUID(), trackID: trackID,
             timelineStart: max(.zero, try TimelineEditing.snapped(time, frame: project.canvas.frameDuration)),
-            duration: original.placement.duration)
+            duration: original.placement.duration, cameraDepth: original.placement.cameraDepth)
         project.timeline.tracks.insert(
             .init(id: trackID, name: TimelineTrack.defaultName(for: Clip.trackKind),
                   kind: Clip.trackKind, items: [clip.timelineItem]), at: 0)
@@ -85,7 +86,7 @@ enum OverlayEditing {
     static func splitTarget(in project: VideoProject, at time: TimelineTime, trackID: UUID?) -> UUID? {
         let frame = project.canvas.frameDuration?.seconds ?? 0.01
         return project.timeline.items.first { item in
-            guard item.isDrawnOverlay, item.placement.trackID == trackID, !item.placement.isLocked,
+            guard item.usesOverlayTiming, item.placement.trackID == trackID, !item.placement.isLocked,
                   project.timeline.tracks.first(where: { $0.id == trackID })?.isLocked == false else { return false }
             return time.seconds-item.placement.timelineStart.seconds >= frame
                 && ((try? item.placement.range.end.seconds) ?? 0)-time.seconds >= frame
@@ -96,11 +97,12 @@ enum OverlayEditing {
         switch project.timeline.item(id: id) {
         case .text(let clip): return try split(clip, at: time, in: &project)
         case .shape(let clip): return try split(clip, at: time, in: &project)
-        default: throw TimelineError.invalid(String(localized: "Select a text or shape layer to split."))
+        case .camera(let clip): return try split(clip, at: time, in: &project)
+        default: throw TimelineError.invalid(String(localized: "Select a text, shape, or camera layer to split."))
         }
     }
 
-    static func split<Clip: DrawnOverlayClip>(_ clip: Clip, at time: TimelineTime, in project: inout VideoProject) throws -> UUID {
+    static func split<Clip: TimelineOverlayClip>(_ clip: Clip, at time: TimelineTime, in project: inout VideoProject) throws -> UUID {
         var left = clip
         guard splitTarget(in: project, at: time, trackID: left.placement.trackID) == left.id else {
             throw TimelineError.invalid(String(localized: "Place the playhead inside the \(Clip.noun) clip."))
@@ -109,7 +111,8 @@ enum OverlayEditing {
         var right = left
         let leftDuration = try boundary.subtracting(left.placement.timelineStart)
         right.placement = .init(id: UUID(), trackID: left.placement.trackID, timelineStart: boundary,
-                                duration: try left.placement.range.end.subtracting(boundary))
+                                duration: try left.placement.range.end.subtracting(boundary),
+                                cameraDepth: left.placement.cameraDepth)
         // Both halves keep the identical keyframe list; only the window each reads moves.
         // Easing across the split is therefore exact, with no interpolated boundary keyframe.
         right.shiftAnimationWindow(by: leftDuration)
@@ -124,6 +127,7 @@ enum OverlayEditing {
         switch project.timeline.item(id: id) {
         case .text(let clip): try edit(clip, operation: operation, to: time, in: &project)
         case .shape(let clip): try edit(clip, operation: operation, to: time, in: &project)
+        case .camera(let clip): try edit(clip, operation: operation, to: time, in: &project)
         default: throw TimelineError.invalid(String(localized: "Overlay clip not found."))
         }
     }
@@ -162,7 +166,7 @@ enum OverlayEditing {
 
     static func moveTogether(_ ids: Set<UUID>, by delta: TimelineTime, in project: inout VideoProject) throws {
         let items = project.timeline.items.filter { ids.contains($0.id) }
-        guard items.count == ids.count, items.allSatisfy(\.isDrawnOverlay) else {
+        guard items.count == ids.count, items.allSatisfy(\.usesOverlayTiming) else {
             throw TimelineError.invalid(String(localized: "Overlay clip not found."))
         }
         let bounds = try moveBounds(for: ids, in: project.timeline.tracks)
@@ -187,7 +191,7 @@ enum OverlayEditing {
         project.timeline = timeline
     }
 
-    static func edit<Clip: DrawnOverlayClip>(_ original: Clip, operation: TimelineGestureEdit, to time: TimelineTime, in project: inout VideoProject) throws {
+    static func edit<Clip: TimelineOverlayClip>(_ original: Clip, operation: TimelineGestureEdit, to time: TimelineTime, in project: inout VideoProject) throws {
         var clip = original
         let target = max(.zero, try TimelineEditing.snapped(time, frame: project.canvas.frameDuration))
         // Every edge stops at this clip's neighbours on the row. A row is a

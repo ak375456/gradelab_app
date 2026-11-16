@@ -442,13 +442,13 @@ extension VideoClip: AnimatableClip {
         .layerMaskRotation, .layerMaskFeather,
         .localMaskPositionX, .localMaskPositionY, .localMaskWidth, .localMaskHeight,
         .localMaskRotation, .localMaskFeather, .localMaskOpacity
-    ] + AnimatableProperty.gradeProperties
+    ] + ClipCamera.properties + AnimatableProperty.gradeProperties
 
     /// Grading joins the transform properties rather than being checked
     /// separately, so validation, `AnimationSnapshot` and the inspector all see
     /// one list.
     static func supports(_ property: AnimatableProperty) -> Bool {
-        supportsKeyPath(property) || property.isGradeProperty
+        supportsKeyPath(property) || ClipCamera.properties.contains(property) || property.isGradeProperty || property == .cameraDolly
     }
 
     /// The grade is read and written directly rather than through a key path.
@@ -459,10 +459,15 @@ extension VideoClip: AnimatableClip {
     /// path applies, without the allocation.
     func baseValue(of property: AnimatableProperty) -> KeyframeValue? {
         if property.isGradeProperty { return gradeSettings.gradeValue(property) }
+        if let key = ClipCamera.keyPath(property), let camera { return .number(camera[keyPath: key]) }
         return keyPathValue(of: property)
     }
 
     mutating func setBaseValue(_ value: KeyframeValue, of property: AnimatableProperty) {
+        if let key = ClipCamera.keyPath(property), let number = value.clamped(to: property).number {
+            camera?[keyPath: key] = number
+            return
+        }
         guard property.isGradeProperty else { return setKeyPathValue(value, of: property) }
         gradeSettings.setGradeValue(value.clamped(to: property), for: property)
     }
@@ -654,6 +659,7 @@ extension Timeline {
                 case .text(let clip): clip.isAnimated
                 case .shape(let clip): clip.isAnimated
                 case .video(let clip): clip.isAnimated
+                case .camera(let clip): clip.isAnimated
                 case .audio: false
                 }
             }

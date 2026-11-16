@@ -69,6 +69,9 @@ struct ShapeToolPanel: View {
                 case "Transform":
                     keyframeHeader
                     CanvasAlignmentRow(model: model)
+                    if let clip = model.selectedShape {
+                        CameraDepthPicker(model: model, item: .shape(clip))
+                    }
                     animated(.positionX, -1...2)
                     animated(.positionY, -1...2)
                     animated(.scale, 0.05...6)

@@ -144,6 +144,8 @@ struct ItemPlacement: Codable, Equatable, Sendable {
     var duration: TimelineTime
     var isEnabled = true
     var isLocked = false
+    var cameraDepth: CameraLayerDepth? = nil
+    var resolvedCameraDepth: CameraLayerDepth { cameraDepth ?? .screen }
     var range: TimelineRange { .init(start: timelineStart, duration: duration) }
 }
 
@@ -158,6 +160,7 @@ struct VideoClip: TimelineClip {
     var sourceRange: TimelineRange
     var gradeSettings: GradeSettings = .neutral
     var transform = VisualTransform()
+    var camera: ClipCamera? = nil
     var opacity: Double = 1
     var blendMode: VisualBlendMode = .normal
     /// Optional keeps every project written before layer masks decodable.
@@ -574,6 +577,7 @@ enum TimelineItem: Codable, Equatable, Identifiable, Sendable {
     case audio(AudioClip)
     case text(TextClip)
     case shape(ShapeClip)
+    case camera(SceneCameraClip)
 
     var placement: ItemPlacement {
         switch self {
@@ -581,6 +585,7 @@ enum TimelineItem: Codable, Equatable, Identifiable, Sendable {
         case .audio(let c): c.placement
         case .text(let c): c.placement
         case .shape(let c): c.placement
+        case .camera(let c): c.placement
         }
     }
     var id: UUID { placement.id }
@@ -588,7 +593,7 @@ enum TimelineItem: Codable, Equatable, Identifiable, Sendable {
         switch self {
         case .video(let c): c.assetID
         case .audio(let c): c.assetID
-        case .text, .shape: nil
+        case .text, .shape, .camera: nil
         }
     }
     /// A drawn layer: one whose picture the app generates rather than reads from
@@ -596,21 +601,24 @@ enum TimelineItem: Codable, Equatable, Identifiable, Sendable {
     /// they have no source range, they live on their own track, and they can sit
     /// anywhere on the timeline without a media edit underneath them.
     var isDrawnOverlay: Bool {
-        switch self { case .text, .shape: true; case .video, .audio: false }
+        switch self { case .text, .shape: true; case .video, .audio, .camera: false }
     }
+
+    var usesOverlayTiming: Bool { trackKind.usesOverlayTiming }
 
     /// The same item carrying a different placement.
     ///
     /// Moving an item to another row is the one edit that rewrites a placement
     /// without caring which case holds it, and a track stores the erased
     /// `TimelineItem` rather than the concrete clip. Without this the move has
-    /// to switch over all four cases purely to put the value back.
+    /// to switch over every case purely to put the value back.
     func withPlacement(_ placement: ItemPlacement) -> TimelineItem {
         switch self {
         case .video(var c): c.placement = placement; return .video(c)
         case .audio(var c): c.placement = placement; return .audio(c)
         case .text(var c): c.placement = placement; return .text(c)
         case .shape(var c): c.placement = placement; return .shape(c)
+        case .camera(var c): c.placement = placement; return .camera(c)
         }
     }
 
@@ -623,6 +631,7 @@ enum TimelineItem: Codable, Equatable, Identifiable, Sendable {
         case .audio: .audio
         case .text: .text
         case .shape: .shape
+        case .camera: .camera
         }
     }
 }

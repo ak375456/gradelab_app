@@ -16,6 +16,50 @@ import XCTest
 /// here in Swift rather than read back out of the shader, so the shader is
 /// checked against the specification and not against itself.
 final class HDRCompositorTests: XCTestCase {
+    func testCameraCropPreservesOnlyTopOfSource() throws {
+        let source = try halfTexture(filledWith: (0.1, 0.1, 0.1))
+        var pixels = [Float16](repeating: 1, count: size * size * 4)
+        for y in 0..<size {
+            for x in 0..<size {
+                for channel in 0..<3 {
+                    pixels[(y * size + x) * 4 + channel] = y < size / 2 ? 0.7 : 0.2
+                }
+            }
+        }
+        pixels.withUnsafeBytes {
+            source.replace(region: MTLRegionMake2D(0, 0, size, size), mipmapLevel: 0,
+                           withBytes: $0.baseAddress!, bytesPerRow: size * 8)
+        }
+        let duration = try TimelineTime.seconds(1)
+        var clip = VideoClip(placement: .init(id: UUID(), trackID: UUID(), timelineStart: .zero, duration: duration),
+                             assetID: UUID(), sourceRange: .init(start: .zero, duration: duration))
+        clip.camera = ClipCamera(mode: .crop, y: 0, cropHeight: 0.5)
+        let canvas = CGSize(width: size, height: size)
+        let placement = ClipPicturePlacement(clip: clip, encoded: canvas, preferred: .identity, canvas: canvas)
+        let output = try compositeVideo(source: source, layer: HDRLayerUniforms(
+            transform: placement.sourceToCanvas, sourceSize: canvas, canvasSize: canvas,
+            opacity: 1, camera: placement))
+        XCTAssertEqual(read(output, x: 0, y: 3).0, 0.7, accuracy: 0.002)
+        XCTAssertEqual(read(output, x: size - 1, y: 4).0, 0.7, accuracy: 0.002)
+        XCTAssertEqual(read(output, x: 4, y: 1).0, 0, accuracy: 0.002)
+        XCTAssertEqual(read(output, x: 4, y: 6).0, 0, accuracy: 0.002)
+    }
+
+    func testSceneCameraApertureCropsBothDimensionsInHDR() throws {
+        let source = try halfTexture(filledWith: (0.6, 0.6, 0.6))
+        let canvas = CGSize(width: size, height: size)
+        var camera = SceneCameraPosition()
+        camera.frameWidth = 0.5
+        camera.frameHeight = 0.75
+        let output = try compositeVideo(source: source, layer: HDRLayerUniforms(
+            transform: identityPlacement, sourceSize: canvas, canvasSize: canvas,
+            opacity: 1, sceneFrame: camera.frame(in: canvas)))
+        XCTAssertEqual(read(output, x: 4, y: 4).0, 0.6, accuracy: 0.002)
+        XCTAssertEqual(read(output, x: 1, y: 4).0, 0, accuracy: 0.002)
+        XCTAssertEqual(read(output, x: 4, y: 0).0, 0, accuracy: 0.002)
+        XCTAssertEqual(read(output, x: 4, y: 6).0, 0.6, accuracy: 0.002)
+    }
+
     func testStabilizationSamplesOriginalSourceAndKeepsTheFittedRectangle() throws {
         let source = try halfTexture(filledWith: (0.4,0.4,0.4))
         var pixels = [Float16](repeating: 1,count: size*size*4)

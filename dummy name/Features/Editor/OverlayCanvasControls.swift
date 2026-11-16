@@ -11,6 +11,7 @@ import UIKit
 struct CanvasOverlay: Identifiable {
     let id: UUID
     var transform: VisualTransform
+    var projection = SceneCameraPosition.Projection(magnification: 1, visibility: 1)
     let range: TimelineRange
     /// The bounds the anchor and placement are measured against: a title's
     /// fitted line box, a shape's own box.
@@ -58,9 +59,10 @@ struct CanvasOverlay: Identifiable {
         id = clip.id
         transform = clip.transform
         range = clip.placement.range
-        let fit = min(canvas.width/displaySize.width, canvas.height/displaySize.height)
-        let fitted = CGRect(origin: .zero, size: CGSize(width: displaySize.width*fit,
-                                                        height: displaySize.height*fit))
+        let framedSize = clip.camera?.frame(source: displaySize, canvas: canvas).size ?? displaySize
+        let fit = min(canvas.width / framedSize.width, canvas.height / framedSize.height)
+        let fitted = CGRect(origin: .zero, size: CGSize(width: framedSize.width * fit,
+                                                        height: framedSize.height * fit))
         anchorBounds = fitted
         // A picture has no ink to clear: its edge IS the frame.
         frame = fitted
@@ -69,6 +71,14 @@ struct CanvasOverlay: Identifiable {
 
     func placement(canvas: CGSize) -> CGAffineTransform {
         transform.placement(bounds: anchorBounds, canvas: canvas)
+    }
+
+    func projected(_ projection: SceneCameraPosition.Projection, canvas: CGSize) -> Self? {
+        guard projection.visibility > 0 else { return nil }
+        var copy = self
+        copy.projection = projection
+        projection.apply(to: &copy.transform, canvas: canvas)
+        return copy
     }
 
     /// The same overlay proposed at another position, for the magnet to measure
@@ -321,11 +331,15 @@ struct OverlayCanvasControls: View {
                             ? snap(rawY, to: Self.positionStops, tolerance: Self.positionTolerance)
                             : (aligned.y, aligned.yGuide)
                         report(x: x.1, y: y.1)
-                        model.setAnimatableValue(.positionX, .number(x.0))
-                        model.setAnimatableValue(.positionY, .number(y.0))
+                        let authored = overlay.projection.authoredPosition(CGPoint(x: x.0, y: y.0), canvas: canvas)
+                        model.setAnimatableValue(.positionX, .number(authored.x))
+                        model.setAnimatableValue(.positionY, .number(authored.y))
                     }.onEnded { _ in origin = nil; guides = (nil, nil); model.flushGradeHistory() })
                     .simultaneousGesture(MagnifyGesture().onChanged { value in
-                        if initialScale == nil { initialScale = overlay.transform.scale; model.playback.pause() }
+                        if initialScale == nil {
+                            initialScale = overlay.transform.scale / overlay.projection.magnification
+                            model.playback.pause()
+                        }
                         model.setAnimatableValue(.scale, .number(min(6, max(0.05, initialScale! * value.magnification))))
                     }.onEnded { _ in initialScale = nil; model.flushGradeHistory() })
                     .simultaneousGesture(RotateGesture().onChanged { value in
@@ -335,7 +349,7 @@ struct OverlayCanvasControls: View {
                         let raw = initialRotation!+value.rotation.degrees
                         let snapped = snap(raw, to: stops(around: raw), tolerance: Self.rotationTolerance)
                         reportRotation(snapped.stop)
-                        model.setAnimatableValue(.rotation, .number(snapped.value))
+                        model.setAnimatableValue(.rotation, .number(snapped.value - overlay.projection.rotation))
                     }.onEnded { _ in initialRotation = nil; rotationGuide = nil; model.flushGradeHistory() })
                     .onTapGesture(count: 2) { if overlay.editsContent { editContent() } }
                     .accessibilityLabel(overlay.selectionAccessibilityLabel)
@@ -352,8 +366,9 @@ struct OverlayCanvasControls: View {
                         let raw = origin!.rotationDegrees+angle
                         let snapped = snap(raw, to: stops(around: raw), tolerance: Self.rotationTolerance)
                         reportRotation(snapped.stop)
-                        model.setAnimatableValue(.scale, .number(min(6, max(0.05, origin!.scale*ratio))))
-                        model.setAnimatableValue(.rotation, .number(snapped.value))
+                        let scale = origin!.scale * ratio / overlay.projection.magnification
+                        model.setAnimatableValue(.scale, .number(min(6, max(0.05, scale))))
+                        model.setAnimatableValue(.rotation, .number(snapped.value - overlay.projection.rotation))
                     }.onEnded { _ in origin = nil; rotationGuide = nil; model.flushGradeHistory() })
                     .accessibilityLabel(overlay.resizeAccessibilityLabel)
                 Button { model.deleteClip() } label: {
@@ -426,10 +441,8 @@ struct OverlayCanvasControls: View {
                             y += stop.value-centre; yGuide = stop.stop
                         }
                         report(x: xGuide, y: yGuide)
-                        model.offsetSelection(.positionX, by: x-applied.x,
-                                              label: AnimatableProperty.positionX.title)
-                        model.offsetSelection(.positionY, by: y-applied.y,
-                                              label: AnimatableProperty.positionY.title)
+                        model.offsetCanvasSelection(by: CGVector(dx: x-applied.x, dy: y-applied.y),
+                                                    label: String(localized: "Move Layers"))
                         groupOrigin = CGPoint(x: x, y: y)
                     }.onEnded { _ in
                         groupOrigin = nil; groupBounds = nil; guides = (nil, nil)
@@ -458,23 +471,19 @@ struct OverlayCanvasControls: View {
 
     /// Whichever drawn layer is selected, evaluated at the playhead.
     private func selection(canvas: CGSize) -> CanvasOverlay? {
-        if let clip = model.evaluatedText { return CanvasOverlay(clip, canvas: canvas) }
-        if let clip = model.evaluatedShape { return CanvasOverlay(clip, canvas: canvas) }
-        if let clip = model.evaluatedMediaOverlay, let size = model.displaySize(of: clip) {
-            return CanvasOverlay(clip, displaySize: size, canvas: canvas)
-        }
-        return nil
+        model.selectedItem.flatMap { model.canvasOverlay(for: $0, canvas: canvas) }
     }
 
     /// Every other drawn layer visible at this frame. A title lines up on a
     /// shape's edge and a shape on a title's, which is the whole point of
     /// measuring both against one description.
     private func peers(canvas: CGSize, excluding ids: Set<UUID>) -> [CanvasOverlay] {
-        model.visibleEvaluatedTexts.filter { !ids.contains($0.id) }.map { CanvasOverlay($0, canvas: canvas) }
-            + model.visibleEvaluatedShapes.filter { !ids.contains($0.id) }.map { CanvasOverlay($0, canvas: canvas) }
-            + model.visibleEvaluatedMediaOverlays.filter { !ids.contains($0.id) }.compactMap { clip in
-                model.displaySize(of: clip).map { CanvasOverlay(clip, displaySize: $0, canvas: canvas) }
-            }
+        let time = model.playheadTime
+        return model.project.timeline.tracks.filter(\.isEnabled).flatMap(\.items).compactMap { item in
+            guard !ids.contains(item.id), item.placement.isEnabled, item.placement.timelineStart <= time,
+                  let end = try? item.placement.range.end, time < end else { return nil }
+            return model.canvasOverlay(for: item, canvas: canvas)
+        }
     }
 
     private func snap(_ value: Double, to stops: [Double], tolerance: Double) -> (value: Double, stop: Double?) {

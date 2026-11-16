@@ -30,6 +30,8 @@ struct TransitionPanel: View {
                     Text("TRANSITIONS").font(.caption.weight(.bold)).foregroundStyle(AppColors.textSecondary)
                     if let transition = model.selectedTransition {
                         Text(transition.type.title).font(.headline)
+                    } else if model.pendingTransitionCut != nil {
+                        Text("Choose a transition for this cut").font(.caption).foregroundStyle(AppColors.textSecondary)
                     } else {
                         Text("Choose an effect at the playhead").font(.caption).foregroundStyle(AppColors.textSecondary)
                     }
@@ -60,6 +62,7 @@ struct TransitionPanel: View {
                                       if editing { model.beginTransitionDurationEditing() }
                                       else { model.endTransitionDurationEditing() }
                                   })
+                .disabled(model.selectedTransitionDurationLimits == nil)
                 .tint(AppColors.accent)
                 .padding(10)
                 .background(.white.opacity(0.055), in: RoundedRectangle(cornerRadius: 10))
@@ -67,8 +70,8 @@ struct TransitionPanel: View {
 
             ScrollView(.vertical) {
                 VStack(alignment: .leading, spacing: 14) {
-                    transitionRow(title: nil, types: [])
-                    ForEach(categories, id: \.self) { category in
+                    transitionRow(title: nil, types: TimelineTransitionType.allCases.filter { $0.category == "BASIC" })
+                    ForEach(categories.dropFirst(), id: \.self) { category in
                         transitionRow(title: Self.categoryLabel(category),
                                       types: TimelineTransitionType.allCases.filter { $0.category == category })
                     }

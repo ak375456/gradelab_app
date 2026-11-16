@@ -177,6 +177,7 @@ enum ProFeature: String, Identifiable, Sendable {
     case gradePresets
     case scopes
     case cameraRecording
+    case editorCamera
     case stabilization
 
     var id: String { rawValue }
@@ -198,6 +199,7 @@ enum ProFeature: String, Identifiable, Sendable {
         case .gradePresets: String(localized: "Keep the look you built.")
         case .scopes: String(localized: "Read the picture, don't guess.")
         case .cameraRecording: String(localized: "Unlock camera recording.")
+        case .editorCamera: String(localized: "Export with Camera")
         case .stabilization: String(localized: "Stabilization")
         }
     }
@@ -234,6 +236,8 @@ enum ProFeature: String, Identifiable, Sendable {
             String(localized: "Waveform, RGB parade and vectorscope in the editor. Camera monitoring and the histogram stay free.")
         case .cameraRecording:
             String(localized: "Preview LUTs and adjust focus, white balance, ISO and exposure for free. Upgrade to GradeLab Pro to record video on iPhone and iPad.")
+        case .editorCamera:
+            String(localized: "Edit and preview Camera layers and Reframe for free. Upgrade to export with them, or hide the Camera layer and remove Reframe to export for free.")
         case .stabilization:
             String(localized: "Unlock on-device video stabilization, smoothness controls and stabilized exports with GradeLab Pro.")
         }
@@ -445,8 +449,8 @@ enum ProAccessPolicy {
     // MARK: - One clip
 
     static func clipRequirements(_ clip: VideoClip) -> [ProFeature] {
-        // Overlays, animation and every blend mode are part of the free editor.
         var found = gradeRequirements(clip.gradeSettings)
+        if clip.camera != nil { found.append(.editorCamera) }
         if let stabilization = clip.resolvedStabilization,
            stabilization.strength.isFinite, stabilization.strength > 0,
            stabilization.cropZoom.isFinite, stabilization.cropZoom >= 1,
@@ -483,6 +487,7 @@ enum ProAccessPolicy {
     /// What the timeline's own contents need, ignoring the export settings.
     static func contentRequirements(_ project: VideoProject) -> [ProFeature] {
         var found: [ProFeature] = []
+        let exportEnd = project.timeline.duration
         for track in project.timeline.tracks where track.isEnabled {
             let live = track.items.filter(\.placement.isEnabled)
             guard !live.isEmpty else { continue }
@@ -490,9 +495,10 @@ enum ProAccessPolicy {
                 switch item {
                 case .video(let clip): found.append(contentsOf: clipRequirements(clip))
                 case .text(let clip): found.append(contentsOf: textRequirements(clip))
-                // Shapes are free, exactly as text is: what GradeLab charges
-                // for is the delivery, not the ability to put a layer on the
-                // timeline. See `configurationRequirements`.
+                case .camera(let clip):
+                    // Camera layers don't extend the movie. A camera beyond
+                    // the last exported frame cannot appear in this export.
+                    if clip.placement.timelineStart < exportEnd { found.append(.editorCamera) }
                 case .shape, .audio: continue
                 }
             }

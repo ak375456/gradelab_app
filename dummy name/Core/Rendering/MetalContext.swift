@@ -6,6 +6,7 @@ final class MetalContext: @unchecked Sendable {
     let device: MTLDevice
     let commandQueue: MTLCommandQueue
     let library: MTLLibrary
+    let usesCustomLibrary: Bool
     let textureCache: CVMetalTextureCache
     /// Bundled creative looks, shared by every consumer of this context.
     let luts: LUTLibrary
@@ -39,6 +40,7 @@ final class MetalContext: @unchecked Sendable {
         self.device = device
         self.commandQueue = commandQueue
         self.library = library
+        usesCustomLibrary = suppliedLibrary != nil
         textureCache = cache
         luts = LUTLibrary(device: device)
         curves = CurveLUTLibrary(device: device)

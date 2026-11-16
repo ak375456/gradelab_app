@@ -1559,6 +1559,11 @@ struct HDRLayerUniforms {
     float4 matte;    // x = track matte is inverted (coverage is 1 - alpha); y..w spare
     float4 stabilizationRow0;
     float4 stabilizationRow1;
+    float4 cameraRow0;
+    float4 cameraRow1;
+    float4 cameraFocus;        // center in frame UV, radius, amount
+    float4 cameraFocusOffsets; // source UV axes for one blur step
+    float4 sceneFrame;         // centered camera aperture in canvas pixels
 };
 
 struct LayerMaskUniforms {
@@ -1640,7 +1645,16 @@ inline float3 sdrToWorking(float3 encoded) {
     return kRec709ToBT2020 * rec709ToLinear(encoded);
 }
 
+inline bool insideSceneFrame(float4 frame, float2 point) {
+    return frame.z <= 0.0 || (all(point >= frame.xy) && all(point < frame.zw));
+}
+
 inline float2 layerCoordinateAtPoint(constant HDRLayerUniforms &layer, float3 p) {
+    if (!insideSceneFrame(layer.sceneFrame, p.xy)) return float2(-2.0);
+    if (layer.cameraRow0.w > 0.5) {
+        float2 frame = float2(dot(layer.cameraRow0.xyz, p), dot(layer.cameraRow1.xyz, p));
+        if (any(frame < 0.0) || any(frame > 1.0)) return float2(-2.0);
+    }
     float2 uv = float2(dot(layer.row0.xyz, p), dot(layer.row1.xyz, p));
     // Crop in the fitted picture BEFORE looking up the corrected source. This
     // keeps letterboxing/overlays rectangular even while the camera rolls.
@@ -1651,6 +1665,29 @@ inline float2 layerCoordinateAtPoint(constant HDRLayerUniforms &layer, float3 p)
 
 inline float2 layerCoordinate(constant HDRLayerUniforms &layer, uint2 position) {
     return layerCoordinateAtPoint(layer, float3(float(position.x) + 0.5, float(position.y) + 0.5, 1.0));
+}
+
+inline float cameraFocusAmount(constant HDRLayerUniforms &layer, float3 position) {
+    if (layer.cameraFocus.w <= 0.0) return 0.0;
+    float2 frame = float2(dot(layer.cameraRow0.xyz, position), dot(layer.cameraRow1.xyz, position));
+    float aspect = layer.cameraRow1.w;
+    float2 delta = (frame - layer.cameraFocus.xy) * float2(max(1.0, aspect), max(1.0, 1.0 / aspect));
+    return layer.cameraFocus.w * smoothstep(layer.cameraFocus.z, layer.cameraFocus.z + 0.18, length(delta));
+}
+
+inline float4 cameraFocusSample(texture2d<float, access::sample> texture, float2 uv,
+                                constant HDRLayerUniforms &layer, float amount) {
+    constexpr sampler s(coord::normalized, address::clamp_to_edge, filter::linear);
+    float4 sample = texture.sample(s, uv);
+    if (amount < 0.001) return sample;
+    float2 x = layer.cameraFocusOffsets.xy * amount;
+    float2 y = layer.cameraFocusOffsets.zw * amount;
+    float4 axial = texture.sample(s, uv + x) + texture.sample(s, uv - x)
+                 + texture.sample(s, uv + y) + texture.sample(s, uv - y);
+    float2 a = (x + y) * 1.1, b = (x - y) * 1.1;
+    float4 diagonals = texture.sample(s, uv + a) + texture.sample(s, uv - a)
+                     + texture.sample(s, uv + b) + texture.sample(s, uv - b);
+    return sample * 0.20 + axial * 0.14 + diagonals * 0.06;
 }
 
 // Preview-only bottom canvas for communicating transparency. Export-created
@@ -1699,18 +1736,20 @@ kernel void compositeVideoHDR(
         destination.write(float4(under, 1.0), position);
         return;
     }
-    constexpr sampler videoSampler(coord::normalized, address::clamp_to_edge, filter::linear);
     // params.z: 0 an HLG signal, 1 Rec.709 SDR, 2 a relit layer that is
     // already in working space.
+    float amount = cameraFocusAmount(layer, float3(float2(position) + 0.5, 1.0));
+    float3 signal = cameraFocusSample(source, uv, layer, amount).rgb;
     float3 working = layer.params.z > 1.5
-        ? source.sample(videoSampler, uv).rgb
+        ? signal
         : (layer.params.z > 0.5
-            ? sdrToWorking(source.sample(videoSampler, uv).rgb)
-            : toWorkingSpace(source.sample(videoSampler, uv).rgb, hdr));
+            ? sdrToWorking(signal)
+            : toWorkingSpace(signal, hdr));
     if (layer.params.y > 0.0) {
+        float3 partnerSignal = cameraFocusSample(partner, uv, layer, amount).rgb;
         float3 next = layer.params.z > 0.5
-            ? sdrToWorking(partner.sample(videoSampler, uv).rgb)
-            : toWorkingSpace(partner.sample(videoSampler, uv).rgb, hdr);
+            ? sdrToWorking(partnerSignal)
+            : toWorkingSpace(partnerSignal, hdr);
         working = mix(working, next, layer.params.y);
     }
     working = applyLookAndGradeHDR(working, uv, grade, lutTexture, curveLUT, warpField, locals);
@@ -1747,8 +1786,8 @@ kernel void compositeImageHDR(
         destination.write(float4(under, 1.0), position);
         return;
     }
-    constexpr sampler imageSampler(coord::normalized, address::clamp_to_edge, filter::linear);
-    float4 sample = source.sample(imageSampler, uv);
+    float amount = cameraFocusAmount(layer, float3(float2(position) + 0.5, 1.0));
+    float4 sample = cameraFocusSample(source, uv, layer, amount);
     float backgroundCoverage = backgroundRemovalCoverage(backgroundMatte, uv);
     float alpha = sample.a * layer.params.x * backgroundCoverage
         * layerMaskWeight(uv, mask)
@@ -2428,6 +2467,7 @@ struct TransitionUniforms {
     float progress;
     float aspectRatio;
     float padding;
+    float4 sceneFrame;
 };
 
 inline float easeTransition(float t) {
@@ -2475,6 +2515,7 @@ inline float4 timelineTransition(
     float2 uv,
     constant TransitionUniforms &u)
 {
+    if (!insideSceneFrame(u.sceneFrame, uv)) return float4(0.0);
     float p = clamp(u.progress, 0.0, 1.0);
     float e = easeTransition(p);
     float4 a = transitionSample(outgoing, uv);
@@ -2805,8 +2846,7 @@ inline float4 gradedHDRTransitionSample(
     float3 point = float3(pixel, 1.0);
     float2 uv = layerCoordinateAtPoint(layer, point);
     if (uv.x < 0.0 || uv.x > 1.0 || uv.y < 0.0 || uv.y > 1.0) return float4(0.0);
-    constexpr sampler s(coord::normalized, address::clamp_to_edge, filter::linear);
-    float3 signal = source.sample(s, uv).rgb;
+    float3 signal = cameraFocusSample(source, uv, layer, cameraFocusAmount(layer, point)).rgb;
     float3 working = layer.params.z > 0.5 ? sdrToWorking(signal) : toWorkingSpace(signal, hdr);
     working = applyLookAndGradeHDR(working, uv, grade, lutTexture, curveLUT, warpField, locals);
     // The matte is sampled at the SCREEN coordinate this sample is being drawn
@@ -2855,6 +2895,10 @@ kernel void compositeTransitionHDR(
     if (position.x >= destination.get_width() || position.y >= destination.get_height()) return;
     uint2 size = uint2(destination.get_width(), destination.get_height());
     float2 uv = (float2(position) + 0.5) / float2(size);
+    if (!insideSceneFrame(u.sceneFrame, uv)) {
+        destination.write(base.read(position), position);
+        return;
+    }
     float p = clamp(u.progress, 0.0, 1.0), e = easeTransition(p);
     auto sampleA = [&](float2 coordinate) {
         return gradedHDRTransitionSample(outgoing, coordinate, size, outgoingGrade, hdr,
@@ -2866,11 +2910,12 @@ kernel void compositeTransitionHDR(
             incomingLayer, incomingMask, incomingLUT, incomingCurve, incomingWarp, incomingMatte,
             incomingBackground, incomingBackgroundRemoval, incomingLocals);
     };
-    float4 a = sampleA(uv), b = sampleB(uv), mixed;
+    float4 mixed;
     switch (u.type) {
-        case 0: mixed = mix(a, b, e); break;
+        case 0: mixed = mix(sampleA(uv), sampleB(uv), e); break;
         case 1:
         case 2: {
+            float4 a = sampleA(uv), b = sampleB(uv);
             float side = p < 0.5 ? p * 2.0 : (p - 0.5) * 2.0;
             float alpha = max(a.a, b.a);
             float3 color = u.type == 2 ? float3(alpha) : float3(0.0);
@@ -2879,20 +2924,16 @@ kernel void compositeTransitionHDR(
             break;
         }
         case 3: {
-            float4 entering = sampleB(uv + float2(1.0 - e, 0));
-            mixed = uv.x >= 1.0 - e ? entering : a; break;
+            mixed = uv.x >= 1.0 - e ? sampleB(uv + float2(1.0 - e, 0)) : sampleA(uv); break;
         }
         case 4: {
-            float4 entering = sampleB(uv - float2(1.0 - e, 0));
-            mixed = uv.x <= e ? entering : a; break;
+            mixed = uv.x <= e ? sampleB(uv - float2(1.0 - e, 0)) : sampleA(uv); break;
         }
         case 5: {
-            float4 entering = sampleB(uv - float2(0, 1.0 - e));
-            mixed = uv.y <= e ? entering : a; break;
+            mixed = uv.y <= e ? sampleB(uv - float2(0, 1.0 - e)) : sampleA(uv); break;
         }
         case 6: {
-            float4 entering = sampleB(uv + float2(0, 1.0 - e));
-            mixed = uv.y >= 1.0 - e ? entering : a; break;
+            mixed = uv.y >= 1.0 - e ? sampleB(uv + float2(0, 1.0 - e)) : sampleA(uv); break;
         }
         case 7:
             mixed = uv.x < 1.0 - e ? sampleB(uv - float2(1.0 - e, 0)) : sampleA(uv + float2(e, 0));
@@ -2909,8 +2950,8 @@ kernel void compositeTransitionHDR(
             // graded SDR canvas. Two-tap directional softness preserves the
             // transition without multiplying the full HDR grade nine times per
             // pixel, which can trip the device GPU watchdog during playback.
-            float4 first = (a + sampleA(uv + float2(blur, 0))) * 0.5;
-            float4 second = (b + sampleB(uv + float2(0, blur))) * 0.5;
+            float4 first = (sampleA(uv) + sampleA(uv + float2(blur, 0))) * 0.5;
+            float4 second = (sampleB(uv) + sampleB(uv + float2(0, blur))) * 0.5;
             mixed = mix(first, second, e); break;
         }
         case 11:
@@ -2933,50 +2974,50 @@ kernel void compositeTransitionHDR(
             break;
         }
         case 14: {
-            mixed = mix(a, b, e);
+            mixed = mix(sampleA(uv), sampleB(uv), e);
             float flash = exp(-pow((p - 0.5) / 0.13, 2.0));
             mixed.rgb = mix(mixed.rgb, float3(max(mixed.a, 0.001)), flash * 0.92); break;
         }
         case 15: {
             float reveal = 1.0 - smoothstep(e - 0.025, e + 0.025, uv.x);
-            mixed = transitionEdgeGlow(mix(a, b, reveal), uv.x - e, 0.032, 0.18); break;
+            mixed = transitionEdgeGlow(mix(sampleA(uv), sampleB(uv), reveal), uv.x - e, 0.032, 0.18); break;
         }
         case 16: {
             float reveal = smoothstep(1.0 - e - 0.025, 1.0 - e + 0.025, uv.x);
-            mixed = transitionEdgeGlow(mix(a, b, reveal), uv.x - (1.0 - e), 0.032, 0.18); break;
+            mixed = transitionEdgeGlow(mix(sampleA(uv), sampleB(uv), reveal), uv.x - (1.0 - e), 0.032, 0.18); break;
         }
         case 17: {
             float reveal = smoothstep(1.0 - e - 0.025, 1.0 - e + 0.025, uv.y);
-            mixed = transitionEdgeGlow(mix(a, b, reveal), uv.y - (1.0 - e), 0.032, 0.18); break;
+            mixed = transitionEdgeGlow(mix(sampleA(uv), sampleB(uv), reveal), uv.y - (1.0 - e), 0.032, 0.18); break;
         }
         case 18: {
             float reveal = 1.0 - smoothstep(e - 0.025, e + 0.025, uv.y);
-            mixed = transitionEdgeGlow(mix(a, b, reveal), uv.y - e, 0.032, 0.18); break;
+            mixed = transitionEdgeGlow(mix(sampleA(uv), sampleB(uv), reveal), uv.y - e, 0.032, 0.18); break;
         }
         case 19: {
             float2 point = uv - 0.5; point.x *= u.aspectRatio;
             float radius = e * sqrt(0.25 * u.aspectRatio * u.aspectRatio + 0.25);
             float reveal = 1.0 - smoothstep(radius - 0.025, radius + 0.025, length(point));
-            mixed = transitionEdgeGlow(mix(a, b, reveal), length(point) - radius, 0.034, 0.16); break;
+            mixed = transitionEdgeGlow(mix(sampleA(uv), sampleB(uv), reveal), length(point) - radius, 0.034, 0.16); break;
         }
         case 20: {
             float angle = (atan2(uv.x - 0.5, uv.y - 0.5) + M_PI_F) / (2.0 * M_PI_F);
             float reveal = 1.0 - smoothstep(e - 0.015, e + 0.015, angle);
             float edgeDistance = min(abs(angle - e), 1.0 - abs(angle - e));
-            mixed = transitionEdgeGlow(mix(a, b, reveal), edgeDistance, 0.018, 0.16); break;
+            mixed = transitionEdgeGlow(mix(sampleA(uv), sampleB(uv), reveal), edgeDistance, 0.018, 0.16); break;
         }
         case 21: {
             float distance = abs(uv.y - 0.5);
             float reveal = 1.0 - smoothstep(e * 0.5 - 0.02, e * 0.5 + 0.02, distance);
-            mixed = transitionEdgeGlow(mix(a, b, reveal), distance - e * 0.5, 0.026, 0.18); break;
+            mixed = transitionEdgeGlow(mix(sampleA(uv), sampleB(uv), reveal), distance - e * 0.5, 0.026, 0.18); break;
         }
         case 22: {
             float distance = abs(uv.x - 0.5);
             float reveal = 1.0 - smoothstep(e * 0.5 - 0.02, e * 0.5 + 0.02, distance);
-            mixed = transitionEdgeGlow(mix(a, b, reveal), distance - e * 0.5, 0.026, 0.18); break;
+            mixed = transitionEdgeGlow(mix(sampleA(uv), sampleB(uv), reveal), distance - e * 0.5, 0.026, 0.18); break;
         }
         case 23: {
-            mixed = mix(a, b, e);
+            mixed = mix(sampleA(uv), sampleB(uv), e);
             float flare = exp(-pow((p - 0.52) / 0.19, 2.0));
             float edge = smoothstep(0.0, 0.32, uv.x + uv.y * 0.35 + p - 0.55);
             mixed.rgb = mix(mixed.rgb, float3(1.0, 0.30, 0.035) * max(mixed.a, 0.001),
@@ -2986,10 +3027,10 @@ kernel void compositeTransitionHDR(
             float offset = sin(p * M_PI_F) * 0.018;
             float4 redMix = mix(sampleA(uv + float2(offset, 0)), sampleB(uv + float2(offset, 0)), e);
             float4 blueMix = mix(sampleA(uv - float2(offset, 0)), sampleB(uv - float2(offset, 0)), e);
-            mixed = mix(a, b, e); mixed.r = redMix.r; mixed.b = blueMix.b; break;
+            mixed = mix(sampleA(uv), sampleB(uv), e); mixed.r = redMix.r; mixed.b = blueMix.b; break;
         }
         case 25: {
-            mixed = mix(a, b, e);
+            mixed = mix(sampleA(uv), sampleB(uv), e);
             mixed.rgb = mix(mixed.rgb, float3(max(mixed.a, 0.001)), sin(p * M_PI_F) * 0.30); break;
         }
         case 26: {
@@ -3001,31 +3042,31 @@ kernel void compositeTransitionHDR(
         case 27: {
             float axis = (uv.x + uv.y) * 0.5;
             float reveal = 1.0 - smoothstep(e - 0.025, e + 0.025, axis);
-            mixed = transitionEdgeGlow(mix(a, b, reveal), axis - e, 0.032, 0.20); break;
+            mixed = transitionEdgeGlow(mix(sampleA(uv), sampleB(uv), reveal), axis - e, 0.032, 0.20); break;
         }
         case 28: {
             float2 point = uv - 0.5; point.x *= u.aspectRatio;
             float distance = abs(point.x) + abs(point.y);
             float radius = e * (0.5 * u.aspectRatio + 0.5);
             float reveal = 1.0 - smoothstep(radius - 0.025, radius + 0.025, distance);
-            mixed = transitionEdgeGlow(mix(a, b, reveal), distance - radius, 0.034, 0.20); break;
+            mixed = transitionEdgeGlow(mix(sampleA(uv), sampleB(uv), reveal), distance - radius, 0.034, 0.20); break;
         }
         case 29: {
             float stripe = fract(uv.y * 8.0);
             float reveal = 1.0 - smoothstep(e - 0.035, e + 0.035, stripe);
-            mixed = transitionEdgeGlow(mix(a, b, reveal), stripe - e, 0.042, 0.16); break;
+            mixed = transitionEdgeGlow(mix(sampleA(uv), sampleB(uv), reveal), stripe - e, 0.042, 0.16); break;
         }
         case 30: {
             float stripe = fract(uv.x * 10.0);
             float reveal = 1.0 - smoothstep(e - 0.035, e + 0.035, stripe);
-            mixed = transitionEdgeGlow(mix(a, b, reveal), stripe - e, 0.042, 0.16); break;
+            mixed = transitionEdgeGlow(mix(sampleA(uv), sampleB(uv), reveal), stripe - e, 0.042, 0.16); break;
         }
         case 31: {
             float2 cell = floor(uv * float2(10.0, 8.0));
             float phase = fmod(cell.x + cell.y, 2.0) * 0.16;
             float local = clamp((e - phase) / 0.84, 0.0, 1.0);
             float reveal = smoothstep(0.0, 1.0, local);
-            mixed = mix(a, b, reveal);
+            mixed = mix(sampleA(uv), sampleB(uv), reveal);
             mixed.rgb = mix(mixed.rgb, float3(max(mixed.a, 0.001)), sin(local * M_PI_F) * 0.12); break;
         }
         case 32: {
@@ -3058,8 +3099,8 @@ kernel void compositeTransitionHDR(
         }
         case 36: {
             float2 trail = (uv - 0.5) * 0.14 * sin(p * M_PI_F);
-            float4 first = (a + sampleA(uv - trail)) * 0.5;
-            float4 second = (b + sampleB(uv + trail)) * 0.5;
+            float4 first = (sampleA(uv) + sampleA(uv - trail)) * 0.5;
+            float4 second = (sampleB(uv) + sampleB(uv + trail)) * 0.5;
             mixed = mix(first, second, e); break;
         }
         case 37: {
@@ -3067,7 +3108,7 @@ kernel void compositeTransitionHDR(
             float settle = 1.0 + 2.70158 * q * q * q + 1.70158 * q * q;
             float edge = 1.0 - settle;
             float reveal = smoothstep(edge - 0.012, edge + 0.012, uv.y);
-            mixed = mix(a, sampleB(uv - float2(0, edge)), reveal); break;
+            mixed = mix(sampleA(uv), sampleB(uv - float2(0, edge)), reveal); break;
         }
         case 38: {
             float2 cell = floor(uv * float2(160.0 * max(u.aspectRatio, 1.0), 160.0));
@@ -3088,7 +3129,7 @@ kernel void compositeTransitionHDR(
             float2 split = direction * 0.038 * energy;
             float4 red = mix(sampleA(uv + split), sampleB(uv + split), e);
             float4 blue = mix(sampleA(uv - split), sampleB(uv - split), e);
-            mixed = mix(a, b, e); mixed.r = red.r; mixed.b = blue.b; break;
+            mixed = mix(sampleA(uv), sampleB(uv), e); mixed.r = red.r; mixed.b = blue.b; break;
         }
         case 40: {
             float energy = sin(p * M_PI_F);
@@ -3129,12 +3170,12 @@ kernel void compositeTransitionHDR(
             float curl = exp(-pow(signedEdge / 0.13, 2.0)) * sin(p * M_PI_F);
             float2 outgoingUV = uv + float2(curl * 0.065, curl * (uv.y - 0.5) * 0.035);
             float reveal = 1.0 - smoothstep(-0.018, 0.018, signedEdge);
-            mixed = mix(sampleA(outgoingUV), b, reveal);
+            mixed = mix(sampleA(outgoingUV), sampleB(uv), reveal);
             float shadow = exp(-pow(signedEdge / 0.055, 2.0)) * sin(p * M_PI_F);
             mixed.rgb *= 1.0 - shadow * 0.28;
             mixed = transitionEdgeGlow(mixed, signedEdge, 0.018, 0.32); break;
         }
-        default: mixed = mix(a, b, e); break;
+        default: mixed = mix(sampleA(uv), sampleB(uv), e); break;
     }
     float3 under = base.read(position).rgb;
     destination.write(float4(mixed.rgb + under * (1.0 - mixed.a), 1.0), position);
@@ -3311,12 +3352,11 @@ kernel void gradeStillTileBGRA(
 inline float3 logLayerWorking(texture2d<float, access::sample> y,
                              texture2d<float, access::sample> c, float2 uv,
                              constant HDRLayerUniforms &layer,
-                             constant YUVUniforms &yuv) {
-    constexpr sampler s(coord::normalized, address::clamp_to_edge, filter::linear);
+                             constant YUVUniforms &yuv, float amount) {
     // 2: a relit layer, already in working space and bound in the luma slot.
-    if (layer.params.z > 1.5) { return y.sample(s, uv).rgb; }
-    float luma = y.sample(s, uv).r;
-    float2 chroma = c.sample(s, uv).rg;
+    if (layer.params.z > 1.5) { return cameraFocusSample(y, uv, layer, amount).rgb; }
+    float luma = cameraFocusSample(y, uv, layer, amount).r;
+    float2 chroma = cameraFocusSample(c, uv, layer, amount).rg;
     return layer.params.z > 0.5 ? sdrToWorking(decodeYUV(luma, chroma, yuv))
                               : appleLogToWorking(luma, chroma);
 }
@@ -3344,9 +3384,10 @@ kernel void compositeVideoAppleLog(
     if (p.x >= destination.get_width() || p.y >= destination.get_height()) return;
     float2 uv = layerCoordinate(layer, p);
     if (any(uv < 0.0) || any(uv > 1.0)) { destination.write(float4(0), p); return; }
-    float3 working = logLayerWorking(luma, chroma, uv, layer, yuv);
+    float amount = cameraFocusAmount(layer, float3(float2(p) + 0.5, 1.0));
+    float3 working = logLayerWorking(luma, chroma, uv, layer, yuv, amount);
     if (layer.params.y > 0.0) {
-        working = mix(working, logLayerWorking(partnerLuma, partnerChroma, uv, layer, yuv), layer.params.y);
+        working = mix(working, logLayerWorking(partnerLuma, partnerChroma, uv, layer, yuv, amount), layer.params.y);
     }
     working = applyLookAndGradeHDR(working, uv, grade, lut, curves, warpField, locals);
     float backgroundCoverage = backgroundRemovalCoverage(backgroundMatte, uv);
@@ -3378,8 +3419,8 @@ kernel void compositeImageAppleLog(
     if (p.x >= destination.get_width() || p.y >= destination.get_height()) return;
     float2 uv = layerCoordinate(layer, p);
     if (any(uv < 0.0) || any(uv > 1.0)) { destination.write(float4(0), p); return; }
-    constexpr sampler s(coord::normalized, address::clamp_to_edge, filter::linear);
-    float4 sample = source.sample(s, uv);
+    float amount = cameraFocusAmount(layer, float3(float2(p) + 0.5, 1.0));
+    float4 sample = cameraFocusSample(source, uv, layer, amount);
     float3 straight = layer.params.w > 0.5 && sample.a > 0.0001 ? sample.rgb / sample.a : sample.rgb;
     float backgroundCoverage = backgroundRemovalCoverage(backgroundMatte, uv);
     straight = suppressBackgroundSpill(straight, backgroundCoverage, backgroundRemoval);

@@ -118,6 +118,9 @@ struct TextToolPanel: View {
                     TextAnimationPanel(model: model, slot: $animationSlot)
                 case "Transform":
                     keyframeHeader
+                    if let clip = model.selectedText {
+                        CameraDepthPicker(model: model, item: .text(clip))
+                    }
                     DurationSliderRow(value: model.selectedText?.placement.duration.seconds ?? 3,
                                       range: 0.1...600, reset: 3,
                                       frameRate: model.durationDisplayFrameRate,

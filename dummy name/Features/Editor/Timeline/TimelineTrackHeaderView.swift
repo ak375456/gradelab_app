@@ -52,6 +52,7 @@ final class TimelineTrackHeaderView: UIView {
         var isAudioMuted = false
         var hasAudioContent = false
         var isSelected = false
+        var labelColor: TimelineTrackColor? = nil
     }
 
     let trackID: UUID
@@ -62,6 +63,7 @@ final class TimelineTrackHeaderView: UIView {
     var onToggleMute: (() -> Void)?
 
     private let card = UIView()
+    private let colorStripe = UIView()
     private let titleLabel = UILabel()
     private let subtitleLabel = UILabel()
     private let lockButton = TimelineHeaderButton()
@@ -84,6 +86,8 @@ final class TimelineTrackHeaderView: UIView {
         card.layer.borderWidth = 1
         card.isUserInteractionEnabled = false
         addSubview(card)
+        colorStripe.layer.cornerRadius = 1
+        card.addSubview(colorStripe)
 
         titleLabel.font = .systemFont(ofSize: 12, weight: .semibold)
         titleLabel.textColor = TimelineTheme.textPrimary
@@ -118,6 +122,8 @@ final class TimelineTrackHeaderView: UIView {
         card.layer.borderColor = (model.isSelected
             ? TimelineTheme.accent.withAlphaComponent(0.55)
             : TimelineTheme.separator).cgColor
+        colorStripe.backgroundColor = model.labelColor?.tint
+        colorStripe.isHidden = model.labelColor == nil
 
         lockButton.setImage(UIImage(systemName: model.isLocked ? "lock.fill" : "lock.open"), for: .normal)
         lockButton.tintColor = model.isLocked ? TimelineTheme.lockedTint : TimelineTheme.textSecondary
@@ -160,6 +166,7 @@ final class TimelineTrackHeaderView: UIView {
         super.layoutSubviews()
         let inset: CGFloat = 3
         card.frame = bounds.insetBy(dx: inset, dy: inset)
+        colorStripe.frame = CGRect(x: 3, y: 8, width: 2, height: max(0, card.bounds.height - 16))
         let content = card.frame.insetBy(dx: 7, dy: 4)
         let size = TimelineMetrics.headerControlSize
 

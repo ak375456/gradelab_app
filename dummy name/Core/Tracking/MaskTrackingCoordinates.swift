@@ -54,6 +54,20 @@ struct MaskTrackingCoordinates: Sendable {
 
     /// The existing compositor's top-left placement transform, before its CI
     /// origin flips. Used only to put editor handles over a transformed layer.
+    func sourceToCanvasTransform(_ clip: VideoClip, canvas: CGSize,
+                                 sourceCorrection: CGAffineTransform = .identity) -> CGAffineTransform {
+        guard clip.camera != nil else {
+            return sourceToCanvasTransform(clip.transform, canvas: canvas, sourceCorrection: sourceCorrection)
+        }
+        let placement = ClipPicturePlacement(clip: clip, encoded: encodedSize,
+                                             preferred: preferredTransform, canvas: canvas)
+        return sourceCorrection
+            .concatenating(.init(a: encodedSize.width, b: 0, c: 0, d: -encodedSize.height,
+                                 tx: 0, ty: encodedSize.height))
+            .concatenating(placement.sourceToCanvas)
+            .concatenating(.init(a: 1 / canvas.width, b: 0, c: 0, d: -1 / canvas.height, tx: 0, ty: 1))
+    }
+
     func sourceToCanvasTransform(_ placement: VisualTransform, canvas: CGSize,
                                  sourceCorrection: CGAffineTransform = .identity) -> CGAffineTransform {
         let fit = min(canvas.width / displayBounds.width, canvas.height / displayBounds.height)

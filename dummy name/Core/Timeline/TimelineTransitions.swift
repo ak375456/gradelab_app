@@ -195,10 +195,21 @@ enum TimelineTransitionEditing {
     static let minimumSeconds = 0.1
     static let maximumSeconds = 5.0
 
+    struct Cut: Equatable, Sendable {
+        let trackID: UUID
+        let outgoingID: UUID
+        let incomingID: UUID
+        let time: TimelineTime
+    }
+
     struct EditPoint {
         let outgoing: VideoClip
         let incoming: VideoClip
         let time: TimelineTime
+
+        var cut: Cut {
+            Cut(trackID: outgoing.placement.trackID, outgoingID: outgoing.id, incomingID: incoming.id, time: time)
+        }
     }
 
     static func transition(in project: VideoProject, at time: TimelineTime, toleranceFrames: Int = 2) -> TimelineTransition? {
@@ -217,29 +228,62 @@ enum TimelineTransitionEditing {
     static func editPoint(in project: VideoProject, at requested: TimelineTime, preferredTrackID: UUID?) throws -> EditPoint? {
         let time = try TimelineEditing.snapped(requested, frame: project.canvas.frameDuration)
         let tolerance = (project.canvas.frameDuration?.seconds ?? 1.0 / 30.0) * 2.01
-        let visualTracks = project.timeline.tracks.filter { $0.kind == .mainVideo || $0.kind == .videoOverlay }
-        let orderedTracks = visualTracks.sorted { lhs, rhs in
-            if lhs.id == preferredTrackID { return true }
-            if rhs.id == preferredTrackID { return false }
-            if lhs.kind == .mainVideo { return true }
-            if rhs.kind == .mainVideo { return false }
-            return false
-        }
-        for track in orderedTracks where track.isEnabled && !track.isLocked {
-            let clips = track.items.compactMap { item -> VideoClip? in
-                guard case .video(let clip) = item, clip.placement.isEnabled, !clip.placement.isLocked,
-                      project.assets.first(where: { $0.id == clip.assetID })?.stillImage == nil else { return nil }
-                return clip
-            }.sorted { $0.placement.timelineStart < $1.placement.timelineStart }
-            for (outgoing, incoming) in zip(clips, clips.dropFirst()) {
-                let cut = try outgoing.placement.range.end
-                guard cut == incoming.placement.timelineStart else { continue }
-                if abs(cut.seconds - time.seconds) <= tolerance {
-                    return .init(outgoing: outgoing, incoming: incoming, time: cut)
-                }
+        let ordered = project.timeline.tracks.enumerated().sorted { lhs, rhs in
+            func priority(_ track: TimelineTrack) -> Int {
+                track.id == preferredTrackID ? 0 : (track.kind == .mainVideo ? 1 : 2)
             }
+            let left = priority(lhs.element), right = priority(rhs.element)
+            return left == right ? lhs.offset < rhs.offset : left < right
+        }
+        let videoAssets = Set(project.assets.filter { $0.videoMetadata != nil && $0.stillImage == nil }.map(\.id))
+        for entry in ordered {
+            if let point = editPoints(on: entry.element, videoAssets: videoAssets).first(where: {
+                abs($0.time.seconds - time.seconds) <= tolerance
+            }) { return point }
         }
         return nil
+    }
+
+    static func editableCuts(in project: VideoProject) -> [Cut] {
+        let videoAssets = Set(project.assets.filter { $0.videoMetadata != nil && $0.stillImage == nil }.map(\.id))
+        guard let minimum = try? minimumDuration(in: project) else { return [] }
+        return project.timeline.tracks.flatMap { track in
+            editPoints(on: track, videoAssets: videoAssets).compactMap { point in
+                guard let maximum = try? maximumEditingDuration(for: point, in: project),
+                      maximum >= minimum else { return nil }
+                return point.cut
+            }
+        }
+    }
+
+    private static func editPoints(on track: TimelineTrack, videoAssets: Set<UUID>) -> [EditPoint] {
+        guard track.isEnabled, !track.isLocked,
+              track.kind == .mainVideo || track.kind == .videoOverlay else { return [] }
+        let clips = track.items.compactMap { item -> VideoClip? in
+            guard case .video(let clip) = item, clip.placement.isEnabled, !clip.placement.isLocked,
+                  videoAssets.contains(clip.assetID) else { return nil }
+            return clip
+        }.sorted { $0.placement.timelineStart < $1.placement.timelineStart }
+        return zip(clips, clips.dropFirst()).compactMap { outgoing, incoming in
+            let cut = incoming.placement.timelineStart
+            guard (try? outgoing.placement.range.end) == cut else { return nil }
+            return EditPoint(outgoing: outgoing, incoming: incoming, time: cut)
+        }
+    }
+
+    private static func editPoint(at cut: Cut, in project: VideoProject) -> EditPoint? {
+        guard let track = project.timeline.tracks.first(where: { $0.id == cut.trackID }) else { return nil }
+        let videoAssets = Set(project.assets.filter { $0.videoMetadata != nil && $0.stillImage == nil }.map(\.id))
+        return editPoints(on: track, videoAssets: videoAssets).first { $0.cut == cut }
+    }
+
+    /// The timeline button targets an exact join even when several rows or
+    /// several short cuts lie under the same playhead.
+    static func apply(_ type: TimelineTransitionType, at cut: Cut, in project: inout VideoProject) throws -> UUID {
+        guard let point = editPoint(at: cut, in: project) else {
+            throw TimelineError.invalid(String(localized: "Choose a cut between two unlocked video clips."))
+        }
+        return try apply(type, at: point, in: &project)
     }
 
     /// Adds/replaces at a cut, or splits the clip under the playhead first. The
@@ -249,10 +293,7 @@ enum TimelineTransitionEditing {
                       preferredTrackID: UUID?, in project: inout VideoProject) throws -> UUID {
         let time = try TimelineEditing.snapped(requested, frame: project.canvas.frameDuration)
         if let existing = transition(in: project, at: time) {
-            guard let index = project.timeline.transitions.firstIndex(where: { $0.id == existing.id }) else { return existing.id }
-            project.timeline.transitions[index].type = type
-            project.timeline.transitions[index].enabled = true
-            return existing.id
+            return try setType(type, for: existing.id, in: &project)
         }
         var point = try editPoint(in: project, at: time, preferredTrackID: preferredTrackID)
         if point == nil {
@@ -272,7 +313,16 @@ enum TimelineTransitionEditing {
             point = .init(outgoing: left, incoming: right, time: right.placement.timelineStart)
         }
         guard let point else { throw TimelineError.invalid(String(localized: "A transition needs video on both sides.")) }
-        let maximum = try maximumDuration(for: point.outgoing, incoming: point.incoming, in: project)
+        return try apply(type, at: point, in: &project)
+    }
+
+    private static func apply(_ type: TimelineTransitionType, at point: EditPoint, in project: inout VideoProject) throws -> UUID {
+        if let existing = project.timeline.transitions.first(where: {
+            $0.outgoingClipID == point.outgoing.id && $0.incomingClipID == point.incoming.id
+        }) {
+            return try setType(type, for: existing.id, in: &project)
+        }
+        let maximum = try maximumEditingDuration(for: point, in: project)
         let minimum = try minimumDuration(in: project)
         guard maximum >= minimum else { throw TimelineError.invalid(String(localized: "The clips do not have enough source frames for a transition.")) }
         let requestedDuration = try TimelineTime.seconds(defaultSeconds)
@@ -284,29 +334,68 @@ enum TimelineTransitionEditing {
         return transition.id
     }
 
+    static func setType(_ type: TimelineTransitionType, for id: UUID, in project: inout VideoProject) throws -> UUID {
+        guard let index = project.timeline.transitions.firstIndex(where: { $0.id == id }),
+              editablePoint(for: project.timeline.transitions[index], in: project) != nil else {
+            throw TimelineError.invalid(String(localized: "Unlock both clips and their track to edit the transition."))
+        }
+        project.timeline.transitions[index].type = type
+        project.timeline.transitions[index].enabled = true
+        return id
+    }
+
+    private static func editablePoint(for transition: TimelineTransition, in project: VideoProject) -> EditPoint? {
+        guard let outgoing = project.timeline.videoClip(id: transition.outgoingClipID) else { return nil }
+        return editPoint(at: Cut(trackID: outgoing.placement.trackID, outgoingID: transition.outgoingClipID,
+                                incomingID: transition.incomingClipID, time: transition.editTime), in: project)
+    }
+
+    static func durationLimits(for transition: TimelineTransition, in project: VideoProject) -> ClosedRange<Double>? {
+        guard transition.enabled, let point = editablePoint(for: transition, in: project),
+              let minimum = try? minimumDuration(in: project),
+              let maximum = try? maximumEditingDuration(for: point, in: project),
+              maximum >= minimum else { return nil }
+        return minimum.seconds...maximum.seconds
+    }
+
+    /// The renderer blends one transition per track at a time. Stop a growing
+    /// transition at the nearest transition on each side, as well as the media handles.
+    private static func maximumEditingDuration(for point: EditPoint, in project: VideoProject) throws -> TimelineTime {
+        var maximum = try maximumDuration(for: point.outgoing, incoming: point.incoming, in: project)
+        for transition in project.timeline.transitions where transition.enabled {
+            guard let range = transition.range else { continue }
+            let gap: TimelineTime
+            if transition.incomingClipID == point.outgoing.id {
+                gap = try point.time.subtracting(range.end)
+            } else if transition.outgoingClipID == point.incoming.id {
+                gap = try range.start.subtracting(point.time)
+            } else {
+                continue
+            }
+            maximum = min(maximum, try gap.adding(gap))
+        }
+        guard maximum >= (try minimumDuration(in: project)) else { return .zero }
+        return try snappedDuration(maximum, in: project)
+    }
+
     static func remove(_ id: UUID, in project: inout VideoProject) {
         project.timeline.transitions.removeAll { $0.id == id }
     }
 
     static func setDuration(_ id: UUID, seconds: Double, in project: inout VideoProject) throws {
-        guard let index = project.timeline.transitions.firstIndex(where: { $0.id == id }),
-              let outgoing = project.timeline.videoClip(id: project.timeline.transitions[index].outgoingClipID),
-              let incoming = project.timeline.videoClip(id: project.timeline.transitions[index].incomingClipID) else { return }
-        let maximum = try maximumDuration(for: outgoing, incoming: incoming, in: project)
-        let minimum = try minimumDuration(in: project)
-        let proposed = try TimelineTime.seconds(min(max(seconds, minimum.seconds), maximumSeconds))
-        project.timeline.transitions[index].duration = try snappedDuration(min(proposed, maximum), in: project)
+        guard seconds.isFinite, let index = project.timeline.transitions.firstIndex(where: { $0.id == id }),
+              let limits = durationLimits(for: project.timeline.transitions[index], in: project) else { return }
+        let proposed = try TimelineTime.seconds(min(max(seconds, limits.lowerBound), limits.upperBound))
+        project.timeline.transitions[index].duration = try snappedDuration(proposed, in: project)
     }
 
     static func maximumDuration(for outgoing: VideoClip, incoming: VideoClip, in project: VideoProject) throws -> TimelineTime {
         guard let outgoingAsset = project.assets.first(where: { $0.id == outgoing.assetID }),
               let incomingAsset = project.assets.first(where: { $0.id == incoming.assetID }),
               outgoingAsset.stillImage == nil, incomingAsset.stillImage == nil else { return .zero }
-        let outgoingSourceHandle = try outgoingAsset.sourceRange.end.subtracting(outgoing.sourceRange.end)
-        let incomingSourceHandle = try incoming.sourceRange.start.subtracting(incomingAsset.sourceRange.start)
-        let outgoingHandle = try ClipSpeed.timelineDuration(sourceDuration: max(.zero, outgoingSourceHandle), speed: outgoing.speed)
-        let incomingHandle = try ClipSpeed.timelineDuration(sourceDuration: max(.zero, incomingSourceHandle), speed: incoming.speed)
-        let half = min(min(outgoingHandle, incomingHandle), min(outgoing.placement.duration, incoming.placement.duration))
+        // Decoder tracks can hold an edge frame when the source ends at the
+        // cut. Each half still fits inside its corresponding timeline clip.
+        let half = min(outgoing.placement.duration, incoming.placement.duration)
         let doubled = try TimelineTime(CMTimeMultiply(half.cmTime, multiplier: 2))
         return min(doubled, try TimelineTime.seconds(maximumSeconds))
     }
@@ -325,7 +414,7 @@ enum TimelineTransitionEditing {
         // side of its edit. Even counts keep both the start and end on the same
         // frame grid as the cut; an odd count would create half-frame source
         // requests that some decoders cannot satisfy deterministically.
-        var frames = max(2, Int32((duration.seconds / frame.seconds).rounded(.down)))
+        var frames = max(2, Int32((duration.seconds / frame.seconds + 1e-7).rounded(.down)))
         if !frames.isMultiple(of: 2) { frames -= 1 }
         return try TimelineTime(CMTimeMultiply(frame.cmTime, multiplier: frames))
     }

@@ -73,6 +73,8 @@ struct ValidateSequence {
         let secondURL = root.appendingPathComponent("second.mov")
         try await generateSource(secondURL)
         let secondAsset = try await VideoMetadataReader().read(from: secondURL)
+        try await validateTransitionAtFullLengthJoin(asset: asset, incoming: secondAsset,
+                                                     context: context, exporter: exporter, root: root)
         var layered = VideoProject(sourceURL: url, displayName: "Layers", metadata: asset.metadata,
             sourceRange: asset.sourceRange, frameDuration: asset.frameDuration)
         let media = ProjectMediaAsset(id: UUID(), url: secondURL, sourceRange: secondAsset.sourceRange!, videoMetadata: secondAsset.metadata, frameDuration: secondAsset.frameDuration)
@@ -127,6 +129,26 @@ struct ValidateSequence {
             precondition(zip(expected, actual).allSatisfy { abs($0-$1) < 0.1 }, "Portrait orientation mismatch \(expected) vs \(actual)")
         }
         print("PASS: portrait layered composition matches source orientation and canvas dimensions")
+        var framedProject = portraitProject
+        var framedClip = framedProject.timeline.firstVideoClip!
+        framedClip.camera = ClipCamera(mode: .crop, y: 0, cropHeight: 0.4)
+        try TimelineEditing.replace(framedClip.id, with: [framedClip], in: &framedProject)
+        let framedSequence = try await SequenceComposition.build(project: framedProject, forExport: false, context: context)
+        let framedPreview = AVAssetImageGenerator(asset: framedSequence.source.asset)
+        framedPreview.videoComposition = framedSequence.source.videoComposition
+        let framedExport = try await exporter.export(asset: portrait, settings: .neutral, configuration: configuration,
+            project: framedProject, outputURL: root.appendingPathComponent("camera-result.mov"))
+        let framedOutput = AVAssetImageGenerator(asset: AVURLAsset(url: framedExport))
+        for x in [0.12, 0.88] {
+            let expected = try await pixelAt(reference, x: x, y: 0.2)
+            let preview = try await pixelAt(framedPreview, x: x, y: 0.5)
+            let exported = try await pixelAt(framedOutput, x: x, y: 0.5)
+            precondition(zip(expected, preview).allSatisfy { abs($0 - $1) < 0.1 }, "Camera altered the full-width crop")
+            precondition(zip(preview, exported).allSatisfy { abs($0 - $1) < 0.08 }, "Camera preview and export differ")
+        }
+        let outsideCrop = try await pixelAt(framedOutput, x: 0.5, y: 0.15)
+        precondition(outsideCrop.prefix(3).allSatisfy { $0 < 0.04 }, "Camera exposed pixels outside the crop")
+        print("PASS: Camera Crop & Fit retains both edges of the top strip in preview and H.264 export")
         let imageURL = root.appendingPathComponent("overlay.png")
         var pixels = [UInt8](repeating: 0, count: 64*32*4)
         for y in 0..<32 { for x in 32..<64 { pixels[(y*64+x)*4+1] = 190; pixels[(y*64+x)*4+3] = 255 } }
@@ -266,6 +288,31 @@ struct ValidateSequence {
         let previewText = try await pixel(textPreview, time: 0.5)
         let plain = try await pixel(AVAssetImageGenerator(asset: AVURLAsset(url: url)), time: 0.5)
         precondition(previewText[1] > plain[1]+0.025, "White text missing from composed preview")
+        var liveCameraProject = textProject
+        var liveCameraClip = liveCameraProject.timeline.firstVideoClip!
+        liveCameraClip.camera = ClipCamera(mode: .crop, y: 0, cropHeight: 0.4)
+        try TimelineEditing.replace(liveCameraClip.id, with: [liveCameraClip], in: &liveCameraProject)
+        textSequence.layerState!.update(liveCameraProject, bypass: false)
+        let liveCameraPreview = AVAssetImageGenerator(asset: textSequence.source.asset)
+        liveCameraPreview.videoComposition = textSequence.source.videoComposition?.mutableCopy() as? AVVideoComposition
+        let titleTime = CMTime(seconds: 0.5, preferredTimescale: 600)
+        let beforeCamera = try await textPreview.image(at: titleTime).image
+        let duringCamera = try await liveCameraPreview.image(at: titleTime).image
+        var visibleTitleSamples = 0
+        for y in [0.4, 0.5, 0.6] {
+            for x in stride(from: 0.25, through: 0.75, by: 0.025) {
+                let before = pixelAt(beforeCamera, x: x, y: y)
+                guard before[1] > 0.5 else { continue }
+                let after = pixelAt(duringCamera, x: x, y: y)
+                visibleTitleSamples += 1
+                precondition(zip(before, after).allSatisfy { abs($0 - $1) < 0.06 }, "Camera moved or hid the title")
+            }
+        }
+        precondition(visibleTitleSamples > 0, "The test must sample visible title pixels")
+        let liveEdge = pixelAt(duringCamera, x: 0.88, y: 0.25)
+        precondition(liveEdge.prefix(3).allSatisfy { $0 < 0.04 }, "Live camera crop did not update")
+        print("PASS: Live camera framing updates while the title stays in place")
+        textSequence.layerState!.update(textProject, bypass: false)
         let textURL = try await exporter.export(asset: asset, settings: .neutral, configuration: .init(codec: .h264), project: textProject, outputURL: root.appendingPathComponent("text.mov"))
         let textReader = AVAssetImageGenerator(asset: AVURLAsset(url: textURL))
         let exportedText = try await pixel(textReader, time: 0.5)
@@ -281,7 +328,106 @@ struct ValidateSequence {
         let updated = try await pixel(updatedPreview, time: 0.5)
         precondition(updated[2] < previewText[2]-0.015, "Live text color did not update without rebuilding")
         print("PASS: text visible in actual video composition and H.264 export, matching pixels, exact duration, live color state without sequence rebuild")
+        try await validateSceneCamera(asset: asset, context: context, exporter: exporter, root: root)
         try await animation(url: url, asset: asset, exporter: exporter, context: context, root: root)
+    }
+
+    static func validateSceneCamera(asset: VideoAsset, context: MetalContext, exporter: VideoExporter, root: URL) async throws {
+        var project = VideoProject(sourceURL: asset.url, displayName: "Camera", metadata: asset.metadata,
+            sourceRange: asset.sourceRange, frameDuration: asset.frameDuration)
+        var footage = project.timeline.firstVideoClip!
+        footage.placement.cameraDepth = .background
+        let times = try [0.1, 0.5, 0.8].map { try TimelineTime.seconds($0) }
+        let framingTime = try TimelineTime.seconds(0.9)
+        let framedSample = try TimelineTime.seconds(0.95)
+        var animation = ClipAnimation(tracks: [AnimationTrack(property: .cameraPositionZ,
+            keyframes: zip(times, [0.0, 0.5, 1.15]).map {
+                Keyframe(time: $0.0, value: .number($0.1), interpolation: .linear)
+            })])
+        let framing: [(AnimatableProperty, Double, Double)] = [
+            (.sceneCameraFrameWidth, 1, 0.5), (.sceneCameraFrameHeight, 1, 0.5),
+            (.sceneCameraRotation, 0, 22), (.sceneCameraZoom, 1, 1.2)
+        ]
+        for (property, initial, framed) in framing {
+            animation.update(property) { track in
+                track.set(.number(initial), at: .zero, interpolation: .hold)
+                track.set(.number(framed), at: framingTime)
+            }
+        }
+        try TimelineEditing.replace(footage.id, with: [footage], in: &project)
+        let titleTrack = UUID()
+        let titleRange = try TimelineTime.seconds(1.25)
+        var title = TextClip(placement: .init(id: UUID(), trackID: titleTrack, timelineStart: .zero,
+                                              duration: titleRange, cameraDepth: .foreground))
+        title.text = "TITLE"
+        title.style.fontSize = 16
+        title.color = .init(red: 0, green: 1, blue: 0)
+        project.timeline.tracks.insert(.init(id: titleTrack, name: "Title", kind: .text, items: [.text(title)]), at: 0)
+        let captionTrack = UUID()
+        var caption = TextClip(placement: .init(id: UUID(), trackID: captionTrack, timelineStart: .zero, duration: titleRange))
+        caption.text = "SCREEN"
+        caption.style.fontSize = 16
+        caption.transform.positionY = 0.16
+        caption.color = .init(red: 0, green: 0, blue: 1)
+        project.timeline.tracks.insert(.init(id: captionTrack, name: "Caption", kind: .text, items: [.text(caption)]), at: 0)
+
+        let cameraTrack = UUID()
+        let camera = SceneCameraClip(placement: .init(id: UUID(), trackID: cameraTrack,
+                                                       timelineStart: .zero, duration: try .seconds(1)),
+                                     animation: animation)
+        project.timeline.tracks.insert(
+            .init(id: cameraTrack, name: "Camera", kind: .camera, items: [.camera(camera)]), at: 0)
+
+        let sequence = try await SequenceComposition.build(project: project, context: context)
+        let preview = AVAssetImageGenerator(asset: sequence.source.asset)
+        preview.videoComposition = sequence.source.videoComposition
+        let output = try await exporter.export(asset: asset, settings: .neutral, configuration: .init(codec: .h264),
+            project: project, outputURL: root.appendingPathComponent("scene-camera.mov"))
+        let exported = AVAssetImageGenerator(asset: AVURLAsset(url: output))
+        for generator in [preview, exported] {
+            generator.requestedTimeToleranceBefore = .zero
+            generator.requestedTimeToleranceAfter = .zero
+            var titleAreas: [Int] = []
+            var screenPixels: [[Int]] = []
+            for time in times + [framedSample, try .seconds(1.1)] {
+                let frame = try await generator.image(at: time.cmTime).image
+                let width = frame.width, height = frame.height
+                var bytes = [UInt8](repeating: 0, count: width * height * 4)
+                bytes.withUnsafeMutableBytes { pixels in
+                    let context = CGContext(data: pixels.baseAddress, width: width, height: height,
+                        bitsPerComponent: 8, bytesPerRow: width * 4, space: CGColorSpaceCreateDeviceRGB(),
+                        bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue)!
+                    context.draw(frame, in: CGRect(x: 0, y: 0, width: width, height: height))
+                }
+                if time == framedSample {
+                    func brightness(x: Int, y: Int) -> Int {
+                        let i = (y * width + x) * 4
+                        return max(Int(bytes[i]), Int(bytes[i + 1]), Int(bytes[i + 2]))
+                    }
+                    let center = brightness(x: width / 2, y: height / 2)
+                    let side = brightness(x: width / 8, y: height / 2)
+                    let edge = brightness(x: width / 2, y: height - 2)
+                    precondition(center > 40 && side < 24 && edge < 24,
+                        "Expected picture at the center and black outside the framing: \(center), \(side), \(edge)")
+                }
+                var green = 0
+                var blue: [Int] = []
+                for index in 0..<(width * height) {
+                    let r = Int(bytes[index * 4]), g = Int(bytes[index * 4 + 1]), b = Int(bytes[index * 4 + 2])
+                    if g > 100, g > max(r, b) + 45 { green += 1 }
+                    if b > 85, b > max(r, g) + 35 { blue.append(index) }
+                }
+                titleAreas.append(green)
+                screenPixels.append(blue)
+            }
+            precondition(titleAreas[0] > 10 && titleAreas[1] > titleAreas[0] * 2 && titleAreas[2] == 0 && titleAreas[3] == 0 && titleAreas[4] > 10,
+                         "Camera did not grow and pass the foreground title: \(titleAreas)")
+            let caption = Set(screenPixels[0])
+            let overlaps = screenPixels.dropFirst().map { caption.intersection(Set($0)).count }
+            precondition(caption.count > 12 && overlaps.allSatisfy { $0 >= caption.count * 4 / 5 },
+                         "Camera moved or hid the Screen caption: \(screenPixels.map(\.count)), overlap \(overlaps)")
+        }
+        print("PASS: Camera passes the foreground title, crops width and height, and leaves Screen captions fixed in preview and H.264 export")
     }
 
     /// Animation must render identically in preview and export, at exact keyframe times and
@@ -542,12 +688,30 @@ struct ValidateSequence {
         precondition(Set(firstInstruction.trackIDs.values).count == 2, "Overlapping source frames cannot share a decoder")
 
         var transitioned = cuts
-        _ = try TimelineTransitionEditing.apply(.crossDissolve, at: .seconds(8.0 / 30),
-            preferredTrackID: nil, in: &transitioned)
+        let transitionCut = TimelineTransitionEditing.editableCuts(in: transitioned).first!
+        let transitionID = try TimelineTransitionEditing.apply(.crossDissolve, at: transitionCut, in: &transitioned)
+        try TimelineTransitionEditing.setDuration(transitionID, seconds: 0.2, in: &transitioned)
+        let resized = transitioned.timeline.transitions[0]
+        precondition(resized.editTime == transitionCut.time && abs(resized.duration.seconds - 0.2) < 0.001,
+                     "Resizing a transition must preserve the cut")
         let transitionSequence = try await SequenceComposition.build(project: transitioned, context: context)
         let transitionInstructions = transitionSequence.source.videoComposition!.instructions.compactMap { $0 as? LayerInstruction }
         precondition(transitionInstructions.contains { Set($0.trackIDs.values).count == 2 },
                      "Transition handles must preserve both source frames")
+        let transitionPreview = AVAssetImageGenerator(asset: transitionSequence.source.asset)
+        transitionPreview.videoComposition = transitionSequence.source.videoComposition
+        let transitionURL = try await exporter.export(asset: asset, settings: .neutral, configuration: configuration,
+            project: transitioned, outputURL: root.appendingPathComponent("resized-transition.mp4"))
+        let transitionExport = AVAssetImageGenerator(asset: AVURLAsset(url: transitionURL))
+        for renderer in [transitionPreview, transitionExport] {
+            renderer.requestedTimeToleranceBefore = .zero
+            renderer.requestedTimeToleranceAfter = .zero
+        }
+        let liveColor = try await pixel(transitionPreview, time: transitionCut.time.seconds)
+        let fileColor = try await pixel(transitionExport, time: transitionCut.time.seconds)
+        precondition(zip(liveColor, fileColor).allSatisfy { abs($0 - $1) <= 0.07 },
+                     "Resized transition differs between preview and export: \(liveColor), \(fileColor)")
+        log("PASS: Transition added at an exact cut and resized preserves cut timing and matches preview with export")
 
         var smoothed = VideoProject(sourceURL: asset.url, displayName: "Retimed cuts", metadata: asset.metadata,
             sourceRange: asset.sourceRange, frameDuration: asset.frameDuration)
@@ -568,6 +732,62 @@ struct ValidateSequence {
         let smoothDuration = try await AVURLAsset(url: smoothURL).load(.duration)
         precondition(abs(smoothDuration.seconds - 6) < 0.05, "Reusing a retimed track changed the timeline duration")
         log("PASS: 11 cuts share one decoder; 60 fps composition exports 90 frames at 30 fps with per-cut grades; overlaps, transitions and smoothed retiming preserve their source frames and duration")
+    }
+
+    static func validateTransitionAtFullLengthJoin(asset: VideoAsset, incoming: VideoAsset,
+                                                   context: MetalContext, exporter: VideoExporter, root: URL) async throws {
+        var project = VideoProject(sourceURL: asset.url, displayName: "Whole clips", metadata: asset.metadata,
+                                   sourceRange: asset.sourceRange, frameDuration: asset.frameDuration)
+        let first = project.timeline.firstVideoClip!
+        let sourceRange = incoming.sourceRange!
+        let cut = try first.placement.range.end
+        let media = ProjectMediaAsset(id: UUID(), url: incoming.url, sourceRange: sourceRange,
+                                      videoMetadata: incoming.metadata, frameDuration: incoming.frameDuration)
+        project.addAsset(media)
+        let next = VideoClip(placement: .init(id: UUID(), trackID: first.placement.trackID,
+                                              timelineStart: cut, duration: sourceRange.duration),
+                             assetID: media.id, sourceRange: sourceRange, embeddedAudio: EmbeddedAudio())
+        project.timeline.tracks[0].items.append(.video(next))
+        let join = TimelineTransitionEditing.editableCuts(in: project).first!
+        let tracks = project.timeline.tracks
+        let duration = project.timeline.duration
+        _ = try TimelineTransitionEditing.apply(.crossDissolve, at: join, in: &project)
+        precondition(project.timeline.tracks == tracks && project.timeline.duration == duration,
+                     "Adding a transition at a full-length join must preserve both clips and audio timing")
+
+        let preview = try await SequenceComposition.build(project: project, forExport: false, context: context)
+        let live = AVAssetImageGenerator(asset: preview.source.asset)
+        live.videoComposition = preview.source.videoComposition
+        let exported = try await exporter.export(asset: asset, settings: .neutral, configuration: .init(codec: .h264),
+            project: project, outputURL: root.appendingPathComponent("whole-clip-transition.mov"))
+        let movie = AVURLAsset(url: exported)
+        let output = AVAssetImageGenerator(asset: movie)
+        for generator in [live, output] {
+            generator.requestedTimeToleranceBefore = .zero
+            generator.requestedTimeToleranceAfter = .zero
+        }
+        let beforeCut = cut.seconds - 1.0 / 30
+        let afterCut = cut.seconds + 1.0 / 30
+        for time in [beforeCut, cut.seconds, afterCut] {
+            let liveColor = try await pixel(live, time: time)
+            let exportedColor = try await pixel(output, time: time)
+            precondition(liveColor[0] > 0.18 && liveColor[1] > 0.18,
+                         "Both clips should be visible during the held-frame dissolve: \(liveColor)")
+            precondition(zip(liveColor, exportedColor).allSatisfy { abs($0 - $1) < 0.08 },
+                         "Held-frame transition differs between preview and export: \(liveColor), \(exportedColor)")
+        }
+        let exportedDuration = try await movie.load(.duration)
+        precondition(abs(exportedDuration.seconds - duration.seconds) < 0.04)
+        let beforeAudio = try await audioRMS(movie, at: cut.seconds - 0.12)
+        let afterAudio = try await audioRMS(movie, at: cut.seconds + 0.03)
+        precondition(beforeAudio > 0.03 && afterAudio > 0.03, "Picture handles must preserve linked audio at the cut")
+
+        project.canvas.width = 1920
+        project.canvas.height = 1080
+        let composed = try await SequenceComposition.build(project: project, forExport: false, context: context)
+        precondition(composed.source.videoComposition?.renderSize.width == 1920)
+        precondition(composed.source.playbackVideoCompositions[.medium]?.renderSize.width == 1280)
+        log("PASS: Full-length clips expose a transition, blend both edge frames in preview and export, and preserve linked audio and duration")
     }
 
     static func validateLayerLiftTiming(asset: VideoAsset, context: MetalContext,
@@ -757,6 +977,10 @@ struct ValidateSequence {
 
     static func pixelAt(_ generator: AVAssetImageGenerator, x: Double, y: Double) async throws -> [Double] {
         let image = try await generator.image(at: CMTime(seconds: 0.5, preferredTimescale: 600)).image
+        return pixelAt(image, x: x, y: y)
+    }
+
+    static func pixelAt(_ image: CGImage, x: Double, y: Double) -> [Double] {
         let crop = image.cropping(to: CGRect(x: Double(image.width)*x, y: Double(image.height)*y, width: 2, height: 2))!
         var bytes = [UInt8](repeating: 0, count: 4)
         bytes.withUnsafeMutableBytes { ptr in

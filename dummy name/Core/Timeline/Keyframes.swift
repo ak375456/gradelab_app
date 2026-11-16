@@ -19,6 +19,11 @@ import Foundation
 enum AnimatableProperty: String, Codable, CaseIterable, Sendable {
     // Shared visual transform: text, video and image clips all use these.
     case positionX, positionY, scale, widthScale, heightScale, rotation, opacity
+    case cameraX, cameraY, cameraZoom, cameraRoll, cameraCropWidth, cameraCropHeight
+    case cameraFocusAmount, cameraFocusX, cameraFocusY, cameraFocusRadius
+    case cameraDolly // Legacy clip key. Migrated when opening a project.
+    case cameraPositionX, cameraPositionY, cameraPositionZ
+    case sceneCameraZoom, sceneCameraRotation, sceneCameraFrameWidth, sceneCameraFrameHeight
     // Structural layer-mask geometry.
     case layerMaskPositionX, layerMaskPositionY, layerMaskWidth, layerMaskHeight
     case layerMaskRotation, layerMaskFeather
@@ -141,6 +146,22 @@ enum AnimatableProperty: String, Codable, CaseIterable, Sendable {
         case .heightScale: String(localized: "Height scale")
         case .rotation: String(localized: "Rotation")
         case .opacity: String(localized: "Opacity")
+        case .cameraX: String(localized: "Camera X")
+        case .cameraY: String(localized: "Camera Y")
+        case .cameraZoom, .sceneCameraZoom: String(localized: "Zoom")
+        case .sceneCameraRotation: String(localized: "Rotation")
+        case .sceneCameraFrameWidth: String(localized: "Frame Width")
+        case .sceneCameraFrameHeight: String(localized: "Frame Height")
+        case .cameraDolly, .cameraPositionZ: String(localized: "Position Z")
+        case .cameraPositionX: String(localized: "Position X")
+        case .cameraPositionY: String(localized: "Position Y")
+        case .cameraRoll: String(localized: "Camera rotation")
+        case .cameraCropWidth: String(localized: "Crop width")
+        case .cameraCropHeight: String(localized: "Crop height")
+        case .cameraFocusAmount: String(localized: "Blur amount")
+        case .cameraFocusX: String(localized: "Focus X")
+        case .cameraFocusY: String(localized: "Focus Y")
+        case .cameraFocusRadius: String(localized: "Focus size")
         case .layerMaskPositionX, .localMaskPositionX: String(localized: "Position X")
         case .layerMaskPositionY, .localMaskPositionY: String(localized: "Position Y")
         case .layerMaskWidth, .localMaskWidth: String(localized: "Width")
@@ -209,6 +230,15 @@ enum AnimatableProperty: String, Codable, CaseIterable, Sendable {
         case .positionX, .positionY: -10...10
         case .scale, .widthScale, .heightScale: 0.01...20
         case .rotation: -36_000...36_000
+        case .cameraX, .cameraY, .cameraFocusAmount, .cameraFocusX, .cameraFocusY: 0...1
+        case .cameraFocusRadius: 0.08...0.85
+        case .cameraZoom: 1...8
+        case .sceneCameraZoom: 0.25...8
+        case .sceneCameraFrameWidth, .sceneCameraFrameHeight: 0.05...1
+        case .cameraDolly, .cameraPositionZ: -0.5...2.5
+        case .cameraPositionX, .cameraPositionY: -2...2
+        case .cameraRoll, .sceneCameraRotation: -36_000...36_000
+        case .cameraCropWidth, .cameraCropHeight: 0.05...1
         case .opacity, .backgroundOpacity, .shadowOpacity, .glowOpacity,
              .layerMaskFeather, .localMaskFeather, .localMaskOpacity,
              .localMaskCornerRadius, .localMaskStrength: 0...1
@@ -260,6 +290,12 @@ enum AnimatableProperty: String, Codable, CaseIterable, Sendable {
         case .scale, .widthScale, .heightScale: .number(1)
         case .rotation: .number(0)
         case .opacity: .number(1)
+        case .cameraX, .cameraY, .cameraFocusX, .cameraFocusY: .number(0.5)
+        case .cameraZoom, .cameraCropWidth, .cameraCropHeight,
+             .sceneCameraZoom, .sceneCameraFrameWidth, .sceneCameraFrameHeight: .number(1)
+        case .cameraRoll, .cameraFocusAmount, .cameraDolly, .cameraPositionX, .cameraPositionY, .cameraPositionZ,
+             .sceneCameraRotation: .number(0)
+        case .cameraFocusRadius: .number(0.24)
         case .layerMaskPositionX, .layerMaskPositionY,
              .localMaskPositionX, .localMaskPositionY: .number(0.5)
         case .layerMaskWidth: .number(0.7)

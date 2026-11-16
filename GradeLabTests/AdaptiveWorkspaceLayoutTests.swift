@@ -78,11 +78,11 @@ final class AdaptiveWorkspaceLayoutTests: XCTestCase {
         let headerHeight: CGFloat = 180
         let budget = AdaptiveWorkspaceLayout.budgetSize(window, headerHeight: headerHeight)
         let preview = min(budget.height * 0.4, EditorWorkspaceBudget.previewCeiling(
-            height: budget.height, floor: 140, showsTimeline: true, showsWarmupNotice: false))
+            height: budget.height, floor: 140, showsTimeline: true))
         let timeline = min(200, EditorWorkspaceBudget.timelineCeiling(
-            height: budget.height, previewHeight: preview, showsWarmupNotice: false))
+            height: budget.height, previewHeight: preview))
         let total = preview + timeline
-            + EditorWorkspaceBudget.chrome(showsTimeline: true, showsWarmupNotice: false)
+            + EditorWorkspaceBudget.chrome(showsTimeline: true)
             + headerHeight - EditorWorkspaceBudget.header
         XCTAssertLessThanOrEqual(total, window.height)
         XCTAssertGreaterThanOrEqual(timeline, EditorWorkspaceBudget.minimumTimeline)

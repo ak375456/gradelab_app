@@ -9,10 +9,29 @@ import XCTest
 @MainActor
 final class PreviewComputeDispatchTests: XCTestCase {
     func testBundledSingleClipPreparesAndDecodesForPreview() async throws {
+        try await assertBundledClipPlays(withReframe: false)
+    }
+
+    func testBundledReframedClipPreparesAndDecodesForPreview() async throws {
+        #if targetEnvironment(simulator)
+        throw XCTSkip("This test needs hardware playback through the custom compositor.")
+        #else
+        try await assertBundledClipPlays(withReframe: true)
+        #endif
+    }
+
+    private func assertBundledClipPlays(withReframe: Bool) async throws {
         let url = try XCTUnwrap(Bundle.main.url(forResource: "onboarding-1-before", withExtension: "mp4"))
         let asset = try await VideoMetadataReader().read(from: url)
-        let project = GradeProject(sourceURL: url, displayName: "Preview sample", metadata: asset.metadata)
+        var project = GradeProject(sourceURL: url, displayName: "Preview sample", metadata: asset.metadata,
+                                   sourceRange: asset.sourceRange, frameDuration: asset.frameDuration)
+        if withReframe {
+            var clip = try XCTUnwrap(project.timeline.firstVideoClip)
+            clip.camera = ClipCamera(zoom: 1.3)
+            try TimelineEditing.replace(clip.id, with: [clip], in: &project)
+        }
         let sequence = try await SequenceComposition.build(project: project, forExport: false)
+        XCTAssertEqual(sequence.layerState != nil, withReframe)
         let playback = VideoPlaybackController(url: url, duration: asset.metadata.durationSeconds)
         playback.replaceSequence(sequence, at: 0)
         let deadline = Date().addingTimeInterval(12)

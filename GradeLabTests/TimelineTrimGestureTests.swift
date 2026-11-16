@@ -131,6 +131,58 @@ final class TimelineTrimGestureTests: XCTestCase {
         }
     }
 
+    func testHoldingLockedClipOpensItsOptionsOnNarrowAndWideTimelines() async throws {
+        for width: CGFloat in [320, 1024] {
+            var project = VideoProject(sourceURL: URL(filePath: "/tmp/clip-lock.mov"),
+                displayName: "Clip lock", metadata: makeVideoMetadata(durationSeconds: 12))
+            let first = try XCTUnwrap(project.timeline.firstVideoClip).id
+            let second = try TimelineEditing.split(first, at: .seconds(6), in: &project)
+            let model = try EditorViewModel(project: project)
+            model.suspendPreviewForExport()
+            model.setClipLocked(true, id: second)
+            XCTAssertEqual(model.selectedClipID, first)
+
+            let canvas = TimelineCanvas(frame: CGRect(x: 0, y: 0, width: width, height: 140))
+            canvas.clips = model.project.timeline.items.compactMap(TimelineDisplayClip.init)
+            canvas.tracks = model.project.timeline.tracks
+            canvas.selectedID = first
+            canvas.selectedIDs = [first]
+            canvas.layoutIfNeeded()
+            canvas.update(time: 9)
+            let scroll = try XCTUnwrap(canvas.subviews.compactMap { $0 as? UIScrollView }.first)
+            let installedHold = try XCTUnwrap(scroll.gestureRecognizers?.compactMap { $0 as? UILongPressGestureRecognizer }
+                .first { $0.delegate === canvas })
+            let touch = Touch()
+            touch.point = CGPoint(x: width / 2, y: TimelineMetrics.rowsTop + 25)
+            XCTAssertTrue(canvas.gestureRecognizer(installedHold, shouldReceive: touch))
+            XCTAssertTrue(canvas.gestureRecognizerShouldBegin(installedHold))
+            canvas.onEdit = { _, _, _ in XCTFail("A locked clip cannot be moved") }
+            canvas.onSelectMany = { _ in XCTFail("A stationary hold should open options") }
+            let opened = expectation(description: "Locked clip options on a \(width)-point timeline")
+            canvas.onOptions = { id in
+                XCTAssertEqual(id, second)
+                model.selectClip(id: id, seek: false)
+                opened.fulfill()
+            }
+            let hold = Hold()
+            hold.point = touch.point
+            hold.phase = .began
+            canvas.perform(NSSelectorFromString("held:"), with: hold)
+            await fulfillment(of: [opened], timeout: 2)
+            hold.phase = .ended
+            canvas.perform(NSSelectorFromString("held:"), with: hold)
+
+            XCTAssertFalse(model.canEditSelection)
+            model.setClipLocked(false, id: second)
+            XCTAssertTrue(model.canEditSelection)
+            XCTAssertEqual(model.history.undoEntries.count, 2)
+            model.undo()
+            XCTAssertFalse(model.canEditSelection)
+            model.redo()
+            XCTAssertTrue(model.canEditSelection)
+        }
+    }
+
     func testHoldingShortTitleMovesSelectedTitlesTogetherWithoutChangingSelection() throws {
         let width: CGFloat = 720
         let (canvas, model, titles, video) = try titleGroup(width: width)

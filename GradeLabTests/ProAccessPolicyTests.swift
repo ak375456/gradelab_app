@@ -62,6 +62,52 @@ final class ProAccessPolicyTests: XCTestCase {
         XCTAssertFalse(ProFeature.cameraRecording.detail.isEmpty)
     }
 
+    func testClipReframeRequiresProForProjectAndSingleClipExport() throws {
+        var project = project()
+        var clip = try XCTUnwrap(project.timeline.firstVideoClip)
+        clip.camera = ClipCamera(zoom: 1.5)
+        try TimelineEditing.replace(clip.id, with: [clip], in: &project)
+        let reopened = try JSONDecoder().decode(VideoProject.self, from: JSONEncoder().encode(project))
+        XCTAssertEqual(ProAccessPolicy.exportRequirements(reopened, configuration: free, settings: .neutral), [.editorCamera])
+
+        let isolated = try XCTUnwrap(SingleClipExport.isolate(clipID: clip.id, in: reopened))
+        XCTAssertEqual(ProAccessPolicy.exportRequirement(isolated, configuration: free), .editorCamera)
+
+        project.timeline.tracks[0].isEnabled = false
+        XCTAssertNil(ProAccessPolicy.exportRequirement(project, configuration: free))
+        project.timeline.tracks[0].isEnabled = true
+        clip.camera = nil
+        try TimelineEditing.replace(clip.id, with: [clip], in: &project)
+        XCTAssertNil(ProAccessPolicy.exportRequirement(project, configuration: free))
+    }
+
+    func testSceneCameraRequiresProOnlyWhenIncludedInExport() throws {
+        var project = project()
+        let trackID = UUID()
+        var camera = SceneCameraClip(placement: .init(id: UUID(), trackID: trackID, timelineStart: .zero,
+                                                      duration: project.timeline.duration),
+                                     position: .init(z: 0.5))
+        let clipID = try XCTUnwrap(project.timeline.firstVideoClip).id
+        project.timeline.setCameraDepth(.foreground, for: clipID)
+        project.timeline.tracks.insert(.init(id: trackID, name: "Camera", kind: .camera,
+                                             items: [.camera(camera)]), at: 0)
+
+        XCTAssertEqual(ProAccessPolicy.exportRequirement(project, configuration: free), .editorCamera)
+        let isolated = try XCTUnwrap(SingleClipExport.isolate(clipID: clipID, in: project))
+        XCTAssertNil(ProAccessPolicy.exportRequirement(isolated, configuration: free))
+
+        project.timeline.tracks[0].isEnabled = false
+        XCTAssertNil(ProAccessPolicy.exportRequirement(project, configuration: free))
+        project.timeline.tracks[0].isEnabled = true
+        camera.placement.isEnabled = false
+        project.timeline.tracks[0].items = [.camera(camera)]
+        XCTAssertNil(ProAccessPolicy.exportRequirement(project, configuration: free))
+        camera.placement.isEnabled = true
+        camera.placement.timelineStart = project.timeline.duration
+        project.timeline.tracks[0].items = [.camera(camera)]
+        XCTAssertNil(ProAccessPolicy.exportRequirement(project, configuration: free))
+    }
+
     // MARK: - Fixtures
 
     private func project(

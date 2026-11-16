@@ -1,5 +1,54 @@
 import UIKit
 
+struct TimelineTransitionHandleLayout {
+    enum Edge { case left, right }
+
+    let center: CGPoint
+    let halfSpan: CGFloat
+    private let handleOffset: CGFloat
+    private let bandHeight: CGFloat = 22
+
+    init(center: CGPoint, duration: Double, zoom: Double) {
+        self.center = center
+        halfSpan = duration * zoom / 2
+        // Pad the ends of a short span so each grip is reachable. The
+        // padding tapers off as the actual edges spread apart.
+        handleOffset = halfSpan + max(0, 30 - halfSpan / 2)
+    }
+
+    var band: CGRect {
+        CGRect(x: center.x - halfSpan, y: center.y - bandHeight / 2,
+               width: 2 * halfSpan, height: bandHeight)
+    }
+
+    func position(of edge: Edge) -> CGPoint {
+        CGPoint(x: center.x + (edge == .left ? -handleOffset : handleOffset), y: center.y)
+    }
+
+    func edge(at point: CGPoint) -> Edge? {
+        guard abs(point.y - center.y) <= 22, abs(point.x - center.x) >= 10 else { return nil }
+        let side: Edge = point.x < center.x ? .left : .right
+        return abs(point.x - position(of: side).x) <= 22 ? side : nil
+    }
+}
+
+struct TimelineTransitionResize {
+    let id: UUID
+    let edge: TimelineTransitionHandleLayout.Edge
+    let duration: Double
+    let zoom: Double
+    let limits: ClosedRange<Double>
+    let frameDuration: Double?
+
+    func duration(at translation: CGFloat) -> Double {
+        let outward = edge == .left ? -translation : translation
+        let proposed = min(limits.upperBound, max(limits.lowerBound, duration + 2 * outward / zoom))
+        guard let frameDuration, frameDuration > 0 else { return proposed }
+        let step = 2 * frameDuration
+        return min(limits.upperBound, max(limits.lowerBound, (proposed / step).rounded() * step))
+    }
+}
+
 /// Everything drawn around the clips: lanes, the ruler, markers, transition
 /// handles, the snap indicator and the playhead.
 ///
@@ -113,24 +162,95 @@ struct TimelineChromeRenderer {
         context.restoreGState()
     }
 
-    func drawTransition(at point: CGPoint, isSelected: Bool) {
-        guard point.x >= contentLeft - 14 else { return }
-        let radius: CGFloat = isSelected ? 10 : 8
+    func drawTransitionControl(at point: CGPoint, isAdd: Bool, isSelected: Bool) {
+        guard point.x >= contentLeft, point.x <= canvas.maxX,
+              point.y >= TimelineMetrics.rulerHeight, point.y <= canvas.maxY else { return }
+        let rect = CGRect(x: point.x - 9, y: point.y - 9, width: 18, height: 18)
+        let tile = UIBezierPath(roundedRect: rect, cornerRadius: 5)
         context.saveGState()
-        context.setShadow(offset: .zero, blur: 4, color: UIColor.black.withAlphaComponent(0.8).cgColor)
-        let diamond = CGMutablePath()
-        diamond.move(to: CGPoint(x: point.x, y: point.y - radius))
-        diamond.addLine(to: CGPoint(x: point.x + radius, y: point.y))
-        diamond.addLine(to: CGPoint(x: point.x, y: point.y + radius))
-        diamond.addLine(to: CGPoint(x: point.x - radius, y: point.y))
-        diamond.closeSubpath()
-        context.addPath(diamond)
-        context.setFillColor((isSelected ? TimelineTheme.accent : UIColor(white: 0.92, alpha: 1)).cgColor)
+        context.clip(to: CGRect(x: contentLeft, y: 0, width: canvas.maxX - contentLeft, height: canvas.height))
+        context.setShadow(offset: .zero, blur: 3, color: UIColor.black.withAlphaComponent(0.75).cgColor)
+        context.setFillColor((isSelected ? TimelineTheme.accentBright : UIColor(white: 0.94, alpha: 1)).cgColor)
+        context.addPath(tile.cgPath)
         context.fillPath()
-        context.addPath(diamond)
-        context.setStrokeColor(UIColor.black.withAlphaComponent(0.8).cgColor)
+        context.setShadow(offset: .zero, blur: 0)
+        context.setStrokeColor(UIColor.black.withAlphaComponent(0.9).cgColor)
         context.setLineWidth(1.5)
+        context.setLineCap(.round)
+        if isAdd {
+            context.move(to: CGPoint(x: point.x - 4, y: point.y))
+            context.addLine(to: CGPoint(x: point.x + 4, y: point.y))
+            context.move(to: CGPoint(x: point.x, y: point.y - 4))
+            context.addLine(to: CGPoint(x: point.x, y: point.y + 4))
+        } else {
+            for side in [-1.0, 1.0] {
+                let outsideX = point.x + 4 * side
+                context.move(to: CGPoint(x: outsideX, y: point.y - 3.5))
+                context.addLine(to: CGPoint(x: point.x + side, y: point.y))
+                context.addLine(to: CGPoint(x: outsideX, y: point.y + 3.5))
+            }
+        }
         context.strokePath()
+        context.restoreGState()
+    }
+
+    func drawTransitionSpan(_ layout: TimelineTransitionHandleLayout, resizable: Bool) {
+        let band = layout.band
+        guard layout.center.y >= TimelineMetrics.rulerHeight, layout.center.y <= canvas.maxY else { return }
+        context.saveGState()
+        context.clip(to: CGRect(x: contentLeft, y: 0, width: canvas.maxX - contentLeft, height: canvas.height))
+        let span = UIBezierPath(roundedRect: band, cornerRadius: 4)
+        context.addPath(span.cgPath)
+        context.setFillColor(TimelineTheme.accent.withAlphaComponent(0.32).cgColor)
+        context.setStrokeColor(TimelineTheme.accentBright.cgColor)
+        context.setLineWidth(1)
+        context.drawPath(using: .fillStroke)
+
+        if resizable {
+            let left = layout.position(of: .left), right = layout.position(of: .right)
+            if left.x < band.minX {
+                context.setStrokeColor(TimelineTheme.accentBright.withAlphaComponent(0.55).cgColor)
+                context.move(to: left)
+                context.addLine(to: right)
+                context.strokePath()
+            }
+            for edge in [TimelineTransitionHandleLayout.Edge.left, .right] {
+                let point = layout.position(of: edge)
+                let grip = UIBezierPath(roundedRect: CGRect(x: point.x - 5, y: band.minY - 2,
+                                                           width: 10, height: band.height + 4), cornerRadius: 4)
+                context.setFillColor(TimelineTheme.accentBright.cgColor)
+                context.addPath(grip.cgPath)
+                context.fillPath()
+                context.setStrokeColor(UIColor.black.withAlphaComponent(0.8).cgColor)
+                context.setLineWidth(1.5)
+                context.setLineCap(.round)
+                context.move(to: CGPoint(x: point.x, y: point.y - 4))
+                context.addLine(to: CGPoint(x: point.x, y: point.y + 4))
+                context.strokePath()
+            }
+        }
+
+        context.restoreGState()
+    }
+
+    func drawTransitionDuration(_ duration: Double, at point: CGPoint, frameDuration: Double?) {
+        let attributes: [NSAttributedString.Key: Any] = [
+            .font: UIFont.monospacedDigitSystemFont(ofSize: 10, weight: .semibold),
+            .foregroundColor: TimelineTheme.textPrimary
+        ]
+        let format = UserDefaults.standard.string(forKey: DurationDisplayFormat.preferenceKey)
+            .flatMap(DurationDisplayFormat.init(rawValue:)) ?? .defaultValue
+        let rate = frameDuration.flatMap { $0 > 0 ? 1 / $0 : nil }
+        let text = DurationText.string(from: duration, format: format, frameRate: rate) as NSString
+        let size = text.size(withAttributes: attributes)
+        let label = CGRect(x: point.x - size.width / 2 - 5, y: point.y - 9,
+                           width: size.width + 10, height: 18)
+        context.saveGState()
+        context.clip(to: CGRect(x: contentLeft, y: 0, width: canvas.maxX - contentLeft, height: canvas.height))
+        context.setFillColor(TimelineTheme.background.withAlphaComponent(0.94).cgColor)
+        context.addPath(UIBezierPath(roundedRect: label, cornerRadius: 4).cgPath)
+        context.fillPath()
+        text.draw(at: CGPoint(x: label.minX + 5, y: label.midY - size.height / 2), withAttributes: attributes)
         context.restoreGState()
     }
 

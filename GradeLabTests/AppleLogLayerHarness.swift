@@ -62,7 +62,9 @@ final class AppleLogLayerHarness {
                 opacity: Double = 1, transform: CGAffineTransform = .identity,
                 mask authoredMask: LayerMask? = nil, sourceIsSDR: Bool = false,
                 partner: CVPixelBuffer? = nil, blendAmount: Double = 0, canvasSize: CGSize? = nil,
-                sourceCorrection: CGAffineTransform = .identity) throws -> (working: [Float], display: [Float]) {
+                sourceCorrection: CGAffineTransform = .identity,
+                camera: ClipPicturePlacement? = nil,
+                sceneFrame: CGRect? = nil) throws -> (working: [Float], display: [Float]) {
         let sourceSize = CGSize(width: CVPixelBufferGetWidth(source), height: CVPixelBufferGetHeight(source))
         let size = canvasSize ?? sourceSize
         let width = Int(size.width), height = Int(size.height)
@@ -84,8 +86,9 @@ final class AppleLogLayerHarness {
         program.setGrainSeed(0.5)
         var grade = program.uniforms
         var yuv = YUVUniforms.make(for: source, fallbackMatrix: "BT.709")
-        var layer = HDRLayerUniforms(transform: transform, sourceSize: sourceSize, canvasSize: size, opacity: opacity,
-            blendAmount: blendAmount, sourceIsSDR: sourceIsSDR, sourceCorrection: sourceCorrection)
+        var layer = HDRLayerUniforms(transform: camera?.sourceToCanvas ?? transform,
+            sourceSize: sourceSize, canvasSize: size, opacity: opacity, blendAmount: blendAmount,
+            sourceIsSDR: sourceIsSDR, sourceCorrection: sourceCorrection, camera: camera, sceneFrame: sceneFrame)
         var mask = LayerMaskUniforms(authoredMask)
         try renderer.encode(AppleLogSpecialization.key("compositeVideoAppleLog", isLog2: isLog2),
                             into: command, width: width, height: height, tileSize: tile) { enc in

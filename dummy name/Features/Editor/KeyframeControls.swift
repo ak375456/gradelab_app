@@ -349,6 +349,11 @@ struct KeyframePropertyRow: View {
     @Binding var selectedKeyframe: TimelineTime?
     var displayScale: Double = 1
     var suffix = ""
+    var previewedNumber: Double?
+    var previewNumber: ((Double?) -> Void)?
+    var commitNumber: ((Double) -> Void)?
+    @State private var isSliding = false
+    @State private var sliderDraft: Double?
 
     private var isActive: Bool { activeProperty == property }
     private var state: EditorViewModel.KeyframeState { model.keyframeState(property) }
@@ -375,12 +380,12 @@ struct KeyframePropertyRow: View {
                 .accessibilityValue(state == .off ? "Not animated" : "Animated")
                 Spacer(minLength: 4)
                 NumericEntryLabel(title: property.title,
-                                  text: (model.animatableNumber(property).wrappedValue * displayScale)
+                                  text: (sliderValue.wrappedValue * displayScale)
                                     .formatted(.number.precision(.fractionLength(0...2))) + suffix,
-                                  value: model.animatableNumber(property).wrappedValue * displayScale,
+                                  value: sliderValue.wrappedValue * displayScale,
                                   range: (range.lowerBound * displayScale)...(range.upperBound * displayScale),
                                   tint: .primary) { typed in
-                    model.setAnimatableValue(property, .number(typed / displayScale), immediate: true)
+                    commit(typed / displayScale)
                 }
                 .font(.caption.monospacedDigit())
                 // An animated value can only be changed at a frame the clip occupies.
@@ -393,10 +398,10 @@ struct KeyframePropertyRow: View {
             // Double-tap sends the property back to its default. On an animated property
             // that writes a keyframe, exactly like any other value change; the Animation menu
             // is what clears the animation as well.
-            ResettableSlider(value: model.animatableNumber(property), range: range,
+            ResettableSlider(value: sliderValue, range: range,
                              resetValue: property.defaultValue.number ?? 0, label: property.title,
-                             onEditingChanged: { editing in if !editing { model.flushGradeHistory() } },
-                             onReset: { model.setAnimatableValue(property, property.defaultValue, immediate: true) })
+                             onEditingChanged: sliderEditingChanged,
+                             onReset: { commit(property.defaultValue.number ?? 0) })
                 .disabled(state != .off && !inRange)
 
             if isActive {
@@ -410,6 +415,43 @@ struct KeyframePropertyRow: View {
                 }
             }
         }
+        .onChange(of: model.animationTime) { _, _ in cancelDraft() }
+        .onDisappear { cancelDraft() }
+    }
+
+    private var sliderValue: Binding<Double> {
+        let value = model.animatableNumber(property)
+        guard let previewNumber else { return value }
+        return Binding(get: { sliderDraft ?? previewedNumber ?? value.wrappedValue }, set: { number in
+            if isSliding {
+                sliderDraft = number
+                previewNumber(number)
+            } else { commit(number) }
+        })
+    }
+
+    private func sliderEditingChanged(_ editing: Bool) {
+        guard previewNumber != nil else {
+            if !editing { model.flushGradeHistory() }
+            return
+        }
+        isSliding = editing
+        if editing { model.playback.pause() }
+        if !editing, let draft = sliderDraft {
+            sliderDraft = nil
+            commit(draft)
+        }
+    }
+
+    private func cancelDraft() {
+        guard sliderDraft != nil else { return }
+        sliderDraft = nil
+        previewNumber?(nil)
+    }
+
+    private func commit(_ number: Double) {
+        if let commitNumber { commitNumber(number) }
+        else { model.setAnimatableValue(property, .number(number), immediate: true) }
     }
 }
 

@@ -21,6 +21,9 @@ struct LiveTransformPanel: View {
         ScrollView {
             VStack(spacing: 6) {
                 KeyframeSectionHeader(model: model, help: $keyframeHelp, confirmsRemoveAll: $confirmsRemoveAll)
+                if let clip = model.selectedClip {
+                    CameraDepthPicker(model: model, item: .video(clip))
+                }
                 ForEach(properties, id: \.0) { property, range in
                     KeyframePropertyRow(model: model, property: property, range: range,
                                         activeProperty: $activeProperty, selectedKeyframe: $selectedKeyframe)
@@ -33,7 +36,9 @@ struct LiveTransformPanel: View {
                     Spacer()
                     Button("Reset") {
                         model.changeVisual("Reset Transform", immediate: true) {
-                            $0.transform = .init(); $0.opacity = 1; $0.blendMode = .normal; $0.animation = nil
+                            $0.transform = .init(); $0.opacity = 1; $0.blendMode = .normal
+                            $0.animation?.tracks.removeAll { !ClipCamera.properties.contains($0.property) }
+                            if $0.animation?.isEmpty == true { $0.animation = nil }
                         }
                         activeProperty = nil; selectedKeyframe = nil
                     }.font(.caption).frame(height: 44)
@@ -300,7 +305,7 @@ struct LayerMaskOverlay: View {
     }
 
     private func sourceGeometry(in picture: CGRect) -> Geometry? {
-        guard let clip = model.selectedClip,
+        guard let clip = model.cameraProjectedSelectedClip,
               let asset = model.project.assets.first(where: { $0.id == clip.assetID }) else { return nil }
         let sourceSize: CGSize
         let preferred: CGAffineTransform
@@ -313,8 +318,8 @@ struct LayerMaskOverlay: View {
         } else { return nil }
         let canvas = CGSize(width: model.project.canvas.width, height: model.project.canvas.height)
         guard sourceSize.width > 0, sourceSize.height > 0, canvas.width > 0, canvas.height > 0 else { return nil }
-        let placement = LayerCompositor.transform(clip.transform, encoded: sourceSize,
-                                                  preferred: preferred, canvas: canvas)
+        let placement = ClipPicturePlacement(clip: clip, encoded: sourceSize,
+                                             preferred: preferred, canvas: canvas)
         let sourceTopToBottom = CGAffineTransform(a: 1, b: 0, c: 0, d: -1,
                                                   tx: 0, ty: sourceSize.height)
         let canvasBottomToTop = CGAffineTransform(a: 1, b: 0, c: 0, d: -1,
@@ -328,7 +333,7 @@ struct LayerMaskOverlay: View {
             sourceSize: sourceSize,
             sourceToPreview: sourceTopToBottom
                 .concatenating(clip.stabilizationCorrection(at: model.playheadTime.cmTime, size: sourceSize))
-                .concatenating(placement)
+                .concatenating(placement.sourceToCanvas)
                 .concatenating(canvasBottomToTop)
                 .concatenating(canvasToPreview)
         )

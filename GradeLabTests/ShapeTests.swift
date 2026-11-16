@@ -88,10 +88,10 @@ final class ShapeTests: XCTestCase {
         XCTAssertFalse(shapeTrack.accepts(.text(text)))
         // A shape row draws no media, so the timeline gives it the short row a
         // title gets rather than a filmstrip's.
-        XCTAssertTrue(TimelineTrack.Kind.shape.isDrawnOverlay)
-        XCTAssertTrue(TimelineTrack.Kind.text.isDrawnOverlay)
-        XCTAssertFalse(TimelineTrack.Kind.mainVideo.isDrawnOverlay)
-        XCTAssertFalse(TimelineTrack.Kind.audio.isDrawnOverlay)
+        XCTAssertTrue(TimelineTrack.Kind.shape.usesOverlayTiming)
+        XCTAssertTrue(TimelineTrack.Kind.text.usesOverlayTiming)
+        XCTAssertFalse(TimelineTrack.Kind.mainVideo.usesOverlayTiming)
+        XCTAssertFalse(TimelineTrack.Kind.audio.usesOverlayTiming)
     }
 
     /// Every animatable property a shape advertises has to be one it can

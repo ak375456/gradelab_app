@@ -21,12 +21,6 @@ final class SimplifiedChineseCaptureTests: XCTestCase {
     func testCaptureLocalizedWorkspaces() async throws {
         try XCTSkipUnless(Locale.preferredLanguages.first?.hasPrefix("zh") == true,
                           "Run with -testLanguage zh-Hans -testRegion CN for localized captures.")
-        CompositorWarmup.shared.start()
-        let warmupDeadline = Date().addingTimeInterval(90)
-        while !CompositorWarmup.shared.isReady && Date() < warmupDeadline {
-            try await Task.sleep(for: .milliseconds(100))
-        }
-        guard CompositorWarmup.shared.isReady else { throw GradeLabError.rendererInitializationFailed }
         try FileManager.default.createDirectory(at: output, withIntermediateDirectories: true)
         let savedIntroduction = UserDefaults.standard.object(forKey: PhoneColorLayout.introductionSeenKey)
         UserDefaults.standard.set(true, forKey: PhoneColorLayout.introductionSeenKey)

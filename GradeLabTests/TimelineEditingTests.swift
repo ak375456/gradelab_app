@@ -32,6 +32,38 @@ final class TimelineEditingTests: XCTestCase {
         XCTAssertEqual(project, original)
     }
 
+    func testLockingOneMainClipProtectsItsTimeWhileNeighborCanBeTrimmedAndDeleted() throws {
+        var project = project()
+        let first = try XCTUnwrap(project.timeline.firstVideoClip).id
+        let second = try TimelineEditing.split(first, at: .seconds(5), in: &project)
+
+        try TimelineEditing.setClipLocked(true, id: second, in: &project)
+        let locked = try XCTUnwrap(project.timeline.videoClip(id: second))
+        XCTAssertTrue(locked.placement.isLocked)
+        XCTAssertFalse(try XCTUnwrap(project.timeline.videoClip(id: first)).placement.isLocked)
+        XCTAssertFalse(project.timeline.tracks[0].isLocked)
+
+        XCTAssertThrowsError(try TimelineEditing.trimClosingGaps(second, edge: .right, to: .seconds(8), in: &project))
+        try TimelineEditing.trimClosingGaps(first, edge: .right, to: .seconds(4), in: &project)
+        XCTAssertEqual(project.timeline.videoClip(id: first)?.placement.duration, try .seconds(4))
+        XCTAssertEqual(project.timeline.videoClip(id: second), locked)
+        try TimelineEditing.trimClosingGaps(first, edge: .right, to: .seconds(8), in: &project)
+        XCTAssertEqual(project.timeline.videoClip(id: first)?.placement.duration, try .seconds(5))
+        XCTAssertEqual(project.timeline.videoClip(id: second), locked)
+        try TimelineEditing.deleteClosingGaps(first, in: &project)
+        XCTAssertNil(project.timeline.videoClip(id: first))
+        XCTAssertEqual(project.timeline.videoClip(id: second), locked)
+
+        var reopened = try JSONDecoder().decode(VideoProject.self, from: JSONEncoder().encode(project))
+        XCTAssertEqual(reopened.timeline.videoClip(id: second), locked)
+        reopened.timeline.tracks[0].isLocked = true
+        XCTAssertThrowsError(try TimelineEditing.setClipLocked(false, id: second, in: &reopened))
+        reopened.timeline.tracks[0].isLocked = false
+        try TimelineEditing.setClipLocked(false, id: second, in: &reopened)
+        try TimelineEditing.insertMove(second, to: .zero, in: &reopened)
+        XCTAssertEqual(reopened.timeline.videoClip(id: second)?.placement.timelineStart, .zero)
+    }
+
     func testVerticalDragCanLiftMainClipIntoANewOverlayLayer() throws {
         var project = project()
         let first = project.timeline.firstVideoClip!.id
@@ -179,6 +211,44 @@ final class TimelineEditingTests: XCTestCase {
         model.redo()
         XCTAssertEqual(model.project.timeline, lifted)
         XCTAssertEqual(model.history.undoEntries.count, 1)
+    }
+
+    @MainActor
+    func testLayerColorOnlyLabelsItsOwnLayerAndRoundTripsThroughHistory() throws {
+        let model = try EditorViewModel(project: project())
+        model.suspendPreviewForExport()
+        model.addShape()
+        model.addShape()
+        let original = model.project.timeline
+        let shapeTracks = original.tracks.filter { $0.kind == .shape }
+        XCTAssertEqual(shapeTracks.count, 2)
+        let target = try XCTUnwrap(shapeTracks.last)
+        let selection = model.selectedClipID
+        let undoCount = model.history.undoEntries.count
+
+        let uncoloredData = try JSONEncoder().encode(model.project)
+        XCTAssertFalse(String(decoding: uncoloredData, as: UTF8.self).contains("\"labelColor\""))
+        XCTAssertEqual(try JSONDecoder().decode(VideoProject.self, from: uncoloredData).timeline, original)
+
+        model.setTrackColor(target.id, .orange)
+        model.setTrackColor(target.id, .orange)
+
+        var recolored = original
+        let index = try XCTUnwrap(recolored.tracks.firstIndex { $0.id == target.id })
+        recolored.tracks[index].labelColor = .orange
+        XCTAssertEqual(model.project.timeline, recolored)
+        XCTAssertEqual(model.selectedClipID, selection)
+        XCTAssertEqual(model.history.undoEntries.count, undoCount + 1)
+        let saved = try JSONEncoder().encode(model.project)
+        XCTAssertEqual(try JSONDecoder().decode(VideoProject.self, from: saved).timeline, recolored)
+
+        model.undo()
+        XCTAssertEqual(model.project.timeline, original)
+        XCTAssertEqual(model.selectedClipID, selection)
+        model.redo()
+        XCTAssertEqual(model.project.timeline, recolored)
+        model.setTrackColor(target.id, nil)
+        XCTAssertEqual(model.project.timeline, original)
     }
 
     func testMovingBetweenLayersIsAtomicWhenDestinationOverlaps() throws {

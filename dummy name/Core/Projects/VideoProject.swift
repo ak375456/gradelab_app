@@ -126,7 +126,7 @@ struct VideoProject: Codable, Identifiable, Equatable, Sendable {
             // custom compositor: the flat path hands AVFoundation one scaled
             // edit and cannot express a varying rate, and frame blending and
             // optical flow both need two source frames at once.
-            return !clip.placement.isEnabled || clip.transform != VisualTransform() || clip.opacity != 1 ||
+            return !clip.placement.isEnabled || clip.transform != VisualTransform() || clip.camera != nil || clip.opacity != 1 ||
                 clip.blendMode != .normal || clip.resolvedLayerMask.isEnabled ||
                 clip.resolvedBackgroundRemoval != nil || clip.resolvedStabilization != nil || editedAudio || clip.smoothsMotion ||
                 clip.isRamped || clip.isReversed
@@ -184,7 +184,7 @@ struct VideoProject: Codable, Identifiable, Equatable, Sendable {
               clip.assetID == primaryAssetID, clip.placement.timelineStart == .zero,
               clip.sourceRange == primaryAsset.sourceRange,
               clip.placement.duration == primaryAsset.sourceRange.duration,
-              clip.transform == VisualTransform(), clip.opacity == 1, !clip.isAnimated,
+              clip.transform == VisualTransform(), clip.camera == nil, clip.opacity == 1, !clip.isAnimated,
               clip.resolvedBackgroundRemoval == nil,
               !clip.isRetimed,
               clip.embeddedAudio == (metadata.hasAudio ? EmbeddedAudio() : nil),
@@ -215,6 +215,14 @@ struct VideoProject: Codable, Identifiable, Equatable, Sendable {
         var itemIDs = Set<UUID>()
         for track in timeline.tracks {
             if track.kind == .audio { try AudioEditing.validate(track) }
+            if track.kind == .camera {
+                let ordered = track.items.sorted { $0.placement.timelineStart < $1.placement.timelineStart }
+                for (left, right) in zip(ordered, ordered.dropFirst()) {
+                    guard try left.placement.range.end <= right.placement.timelineStart else {
+                        throw TimelineError.invalid(String(localized: "Cameras on the same track cannot overlap."))
+                    }
+                }
+            }
             for item in track.items {
                 guard itemIDs.insert(item.id).inserted, track.accepts(item),
                       item.placement.trackID == track.id,
@@ -222,6 +230,9 @@ struct VideoProject: Codable, Identifiable, Equatable, Sendable {
                     throw TimelineError.invalid(String(localized: "Invalid clip placement or track membership."))
                 }
                 _ = try item.placement.range.end
+                if case .video(let clip) = item, clip.camera?.isValid == false {
+                    throw TimelineError.invalid(String(localized: "Invalid camera framing."))
+                }
                 if case .video(let clip) = item, let linked = clip.embeddedAudio,
                    !linked.volume.isFinite || !(0...1).contains(linked.volume) {
                     throw TimelineError.invalid(String(localized: "Audio volume must be between 0 and 100 percent."))
@@ -277,6 +288,11 @@ struct VideoProject: Codable, Identifiable, Equatable, Sendable {
                 switch item {
                 case .text(let clip): try Self.validateAnimation(clip)
                 case .shape(let clip): try Self.validateAnimation(clip)
+                case .camera(let clip):
+                    guard clip.position.isValid else {
+                        throw TimelineError.invalid(String(localized: "Invalid camera position."))
+                    }
+                    try Self.validateAnimation(clip)
                 case .video(let clip):
                     try Self.validateAnimation(clip)
                     try Self.validateMaskedGrades(clip)
@@ -287,7 +303,7 @@ struct VideoProject: Codable, Identifiable, Equatable, Sendable {
                 switch item {
                 case .video(let clip): sourceRange = clip.sourceRange
                 case .audio(let clip): sourceRange = clip.sourceRange
-                case .text, .shape: sourceRange = nil
+                case .text, .shape, .camera: sourceRange = nil
                 }
                 if let sourceRange {
                     // A clip occupies whatever its time map makes of its source
@@ -527,6 +543,7 @@ struct VideoProject: Codable, Identifiable, Equatable, Sendable {
         // than refused: the relationship is dropped, the layers are untouched,
         // and the document opens. Runs before `validate`, which then treats an
         // unresolvable matte graph as the bug it would be.
+        timeline.migrateLegacyCameras()
         timeline.reconcileTrackMattes()
         try validate()
     }

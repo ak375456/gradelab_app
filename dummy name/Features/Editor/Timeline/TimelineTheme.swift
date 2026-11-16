@@ -60,11 +60,29 @@ enum TimelineTheme {
 
     /// A row's identity colour, used for the clip body and its waveform so an
     /// audio clip, a title and a shape stay distinguishable at a glance.
-    static func tint(for clip: TimelineDisplayClip) -> UIColor {
-        if clip.isAudio { return UIColor(red: 0.325, green: 0.576, blue: 0.965, alpha: 1) }
-        if clip.isText { return UIColor(red: 0.686, green: 0.522, blue: 0.972, alpha: 1) }
-        if clip.isShape { return UIColor(red: 0.322, green: 0.784, blue: 0.706, alpha: 1) }
-        return UIColor(white: 0.46, alpha: 1)
+    static func tint(for kind: TimelineTrack.Kind) -> UIColor {
+        switch kind {
+        case .audio: UIColor(red: 0.325, green: 0.576, blue: 0.965, alpha: 1)
+        case .text: UIColor(red: 0.686, green: 0.522, blue: 0.972, alpha: 1)
+        case .camera: UIColor(red: 0.43, green: 0.65, blue: 1, alpha: 1)
+        case .shape: UIColor(red: 0.322, green: 0.784, blue: 0.706, alpha: 1)
+        case .mainVideo, .videoOverlay: UIColor(white: 0.46, alpha: 1)
+        }
+    }
+}
+
+extension TimelineTrackColor {
+    var tint: UIColor {
+        switch self {
+        case .red: UIColor(red: 1, green: 0.36, blue: 0.37, alpha: 1)
+        case .orange: UIColor(red: 1, green: 0.62, blue: 0.30, alpha: 1)
+        case .yellow: UIColor(red: 0.98, green: 0.83, blue: 0.30, alpha: 1)
+        case .green: UIColor(red: 0.52, green: 0.80, blue: 0.35, alpha: 1)
+        case .teal: UIColor(red: 0.26, green: 0.78, blue: 0.71, alpha: 1)
+        case .blue: UIColor(red: 0.35, green: 0.65, blue: 1, alpha: 1)
+        case .purple: UIColor(red: 0.73, green: 0.53, blue: 1, alpha: 1)
+        case .pink: UIColor(red: 1, green: 0.53, blue: 0.76, alpha: 1)
+        }
     }
 }
 

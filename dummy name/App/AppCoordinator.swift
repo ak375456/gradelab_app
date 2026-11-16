@@ -63,11 +63,6 @@ final class AppCoordinator: ObservableObject {
         self.projectStore = projectStore
         self.cameraRecordingStore = cameraRecordingStore
         self.imageProjectStore = imageProjectStore
-        // Started at launch, not when a tool needs it: the compositing shaders
-        // take real time to compile the first time they are built on a device,
-        // and paying that while someone waits for a frame is what made the first
-        // Transform after a fresh install stall. See `CompositorWarmup`.
-        CompositorWarmup.shared.start()
         Task { await loadProjects() }
         Task { await loadImageProjects() }
     }

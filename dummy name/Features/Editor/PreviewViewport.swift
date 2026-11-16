@@ -9,10 +9,11 @@ extension EnvironmentValues {
     }
 }
 
-/// Tools retain one-finger input; the viewport always accepts two fingers.
+/// Camera gestures own the picture while the Camera tool is adjusting a clip.
 enum PreviewInteraction: Equatable {
     case full
     case pinchOnly
+    case camera
 }
 
 /// Inspection only: picture and tool overlays share one native zoom surface.
@@ -189,6 +190,8 @@ private struct NativePreviewViewport<Content: View>: UIViewRepresentable {
         scroll.delaysContentTouches = false
         scroll.delegate = coordinator
         scroll.panGestureRecognizer.minimumNumberOfTouches = interaction == .full ? 1 : 2
+        scroll.panGestureRecognizer.isEnabled = interaction != .camera
+        scroll.pinchGestureRecognizer?.isEnabled = interaction != .camera
         scroll.addSubview(coordinator.host.view)
         scroll.onLayout = { [weak coordinator, weak scroll] in
             guard let scroll else { return }
@@ -206,6 +209,8 @@ private struct NativePreviewViewport<Content: View>: UIViewRepresentable {
         coordinator.parent = self
         coordinator.host.rootView = content
         scroll.panGestureRecognizer.minimumNumberOfTouches = interaction == .full ? 1 : 2
+        scroll.panGestureRecognizer.isEnabled = interaction != .camera
+        scroll.pinchGestureRecognizer?.isEnabled = interaction != .camera
         coordinator.layout(scroll)
         if coordinator.lastCommand != command.id {
             coordinator.lastCommand = command.id

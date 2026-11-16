@@ -4,8 +4,8 @@ import SwiftUI
 
 /// The tall layout stacks rigid heights. If the picture and the timeline
 /// together ask for more than the window has, SwiftUI does not shrink them — it
-/// lets the mode bar fall off the bottom, and with it the first-run warm-up
-/// notice. These assert the budget adds up on the screens the app ships to.
+/// lets the mode bar fall off the bottom. These assert the budget fits the
+/// screens the app ships to.
 final class EditorWorkspaceBudgetTests: XCTestCase {
 
     /// GeometryReader heights, i.e. the screen minus its safe areas, for the
@@ -20,23 +20,18 @@ final class EditorWorkspaceBudgetTests: XCTestCase {
     ]
 
     /// The whole column, laid out the way `editorLayout` stacks it.
-    private func total(height: CGFloat, preview: CGFloat, timeline: CGFloat,
-                       warmup: Bool) -> CGFloat {
-        preview + timeline + EditorWorkspaceBudget.chrome(showsTimeline: true, showsWarmupNotice: warmup)
+    private func total(preview: CGFloat, timeline: CGFloat) -> CGFloat {
+        preview + timeline + EditorWorkspaceBudget.chrome(showsTimeline: true)
     }
 
     func testPictureAndTimelineTogetherAlwaysLeaveRoomForTheModeBar() {
-        for warmup in [true, false] {
-            for device in heights {
-                let preview = EditorWorkspaceBudget.previewCeiling(
-                    height: device.height, floor: 140, showsTimeline: true, showsWarmupNotice: warmup)
-                let timeline = EditorWorkspaceBudget.timelineCeiling(
-                    height: device.height, previewHeight: preview, showsWarmupNotice: warmup)
-                let used = total(height: device.height, preview: preview, timeline: timeline, warmup: warmup)
-                XCTAssertLessThanOrEqual(
-                    used, device.height + 0.5,
-                    "\(device.name) overflows by \(used - device.height)pt with warmup=\(warmup)")
-            }
+        for device in heights {
+            let preview = EditorWorkspaceBudget.previewCeiling(
+                height: device.height, floor: 140, showsTimeline: true)
+            let timeline = EditorWorkspaceBudget.timelineCeiling(height: device.height, previewHeight: preview)
+            let used = total(preview: preview, timeline: timeline)
+            XCTAssertLessThanOrEqual(used, device.height + 0.5,
+                                     "\(device.name) overflows by \(used - device.height)pt")
         }
     }
 
@@ -47,17 +42,17 @@ final class EditorWorkspaceBudgetTests: XCTestCase {
         let height: CGFloat = 956
         let dragged: CGFloat = 640
         let allowed = EditorWorkspaceBudget.previewCeiling(
-            height: height, floor: 140, showsTimeline: true, showsWarmupNotice: false)
+            height: height, floor: 140, showsTimeline: true)
         XCTAssertLessThan(allowed, dragged, "a workspace stored before the ceiling existed must be reined in")
         XCTAssertGreaterThanOrEqual(
-            height - allowed - EditorWorkspaceBudget.chrome(showsTimeline: true, showsWarmupNotice: false),
+            height - allowed - EditorWorkspaceBudget.chrome(showsTimeline: true),
             EditorWorkspaceBudget.minimumTimeline)
     }
 
     func testTheTimelineNeverGivesUpItsToolbarRulerAndARow() {
         for device in heights {
             let ceiling = EditorWorkspaceBudget.timelineCeiling(
-                height: device.height, previewHeight: device.height * 0.9, showsWarmupNotice: true)
+                height: device.height, previewHeight: device.height * 0.9)
             XCTAssertGreaterThanOrEqual(ceiling, EditorWorkspaceBudget.minimumTimeline, device.name)
         }
         // The floor really does hold a toolbar, a ruler and a row.
@@ -69,9 +64,9 @@ final class EditorWorkspaceBudgetTests: XCTestCase {
     func testHidingTheTimelineHandsItsRoomBackToThePicture() {
         let height: CGFloat = 759
         let withTimeline = EditorWorkspaceBudget.previewCeiling(
-            height: height, floor: 140, showsTimeline: true, showsWarmupNotice: false)
+            height: height, floor: 140, showsTimeline: true)
         let without = EditorWorkspaceBudget.previewCeiling(
-            height: height, floor: 140, showsTimeline: false, showsWarmupNotice: false)
+            height: height, floor: 140, showsTimeline: false)
         XCTAssertGreaterThan(without, withTimeline)
         XCTAssertEqual(without, height * 0.72, accuracy: 0.001)
     }
@@ -83,10 +78,10 @@ final class EditorWorkspaceBudgetTests: XCTestCase {
     /// than clipping it, which is `TimelineCanvas.clipHeight`'s job.
     func testTheDefaultWorkspaceFitsEveryDeviceOnFirstRun() {
         for (name, height) in heights {
-            let preview = defaultPreview(height: height, warmup: true)
+            let preview = defaultPreview(height: height)
             let timeline = EditorWorkspaceBudget.timelineCeiling(
-                height: height, previewHeight: preview, showsWarmupNotice: true)
-            let used = total(height: height, preview: preview, timeline: timeline, warmup: true)
+                height: height, previewHeight: preview)
+            let used = total(preview: preview, timeline: timeline)
             XCTAssertLessThanOrEqual(used, height + 0.5, "\(name) overflows by \(used - height)pt")
 
             let canvas = timeline - TimelineToolbar<EmptyView>.height
@@ -98,22 +93,21 @@ final class EditorWorkspaceBudgetTests: XCTestCase {
     }
 
     /// Anything from a current-generation phone upwards shows the whole
-    /// regular row by default, warm-up notice and all — a filmstrip above a
+    /// regular row by default — a filmstrip above a
     /// waveform, not a squeezed strip.
     func testACurrentPhoneShowsAFullHeightRowOnFirstRun() {
         let oneRow = TimelineToolbar<EmptyView>.height + TimelineMetrics.rowsTop
             + TimelineTrackHeightChoice.regular.points(for: .mainVideo)
         for (name, height) in heights where height >= 759 {
             let ceiling = EditorWorkspaceBudget.timelineCeiling(
-                height: height, previewHeight: defaultPreview(height: height, warmup: true),
-                showsWarmupNotice: true)
+                height: height, previewHeight: defaultPreview(height: height))
             XCTAssertGreaterThanOrEqual(ceiling, oneRow, "\(name) cannot show a whole row on first run")
         }
     }
 
     /// `previewHeight`'s untouched default for a single-track project.
-    private func defaultPreview(height: CGFloat, warmup: Bool) -> CGFloat {
+    private func defaultPreview(height: CGFloat) -> CGFloat {
         min(height * 0.40, EditorWorkspaceBudget.previewCeiling(
-            height: height, floor: 140, showsTimeline: true, showsWarmupNotice: warmup))
+            height: height, floor: 140, showsTimeline: true))
     }
 }
