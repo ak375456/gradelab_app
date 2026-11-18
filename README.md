@@ -59,6 +59,29 @@ Paths beginning with `Core/` in the table are relative to `dummy name/`.
 Xcode uses synchronized groups for `dummy name/` and `GradeLabTests/`; files
 placed inside those trees may become app/test inputs automatically.
 
+## Feedback in Firebase
+
+In the GradeLab Firebase project, open **Firestore → Data → feedback** and
+select a report. Edit its `developer` string to reply. The sender sees the reply
+under **Settings → Feedback** when they reopen the screen or check for a reply.
+Keep the field empty to hide the reply.
+
+If the report has a screenshot, the following command saves it as a JPEG using
+the active `gcloud` account with Firestore read access:
+
+```sh
+python3 Scripts/download_feedback_screenshot.py DOCUMENT_ID /tmp/feedback.jpg
+```
+
+To free space while keeping a report and its reply, remove only its
+`screenshot` field. To let the same device submit again, delete the entire
+report. The app removes the local receipt after its next successful check
+in Settings → Feedback.
+The updated app keeps the private report ID and sent message in the device’s Keychain. Treat
+Firestore document IDs beginning with `report_` as private links. The app uses
+the ID to read the report and its reply without a sign-in. Older reports do
+not have a reply screen.
+
 ## Implementation boundaries
 
 - Video and photos share `GradeSettings` and Metal grading functions. Preserve

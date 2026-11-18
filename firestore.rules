@@ -1,0 +1,50 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function shortText(value, limit) {
+      return value is string && value.size() > 0 && value.size() <= limit;
+    }
+
+    function validDiagnostics(details) {
+      return details is map
+        && details.keys().hasOnly(['appVersion', 'appBuild', 'os', 'osVersion', 'deviceModel'])
+        && shortText(details.appVersion, 32)
+        && shortText(details.appBuild, 32)
+        && shortText(details.os, 32)
+        && shortText(details.osVersion, 32)
+        && shortText(details.deviceModel, 80);
+    }
+
+    match /feedback/{id} {
+      function isPrivateReport() {
+        return id.matches('report_[0-9a-f]{8}(-[0-9a-f]{4}){3}-[0-9a-f]{12}');
+      }
+
+      function validReport() {
+        return request.resource.data.category in ['issue', 'suggestion', 'other']
+          && request.resource.data.area in ['general', 'importMedia', 'editing', 'camera', 'export', 'purchases']
+          && shortText(request.resource.data.message, 4000)
+          && request.resource.data.message.matches('(?s).*[^[:space:]].*')
+          && request.resource.data.createdAt == request.time
+          && (!('diagnostics' in request.resource.data) || validDiagnostics(request.resource.data.diagnostics));
+      }
+
+      // The ID is a private lookup key. Collection queries and client edits are denied.
+      allow get: if isPrivateReport();
+      allow create: if validReport() && (
+        (isPrivateReport()
+          && request.resource.data.keys().hasOnly([
+            'category', 'area', 'message', 'diagnostics', 'createdAt', 'screenshot', 'developer'
+          ])
+          && request.resource.data.developer == ''
+          && (!('screenshot' in request.resource.data)
+            || (request.resource.data.screenshot is bytes
+              && request.resource.data.screenshot.size() > 0
+              && request.resource.data.screenshot.size() <= 300000)))
+        // Keep text-only feedback working in older builds. Legacy IDs cannot read reports.
+        || (id.matches('[0-9a-f]{8}(-[0-9a-f]{4}){3}-[0-9a-f]{12}')
+          && request.resource.data.keys().hasOnly(['category', 'area', 'message', 'diagnostics', 'createdAt']))
+      );
+    }
+  }
+}

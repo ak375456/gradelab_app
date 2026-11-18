@@ -8,6 +8,9 @@ struct HomeView: View {
     @State private var importingImage = false
     @State private var importFromFiles = AppPlatform.isMac
     @State private var settings = false
+    @State private var showsFeedback = false
+    @AppStorage(FeedbackReportStore.bannerDismissedKey) private var feedbackBannerDismissed = false
+    @State private var checkedFeedbackBanner = false
     @State private var pendingDeletion: RecentProject?
     @State private var pendingCameraDeletion: CameraRecording?
     @ObservedObject private var store = ProStore.shared
@@ -38,6 +41,7 @@ struct HomeView: View {
                             .transition(.scale(scale: 0.96, anchor: .top).combined(with: .opacity))
                     }
                     unlockPro
+                    if checkedFeedbackBanner && !feedbackBannerDismissed { feedbackBanner }
                     importHero
                     pendingCaptures
                     recentProjects
@@ -57,6 +61,16 @@ struct HomeView: View {
         // the way the same slider behaves in the editor.
         .numericEntryHost()
         .sheet(isPresented: $settings) { EditorSettings() }
+        .sheet(isPresented: $showsFeedback) {
+            NavigationStack {
+                FeedbackView()
+                    .toolbar {
+                        ToolbarItem(placement: .confirmationAction) {
+                            Button("Done") { showsFeedback = false }
+                        }
+                    }
+            }
+        }
         .sheet(isPresented: $paywall) { PaywallView() }
         .modifier(MediaImportPicker(isPresented: $importPicker, images: importingImage,
                                     allowsMultipleSelection: !importingImage, useFiles: importFromFiles,
@@ -73,6 +87,52 @@ struct HomeView: View {
             if phase != .active { grade.persist() }
         }
         .task { await store.loadProducts() }
+        .task {
+            if !feedbackBannerDismissed, (try? await FeedbackService.localReceipt()) != nil {
+                feedbackBannerDismissed = true
+            }
+            checkedFeedbackBanner = true
+        }
+    }
+
+    private var feedbackBanner: some View {
+        HStack(alignment: .top, spacing: 0) {
+            Button { showsFeedback = true } label: {
+                HStack(alignment: .top, spacing: AppSpacing.compact) {
+                    Image(systemName: "bubble.left")
+                        .font(AppTypography.headline)
+                        .foregroundStyle(grade.accent)
+                        .accessibilityHidden(true)
+                    VStack(alignment: .leading, spacing: AppSpacing.xSmall) {
+                        Text("Send anonymous feedback")
+                            .font(AppTypography.bodyEmphasized)
+                            .foregroundStyle(AppColors.textPrimary)
+                        Text("Goes directly to the developer. No sign-in required.")
+                            .font(AppTypography.caption)
+                            .foregroundStyle(AppColors.textSecondary)
+                    }
+                    .fixedSize(horizontal: false, vertical: true)
+                }
+                .multilineTextAlignment(.leading)
+                .padding(.leading, AppSpacing.standard)
+                .padding(.vertical, AppSpacing.compact)
+                .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
+                .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            .accessibilityElement(children: .combine)
+
+            Button { feedbackBannerDismissed = true } label: {
+                Image(systemName: "xmark")
+                    .font(AppTypography.sectionLabel)
+                    .foregroundStyle(AppColors.textSecondary)
+                    .frame(width: 44, height: 44)
+                    .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel("Dismiss feedback banner")
+        }
+        .appSurface()
     }
 
     /// Opening the panel is what counts as finding it: the invitation on the

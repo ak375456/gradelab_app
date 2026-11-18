@@ -614,6 +614,15 @@ struct EditorSettings: View {
     var body: some View {
         NavigationStack {
             Form {
+                Section("Support") {
+                    NavigationLink {
+                        FeedbackView()
+                    } label: {
+                        settingsLink(String(localized: "Feedback"), "bubble.left",
+                                     String(localized: "Send anonymous feedback or check for a reply."),
+                                     opensInBrowser: false)
+                    }
+                }
                 if !AppPlatform.isMac && UIDevice.current.userInterfaceIdiom == .phone {
                     PhoneColorLayoutSettings()
                 }
@@ -739,12 +748,12 @@ struct EditorSettings: View {
                         }
                     }
                 } header: { Text("About") }
-                  footer: { Text("GradeLab collects no data. No accounts, no analytics, no advertising and no trackers — your footage never leaves this device.") }
+                  footer: { Text("GradeLab sends feedback and any screenshot you attach when you choose to submit it.") }
             }.navigationTitle("Settings").navigationBarTitleDisplayMode(.inline).toolbar { Button("Done") { dismiss() } }
         }.preferredColorScheme(.dark)
     }
 
-    private func settingsLink(_ title: String, _ icon: String, _ detail: String) -> some View {
+    private func settingsLink(_ title: String, _ icon: String, _ detail: String, opensInBrowser: Bool = true) -> some View {
         HStack(alignment: .top, spacing: 12) {
             Image(systemName: icon)
                 .font(.system(size: 15))
@@ -755,12 +764,14 @@ struct EditorSettings: View {
                 Text(detail).font(.caption).foregroundStyle(AppColors.textSecondary)
             }
             Spacer(minLength: 0)
-            Image(systemName: "arrow.up.right")
-                .font(.caption2)
-                .foregroundStyle(AppColors.textTertiary)
+            if opensInBrowser {
+                Image(systemName: "arrow.up.right")
+                    .font(.caption2)
+                    .foregroundStyle(AppColors.textTertiary)
+            }
         }
         .padding(.vertical, 2)
         .accessibilityElement(children: .combine)
-        .accessibilityHint("Opens in your browser")
+        .accessibilityHint(Text(opensInBrowser ? "Opens in your browser" : ""))
     }
 }
