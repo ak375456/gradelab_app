@@ -56845,6 +56845,9 @@
         }
       }
     },
+    "If the developer replies, it will appear here. You can send another report if this one is deleted." : {
+
+    },
     "Image" : {
       "localizations" : {
         "de" : {
@@ -137975,10 +137978,7 @@
         }
       }
     },
-    "You can send one report and check back here for a reply." : {
-
-    },
-    "You can send one report. If the developer replies, it will appear here." : {
+    "You can have one report at a time. Check back here for a reply." : {
 
     },
     "You can switch between Compact and Classic anytime. Open the ••• menu at the top of the editor → %@ → iPhone Color workspace." : {
